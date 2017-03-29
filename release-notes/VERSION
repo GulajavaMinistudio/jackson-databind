@@ -13,6 +13,8 @@ Project: jackson-databind
  (reported by Starkom@github)
 #357: StackOverflowError with contentConverter that returns array type
  (reported by Florian S)
+#383: Recursive `@JsonUnwrapped` (`child` with same type) fail: "No _valueDeserializer assigned"
+ (reported by tdavis@github)
 #403: Make FAIL_ON_NULL_FOR_PRIMITIVES apply to primitive arrays and other types that wrap primitives
  (reported by Harleen S)
 #476: Allow "Serialize as POJO" using `@JsonFormat(shape=Shape.OBJECT)` class annotation
@@ -58,6 +60,8 @@ Project: jackson-databind
  (suggested by PawelJagus@github)
 #1454: Support `@JsonFormat.lenient` for `java.util.Date`, `java.util.Calendar`
 #1474: Replace use of `Class.newInstance()` (deprecated in Java 9) with call via Constructor
+#1480: Add support for serializing `boolean`/`Boolean` as number (0 or 1)
+ (suggested by jwilmoth@github)
 #1520: Case insensitive enum deserialization feature.
  (contributed by Ana-Eliza B)
 #1544: EnumMapDeserializer assumes a pure EnumMap and does not support EnumMap derived classes
@@ -78,6 +82,9 @@ Project: jackson-databind
  (reported by Alex P)
 #1570: `Enum` key for `Map` ignores `SerializationFeature.WRITE_ENUMS_USING_INDEX`
  (reported by SolaKun@github)
+#1573: Missing properties when deserializing using a builder class with a non-default
+  constructor and a mutator annotated with `@JsonUnwrapped`
+ (reported by Joshua J)
 #1575: Problem with `@JsonIgnoreProperties` on recursive property (regression in 2.8)
  (reported by anujkumar04@github)
 - Minor fix to creation of `PropertyMetadata`, had one path that could lead to NPE
