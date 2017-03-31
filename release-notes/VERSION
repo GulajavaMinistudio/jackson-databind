@@ -62,7 +62,7 @@ Project: jackson-databind
 #1474: Replace use of `Class.newInstance()` (deprecated in Java 9) with call via Constructor
 #1480: Add support for serializing `boolean`/`Boolean` as number (0 or 1)
  (suggested by jwilmoth@github)
-#1520: Case insensitive enum deserialization feature.
+#1520: Case insensitive enum deserialization with `MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS`
  (contributed by Ana-Eliza B)
 #1544: EnumMapDeserializer assumes a pure EnumMap and does not support EnumMap derived classes
  (reported by Lyor G)
@@ -77,6 +77,9 @@ Project: jackson-databind
 2.8.8 (not yet released)
 
 (partial) #994: `DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS` only works for POJOs, Maps
+#1345: `@JsonProperty(access = READ_ONLY)` together with generated constructor (Lombok) causes
+ exception: "Could not find creator property with name ..."
+ (reported by Raniz85@github)
 #1533: `AsPropertyTypeDeserializer` ignores `DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
 #1543: JsonFormat.Shape.NUMBER_INT does not work when defined on enum type in 2.8
  (reported by Alex P)
