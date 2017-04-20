@@ -27,6 +27,17 @@ public class BooleanFormatTest extends BaseMapTest
         }
     }
 
+    /**
+     * Simple wrapper around boolean types, usually to test value
+     * conversions or wrapping
+     */
+    protected static class BooleanWrapper {
+        public Boolean b;
+
+        public BooleanWrapper() { }
+        public BooleanWrapper(Boolean value) { b = value; }
+    }
+
     static class AltBoolean extends BooleanWrapper
     {
         public AltBoolean() { }
@@ -39,13 +50,13 @@ public class BooleanFormatTest extends BaseMapTest
     /**********************************************************
      */
 
-    private final static ObjectMapper MAPPER = new ObjectMapper();
+    private final static ObjectMapper MAPPER = newObjectMapper();
 
     public void testShapeViaDefaults() throws Exception
     {
         assertEquals(aposToQuotes("{'b':true}"),
                 MAPPER.writeValueAsString(new BooleanWrapper(true)));
-        ObjectMapper m = new ObjectMapper();
+        ObjectMapper m = newObjectMapper();
         m.configOverride(Boolean.class)
             .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.NUMBER));
         assertEquals(aposToQuotes("{'b':1}"),
