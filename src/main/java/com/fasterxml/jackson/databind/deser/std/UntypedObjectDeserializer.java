@@ -200,9 +200,8 @@ public class UntypedObjectDeserializer
 
     @Override // since 2.9
     public Boolean supportsUpdate(DeserializationConfig config) {
-        // 23-Oct-2016, tatu: In theory, some values would be updateable (Maps, Collections),
-        //    but seems very error prone, so for now declare that we do not support it.
-        return Boolean.FALSE;
+        // 21-Apr-2017, tatu: Bit tricky... some values, yes. So let's say "dunno"
+        return null;
     }
 
     @Override
@@ -325,6 +324,74 @@ public class UntypedObjectDeserializer
         return ctxt.handleUnexpectedToken(Object.class, p);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override // since 2.9 (to support deep merge)
+    public Object deserialize(JsonParser p, DeserializationContext ctxt, Object intoValue)
+        throws IOException
+    {
+        switch (p.getCurrentTokenId()) {
+        case JsonTokenId.ID_START_OBJECT:
+        case JsonTokenId.ID_FIELD_NAME:
+            // 28-Oct-2015, tatu: [databind#989] We may also be given END_OBJECT (similar to FIELD_NAME),
+            //    if caller has advanced to the first token of Object, but for empty Object
+        case JsonTokenId.ID_END_OBJECT:
+            if (_mapDeserializer != null) {
+                return _mapDeserializer.deserialize(p, ctxt, intoValue);
+            }
+            if (intoValue instanceof Map<?,?>) {
+                return mapObject(p, ctxt, (Map<Object,Object>) intoValue);
+            }
+            return mapObject(p, ctxt);
+        case JsonTokenId.ID_START_ARRAY:
+            if (_listDeserializer != null) {
+                return _listDeserializer.deserialize(p, ctxt, intoValue);
+            }
+            if (intoValue instanceof Collection<?>) {
+                return mapArray(p, ctxt, (Collection<Object>) intoValue);
+            }
+            if (ctxt.isEnabled(DeserializationFeature.USE_JAVA_ARRAY_FOR_JSON_ARRAY)) {
+                return mapArrayToArray(p, ctxt);
+            }
+            return mapArray(p, ctxt);
+        case JsonTokenId.ID_EMBEDDED_OBJECT:
+            return p.getEmbeddedObject();
+        case JsonTokenId.ID_STRING:
+            if (_stringDeserializer != null) {
+                return _stringDeserializer.deserialize(p, ctxt, intoValue);
+            }
+            return p.getText();
+
+        case JsonTokenId.ID_NUMBER_INT:
+            if (_numberDeserializer != null) {
+                return _numberDeserializer.deserialize(p, ctxt, intoValue);
+            }
+            if (ctxt.hasSomeOfFeatures(F_MASK_INT_COERCIONS)) {
+                return _coerceIntegral(p, ctxt);
+            }
+            return p.getNumberValue();
+
+        case JsonTokenId.ID_NUMBER_FLOAT:
+            if (_numberDeserializer != null) {
+                return _numberDeserializer.deserialize(p, ctxt, intoValue);
+            }
+            if (ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                return p.getDecimalValue();
+            }
+            return p.getNumberValue();
+        case JsonTokenId.ID_TRUE:
+            return Boolean.TRUE;
+        case JsonTokenId.ID_FALSE:
+            return Boolean.FALSE;
+
+        case JsonTokenId.ID_NULL:
+            // 21-Apr-2017, tatu: May need to consider "skip nulls" at some point but...
+            return null;
+        default:
+        }
+        // easiest to just delegate to "dumb" version for the rest?
+        return deserialize(p, ctxt);
+    }
+
     /*
     /**********************************************************
     /* Internal methods
@@ -371,6 +438,17 @@ public class UntypedObjectDeserializer
         // let's create full array then
         ArrayList<Object> result = new ArrayList<Object>(totalSize);
         buffer.completeAndClearBuffer(values, ptr, result);
+        return result;
+    }
+
+    protected Object mapArray(JsonParser p, DeserializationContext ctxt,
+            Collection<Object> result) throws IOException
+    {
+        // we start by pointing to START_ARRAY. Also, no real merging; array/Collection
+        // just appends always
+        while (p.nextToken() != JsonToken.END_ARRAY) {
+            result.add(deserialize(p, ctxt));
+        }
         return result;
     }
 
@@ -456,6 +534,36 @@ public class UntypedObjectDeserializer
         return buffer.completeAndClearBuffer(values, ptr);
     }
 
+    protected Object mapObject(JsonParser p, DeserializationContext ctxt,
+            Map<Object,Object> m) throws IOException
+    {
+        JsonToken t = p.getCurrentToken();
+        if (t == JsonToken.START_OBJECT) {
+            t = p.nextToken();
+        }
+        if (t == JsonToken.END_OBJECT) {
+            return m;
+        }
+        // NOTE: we are guaranteed to point to FIELD_NAME
+        String key = p.getCurrentName();
+        do {
+            p.nextToken();
+            // and possibly recursive merge here
+            Object old = m.get(key);
+            Object newV;
+
+            if (old != null) {
+                newV = deserialize(p, ctxt, old);
+            } else {
+                newV = deserialize(p, ctxt);
+            }
+            if (newV != old) {
+                m.put(key, newV);
+            }
+        } while ((key = p.nextFieldName()) != null);
+        return m;
+    }
+
     /*
     /**********************************************************
     /* Separate "vanilla" implementation for common case of
@@ -475,9 +583,8 @@ public class UntypedObjectDeserializer
 
         @Override // since 2.9
         public Boolean supportsUpdate(DeserializationConfig config) {
-            // 23-Oct-2016, tatu: In theory, some values would be updateable (Maps, Collections),
-            //    but seems very error prone, so for now declare that we do not support it.
-            return Boolean.FALSE;
+            // 21-Apr-2017, tatu: Bit tricky... some values, yes. So let's say "dunno"
+            return null;
         }
 
         @Override
@@ -581,6 +688,68 @@ public class UntypedObjectDeserializer
             return ctxt.handleUnexpectedToken(Object.class, p);
         }
 
+        @SuppressWarnings("unchecked")
+        @Override // since 2.9 (to support deep merge)
+        public Object deserialize(JsonParser p, DeserializationContext ctxt, Object intoValue)
+            throws IOException
+        {
+            switch (p.getCurrentTokenId()) {
+            case JsonTokenId.ID_END_OBJECT:
+            case JsonTokenId.ID_END_ARRAY:
+                return intoValue;
+            case JsonTokenId.ID_START_OBJECT:
+                {
+                    JsonToken t = p.nextToken(); // to get to FIELD_NAME or END_OBJECT
+                    if (t == JsonToken.END_OBJECT) {
+                        return intoValue;
+                    }
+                }
+            case JsonTokenId.ID_FIELD_NAME:
+                if (intoValue instanceof Map<?,?>) {
+                    Map<Object,Object> m = (Map<Object,Object>) intoValue;
+                    // NOTE: we are guaranteed to point to FIELD_NAME
+                    String key = p.getCurrentName();
+                    do {
+                        p.nextToken();
+                        // and possibly recursive merge here
+                        Object old = m.get(key);
+                        Object newV;
+                        if (old != null) {
+                            newV = deserialize(p, ctxt, old);
+                        } else {
+                            newV = deserialize(p, ctxt);
+                        }
+                        if (newV != old) {
+                            m.put(key, newV);
+                        }
+                    } while ((key = p.nextFieldName()) != null);
+                    return intoValue;
+                }
+                break;
+            case JsonTokenId.ID_START_ARRAY:
+                {
+                    JsonToken t = p.nextToken(); // to get to FIELD_NAME or END_OBJECT
+                    if (t == JsonToken.END_ARRAY) {
+                        return intoValue;
+                    }
+                }
+
+                if (intoValue instanceof Collection<?>) {
+                    Collection<Object> c = (Collection<Object>) intoValue;
+                    // NOTE: merge for arrays/Collections means append, can't merge contents
+                    do {
+                        c.add(deserialize(p, ctxt));
+                    } while (p.nextToken() != JsonToken.END_ARRAY);
+                    return intoValue;
+                }
+                // 21-Apr-2017, tatu: Should we try to support merging of Object[] values too?
+                //    ... maybe future improvement
+                break;
+            }
+            // Easiest handling for the rest, delegate. Only (?) question: how about nulls?
+            return deserialize(p, ctxt);
+        }
+
         protected Object mapArray(JsonParser p, DeserializationContext ctxt) throws IOException
         {
             Object value = deserialize(p, ctxt);
@@ -618,6 +787,24 @@ public class UntypedObjectDeserializer
         }
 
         /**
+         * Method called to map a JSON Array into a Java Object array (Object[]).
+         */
+        protected Object[] mapArrayToArray(JsonParser p, DeserializationContext ctxt) throws IOException {
+            ObjectBuffer buffer = ctxt.leaseObjectBuffer();
+            Object[] values = buffer.resetAndStart();
+            int ptr = 0;
+            do {
+                Object value = deserialize(p, ctxt);
+                if (ptr >= values.length) {
+                    values = buffer.appendCompletedChunk(values);
+                    ptr = 0;
+                }
+                values[ptr++] = value;
+            } while (p.nextToken() != JsonToken.END_ARRAY);
+            return buffer.completeAndClearBuffer(values, ptr);
+        }
+
+        /**
          * Method called to map a JSON Object into a Java value.
          */
         protected Object mapObject(JsonParser p, DeserializationContext ctxt) throws IOException
@@ -652,24 +839,6 @@ public class UntypedObjectDeserializer
                 result.put(key, deserialize(p, ctxt));
             } while ((key = p.nextFieldName()) != null);
             return result;
-        }
-
-        /**
-         * Method called to map a JSON Array into a Java Object array (Object[]).
-         */
-        protected Object[] mapArrayToArray(JsonParser p, DeserializationContext ctxt) throws IOException {
-            ObjectBuffer buffer = ctxt.leaseObjectBuffer();
-            Object[] values = buffer.resetAndStart();
-            int ptr = 0;
-            do {
-                Object value = deserialize(p, ctxt);
-                if (ptr >= values.length) {
-                    values = buffer.appendCompletedChunk(values);
-                    ptr = 0;
-                }
-                values[ptr++] = value;
-            } while (p.nextToken() != JsonToken.END_ARRAY);
-            return buffer.completeAndClearBuffer(values, ptr);
         }
     }
 }
