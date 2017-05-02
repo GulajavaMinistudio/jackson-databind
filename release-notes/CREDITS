@@ -647,3 +647,11 @@ Jared Jacobs (2is10@github)
   * Requested #1605: Allow serialization of `InetAddress` as simple numeric host address
    (2.9.0)
 
+Patrick Gunia (pgunia@github)
+  * Reported #1440: Wrong `JsonStreamContext` in `DeserializationProblemHandler` when reading
+  `TokenBuffer` content
+   (2.9.0)
+
+Carsten Wickner (CarstenWickner@github)
+  * Contributed #1522: Global `@JsonInclude(Include.NON_NULL)` for all properties with a specific type
+   (2.9.0)

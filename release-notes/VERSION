@@ -55,6 +55,9 @@ Project: jackson-databind
 #1433: `ObjectMapper.convertValue()` with null does not consider null conversions
   (`JsonDeserializer.getNullValue()`)
  (contributed by jdmichal@github)
+#1440: Wrong `JsonStreamContext` in `DeserializationProblemHandler` when reading
+  `TokenBuffer` content
+ (reported by Patrick G)
 #1444: Change `ObjectMapper.setSerializationInclusion()` to apply to content inclusion too
 #1450: `SimpleModule.addKeyDeserializer()' should throw `IllegalArgumentException` if `null`
   reference of `KeyDeserializer` passed
@@ -65,6 +68,8 @@ Project: jackson-databind
  (suggested by jwilmoth@github)
 #1520: Case insensitive enum deserialization with `MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS`
  (contributed by Ana-Eliza B)
+#1522: Global `@JsonInclude(Include.NON_NULL)` for all properties with a specific type
+ (contributed by Carsten W)
 #1544: EnumMapDeserializer assumes a pure EnumMap and does not support EnumMap derived classes
  (reported by Lyor G)
 #1550: Unexpected behavior with `@JsonInclude(JsonInclude.Include.NON_EMPTY)` and
