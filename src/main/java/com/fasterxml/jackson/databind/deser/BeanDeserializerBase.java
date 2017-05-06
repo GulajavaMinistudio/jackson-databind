@@ -666,9 +666,8 @@ public abstract class BeanDeserializerBase
 
         // First: may have an override for Object Id:
         final AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
-        final AnnotatedMember accessor = (property == null || intr == null)
-                ? null : property.getMember();
-        if (accessor != null && intr != null) {
+        final AnnotatedMember accessor = _neitherNull(property, intr) ? property.getMember() : null;
+        if (accessor != null) {
             ObjectIdInfo objectIdInfo = intr.findObjectIdInfo(accessor);
             if (objectIdInfo != null) { // some code duplication here as well (from BeanDeserializerFactory)
                 // 2.1: allow modifications by "id ref" annotations as well:
@@ -690,7 +689,7 @@ public abstract class BeanDeserializerBase
                     }
                     idType = idProp.getType();
                     idGen = new PropertyBasedObjectIdGenerator(objectIdInfo.getScope());
-                } else { // other types need to be simpler
+                } else { // other types are to be simpler
                     JavaType type = ctxt.constructType(implClass);
                     idType = ctxt.getTypeFactory().findTypeParameters(type, ObjectIdGenerator.class)[0];
                     idProp = null;
@@ -1040,7 +1039,7 @@ public abstract class BeanDeserializerBase
     {
         SettableBeanProperty prop = (_beanProperties == null) ?
                 null : _beanProperties.find(propertyName);
-        if (prop == null && _propertyBasedCreator != null) {
+        if (_neitherNull(prop, _propertyBasedCreator)) {
             prop = _propertyBasedCreator.findCreatorProperty(propertyName);
         }
         return prop;
@@ -1060,7 +1059,7 @@ public abstract class BeanDeserializerBase
     {
         SettableBeanProperty prop = (_beanProperties == null) ?
                 null : _beanProperties.find(propertyIndex);
-        if (prop == null && _propertyBasedCreator != null) {
+        if (_neitherNull(prop, _propertyBasedCreator)) {
             prop = _propertyBasedCreator.findCreatorProperty(propertyIndex);
         }
         return prop;

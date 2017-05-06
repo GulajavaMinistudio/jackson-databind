@@ -1123,7 +1123,7 @@ public abstract class DeserializationContext
      * actual type; usually since there is no mapping defined.
      * Default implementation will try to call {@link DeserializationProblemHandler#handleUnknownTypeId}
      * on configured handlers, if any, to allow for recovery; if recovery does not
-     * succeed, will throw exception constructed with {@link #unknownTypeIdException}.
+     * succeed, will throw exception constructed with {@link #invalidTypeIdException}.
      *
      * @param baseType Base type from which resolution starts
      * @param id Type id that could not be converted
@@ -1558,17 +1558,7 @@ public abstract class DeserializationContext
         return InvalidDefinitionException.from(_parser, msg, type);
     }
 
-    /**
-     * Helper method for constructing exception to indicate that given type id
-     * could not be resolved to a valid subtype of specified base type, during
-     * polymorphic deserialization.
-     *<p>
-     * Note that most of the time this method should NOT be called; instead,
-     * {@link #handleUnknownTypeId} should be called which will call this method
-     * if necessary.
-     *
-     * @since 2.9
-     */
+    @Override
     public JsonMappingException invalidTypeIdException(JavaType baseType, String typeId,
             String extraDesc) {
         String msg = String.format("Could not resolve type id '%s' as a subtype of %s",
