@@ -727,11 +727,22 @@ public final class TypeFactory
      * for contained types.
      */
     public CollectionType constructCollectionType(Class<? extends Collection> collectionClass,
-            JavaType elementType) {
-        // 19-Oct-2015, tatu: Allow case of no-type-variables, since it seems likely to be
-        //    a valid use case here
-        return (CollectionType) _fromClass(null, collectionClass,
-                TypeBindings.create(collectionClass, elementType));
+            JavaType elementType)
+    {
+        TypeBindings bindings = TypeBindings.createIfNeeded(collectionClass, elementType);
+        CollectionType result = (CollectionType) _fromClass(null, collectionClass, bindings);
+        // 17-May-2017, tatu: As per [databind#1415], we better verify bound values if (but only if)
+        //    type being resolved was non-generic (i.e.element type was ignored)
+        if (bindings.isEmpty() && (elementType != null)) {
+            JavaType t = result.findSuperType(Collection.class);
+            JavaType realET = t.getContentType();
+            if (!realET.equals(elementType)) {
+                throw new IllegalArgumentException(String.format(
+                        "Non-generic Collection class %s did not resolve to something with element type %s but %s ",
+                        ClassUtil.nameOf(collectionClass), elementType, realET));
+            }
+        }
+        return result;
     }
 
     /**
@@ -785,8 +796,26 @@ public final class TypeFactory
      * for contained types.
      */
     public MapType constructMapType(Class<? extends Map> mapClass, JavaType keyType, JavaType valueType) {
-        return (MapType) _fromClass(null, mapClass,
-                TypeBindings.create(mapClass, keyType, valueType));
+        TypeBindings bindings = TypeBindings.createIfNeeded(mapClass, new JavaType[] { keyType, valueType });
+        MapType result = (MapType) _fromClass(null, mapClass, bindings);
+        // 17-May-2017, tatu: As per [databind#1415], we better verify bound values if (but only if)
+        //    type being resolved was non-generic (i.e.element type was ignored)
+        if (bindings.isEmpty()) {
+            JavaType t = result.findSuperType(Map.class);
+            JavaType realKT = t.getKeyType();
+            if (!realKT.equals(keyType)) {
+                throw new IllegalArgumentException(String.format(
+                        "Non-generic Map class %s did not resolve to something with key type %s but %s ",
+                        ClassUtil.nameOf(mapClass), keyType, realKT));
+            }
+            JavaType realVT = t.getContentType();
+            if (!realVT.equals(valueType)) {
+                throw new IllegalArgumentException(String.format(
+                        "Non-generic Map class %s did not resolve to something with value type %s but %s ",
+                        ClassUtil.nameOf(mapClass), valueType, realVT));
+            }
+        }
+        return result;
     }
 
     /**
@@ -874,15 +903,15 @@ public final class TypeFactory
      * type <code>List&lt;Set&lt;Integer>></code>, you could
      * call
      *<pre>
-     *  JavaType inner = TypeFactory.constructParametrizedType(Set.class, Set.class, Integer.class);
-     *  return TypeFactory.constructParametrizedType(ArrayList.class, List.class, inner);
+     *  JavaType inner = TypeFactory.constructParametricType(Set.class, Set.class, Integer.class);
+     *  return TypeFactory.constructParametricType(ArrayList.class, List.class, inner);
      *</pre>
      *<p>
      * The reason for first two arguments to be separate is that parameterization may
      * apply to a super-type. For example, if generic type was instead to be
      * constructed for <code>ArrayList&lt;Integer></code>, the usual call would be:
      *<pre>
-     *  TypeFactory.constructParametrizedType(ArrayList.class, List.class, Integer.class);
+     *  TypeFactory.constructParametricType(ArrayList.class, List.class, Integer.class);
      *</pre>
      * since parameterization is applied to {@link java.util.List}.
      * In most cases distinction does not matter, but there are types where it does;
@@ -910,15 +939,15 @@ public final class TypeFactory
      * type <code>List&lt;Set&lt;Integer>></code>, you could
      * call
      *<pre>
-     *  JavaType inner = TypeFactory.constructParametrizedType(Set.class, Set.class, Integer.class);
-     *  return TypeFactory.constructParametrizedType(ArrayList.class, List.class, inner);
+     *  JavaType inner = TypeFactory.constructParametricType(Set.class, Set.class, Integer.class);
+     *  return TypeFactory.constructParametricType(ArrayList.class, List.class, inner);
      *</pre>
      *<p>
      * The reason for first two arguments to be separate is that parameterization may
      * apply to a super-type. For example, if generic type was instead to be
      * constructed for <code>ArrayList&lt;Integer></code>, the usual call would be:
      *<pre>
-     *  TypeFactory.constructParametrizedType(ArrayList.class, List.class, Integer.class);
+     *  TypeFactory.constructParametricType(ArrayList.class, List.class, Integer.class);
      *</pre>
      * since parameterization is applied to {@link java.util.List}.
      * In most cases distinction does not matter, but there are types where it does;
@@ -938,7 +967,10 @@ public final class TypeFactory
 
     /**
      * @since 2.5 -- but will probably deprecated in 2.7 or 2.8 (not needed with 2.7)
+     *
+     * @deprecated since 2.9 Use {@link #constructParametricType(Class,JavaType...)} instead
      */
+    @Deprecated
     public JavaType constructParametrizedType(Class<?> parametrized, Class<?> parametersFor,
             JavaType... parameterTypes)
     {
@@ -947,7 +979,10 @@ public final class TypeFactory
 
     /**
      * @since 2.5 -- but will probably deprecated in 2.7 or 2.8 (not needed with 2.7)
+     *
+     * @deprecated since 2.9 Use {@link #constructParametricType(Class,Class...)} instead
      */
+    @Deprecated
     public JavaType constructParametrizedType(Class<?> parametrized, Class<?> parametersFor,
             Class<?>... parameterClasses)
     {
