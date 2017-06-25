@@ -2,17 +2,13 @@ package com.fasterxml.jackson.databind.deser.jdk;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
-import java.util.TimeZone;
+import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.fasterxml.jackson.databind.util.ISO8601DateFormat;
 
 public class DateDeserializationTest
     extends BaseMapTest
@@ -231,6 +227,8 @@ public class DateDeserializationTest
     {
         String inputStr;
         Date inputDate;
+
+        // 23-Jun-2017, tatu: Shouldn't this be UTC?
         Calendar c = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
 
         inputStr = "1997-07-16T19:20+01:00";
@@ -404,7 +402,10 @@ public class DateDeserializationTest
         result = MAPPER.readValue(quote(dateStr), Calendar.class);
 
         // note: representation may differ (wrt timezone etc), but underlying value must remain the same:
-        assertEquals(l, result.getTimeInMillis());
+        if (l != result.getTimeInMillis()) {
+            fail(String.format("Expected timestamp %d, got %d, for '%s'",
+                    l, result.getTimeInMillis(), dateStr));
+        }
     }
 
     public void testCustom() throws Exception
@@ -531,19 +532,6 @@ public class DateDeserializationTest
         assertEquals(9, c.get(Calendar.HOUR_OF_DAY));
     }
 
-    // Based on an external report; was throwing an exception for second case here
-    public void testISO8601Directly() throws Exception
-    {
-        final String TIME_STR = "2015-01-21T08:56:13.533+0000";
-        Date d = MAPPER.readValue(quote(TIME_STR), Date.class);
-        assertNotNull(d);
-
-        ISO8601DateFormat f = new ISO8601DateFormat();
-        Date d2 = f.parse(TIME_STR);
-        assertNotNull(d2);
-        assertEquals(d.getTime(), d2.getTime());
-    }
-
     // [databind#1651]
     public void testDateEndingWithZNonDefTZ1651() throws Exception
     {
@@ -563,7 +551,55 @@ public class DateDeserializationTest
         // Underlying timestamps should be the same
         assertEquals(dateUTC.getTime(), dateGMT1.getTime());
     }
+
+    /*
+    /**********************************************************
+    /* Context timezone use (or not)
+    /**********************************************************
+     */
     
+    // for [databind#204]
+    public void testContextTimezone() throws Exception
+    {
+        String inputStr = "1997-07-16T19:20:30.45+0100";
+        final String tzId = "PST";
+
+        // this is enabled by default:
+        assertTrue(MAPPER.isEnabled(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE));
+        final ObjectReader r = MAPPER
+                .readerFor(Calendar.class)
+                .with(TimeZone.getTimeZone(tzId));
+
+        // by default use contextual timezone:
+        Calendar cal = r.readValue(quote(inputStr));
+        TimeZone tz = cal.getTimeZone();
+        assertEquals(tzId, tz.getID());
+
+        assertEquals(1997, cal.get(Calendar.YEAR));
+        assertEquals(Calendar.JULY, cal.get(Calendar.MONTH));
+        assertEquals(16, cal.get(Calendar.DAY_OF_MONTH));
+
+        // Translated from original into PST differs:
+        assertEquals(20, cal.get(Calendar.MINUTE));
+        assertEquals(30, cal.get(Calendar.SECOND));
+        assertEquals(11, cal.get(Calendar.HOUR_OF_DAY));
+
+        // but if disabled, should use what's been sent in:
+        cal = r.without(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+                .readValue(quote(inputStr));
+
+        // 23-Jun-2017, tatu: Actually turns out to be hard if not impossible to do ...
+        //    problem being SimpleDateFormat does not really retain timezone offset.
+        //    But if we match fields... we perhaps could use it?
+        
+        // !!! TODO: would not yet pass
+/*
+        System.err.println("CAL/2 == "+cal);
+
+        System.err.println("tz == "+cal.getTimeZone());
+        */
+    }
+
     /*
     /**********************************************************
     /* Test(s) for array unwrapping
