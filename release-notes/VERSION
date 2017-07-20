@@ -82,6 +82,8 @@ Project: jackson-databind
 #1554: Support deserialization of `Shape.OBJECT` ("as POJO") for `Map`s (and map-like types)
 #1556: Add `ObjectMapper.updateValue()` method to update instance with given overrides
  (suggested by syncer@github)
+#1583: Add a `DeserializationFeature.FAIL_ON_TRAILING_TOKENS` to force reading of the
+  whole input as single value
 #1592: Add support for handling primitive/discrepancy problem with type refinements
 #1605: Allow serialization of `InetAddress` as simple numeric host address
  (requested by Jared J)
@@ -97,6 +99,9 @@ Project: jackson-databind
 #1688: Deserialization fails for `java.nio.file.Path` implementations when default typing
   enabled
  (reported by Christian B)
+#1690: Prevent use of quoted number (index) for Enum deserialization via
+  `MapperFeature.ALLOW_COERCION_OF_SCALARS`
+ (requested by magdel@github)
 
 2.8.9.1 (not yet released)
 
