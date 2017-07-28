@@ -1335,9 +1335,8 @@ public abstract class BeanDeserializerBase
         if (_objectIdReader != null) {
             return deserializeFromObjectId(p, ctxt);
         }
-        /* Bit complicated if we have delegating creator; may need to use it,
-         * or might not...
-         */
+        // Bit complicated if we have delegating creator; may need to use it,
+        // or might not...
         JsonDeserializer<Object> delegateDeser = _delegateDeserializer();
         if (delegateDeser != null) {
             if (!_valueInstantiator.canCreateFromString()) {
@@ -1448,10 +1447,31 @@ public abstract class BeanDeserializerBase
         if (_objectIdReader != null) {
             return deserializeFromObjectId(p, ctxt);
         }
-
+        // 26-Jul-2017, tatu: as per [databind#1711] need to support delegating case too
+        JsonDeserializer<Object> delegateDeser = _delegateDeserializer();
+        if (delegateDeser != null) {
+            if (!_valueInstantiator.canCreateFromString()) {
+                Object bean = _valueInstantiator.createUsingDelegate(ctxt,
+                        delegateDeser.deserialize(p, ctxt));
+                if (_injectables != null) {
+                    injectValues(ctxt, bean);
+                }
+                return bean;
+            }
+        }
         // TODO: maybe add support for ValueInstantiator, embedded?
-        
-        return p.getEmbeddedObject();
+
+        // 26-Jul-2017, tatu: related to [databind#1711], let's actually verify assignment
+        //    compatibility before returning. Bound to catch misconfigured cases and produce
+        //    more meaningful exceptions.
+        Object value = p.getEmbeddedObject();
+        if (value != null) {
+            if (!_beanType.getClass().isInstance(value)) {
+                // allow this to be handled...
+                value = ctxt.handleWeirdNativeValue(_beanType, value, p);
+            }
+        }
+        return value;
     }
 
     /**
