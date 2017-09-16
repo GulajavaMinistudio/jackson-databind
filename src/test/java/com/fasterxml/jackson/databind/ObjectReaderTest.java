@@ -102,11 +102,6 @@ public class ObjectReaderTest extends BaseMapTest
         ObjectReader r = MAPPER.reader();
         assertSame(MAPPER.getFactory(), r.getFactory());
 
-        JsonFactory f = new JsonFactory();
-        r = r.with(f);
-        assertSame(f, r.getFactory());
-        assertSame(r, r.with(f));
-
         assertNotNull(r.getTypeFactory());
         assertNull(r.getInjectableValues());
 
@@ -126,21 +121,6 @@ public class ObjectReaderTest extends BaseMapTest
         assertNotSame(r, newR);
         assertSame(newR, newR.withHandler(probH));
         r = newR;
-    }
-
-    @SuppressWarnings("deprecation")
-    public void testDeprecatedSettings() throws Exception
-    {
-        ObjectReader r = MAPPER.reader();
-
-        // and deprecated variants
-        ObjectReader newR = r.forType(MAPPER.constructType(String.class));
-        assertSame(newR, newR.withType(String.class));
-        assertSame(newR, newR.withType(MAPPER.constructType(String.class)));
-
-        newR = newR.withRootName(PropertyName.construct("foo"));
-        assertNotSame(r, newR);
-        assertSame(newR, newR.withRootName(PropertyName.construct("foo")));
     }
 
     public void testNoPrefetch() throws Exception

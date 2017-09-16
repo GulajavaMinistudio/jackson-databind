@@ -51,7 +51,7 @@ public abstract class DeserializationContext
     extends DatabindContext
     implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L; // 2.6
+    private static final long serialVersionUID = 3L;
 
     /*
     /**********************************************************
@@ -1089,7 +1089,7 @@ targetType, goodValue.getClass()));
     public Object handleUnexpectedToken(Class<?> instClass, JsonParser p)
         throws IOException
     {
-        return handleUnexpectedToken(instClass, p.getCurrentToken(), p, null);
+        return handleUnexpectedToken(instClass, p.currentToken(), p, null);
     }
 
     /**
@@ -1351,49 +1351,6 @@ trailingToken, ClassUtil.nameOf(targetType)
                 ));
     }
 
-    @Deprecated // since 2.9
-    public void reportWrongTokenException(JsonParser p,
-            JsonToken expToken, String msg, Object... msgArgs)
-        throws JsonMappingException
-    {
-        msg = _format(msg, msgArgs);
-        throw wrongTokenException(p, expToken, msg);
-    }
-    
-    /**
-     * Helper method for reporting a problem with unhandled unknown property.
-     * 
-     * @param instanceOrClass Either value being populated (if one has been
-     *   instantiated), or Class that indicates type that would be (or
-     *   have been) instantiated
-     * @param deser Deserializer that had the problem, if called by deserializer
-     *   (or on behalf of one)
-     *
-     * @deprecated Since 2.8 call {@link #handleUnknownProperty} instead
-     */
-    @Deprecated
-    public void reportUnknownProperty(Object instanceOrClass, String fieldName,
-            JsonDeserializer<?> deser)
-        throws JsonMappingException
-    {
-        if (isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)) {
-            // Do we know properties that are expected instead?
-            Collection<Object> propIds = (deser == null) ? null : deser.getKnownPropertyNames();
-            throw UnrecognizedPropertyException.from(_parser,
-                    instanceOrClass, fieldName, propIds);
-        }
-    }
-
-    /**
-     * @since 2.8
-     *
-     * @deprecated Since 2.9: not clear this ever occurs
-     */
-    @Deprecated // since 2.9
-    public void reportMissingContent(String msg, Object... msgArgs) throws JsonMappingException {
-        throw MismatchedInputException.from(getParser(), (JavaType) null, "No content to map due to end-of-input");
-    }
-
     /*
     /**********************************************************
     /* Methods for problem reporting, in cases where recovery
@@ -1405,8 +1362,6 @@ trailingToken, ClassUtil.nameOf(targetType)
      * Helper method called to indicate problem in POJO (serialization) definitions or settings
      * regarding specific Java type, unrelated to actual JSON content to map.
      * Default behavior is to construct and throw a {@link JsonMappingException}.
-     *
-     * @since 2.9
      */
     public <T> T reportBadTypeDefinition(BeanDescription bean,
             String msg, Object... msgArgs) throws JsonMappingException {
@@ -1420,8 +1375,6 @@ trailingToken, ClassUtil.nameOf(targetType)
      * Helper method called to indicate problem in POJO (serialization) definitions or settings
      * regarding specific property (of a type), unrelated to actual JSON content to map.
      * Default behavior is to construct and throw a {@link JsonMappingException}.
-     *
-     * @since 2.9
      */
     public <T> T reportBadPropertyDefinition(BeanDescription bean, BeanPropertyDefinition prop,
             String msg, Object... msgArgs) throws JsonMappingException {
@@ -1480,7 +1433,7 @@ trailingToken, ClassUtil.nameOf(targetType)
             JsonToken expToken, String extra)
     {
         String msg = String.format("Unexpected token (%s), expected %s",
-                p.getCurrentToken(), expToken);
+                p.currentToken(), expToken);
         msg = _colonConcat(msg, extra);
         return MismatchedInputException.from(p, targetType, msg);
     }
@@ -1489,16 +1442,9 @@ trailingToken, ClassUtil.nameOf(targetType)
             JsonToken expToken, String extra)
     {
         String msg = String.format("Unexpected token (%s), expected %s",
-                p.getCurrentToken(), expToken);
+                p.currentToken(), expToken);
         msg = _colonConcat(msg, extra);
         return MismatchedInputException.from(p, targetType, msg);
-    }
-    
-    @Deprecated // since 2.9
-    public JsonMappingException wrongTokenException(JsonParser p, JsonToken expToken,
-            String msg)
-    {
-        return wrongTokenException(p, (JavaType) null, expToken, msg);
     }
 
     /**
@@ -1527,8 +1473,6 @@ trailingToken, ClassUtil.nameOf(targetType)
      * @param value String value from input being deserialized
      * @param instClass Type that String should be deserialized into
      * @param msg Message that describes specific problem
-     * 
-     * @since 2.1
      */
     public JsonMappingException weirdStringException(String value, Class<?> instClass,
             String msg) {
@@ -1623,115 +1567,6 @@ trailingToken, ClassUtil.nameOf(targetType)
         String msg = String.format("Missing type id when trying to resolve subtype of %s",
                 baseType);
         return InvalidTypeIdException.from(_parser, _colonConcat(msg, extraDesc), baseType, null);
-    }
-
-    /*
-    /**********************************************************
-    /* Deprecated exception factory methods
-    /**********************************************************
-     */
-
-    /**
-     * @since 2.5
-     *
-     * @deprecated Since 2.8 use {@link #handleUnknownTypeId} instead
-     */
-    @Deprecated
-    public JsonMappingException unknownTypeException(JavaType type, String id,
-            String extraDesc)
-    {
-        String msg = String.format("Could not resolve type id '%s' into a subtype of %s",
-                id, type);
-        msg = _colonConcat(msg, extraDesc);
-        return MismatchedInputException.from(_parser, type, msg);
-    }
-
-    /**
-     * Helper method for constructing exception to indicate that end-of-input was
-     * reached while still expecting more tokens to deserialize value of specified type.
-     *
-     * @deprecated Since 2.8; currently no way to catch EOF at databind level
-     */
-    @Deprecated
-    public JsonMappingException endOfInputException(Class<?> instClass) {
-        return MismatchedInputException.from(_parser, instClass,
-                "Unexpected end-of-input when trying to deserialize a "+instClass.getName());
-    }
-
-    /*
-    /**********************************************************
-    /* Deprecated methods for constructing, throwing non-specific
-    /* JsonMappingExceptions: as of 2.9, should use more specific
-    /* ones.
-    /**********************************************************
-     */
-    
-    /**
-     * Fallback method that may be called if no other <code>reportXxx</code>
-     * is applicable -- but only in that case.
-     *
-     * @since 2.8
-     * 
-     * @deprecated Since 2.9: use a more specific method, or {@link #reportBadDefinition(JavaType, String)},
-     *    or {@link #reportInputMismatch} instead
-     */
-    @Deprecated // since 2.9
-    public void reportMappingException(String msg, Object... msgArgs)
-        throws JsonMappingException
-    {
-        throw JsonMappingException.from(getParser(), _format(msg, msgArgs));
-    }
-
-    /**
-     * Helper method for constructing generic mapping exception with specified
-     * message and current location information.
-     * Note that application code should almost always call
-     * one of <code>handleXxx</code> methods, or {@link #reportMappingException(String, Object...)}
-     * instead.
-     * 
-     * @since 2.6
-     * 
-     * @deprecated Since 2.9 use more specific error reporting methods instead
-     */
-    @Deprecated
-    public JsonMappingException mappingException(String message) {
-        return JsonMappingException.from(getParser(), message);
-    }
-
-    /**
-     * Helper method for constructing generic mapping exception with specified
-     * message and current location information
-     * Note that application code should almost always call
-     * one of <code>handleXxx</code> methods, or {@link #reportMappingException(String, Object...)}
-     * instead.
-     * 
-     * @since 2.6
-     *
-     * @deprecated Since 2.9 use more specific error reporting methods instead
-     */
-    @Deprecated
-    public JsonMappingException mappingException(String msg, Object... msgArgs) {
-        return JsonMappingException.from(getParser(), _format(msg, msgArgs));
-    }
-
-    /**
-     * Helper method for constructing generic mapping exception for specified type
-     * 
-     * @deprecated Since 2.8 use {@link #handleUnexpectedToken(Class, JsonParser)} instead
-     */
-    @Deprecated
-    public JsonMappingException mappingException(Class<?> targetClass) {
-        return mappingException(targetClass, _parser.getCurrentToken());
-    }
-
-    /**
-     * @deprecated Since 2.8 use {@link #handleUnexpectedToken(Class, JsonParser)} instead
-     */
-    @Deprecated
-    public JsonMappingException mappingException(Class<?> targetClass, JsonToken token) {
-        return JsonMappingException.from(_parser,
-                String.format("Cannot deserialize instance of %s out of %s token",
-                        _calcName(targetClass), token));
     }
 
     /*

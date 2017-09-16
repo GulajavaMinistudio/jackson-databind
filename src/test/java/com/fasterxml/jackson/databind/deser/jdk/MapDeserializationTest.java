@@ -223,9 +223,8 @@ public class MapDeserializationTest
     {
         // to get typing, must use type reference
         String JSON = "{ \"1\" : true, \"-1\" : false }";
-        Map<Integer,Object> result = MAPPER.readValue
-            (JSON, new TypeReference<HashMap<Integer,Object>>() { });
-
+        Map<Object,Object> result = MAPPER.readValue
+            (JSON, new TypeReference<HashMap<Integer,Boolean>>() { });
         assertNotNull(result);
         assertEquals(HashMap.class, result.getClass());
         assertEquals(2, result.size());

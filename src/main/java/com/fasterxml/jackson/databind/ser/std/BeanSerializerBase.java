@@ -1,28 +1,25 @@
 package com.fasterxml.jackson.databind.ser.std;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.type.WritableTypeId;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.ObjectIdInfo;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitable;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
-import com.fasterxml.jackson.databind.jsonschema.JsonSerializableSchema;
-import com.fasterxml.jackson.databind.jsonschema.SchemaAware;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.*;
 import com.fasterxml.jackson.databind.ser.impl.MapEntrySerializer;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
 import com.fasterxml.jackson.databind.ser.impl.PropertyBasedObjectIdGenerator;
 import com.fasterxml.jackson.databind.ser.impl.WritableObjectId;
-import com.fasterxml.jackson.databind.util.ArrayBuilders;
 import com.fasterxml.jackson.databind.util.Converter;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 
@@ -36,7 +33,7 @@ import com.fasterxml.jackson.databind.util.NameTransformer;
 public abstract class BeanSerializerBase
     extends StdSerializer<Object>
     implements ContextualSerializer, ResolvableSerializer,
-        JsonFormatVisitable, SchemaAware
+        JsonFormatVisitable
 {
     protected final static PropertyName NAME_FOR_OBJECT_REF = new PropertyName("#object-ref");
 
@@ -168,12 +165,6 @@ public abstract class BeanSerializerBase
         _serializationShape = src._serializationShape;
     }
 
-    @Deprecated // since 2.8, remove soon
-    protected BeanSerializerBase(BeanSerializerBase src, String[] toIgnore)
-    {
-        this(src, ArrayBuilders.arrayToSet(toIgnore));
-    }
-    
     protected BeanSerializerBase(BeanSerializerBase src, Set<String> toIgnore)
     {
         super(src._handledType);
@@ -218,36 +209,19 @@ public abstract class BeanSerializerBase
     /**
      * Mutant factory used for creating a new instance with additional
      * set of properties to ignore (from properties this instance otherwise has)
-     * 
-     * @since 2.8
      */
     protected abstract BeanSerializerBase withIgnorals(Set<String> toIgnore);
-    
-    /**
-     * Mutant factory used for creating a new instance with additional
-     * set of properties to ignore (from properties this instance otherwise has)
-     * 
-     * @deprecated since 2.8
-     */
-    @Deprecated
-    protected BeanSerializerBase withIgnorals(String[] toIgnore) {
-        return withIgnorals(ArrayBuilders.arrayToSet(toIgnore));
-    }
 
     /**
      * Mutant factory for creating a variant that output POJO as a
      * JSON Array. Implementations may ignore this request if output
      * as array is not possible (either at all, or reliably).
-     * 
-     * @since 2.1
      */
     protected abstract BeanSerializerBase asArraySerializer();
 
     /**
      * Mutant factory used for creating a new instance with different
      * filter id (used with <code>JsonFilter</code> annotation)
-     * 
-     * @since 2.3
      */
     @Override
     public abstract BeanSerializerBase withFilterId(Object filterId);
@@ -670,9 +644,6 @@ public abstract class BeanSerializerBase
         typeSer.writeTypeSuffix(g, typeIdDef);
     }
 
-    /**
-     * @since 2.9
-     */
     protected final WritableTypeId _typeIdDef(TypeSerializer typeSer,
             Object bean, JsonToken valueShape) {
         if (_typeId == null) {
@@ -684,16 +655,6 @@ public abstract class BeanSerializerBase
             typeId = "";
         }
         return typeSer.typeId(bean, valueShape, typeId);
-    }
-
-    @Deprecated // since 2.9
-    protected final String _customTypeId(Object bean)
-    {
-        final Object typeId = _typeId.getValue(bean);
-        if (typeId == null) {
-            return "";
-        }
-        return (typeId instanceof String) ? (String) typeId : typeId.toString();
     }
 
     /*
@@ -787,45 +748,6 @@ public abstract class BeanSerializerBase
         }
     }
 
-    @Deprecated
-    @Override
-    public JsonNode getSchema(SerializerProvider provider, Type typeHint)
-        throws JsonMappingException
-    {
-        ObjectNode o = createSchemaNode("object", true);
-        // [JACKSON-813]: Add optional JSON Schema id attribute, if found
-        // NOTE: not optimal, does NOT go through AnnotationIntrospector etc:
-        JsonSerializableSchema ann = _handledType.getAnnotation(JsonSerializableSchema.class);
-        if (ann != null) {
-            String id = ann.id();
-            if (id != null && id.length() > 0) {
-                o.put("id", id);
-            }
-        }
- 
-        //todo: should the classname go in the title?
-        //o.put("title", _className);
-        ObjectNode propertiesNode = o.objectNode();
-        final PropertyFilter filter;
-        if (_propertyFilterId != null) {
-            filter = findPropertyFilter(provider, _propertyFilterId, null);
-        } else {
-            filter = null;
-        }
-        		
-        for (int i = 0; i < _props.length; i++) {
-            BeanPropertyWriter prop = _props[i];
-            if (filter == null) {
-                prop.depositSchemaProperty(propertiesNode, provider);
-            } else {
-                filter.depositSchemaProperty(prop, propertiesNode, provider);
-            }
-
-        }
-        o.set("properties", propertiesNode);
-        return o;
-    }
-    
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
         throws JsonMappingException

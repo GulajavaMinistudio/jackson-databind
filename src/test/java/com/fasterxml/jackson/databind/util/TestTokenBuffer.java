@@ -57,7 +57,7 @@ public class TestTokenBuffer extends BaseMapTest
         
         // First, with empty buffer
         JsonParser p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertNull(p.nextToken());
         p.close();
 
@@ -65,7 +65,7 @@ public class TestTokenBuffer extends BaseMapTest
         buf.writeString("abc");
 
         p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertToken(JsonToken.VALUE_STRING, p.nextToken());
         assertEquals("abc", p.getText());
         assertNull(p.nextToken());
@@ -74,7 +74,7 @@ public class TestTokenBuffer extends BaseMapTest
         // Then, let's append at root level
         buf.writeNumber(13);
         p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertToken(JsonToken.VALUE_STRING, p.nextToken());
         assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
         assertEquals(13, p.getIntValue());
@@ -105,7 +105,7 @@ public class TestTokenBuffer extends BaseMapTest
         }
 
         JsonParser p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
 
         for (double v : values1) {
             assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
@@ -152,7 +152,7 @@ public class TestTokenBuffer extends BaseMapTest
         assertTrue(buf.getOutputContext().inRoot());
 
         JsonParser p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertTrue(p.getParsingContext().inRoot());
         assertToken(JsonToken.START_ARRAY, p.nextToken());
         assertTrue(p.getParsingContext().inArray());
@@ -213,7 +213,7 @@ public class TestTokenBuffer extends BaseMapTest
         assertTrue(buf.getOutputContext().inRoot());
 
         JsonParser p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertTrue(p.getParsingContext().inRoot());
         assertToken(JsonToken.START_OBJECT, p.nextToken());
         assertTrue(p.getParsingContext().inObject());
@@ -230,7 +230,7 @@ public class TestTokenBuffer extends BaseMapTest
         buf.writeEndObject();
 
         p = buf.asParser();
-        assertNull(p.getCurrentToken());
+        assertNull(p.currentToken());
         assertToken(JsonToken.START_OBJECT, p.nextToken());
         assertNull(p.getCurrentName());
         assertToken(JsonToken.FIELD_NAME, p.nextToken());
@@ -511,7 +511,7 @@ public class TestTokenBuffer extends BaseMapTest
         assertFalse(p.isClosed());
         
         assertFalse(seq.hasCurrentToken());
-        assertNull(seq.getCurrentToken());
+        assertNull(seq.currentToken());
         assertNull(seq.getCurrentName());
 
         assertToken(JsonToken.START_ARRAY, seq.nextToken());

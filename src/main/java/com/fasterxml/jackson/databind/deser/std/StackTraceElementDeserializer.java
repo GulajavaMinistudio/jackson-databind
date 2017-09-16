@@ -18,7 +18,7 @@ public class StackTraceElementDeserializer
     @Override
     public StackTraceElement deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
     {
-        JsonToken t = p.getCurrentToken();
+        JsonToken t = p.currentToken();
         // Must get an Object
         if (t == JsonToken.START_OBJECT) {
             String className = "", methodName = "", fileName = "";
@@ -67,18 +67,8 @@ public class StackTraceElementDeserializer
         return (StackTraceElement) ctxt.handleUnexpectedToken(_valueClass, p);
     }
 
-    @Deprecated // since 2.9
-    protected StackTraceElement constructValue(DeserializationContext ctxt,
-            String className, String methodName, String fileName, int lineNumber,
-            String moduleName, String moduleVersion) {
-        return constructValue(ctxt, className, methodName, fileName, lineNumber,
-                moduleName, moduleVersion, null);
-    }
-
     /**
      * Overridable factory method used for constructing {@link StackTraceElement}s.
-     *
-     * @since 2.8
      */
     protected StackTraceElement constructValue(DeserializationContext ctxt,
             String className, String methodName, String fileName, int lineNumber,
