@@ -80,8 +80,32 @@
   </dependencies>
 
   <build>
-     <plugins>
+    <plugins>
+
       <plugin>
+	<groupId>org.jacoco</groupId>
+	<artifactId>jacoco-maven-plugin</artifactId>
+
+<!-- from parent (base)
+    <executions>
+        <execution>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>prepare-package</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+    </executions>
+-->
+</plugin>
+
+
+       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <version>${version.plugin.surefire}</version>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -98,7 +122,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>${version.plugin.javadoc}</version>
         <configuration>
           <links combine.children="append">
             <link>http://fasterxml.github.com/jackson-annotations/javadoc/3.0</link>
@@ -111,6 +134,20 @@
         <!-- Inherited from oss-base. Generate PackageVersion.java.-->
         <groupId>com.google.code.maven-replacer-plugin</groupId>
         <artifactId>replacer</artifactId>
+      </plugin>
+
+      <!-- 17-Sep-2017, tatu: With 3.0 need to ensure parameter names compiled in
+        -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <inherited>true</inherited>
+        <configuration>
+          <optimize>true</optimize>
+          <compilerArgs>
+            <arg>-parameters</arg>
+          </compilerArgs>
+        </configuration>
       </plugin>
 
       <!-- 18-Oct-2016, tatu: Try to make coveralls work -->

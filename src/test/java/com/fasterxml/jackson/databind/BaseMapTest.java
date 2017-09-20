@@ -3,8 +3,6 @@ package com.fasterxml.jackson.databind;
 import java.io.*;
 import java.util.*;
 
-import static org.junit.Assert.*;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 import com.fasterxml.jackson.core.*;
@@ -83,7 +81,8 @@ public abstract class BaseMapTest
             this.object = object;
         }
         public Object getObject() { return object; }
-        @JsonCreator
+
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         static ObjectWrapper jsonValue(final Object object) {
             return new ObjectWrapper(object);
         }
