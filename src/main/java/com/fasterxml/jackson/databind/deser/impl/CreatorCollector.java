@@ -320,8 +320,6 @@ public class CreatorCollector
 
     /**
      * Helper method for recognizing `Enum.valueOf()` factory method
-     *
-     * @since 2.8.1
      */
     protected boolean _isEnumValueOf(AnnotatedWithParams creator) {
         return creator.getDeclaringClass().isEnum()

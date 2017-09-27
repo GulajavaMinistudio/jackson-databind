@@ -38,11 +38,6 @@ public class POJOPropertiesCollector
     protected final boolean _forSerialization;
 
     /**
-     * @since 2.5
-     */
-    protected final boolean _stdBeanNaming;
-
-    /**
      * Type of POJO for which properties are being collected.
      */
     protected final JavaType _type;
@@ -127,7 +122,6 @@ public class POJOPropertiesCollector
             JavaType type, AnnotatedClass classDef, String mutatorPrefix)
     {
         _config = config;
-        _stdBeanNaming = config.isEnabled(MapperFeature.USE_STD_BEAN_NAMING);
         _forSerialization = forSerialization;
         _type = type;
         _classDef = classDef;
@@ -285,8 +279,6 @@ public class POJOPropertiesCollector
 
     /**
      * Internal method that will collect actual property information.
-     *
-     * @since 2.6
      */
     protected void collectAll()
     {
@@ -305,38 +297,34 @@ public class POJOPropertiesCollector
         // Remove ignored properties, first; this MUST precede annotation merging
         // since logic relies on knowing exactly which accessor has which annotation
         _removeUnwantedProperties(props);
-
-        // then merge annotations, to simplify further processing
+        // and then remove unneeded accessors (wrt read-only, read-write)
+        _removeUnwantedAccessor(props);
+        // Rename remaining properties
+        _renameProperties(props);
+        // then merge annotations, to simplify further processing: has to be done AFTER
+        // preceding renaming step to get right propagation
         for (POJOPropertyBuilder property : props.values()) {
             property.mergeAnnotations(_forSerialization);
         }
-        // and then remove unneeded accessors (wrt read-only, read-write)
-        _removeUnwantedAccessor(props);
-
-        // Rename remaining properties
-        _renameProperties(props);
-
         // And use custom naming strategy, if applicable...
         PropertyNamingStrategy naming = _findNamingStrategy();
         if (naming != null) {
             _renameUsing(props, naming);
         }
 
-        /* Sort by visibility (explicit over implicit); drop all but first
-         * of member type (getter, setter etc) if there is visibility
-         * difference
-         */
+        // Sort by visibility (explicit over implicit); drop all but first
+        // of member type (getter, setter etc) if there is visibility
+        // difference
         for (POJOPropertyBuilder property : props.values()) {
             property.trimByVisibility();
         }
 
-        /* and, if required, apply wrapper name: note, MUST be done after
-         * annotations are merged.
-         */
+        // and, if required, apply wrapper name: note, MUST be done after
+        // annotations are merged.
         if (_config.isEnabled(MapperFeature.USE_WRAPPER_NAME_AS_PROPERTY_NAME)) {
             _renameWithWrappers(props);
         }
-        
+
         // well, almost last: there's still ordering...
         _sortProperties(props);
         _properties = props;
@@ -348,7 +336,7 @@ public class POJOPropertiesCollector
     /* Overridable internal methods, adding members
     /**********************************************************
      */
-    
+
     /**
      * Method for collecting basic information on all fields found
      */
@@ -461,9 +449,6 @@ public class POJOPropertiesCollector
         }
     }
 
-    /**
-     * @since 2.4
-     */
     protected void _addCreatorParam(Map<String, POJOPropertyBuilder> props,
             AnnotatedParameter param)
     {
@@ -566,10 +551,10 @@ public class POJOPropertiesCollector
         if (!nameExplicit) { // no explicit name; must consider implicit
             implName = ai.findImplicitPropertyName(m);
             if (implName == null) {
-                implName = BeanUtil.okNameForRegularGetter(m, m.getName(), _stdBeanNaming);
+                implName = BeanUtil.okNameForRegularGetter(m, m.getName());
             }
             if (implName == null) { // if not, must skip
-                implName = BeanUtil.okNameForIsGetter(m, m.getName(), _stdBeanNaming);
+                implName = BeanUtil.okNameForIsGetter(m, m.getName());
                 if (implName == null) {
                     return;
                 }
@@ -581,7 +566,7 @@ public class POJOPropertiesCollector
             // we still need implicit name to link with other pieces
             implName = ai.findImplicitPropertyName(m);
             if (implName == null) {
-                implName = BeanUtil.okNameForGetter(m, _stdBeanNaming);
+                implName = BeanUtil.okNameForGetter(m);
             }
             // if not regular getter name, use method name as is
             if (implName == null) {
@@ -608,7 +593,7 @@ public class POJOPropertiesCollector
         if (!nameExplicit) { // no explicit name; must follow naming convention
             implName = (ai == null) ? null : ai.findImplicitPropertyName(m);
             if (implName == null) {
-                implName = BeanUtil.okNameForMutator(m, _mutatorPrefix, _stdBeanNaming);
+                implName = BeanUtil.okNameForMutator(m, _mutatorPrefix);
             }
             if (implName == null) { // if not, must skip
             	return;
@@ -618,7 +603,7 @@ public class POJOPropertiesCollector
             // we still need implicit name to link with other pieces
             implName = (ai == null) ? null : ai.findImplicitPropertyName(m);
             if (implName == null) {
-                implName = BeanUtil.okNameForMutator(m, _mutatorPrefix, _stdBeanNaming);
+                implName = BeanUtil.okNameForMutator(m, _mutatorPrefix);
             }
             // if not regular getter name, use method name as is
             if (implName == null) {
@@ -851,9 +836,7 @@ public class POJOPropertiesCollector
             } else {
                 simpleName = fullName.getSimpleName();
             }
-            /* As per [JACKSON-687], need to consider case where there may already be
-             * something in there...
-             */
+            // Need to consider case where there may already be something in there...
             POJOPropertyBuilder old = propMap.get(simpleName);
             if (old == null) {
                 propMap.put(simpleName, prop);
@@ -914,8 +897,8 @@ public class POJOPropertiesCollector
     /**********************************************************
      */
     
-    /* First, order by [JACKSON-90] (explicit ordering and/or alphabetic)
-     * and then for [JACKSON-170] (implicitly order creator properties before others)
+    /* First, explicit ordering and/or alphabetic
+     * and then implicitly order creator properties before others.
      */
     protected void _sortProperties(Map<String, POJOPropertyBuilder> props)
     {
@@ -1047,9 +1030,8 @@ public class POJOPropertiesCollector
         if (namingDef instanceof PropertyNamingStrategy) {
             return (PropertyNamingStrategy) namingDef;
         }
-        /* Alas, there's no way to force return type of "either class
-         * X or Y" -- need to throw an exception after the fact
-         */
+        // Alas, there's no way to force return type of "either class
+        // X or Y" -- need to throw an exception after the fact
         if (!(namingDef instanceof Class)) {
             throw new IllegalStateException("AnnotationIntrospector returned PropertyNamingStrategy definition of type "
                     +namingDef.getClass().getName()+"; expected type PropertyNamingStrategy or Class<PropertyNamingStrategy> instead");
