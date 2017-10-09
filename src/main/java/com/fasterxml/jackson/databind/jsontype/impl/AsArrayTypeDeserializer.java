@@ -103,14 +103,14 @@ public class AsArrayTypeDeserializer
                 && !_usesExternalId()
                 && p.isExpectedStartObjectToken()) {
             // but what if there's nowhere to add it in? Error? Or skip? For now, skip.
-            TokenBuffer tb = new TokenBuffer(null, false);
+            TokenBuffer tb = TokenBuffer.forInputBuffering(p, ctxt);
             tb.writeStartObject(); // recreate START_OBJECT
             tb.writeFieldName(_typePropertyName);
             tb.writeString(typeId);
             // 02-Jul-2016, tatu: Depending on for JsonParserSequence is initialized it may
             //   try to access current token; ensure there isn't one
             p.clearCurrentToken();
-            p = JsonParserSequence.createFlattened(false, tb.asParser(p), p);
+            p = JsonParserSequence.createFlattened(false, tb.asParser(ctxt, p), p);
             p.nextToken();
         }
         Object value = deser.deserialize(p, ctxt);

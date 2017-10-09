@@ -1,6 +1,7 @@
 package com.fasterxml.jackson.databind.node;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.tree.ObjectTreeNode;
 import com.fasterxml.jackson.core.type.WritableTypeId;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
@@ -13,11 +14,10 @@ import java.util.*;
 
 /**
  * Node that maps to JSON Object structures in JSON content.
- *<p>
- * Note: class was <code>final</code> temporarily for Jackson 2.2.
  */
 public class ObjectNode
     extends ContainerNode<ObjectNode>
+    implements ObjectTreeNode // since 3.0
 {
     // Note: LinkedHashMap for backwards compatibility
     protected final Map<String, JsonNode> _children;
@@ -27,9 +27,6 @@ public class ObjectNode
         _children = new LinkedHashMap<String, JsonNode>();
     }
 
-    /**
-     * @since 2.4
-     */
     public ObjectNode(JsonNodeFactory nc, Map<String, JsonNode> kids) {
         super(nc);
         _children = kids;
@@ -337,7 +334,7 @@ public class ObjectNode
 
     /*
     /**********************************************************
-    /* Extended ObjectNode API, mutators, since 2.1
+    /* Extended ObjectNode API, mutators
     /**********************************************************
      */
 
@@ -351,10 +348,8 @@ public class ObjectNode
      *   {@link #remove} instead)
      *
      * @return This node after adding/replacing property value (to allow chaining)
-     *
-     * @since 2.1
      */
-    public JsonNode set(String fieldName, JsonNode value)
+    public ObjectNode set(String fieldName, JsonNode value)
     {
         if (value == null) {
             value = nullNode();
@@ -370,10 +365,8 @@ public class ObjectNode
      * @param properties Properties to add
      * 
      * @return This node after adding/replacing property values (to allow chaining)
-     *
-     * @since 2.1
      */
-    public JsonNode setAll(Map<String,? extends JsonNode> properties)
+    public ObjectNode setAll(Map<String,? extends JsonNode> properties)
     {
         for (Map.Entry<String,? extends JsonNode> en : properties.entrySet()) {
             JsonNode n = en.getValue();
@@ -392,10 +385,8 @@ public class ObjectNode
      * @param other Object of which properties to add to this object
      *
      * @return This node after addition (to allow chaining)
-     *
-     * @since 2.1
      */
-    public JsonNode setAll(ObjectNode other)
+    public ObjectNode setAll(ObjectNode other)
     {
         _children.putAll(other._children);
         return this;
@@ -410,8 +401,6 @@ public class ObjectNode
      * 
      * @return Old value of the property; null if there was no such property
      *   with value
-     * 
-     * @since 2.1
      */
     public JsonNode replace(String fieldName, JsonNode value)
     {
@@ -426,10 +415,8 @@ public class ObjectNode
      * returning instance after removal.
      * 
      * @return This node after removing entry (if any)
-     * 
-     * @since 2.1
      */
-    public JsonNode without(String fieldName)
+    public ObjectNode without(String fieldName)
     {
         _children.remove(fieldName);
         return this;
@@ -442,8 +429,6 @@ public class ObjectNode
      * @param fieldNames Names of fields to remove
      * 
      * @return This node after removing entries
-     * 
-     * @since 2.1
      */
     public ObjectNode without(Collection<String> fieldNames)
     {
@@ -570,9 +555,6 @@ public class ObjectNode
         return _put(fieldName, pojoNode(pojo));
     }
 
-    /**
-     * @since 2.6
-     */
     public ObjectNode putRawValue(String fieldName, RawValue raw) {
         return _put(fieldName, rawValueNode(raw));
     }
@@ -714,8 +696,6 @@ public class ObjectNode
      * Method for setting value of a field to specified numeric value.
      * 
      * @return This node (to allow chaining)
-     *
-     * @since 2.9
      */
     public ObjectNode put(String fieldName, BigInteger v) {
         return _put(fieldName, (v == null) ? nullNode()

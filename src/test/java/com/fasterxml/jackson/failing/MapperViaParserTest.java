@@ -1,4 +1,4 @@
-package com.fasterxml.jackson.databind;
+package com.fasterxml.jackson.failing;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -6,6 +6,7 @@ import java.io.StringReader;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.io.SerializedString;
+import com.fasterxml.jackson.databind.BaseMapTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class MapperViaParserTest  extends BaseMapTest
@@ -71,61 +72,6 @@ public class MapperViaParserTest  extends BaseMapTest
     /* Unit tests
     /********************************************************
      */
-
-    public void testPojoReading() throws IOException
-    {
-        JsonFactory jf = new MappingJsonFactory();
-        final String JSON = "{ \"x\" : 9 }";
-        JsonParser jp = jf.createParser(new StringReader(JSON));
-
-        // let's try first by advancing:
-        assertToken(JsonToken.START_OBJECT, jp.nextToken());
-        Pojo p = jp.readValueAs(Pojo.class);
-        assertEquals(9, p._x);
-        jp.close();
-
-        // and without
-        jp = jf.createParser(new StringReader(JSON));
-        p = jp.readValueAs(Pojo.class);
-        assertEquals(9, p._x);
-        jp.close();
-    }
-
-    /**
-     * Test similar to above, but instead reads a sequence of values
-     */
-    public void testIncrementalPojoReading()
-        throws IOException
-    {
-        JsonFactory jf = new MappingJsonFactory();
-        final String JSON = "[ 1, true, null, \"abc\" ]";
-        JsonParser jp = jf.createParser(new StringReader(JSON));
-
-        // let's advance past array start to prevent full binding
-        assertToken(JsonToken.START_ARRAY, jp.nextToken());
-
-        assertToken(JsonToken.VALUE_NUMBER_INT, jp.nextToken());
-        assertEquals(Integer.valueOf(1), jp.readValueAs(Integer.class));
-        assertEquals(Boolean.TRUE, jp.readValueAs(Boolean.class));
-        /* note: null can be returned both when there is no more
-         * data in current scope, AND when Json null literal is
-         * bound!
-         */
-        assertNull(jp.readValueAs(Object.class));
-        // but we can verify that it was Json null by:
-        assertEquals(JsonToken.VALUE_NULL, jp.getLastClearedToken());
-
-        assertEquals("abc", jp.readValueAs(String.class));
-
-        // this null is for actually hitting the END_ARRAY
-        assertNull(jp.readValueAs(Object.class));
-        assertEquals(JsonToken.END_ARRAY, jp.getLastClearedToken());
-
-        // afrer which there should be nothing to advance to:
-        assertNull(jp.nextToken());
-
-        jp.close();
-    }
 
     @SuppressWarnings("resource")
     public void testPojoReadingFailing()

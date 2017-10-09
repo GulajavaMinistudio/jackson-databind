@@ -67,13 +67,6 @@ Simplest usage is of form:
   // and find values by, for example, using a {@link com.fasterxml.jackson.core.JsonPointer} expression:
   int age = root.at("/personal/age").getValueAsInt(); 
 </pre>
- *<p>
- * The main conversion API is defined in {@link ObjectCodec}, so that
- * implementation details of this class need not be exposed to
- * streaming parser and generator classes. Usage via {@link ObjectCodec} is,
- * however, usually only for cases where dependency to {@link ObjectMapper} is
- * either not possible (from Streaming API), or undesireable (when only relying
- * on Streaming API).
  *<p> 
  * Mapper instances are fully thread-safe provided that ALL configuration of the
  * instance occurs before ANY read or write calls. If configuration of a mapper instance
@@ -116,7 +109,6 @@ Simplest usage is of form:
  * (using {@link #setDefaultTyping}).
  */
 public class ObjectMapper
-    extends ObjectCodec
     implements Versioned,
         java.io.Serializable
 {
@@ -137,7 +129,7 @@ public class ObjectMapper
      * Since 2.4 there are special exceptions for JSON Tree model
      * types (sub-types of {@link TreeNode}: default typing is never
      * applied to them.
-     * Since 2.8(.4) additional checks are made to avoid attempts at default
+     * Since 2.8 additional checks are made to avoid attempts at default
      * typing primitive-valued properties.
      *<p>
      * NOTE: use of Default Typing can be a potential security risk if incoming
@@ -301,7 +293,8 @@ public class ObjectMapper
             null, StdDateFormat.instance, null,
             Locale.getDefault(),
             null, // to indicate "use Jackson default TimeZone" (UTC since Jackson 2.7)
-            Base64Variants.getDefaultVariant() // 2.1
+            Base64Variants.getDefaultVariant(),
+            JsonNodeFactory.instance
     );
 
     /*
@@ -345,7 +338,7 @@ public class ObjectMapper
     /* Configuration settings: mix-in annotations
     /**********************************************************
      */
-    
+
     /**
      * Mapping that defines how to apply mix-in annotations: key is
      * the type to received additional annotations, and value is the
@@ -356,8 +349,6 @@ public class ObjectMapper
      * same field or method. They can be further masked by sub-classes:
      * you can think of it as injecting annotations between the target
      * class and its sub-classes (or interfaces)
-     * 
-     * @since 2.6 (earlier was a simple {@link java.util.Map}
      */
     protected SimpleMixInResolver _mixIns;
 
@@ -420,8 +411,6 @@ public class ObjectMapper
      * registered; kept track of iff {@link MapperFeature#IGNORE_DUPLICATE_MODULE_REGISTRATIONS}
      * is enabled, so that duplicate registration calls can be ignored
      * (to avoid adding same handlers multiple times, mostly).
-     * 
-     * @since 2.5
      */
     protected Set<Object> _registeredModuleTypes;
     
@@ -489,13 +478,10 @@ public class ObjectMapper
 
     /**
      * Copy-constructor, mostly used to support {@link #copy}.
-     * 
-     * @since 2.1
      */
     protected ObjectMapper(ObjectMapper src)
     {
         _jsonFactory = src._jsonFactory.copy();
-        _jsonFactory.setCodec(this);
         _subtypeResolver = src._subtypeResolver;
         _typeFactory = src._typeFactory;
         _injectableValues = src._injectableValues;
@@ -528,7 +514,7 @@ public class ObjectMapper
      * {@link JsonGenerator}s, and uses given providers for accessing
      * serializers and deserializers.
      * 
-     * @param jf TokenStreamFactory to use: if null, a new {@link MappingJsonFactory} will be constructed
+     * @param jf TokenStreamFactory to use: if null, a new {@link JsonFactory} will be constructed
      * @param sp SerializerProvider to use: if null, a {@link SerializerProvider} will be constructed
      * @param dc Blueprint deserialization context instance to use for creating
      *    actual context objects; if null, will construct standard
@@ -537,20 +523,12 @@ public class ObjectMapper
     public ObjectMapper(TokenStreamFactory jf,
             DefaultSerializerProvider sp, DefaultDeserializationContext dc)
     {
-        /* 02-Mar-2009, tatu: Important: we MUST default to using
-         *   the mapping factory, otherwise tree serialization will
-         *   have problems with POJONodes.
-         * 03-Jan-2010, tatu: and obviously we also must pass 'this',
-         *    to create actual linking.
-         */
+        // 06-OCt-2017, tatu: Should probably change dependency one of these days...
+        //   but not today.
         if (jf == null) {
-            _jsonFactory = new MappingJsonFactory(this);
-        } else {
-            _jsonFactory = jf;
-            if (jf.getCodec() == null) { // as per [JACKSON-741]
-                _jsonFactory.setCodec(this);
-            }
+            jf = new JsonFactory();
         }
+        _jsonFactory = jf;
         _subtypeResolver = new StdSubtypeResolver();
         RootNameLookup rootNames = new RootNameLookup();
         // and default type factory is shared one
@@ -582,8 +560,6 @@ public class ObjectMapper
     /**
      * Overridable helper method used to construct default {@link ClassIntrospector}
      * to use.
-     * 
-     * @since 2.5
      */
     protected ClassIntrospector defaultClassIntrospector() {
         return new BasicClassIntrospector();
@@ -607,17 +583,12 @@ public class ObjectMapper
      * are NOT shared, which means that the new instance may be re-configured
      * before use; meaning that it behaves the same way as if an instance
      * was constructed from scratch.
-     * 
-     * @since 2.1
      */
     public ObjectMapper copy() {
         _checkInvalidCopy(ObjectMapper.class);
         return new ObjectMapper(this);
     }
 
-    /**
-     * @since 2.1
-     */
     protected void _checkInvalidCopy(Class<?> exp)
     {
         if (getClass() != exp) {
@@ -637,8 +608,6 @@ public class ObjectMapper
     /**
      * Factory method sub-classes must override, to produce {@link ObjectReader}
      * instances of proper sub-type
-     * 
-     * @since 2.5
      */
     protected ObjectReader _newReader(DeserializationConfig config) {
         return new ObjectReader(this, config);
@@ -647,8 +616,6 @@ public class ObjectMapper
     /**
      * Factory method sub-classes must override, to produce {@link ObjectReader}
      * instances of proper sub-type
-     * 
-     * @since 2.5
      */
     protected ObjectReader _newReader(DeserializationConfig config,
             JavaType valueType, Object valueToUpdate,
@@ -659,8 +626,6 @@ public class ObjectMapper
     /**
      * Factory method sub-classes must override, to produce {@link ObjectWriter}
      * instances of proper sub-type
-     * 
-     * @since 2.5
      */
     protected ObjectWriter _newWriter(SerializationConfig config) {
         return new ObjectWriter(this, config);
@@ -669,8 +634,6 @@ public class ObjectMapper
     /**
      * Factory method sub-classes must override, to produce {@link ObjectWriter}
      * instances of proper sub-type
-     * 
-     * @since 2.5
      */
     protected ObjectWriter _newWriter(SerializationConfig config, FormatSchema schema) {
         return new ObjectWriter(this, config, schema);
@@ -679,8 +642,6 @@ public class ObjectMapper
     /**
      * Factory method sub-classes must override, to produce {@link ObjectWriter}
      * instances of proper sub-type
-     * 
-     * @since 2.5
      */
     protected ObjectWriter _newWriter(SerializationConfig config,
             JavaType rootType, PrettyPrinter pp) {
@@ -757,9 +718,9 @@ public class ObjectMapper
 
             @SuppressWarnings("unchecked")
             @Override
-            public <C extends ObjectCodec> C getOwner() {
+            public Object getOwner() {
                 // why do we need the cast here?!?
-                return (C) ObjectMapper.this;
+                return ObjectMapper.this;
             }
 
             @Override
@@ -921,8 +882,6 @@ public class ObjectMapper
      *      registerModule(module);
      *   }
      *</pre>
-     * 
-     * @since 2.2
      */
     public ObjectMapper registerModules(Module... modules)
     {
@@ -940,8 +899,6 @@ public class ObjectMapper
      *      registerModule(module);
      *   }
      *</pre>
-     * 
-     * @since 2.2
      */
     public ObjectMapper registerModules(Iterable<? extends Module> modules)
     {
@@ -957,8 +914,6 @@ public class ObjectMapper
      *<p>
      * Note that method does not do any caching, so calls should be considered
      * potentially expensive.
-     * 
-     * @since 2.2
      */
     public static List<Module> findModules() {
         return findModules(null);
@@ -970,8 +925,6 @@ public class ObjectMapper
      *<p>
      * Note that method does not do any caching, so calls should be considered
      * potentially expensive.
-     * 
-     * @since 2.2
      */
     public static List<Module> findModules(ClassLoader classLoader)
     {
@@ -1007,8 +960,6 @@ public class ObjectMapper
      * As with {@link #findModules()}, no caching is done for modules, so care
      * needs to be taken to either create and share a single mapper instance;
      * or to cache introspected set of modules.
-     *
-     * @since 2.2
      */
     public ObjectMapper findAndRegisterModules() {
         return registerModules(findModules());
@@ -1106,13 +1057,10 @@ public class ObjectMapper
     /**
      * Accessor for constructing and returning a {@link SerializerProvider}
      * instance that may be used for accessing serializers. This is same as
-     * calling {@link #getSerializerProvider}, and calling <code>createInstance</code>
-     * on it.
-     *
-     * @since 2.7
+     * calling {@link #getSerializerProvider}, and calling <code>createInstance</code> on it.
      */
     public SerializerProvider getSerializerProviderInstance() {
-        return _serializerProvider(_serializationConfig);
+        return _serializerProvider();
     }
 
     /*
@@ -1771,7 +1719,6 @@ public class ObjectMapper
      * @return {@link TokenStreamFactory} that this mapper uses when it needs to
      *   construct Json parser and generators
      */
-    @Override
     public TokenStreamFactory getFactory() { return _jsonFactory; }
 
     /**
@@ -1791,9 +1738,6 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * @since 2.5
-     */
     public DateFormat getDateFormat() {
         // arbitrary choice but let's do:
         return _serializationConfig.getDateFormat();
@@ -2190,12 +2134,12 @@ public class ObjectMapper
      * @throws JsonMappingException if the input JSON structure does not match structure
      *   expected for result type (or has other mismatch issues)
      */
-    @Override
     @SuppressWarnings("unchecked")
     public <T> T readValue(JsonParser p, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readValue(getDeserializationConfig(), p, _typeFactory.constructType(valueType));
+        DeserializationContext ctxt = createDeserializationContext(p);
+        return (T) _readValue(ctxt, p, _typeFactory.constructType(valueType));
     } 
 
     /**
@@ -2214,12 +2158,12 @@ public class ObjectMapper
      * @throws JsonMappingException if the input JSON structure does not match structure
      *   expected for result type (or has other mismatch issues)
      */
-    @Override
     @SuppressWarnings("unchecked")
     public <T> T readValue(JsonParser p, TypeReference<?> valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readValue(getDeserializationConfig(), p, _typeFactory.constructType(valueTypeRef));
+        DeserializationContext ctxt = createDeserializationContext(p);
+        return (T) _readValue(ctxt, p, _typeFactory.constructType(valueTypeRef));
     }
 
     /**
@@ -2237,12 +2181,12 @@ public class ObjectMapper
      * @throws JsonMappingException if the input JSON structure does not match structure
      *   expected for result type (or has other mismatch issues)
      */
-    @Override
     @SuppressWarnings("unchecked")
     public final <T> T readValue(JsonParser p, ResolvedType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readValue(getDeserializationConfig(), p, (JavaType) valueType);
+        DeserializationContext ctxt = createDeserializationContext(p);
+        return (T) _readValue(ctxt, p, (JavaType) valueType);
     }
 
     /**
@@ -2261,9 +2205,10 @@ public class ObjectMapper
     public <T> T readValue(JsonParser p, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readValue(getDeserializationConfig(), p, valueType);
+        DeserializationContext ctxt = createDeserializationContext(p);
+        return (T) _readValue(ctxt, p, valueType);
     }
-    
+
     /**
      * Method to deserialize JSON content as tree expressed
      * using set of {@link JsonNode} instances. Returns
@@ -2284,7 +2229,6 @@ public class ObjectMapper
      * @throws JsonParseException if underlying input contains invalid content
      *    of type {@link JsonParser} supports (JSON for default case)
      */
-    @Override
     public <T extends TreeNode> T readTree(JsonParser p)
         throws IOException, JsonProcessingException
     {
@@ -2295,7 +2239,6 @@ public class ObjectMapper
         /* 05-Aug-2011, tatu: Also, must check for EOF here before
          *   calling readValue(), since that'll choke on it otherwise
          */
-        DeserializationConfig cfg = getDeserializationConfig();
         JsonToken t = p.currentToken();
         if (t == null) {
             t = p.nextToken();
@@ -2303,7 +2246,8 @@ public class ObjectMapper
                 return null;
             }
         }
-        JsonNode n = (JsonNode) _readValue(cfg, p, JSON_NODE_TYPE);
+        DeserializationContext ctxt = createDeserializationContext(p);
+        JsonNode n = (JsonNode) _readValue(ctxt, p, JSON_NODE_TYPE);
         if (n == null) {
             n = getNodeFactory().nullNode();
         }
@@ -2330,26 +2274,10 @@ public class ObjectMapper
      *<p>
      * Note that {@link ObjectReader} has more complete set of variants.
      */
-    @Override
-    public <T> MappingIterator<T> readValues(JsonParser p, ResolvedType valueType)
-        throws IOException, JsonProcessingException
-    {
-        return readValues(p, (JavaType) valueType);
-    }
-
-    /**
-     * Convenience method, equivalent in function to:
-     *<pre>
-     *   readerFor(valueType).readValues(p);
-     *</pre>
-     *<p>
-     * Type-safe overload of {@link #readValues(JsonParser, ResolvedType)}.
-     */
     public <T> MappingIterator<T> readValues(JsonParser p, JavaType valueType)
         throws IOException, JsonProcessingException
     {
-        DeserializationConfig config = getDeserializationConfig();
-        DeserializationContext ctxt = createDeserializationContext(p, config);
+        DeserializationContext ctxt = createDeserializationContext(p);
         JsonDeserializer<?> deser = _findRootDeserializer(ctxt, valueType);
         // false -> do NOT close JsonParser (since caller passed it)
         return new MappingIterator<T>(valueType, p, ctxt, deser,
@@ -2362,25 +2290,14 @@ public class ObjectMapper
      *   readerFor(valueType).readValues(p);
      *</pre>
      *<p>
-     * Type-safe overload of {@link #readValues(JsonParser, ResolvedType)}.
+     * Type-safe overload of {@link #readValues(JsonParser, JavaType)}.
      */
-    @Override
     public <T> MappingIterator<T> readValues(JsonParser p, Class<T> valueType)
         throws IOException, JsonProcessingException
     {
         return readValues(p, _typeFactory.constructType(valueType));
     }
 
-    /**
-     * Method for reading sequence of Objects from parser stream.
-     */
-    @Override
-    public <T> MappingIterator<T> readValues(JsonParser p, TypeReference<?> valueTypeRef)
-        throws IOException, JsonProcessingException
-    {
-        return readValues(p, _typeFactory.constructType(valueTypeRef));
-    }
-    
     /*
     /**********************************************************
     /* Public API not included in ObjectCodec: deserialization
@@ -2416,7 +2333,8 @@ public class ObjectMapper
      */
     public JsonNode readTree(InputStream in) throws IOException
     {
-        return _readTreeAndClose(_jsonFactory.createParser(in));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, in));
     }
 
     /**
@@ -2443,7 +2361,8 @@ public class ObjectMapper
      *   for {@link JsonNode#isNull()}
      */
     public JsonNode readTree(Reader r) throws IOException {
-        return _readTreeAndClose(_jsonFactory.createParser(r));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, r));
     }
 
     /**
@@ -2470,7 +2389,8 @@ public class ObjectMapper
      *    of type {@link JsonParser} supports (JSON for default case)
      */
     public JsonNode readTree(String content) throws IOException {
-        return _readTreeAndClose(_jsonFactory.createParser(content));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, content));
     }
 
     /**
@@ -2490,7 +2410,8 @@ public class ObjectMapper
      *    of type {@link JsonParser} supports (JSON for default case)
      */
     public JsonNode readTree(byte[] content) throws IOException {
-        return _readTreeAndClose(_jsonFactory.createParser(content));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, content));
     }
     
     /**
@@ -2516,7 +2437,8 @@ public class ObjectMapper
     public JsonNode readTree(File file)
         throws IOException, JsonProcessingException
     {
-        return _readTreeAndClose(_jsonFactory.createParser(file));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, file));
     }
 
     /**
@@ -2540,7 +2462,8 @@ public class ObjectMapper
      *    of type {@link JsonParser} supports (JSON for default case)
      */
     public JsonNode readTree(URL source) throws IOException {
-        return _readTreeAndClose(_jsonFactory.createParser(source));
+        DeserializationContext ctxt = createDeserializationContext();
+        return _readTreeAndClose(ctxt, _jsonFactory.createParser(ctxt, source));
     }
 
     /*
@@ -2554,23 +2477,19 @@ public class ObjectMapper
      * Method that can be used to serialize any Java value as
      * JSON output, using provided {@link JsonGenerator}.
      */
-    @Override
     public void writeValue(JsonGenerator g, Object value)
         throws IOException, JsonGenerationException, JsonMappingException
     {
         SerializationConfig config = getSerializationConfig();
-
-        /* 12-May-2015/2.6, tatu: Looks like we do NOT want to call the usual
-         *    'config.initialize(g)` here, since it is assumed that generator
-         *    has been configured by caller. But for some reason we don't
-         *    trust indentation settings...
-         */
-        // 10-Aug-2012, tatu: as per [Issue#12], must handle indentation:
+        // 04-Oct-2017, tatu: Generator should come properly configured and we should not
+        //   change its state in any way, I think (at least with Jackson 3.0)
+        /*
         if (config.isEnabled(SerializationFeature.INDENT_OUTPUT)) {
             if (g.getPrettyPrinter() == null) {
                 g.setPrettyPrinter(config.constructDefaultPrettyPrinter());
             }
         }
+        */
         if (config.isEnabled(SerializationFeature.CLOSE_CLOSEABLE) && (value instanceof Closeable)) {
             _writeCloseableValue(g, value, config);
         } else {
@@ -2583,18 +2502,17 @@ public class ObjectMapper
 
     /*
     /**********************************************************
-    /* Public API (from TreeCodec via ObjectCodec): Tree Model support
+    /* Public API: Tree Model support
     /**********************************************************
      */
 
-    @Override
-    public void writeTree(JsonGenerator jgen, TreeNode rootNode)
+    public void writeTree(JsonGenerator g, TreeNode rootNode)
         throws IOException, JsonProcessingException
     {
         SerializationConfig config = getSerializationConfig();
-        _serializerProvider(config).serializeValue(jgen, rootNode);
+        _serializerProvider(config).serializeValue(g, rootNode);
         if (config.isEnabled(SerializationFeature.FLUSH_AFTER_WRITE_VALUE)) {
-            jgen.flush();
+            g.flush();
         }
     }
     
@@ -2602,13 +2520,13 @@ public class ObjectMapper
      * Method to serialize given JSON Tree, using generator
      * provided.
      */
-    public void writeTree(JsonGenerator jgen, JsonNode rootNode)
+    public void writeTree(JsonGenerator g, JsonNode rootNode)
         throws IOException, JsonProcessingException
     {
         SerializationConfig config = getSerializationConfig();
-        _serializerProvider(config).serializeValue(jgen, rootNode);
+        _serializerProvider(config).serializeValue(g, rootNode);
         if (config.isEnabled(SerializationFeature.FLUSH_AFTER_WRITE_VALUE)) {
-            jgen.flush();
+            g.flush();
         }
     }
     
@@ -2619,7 +2537,6 @@ public class ObjectMapper
      * part of core package, whereas impls are part of mapper
      * package)
      */
-    @Override    
     public ObjectNode createObjectNode() {
         return _deserializationConfig.getNodeFactory().objectNode();
     }
@@ -2631,7 +2548,6 @@ public class ObjectMapper
      * part of core package, whereas impls are part of mapper
      * package)
      */
-    @Override
     public ArrayNode createArrayNode() {
         return _deserializationConfig.getNodeFactory().arrayNode();
     }
@@ -2642,9 +2558,9 @@ public class ObjectMapper
      * 
      * @param n Root node of the tree that resulting parser will read from
      */
-    @Override
     public JsonParser treeAsTokens(TreeNode n) {
-        return new TreeTraversingParser((JsonNode) n, this);
+        DeserializationContext ctxt = createDeserializationContext();
+        return new TreeTraversingParser((JsonNode) n, ctxt);
     }
 
     /**
@@ -2657,7 +2573,6 @@ public class ObjectMapper
      *</pre>
      */
     @SuppressWarnings("unchecked")
-    @Override
     public <T> T treeToValue(TreeNode n, Class<T> valueType)
         throws JsonProcessingException
     {
@@ -2709,14 +2624,23 @@ public class ObjectMapper
     public <T extends JsonNode> T valueToTree(Object fromValue)
         throws IllegalArgumentException
     {
-        if (fromValue == null) return null;
-        TokenBuffer buf = new TokenBuffer(this, false);
+        if (fromValue == null) {
+            return null;
+        }
+        // 06-Oct-2017, tatu: `convertValue()` disables root value wrapping so
+        //   do it here too
+        SerializationConfig config = getSerializationConfig()
+            .without(SerializationFeature.WRAP_ROOT_VALUE);
+        DefaultSerializerProvider prov = _serializerProvider(config);
+        TokenBuffer buf = TokenBuffer.forValueConversion(prov);
+        // Would like to let buffer decide, but it won't have deser config to check so...
         if (isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
             buf = buf.forceUseOfBigDecimal(true);
         }
         JsonNode result;
         try {
-            writeValue(buf, fromValue);
+            // Equivalent to `writeValue()`, basically:
+            prov.serializeValue(buf, fromValue);
             JsonParser p = buf.asParser();
             result = readTree(p);
             p.close();
@@ -2725,7 +2649,7 @@ public class ObjectMapper
         }
         return (T) result;
     } 
-    
+
     /*
     /**********************************************************
     /* Extended Public API, accessors
@@ -2748,18 +2672,16 @@ public class ObjectMapper
      *  serializable)
      */
     public boolean canSerialize(Class<?> type) {
-        return _serializerProvider(getSerializationConfig()).hasSerializerFor(type, null);
+        return _serializerProvider().hasSerializerFor(type, null);
     }
 
     /**
      * Method similar to {@link #canSerialize(Class)} but that can return
      * actual {@link Throwable} that was thrown when trying to construct
      * serializer: this may be useful in figuring out what the actual problem is.
-     * 
-     * @since 2.3
      */
     public boolean canSerialize(Class<?> type, AtomicReference<Throwable> cause) {
-        return _serializerProvider(getSerializationConfig()).hasSerializerFor(type, cause);
+        return _serializerProvider().hasSerializerFor(type, cause);
     }
     
     /**
@@ -2781,21 +2703,17 @@ public class ObjectMapper
      */
     public boolean canDeserialize(JavaType type)
     {
-        return createDeserializationContext(null,
-                getDeserializationConfig()).hasValueDeserializerFor(type, null);
+        return createDeserializationContext().hasValueDeserializerFor(type, null);
     }
 
     /**
      * Method similar to {@link #canDeserialize(JavaType)} but that can return
      * actual {@link Throwable} that was thrown when trying to construct
      * serializer: this may be useful in figuring out what the actual problem is.
-     * 
-     * @since 2.3
      */
     public boolean canDeserialize(JavaType type, AtomicReference<Throwable> cause)
     {
-        return createDeserializationContext(null,
-                getDeserializationConfig()).hasValueDeserializerFor(type, cause);
+        return createDeserializationContext().hasValueDeserializerFor(type, cause);
     }
     
     /*
@@ -2821,7 +2739,9 @@ public class ObjectMapper
     public <T> T readValue(File src, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueType));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt, _jsonFactory.createParser(ctxt, src),
+                _typeFactory.constructType(valueType));
     } 
 
     /**
@@ -2840,7 +2760,9 @@ public class ObjectMapper
     public <T> T readValue(File src, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueTypeRef));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt, _jsonFactory.createParser(ctxt, src),
+                _typeFactory.constructType(valueTypeRef));
     } 
 
     /**
@@ -2859,7 +2781,8 @@ public class ObjectMapper
     public <T> T readValue(File src, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt, _jsonFactory.createParser(ctxt, src), valueType);
     }
 
     /**
@@ -2878,7 +2801,9 @@ public class ObjectMapper
     public <T> T readValue(URL src, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueType));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueType));
     } 
 
     /**
@@ -2897,14 +2822,18 @@ public class ObjectMapper
     public <T> T readValue(URL src, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueTypeRef));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueTypeRef));
     } 
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(URL src, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(src), valueType);
     } 
 
     /**
@@ -2923,7 +2852,9 @@ public class ObjectMapper
     public <T> T readValue(String content, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(content), _typeFactory.constructType(valueType));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, content), _typeFactory.constructType(valueType));
     } 
 
     /**
@@ -2942,7 +2873,9 @@ public class ObjectMapper
     public <T> T readValue(String content, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(content), _typeFactory.constructType(valueTypeRef));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, content), _typeFactory.constructType(valueTypeRef));
     } 
 
     /**
@@ -2961,107 +2894,136 @@ public class ObjectMapper
     public <T> T readValue(String content, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(content), valueType);
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, content), valueType);
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(Reader src, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueType));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueType));
+    }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public <T> T readValue(Reader src, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueTypeRef));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueTypeRef));
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(Reader src, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), valueType);
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(InputStream src, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueType));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueType));
+    }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public <T> T readValue(InputStream src, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueTypeRef));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueTypeRef));
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(InputStream src, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), valueType);
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(byte[] src, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueType));
-    } 
-    
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueType));
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T readValue(byte[] src, int offset, int len, 
                                Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src, offset, len), _typeFactory.constructType(valueType));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src, offset, len), _typeFactory.constructType(valueType));
+    }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public <T> T readValue(byte[] src, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), _typeFactory.constructType(valueTypeRef));
-    } 
-    
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueTypeRef));
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public <T> T readValue(byte[] src, int offset, int len,
                            TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src, offset, len), _typeFactory.constructType(valueTypeRef));
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src, offset, len), _typeFactory.constructType(valueTypeRef));
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(byte[] src, JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
-    } 
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), valueType);
+    }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(byte[] src, int offset, int len,
                            JavaType valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src, offset, len), valueType);
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src, offset, len), valueType);
     } 
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(DataInput src, Class<T> valueType) throws IOException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src),
-                _typeFactory.constructType(valueType));
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), _typeFactory.constructType(valueType));
     }
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(DataInput src, JavaType valueType) throws IOException
     {
-        return (T) _readMapAndClose(_jsonFactory.createParser(src), valueType);
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return (T) _readMapAndClose(ctxt,
+                _jsonFactory.createParser(ctxt, src), valueType);
     }
 
     /*
@@ -3078,7 +3040,9 @@ public class ObjectMapper
     public void writeValue(File resultFile, Object value)
         throws IOException, JsonGenerationException, JsonMappingException
     {
-        _configAndWriteValue(_jsonFactory.createGenerator(resultFile, JsonEncoding.UTF8), value);
+        DefaultSerializerProvider prov = _serializerProvider();
+        _configAndWriteValue(prov,
+                _jsonFactory.createGenerator(prov, resultFile, JsonEncoding.UTF8), value);
     }
 
     /**
@@ -3095,16 +3059,17 @@ public class ObjectMapper
     public void writeValue(OutputStream out, Object value)
         throws IOException, JsonGenerationException, JsonMappingException
     {
-        _configAndWriteValue(_jsonFactory.createGenerator(out, JsonEncoding.UTF8), value);
+        DefaultSerializerProvider prov = _serializerProvider();
+        _configAndWriteValue(prov,
+                _jsonFactory.createGenerator(prov, out, JsonEncoding.UTF8), value);
     }
 
-    /**
-     * @since 2.8
-     */
     public void writeValue(DataOutput out, Object value)
         throws IOException
     {
-        _configAndWriteValue(_jsonFactory.createGenerator(out, JsonEncoding.UTF8), value);
+        DefaultSerializerProvider prov = _serializerProvider();
+        _configAndWriteValue(prov,
+                _jsonFactory.createGenerator(prov, out), value);
     }
 
     /**
@@ -3120,7 +3085,8 @@ public class ObjectMapper
     public void writeValue(Writer w, Object value)
         throws IOException, JsonGenerationException, JsonMappingException
     {
-        _configAndWriteValue(_jsonFactory.createGenerator(w), value);
+        DefaultSerializerProvider prov = _serializerProvider();
+        _configAndWriteValue(prov, _jsonFactory.createGenerator(prov, w), value);
     }
 
     /**
@@ -3128,8 +3094,6 @@ public class ObjectMapper
      * a String. Functionally equivalent to calling
      * {@link #writeValue(Writer,Object)} with {@link java.io.StringWriter}
      * and constructing String, but more efficient.
-     *<p>
-     * Note: prior to version 2.1, throws clause included {@link IOException}; 2.1 removed it.
      */
     @SuppressWarnings("resource")
     public String writeValueAsString(Object value)
@@ -3137,8 +3101,9 @@ public class ObjectMapper
     {
         // alas, we have to pull the recycler directly here...
         SegmentedStringWriter sw = new SegmentedStringWriter(_jsonFactory._getBufferRecycler());
+        DefaultSerializerProvider prov = _serializerProvider();
         try {
-            _configAndWriteValue(_jsonFactory.createGenerator(sw), value);
+            _configAndWriteValue(prov, _jsonFactory.createGenerator(prov, sw), value);
         } catch (JsonProcessingException e) {
             throw e;
         } catch (IOException e) { // shouldn't really happen, but is declared as possibility so:
@@ -3153,17 +3118,17 @@ public class ObjectMapper
      * {@link #writeValue(Writer,Object)} with {@link java.io.ByteArrayOutputStream}
      * and getting bytes, but more efficient.
      * Encoding used will be UTF-8.
-     *<p>
-     * Note: prior to version 2.1, throws clause included {@link IOException}; 2.1 removed it.
      */
     @SuppressWarnings("resource")
     public byte[] writeValueAsBytes(Object value)
         throws JsonProcessingException
     {
+        DefaultSerializerProvider prov = _serializerProvider();
         ByteArrayBuilder bb = new ByteArrayBuilder(_jsonFactory._getBufferRecycler());
         try {
-            _configAndWriteValue(_jsonFactory.createGenerator(bb, JsonEncoding.UTF8), value);
-        } catch (JsonProcessingException e) { // to support [JACKSON-758]
+            _configAndWriteValue(prov,
+                    _jsonFactory.createGenerator(prov, bb, JsonEncoding.UTF8), value);
+        } catch (JsonProcessingException e) {
             throw e;
         } catch (IOException e) { // shouldn't really happen, but is declared as possibility so:
             throw JsonMappingException.fromUnexpectedIOE(e);
@@ -3171,6 +3136,68 @@ public class ObjectMapper
         byte[] result = bb.toByteArray();
         bb.release();
         return result;
+    }
+
+    /**
+     * Method called to configure the generator as necessary and then
+     * call write functionality
+     */
+    protected final void _configAndWriteValue(DefaultSerializerProvider prov,
+            JsonGenerator g, Object value)
+        throws IOException
+    {
+        if (prov.isEnabled(SerializationFeature.CLOSE_CLOSEABLE) && (value instanceof Closeable)) {
+            _configAndWriteCloseable(prov, g, value);
+            return;
+        }
+        try {
+            prov.serializeValue(g, value);
+        } catch (Exception e) {
+            ClassUtil.closeOnFailAndThrowAsIOE(g, e);
+            return;
+        }
+        g.close();
+    }
+
+    /**
+     * Helper method used when value to serialize is {@link Closeable} and its <code>close()</code>
+     * method is to be called right after serialization has been called
+     */
+    private final void _configAndWriteCloseable(DefaultSerializerProvider prov,
+            JsonGenerator g, Object value)
+        throws IOException
+    {
+        Closeable toClose = (Closeable) value;
+        try {
+            prov.serializeValue(g, value);
+            Closeable tmpToClose = toClose;
+            toClose = null;
+            tmpToClose.close();
+        } catch (Exception e) {
+            ClassUtil.closeOnFailAndThrowAsIOE(g, toClose, e);
+            return;
+        }
+        g.close();
+    }
+
+    /**
+     * Helper method used when value to serialize is {@link Closeable} and its <code>close()</code>
+     * method is to be called right after serialization has been called
+     */
+    protected final void _writeCloseableValue(JsonGenerator g, Object value, SerializationConfig cfg)
+        throws IOException
+    {
+        Closeable toClose = (Closeable) value;
+        try {
+            _serializerProvider(cfg).serializeValue(g, value);
+            if (cfg.isEnabled(SerializationFeature.FLUSH_AFTER_WRITE_VALUE)) {
+                g.flush();
+            }
+        } catch (Exception e) {
+            ClassUtil.closeOnFailAndThrowAsIOE(null, toClose, e);
+            return;
+        }
+        toClose.close();
     }
 
     /*
@@ -3232,8 +3259,6 @@ public class ObjectMapper
      * Main reason for using this method is performance, as writer is able
      * to pre-fetch serializer to use before write, and if writer is used
      * more than once this avoids addition per-value serializer lookups.
-     * 
-     * @since 2.5
      */
     public ObjectWriter writerFor(Class<?> rootType) {
         return _newWriter(getSerializationConfig(),
@@ -3249,8 +3274,6 @@ public class ObjectMapper
      * Main reason for using this method is performance, as writer is able
      * to pre-fetch serializer to use before write, and if writer is used
      * more than once this avoids addition per-value serializer lookups.
-     * 
-     * @since 2.5
      */
     public ObjectWriter writerFor(TypeReference<?> rootType) {
         return _newWriter(getSerializationConfig(),
@@ -3266,25 +3289,11 @@ public class ObjectMapper
      * Main reason for using this method is performance, as writer is able
      * to pre-fetch serializer to use before write, and if writer is used
      * more than once this avoids addition per-value serializer lookups.
-     * 
-     * @since 2.5
      */
     public ObjectWriter writerFor(JavaType rootType) {
         return _newWriter(getSerializationConfig(), rootType, /*PrettyPrinter*/null);
     }
 
-    /**
-     * Factory method for constructing {@link ObjectWriter} that will
-     * serialize objects using specified pretty printer for indentation
-     * (or if null, no pretty printer)
-     */
-    public ObjectWriter writer(PrettyPrinter pp) {
-        if (pp == null) { // need to use a marker to indicate explicit disabling of pp
-            pp = ObjectWriter.NULL_PRETTY_PRINTER;
-        }
-        return _newWriter(getSerializationConfig(), /*root type*/ null, pp);
-    }
-    
     /**
      * Factory method for constructing {@link ObjectWriter} that will
      * serialize objects using the default pretty printer for indentation
@@ -3318,8 +3327,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectWriter} that will
      * use specified Base64 encoding variant for Base64-encoded binary data.
-     * 
-     * @since 2.1
      */
     public ObjectWriter writer(Base64Variant defaultBase64) {
         return _newWriter(getSerializationConfig().with(defaultBase64));
@@ -3328,8 +3335,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectReader} that will
      * use specified character escaping details for output.
-     * 
-     * @since 2.3
      */
     public ObjectWriter writer(CharacterEscapes escapes) {
         return _newWriter(getSerializationConfig()).with(escapes);
@@ -3401,8 +3406,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectReader} that will
      * read or update instances of specified type
-     * 
-     * @since 2.6
      */
     public ObjectReader readerFor(JavaType type) {
         return _newReader(getDeserializationConfig(), type, null,
@@ -3412,8 +3415,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectReader} that will
      * read or update instances of specified type
-     * 
-     * @since 2.6
      */
     public ObjectReader readerFor(Class<?> type) {
         return _newReader(getDeserializationConfig(), _typeFactory.constructType(type), null,
@@ -3423,8 +3424,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectReader} that will
      * read or update instances of specified type
-     * 
-     * @since 2.6
      */
     public ObjectReader readerFor(TypeReference<?> type) {
         return _newReader(getDeserializationConfig(), _typeFactory.constructType(type), null,
@@ -3474,8 +3473,6 @@ public class ObjectMapper
     /**
      * Factory method for constructing {@link ObjectReader} that will
      * use specified Base64 encoding variant for Base64-encoded binary data.
-     * 
-     * @since 2.1
      */
     public ObjectReader reader(Base64Variant defaultBase64) {
         return _newReader(getDeserializationConfig().with(defaultBase64));
@@ -3514,7 +3511,7 @@ public class ObjectMapper
      * the goal is just to allow efficient value conversions for structurally
      * compatible Objects, according to standard Jackson configuration.
      *<p>
-     * Further note that functianality is not designed to support "advanced" use
+     * Further note that this functionality is not designed to support "advanced" use
      * cases, such as conversion of polymorphic values, or cases where Object Identity
      * is used.
      *      
@@ -3575,35 +3572,36 @@ public class ObjectMapper
                 return fromValue;
             }
         }
-        
-        // Then use TokenBuffer, which is a JsonGenerator:
-        TokenBuffer buf = new TokenBuffer(this, false);
+
+        // inlined 'writeValue' with minor changes:
+        // first: disable wrapping when writing
+        SerializationConfig config = getSerializationConfig()
+                .without(SerializationFeature.WRAP_ROOT_VALUE);
+        DefaultSerializerProvider prov = _serializerProvider(config);
+        TokenBuffer buf = TokenBuffer.forValueConversion(prov);
+        // Would like to let buffer decide, but it won't have deser config to check so...
         if (isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
             buf = buf.forceUseOfBigDecimal(true);
         }
         try {
-            // inlined 'writeValue' with minor changes:
-            // first: disable wrapping when writing
-            SerializationConfig config = getSerializationConfig().without(SerializationFeature.WRAP_ROOT_VALUE);
             // no need to check for closing of TokenBuffer
-            _serializerProvider(config).serializeValue(buf, fromValue);
+            prov.serializeValue(buf, fromValue);
 
             // then matching read, inlined 'readValue' with minor mods:
-            final JsonParser p = buf.asParser();
+            DefaultDeserializationContext readCtxt = createDeserializationContext();
+            final JsonParser p = buf.asParser(readCtxt);
+            readCtxt.assignParser(p);
             Object result;
             // ok to pass in existing feature flags; unwrapping handled by mapper
-            final DeserializationConfig deserConfig = getDeserializationConfig();
             JsonToken t = _initForReading(p, toValueType);
             if (t == JsonToken.VALUE_NULL) {
-                DeserializationContext ctxt = createDeserializationContext(p, deserConfig);
-                result = _findRootDeserializer(ctxt, toValueType).getNullValue(ctxt);
+                result = _findRootDeserializer(readCtxt, toValueType).getNullValue(readCtxt);
             } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
                 result = null;
             } else { // pointing to event other than null
-                DeserializationContext ctxt = createDeserializationContext(p, deserConfig);
-                JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, toValueType);
+                JsonDeserializer<Object> deser = _findRootDeserializer(readCtxt, toValueType);
                 // note: no handling of unwrapping
-                result = deser.deserialize(p, ctxt);
+                result = deser.deserialize(p, readCtxt);
             }
             p.close();
             return result;
@@ -3644,33 +3642,34 @@ public class ObjectMapper
      *     Java array will create a new array)
      *
      * @throws JsonMappingException if there are structural incompatibilities that prevent update.
-     * 
-     * @since 2.9
      */
     @SuppressWarnings("resource")
     public <T> T updateValue(T valueToUpdate, Object overrides)
         throws JsonMappingException
     {
-        T result = valueToUpdate;
-        if ((valueToUpdate != null) && (overrides != null)) {
-            TokenBuffer buf = new TokenBuffer(this, false);
-            if (isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
-                buf = buf.forceUseOfBigDecimal(true);
+        if ((valueToUpdate == null) || (overrides == null)) {
+            return valueToUpdate;
+        }
+        SerializationConfig config = getSerializationConfig()
+                .without(SerializationFeature.WRAP_ROOT_VALUE);
+        DefaultSerializerProvider prov = _serializerProvider(config);
+        TokenBuffer buf = TokenBuffer.forValueConversion(prov);
+        // Would like to let buffer decide, but it won't have deser config to check so...
+        if (isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+            buf = buf.forceUseOfBigDecimal(true);
+        }
+        T result;
+        try {
+            prov.serializeValue(buf, overrides);
+            JsonParser p = buf.asParser();
+            result = readerForUpdating(valueToUpdate).readValue(p);
+            p.close();
+        } catch (IOException e) { // should not occur, no real i/o...
+            if (e instanceof JsonMappingException) {
+                throw (JsonMappingException) e;
             }
-            try {
-                SerializationConfig config = getSerializationConfig().
-                        without(SerializationFeature.WRAP_ROOT_VALUE);
-                _serializerProvider(config).serializeValue(buf, overrides);
-                JsonParser p = buf.asParser();
-                result = readerForUpdating(valueToUpdate).readValue(p);
-                p.close();
-            } catch (IOException e) { // should not occur, no real i/o...
-                if (e instanceof JsonMappingException) {
-                    throw (JsonMappingException) e;
-                }
-                // 17-Mar-2017, tatu: Really ought not happen...
-                throw JsonMappingException.fromUnexpectedIOE(e);
-            }
+            // 17-Mar-2017, tatu: Really ought not happen...
+            throw JsonMappingException.fromUnexpectedIOE(e);
         }
         return result;
     }
@@ -3712,7 +3711,7 @@ public class ObjectMapper
         if (type == null) {
             throw new IllegalArgumentException("type must be provided");
         }
-        _serializerProvider(getSerializationConfig()).acceptJsonFormatVisitor(type, visitor);
+        _serializerProvider().acceptJsonFormatVisitor(type, visitor);
     }
 
     /*
@@ -3726,69 +3725,15 @@ public class ObjectMapper
      * {@link SerializerProvider} to use for serialization.
      */
     protected DefaultSerializerProvider _serializerProvider(SerializationConfig config) {
-        return _serializerProvider.createInstance(config, _serializerFactory);
+        // 03-Oct-2017, tatu: Should be ok to pass "empty" generator settings...
+        return _serializerProvider.createInstance(config,
+                GeneratorSettings.empty(), _serializerFactory);
     }
 
-    /**
-     * Method called to configure the generator as necessary and then
-     * call write functionality
-     */
-    protected final void _configAndWriteValue(JsonGenerator g, Object value)
-        throws IOException
-    {
-        SerializationConfig cfg = getSerializationConfig();
-        cfg.initialize(g); // since 2.5
-        if (cfg.isEnabled(SerializationFeature.CLOSE_CLOSEABLE) && (value instanceof Closeable)) {
-            _configAndWriteCloseable(g, value, cfg);
-            return;
-        }
-        try {
-            _serializerProvider(cfg).serializeValue(g, value);
-        } catch (Exception e) {
-            ClassUtil.closeOnFailAndThrowAsIOE(g, e);
-            return;
-        }
-        g.close();
-    }
-
-    /**
-     * Helper method used when value to serialize is {@link Closeable} and its <code>close()</code>
-     * method is to be called right after serialization has been called
-     */
-    private final void _configAndWriteCloseable(JsonGenerator g, Object value, SerializationConfig cfg)
-        throws IOException
-    {
-        Closeable toClose = (Closeable) value;
-        try {
-            _serializerProvider(cfg).serializeValue(g, value);
-            Closeable tmpToClose = toClose;
-            toClose = null;
-            tmpToClose.close();
-        } catch (Exception e) {
-            ClassUtil.closeOnFailAndThrowAsIOE(g, toClose, e);
-            return;
-        }
-        g.close();
-    }
-
-    /**
-     * Helper method used when value to serialize is {@link Closeable} and its <code>close()</code>
-     * method is to be called right after serialization has been called
-     */
-    private final void _writeCloseableValue(JsonGenerator g, Object value, SerializationConfig cfg)
-        throws IOException
-    {
-        Closeable toClose = (Closeable) value;
-        try {
-            _serializerProvider(cfg).serializeValue(g, value);
-            if (cfg.isEnabled(SerializationFeature.FLUSH_AFTER_WRITE_VALUE)) {
-                g.flush();
-            }
-        } catch (Exception e) {
-            ClassUtil.closeOnFailAndThrowAsIOE(null, toClose, e);
-            return;
-        }
-        toClose.close();
+    protected DefaultSerializerProvider _serializerProvider() {
+        // 03-Oct-2017, tatu: Should be ok to pass "empty" generator settings...
+        return _serializerProvider.createInstance(getSerializationConfig(),
+                GeneratorSettings.empty(), _serializerFactory);
     }
 
     /*
@@ -3800,7 +3745,7 @@ public class ObjectMapper
     /**
      * Actual implementation of value reading+binding operation.
      */
-    protected Object _readValue(DeserializationConfig cfg, JsonParser p,
+    protected Object _readValue(DeserializationContext ctxt, JsonParser p,
             JavaType valueType)
         throws IOException
     {
@@ -3810,7 +3755,7 @@ public class ObjectMapper
          */
         Object result;
         JsonToken t = _initForReading(p, valueType);
-        final DeserializationContext ctxt = createDeserializationContext(p, cfg);
+        final DeserializationConfig config = ctxt.getConfig();
         if (t == JsonToken.VALUE_NULL) {
             // Ask JsonDeserializer what 'null value' to use:
             result = _findRootDeserializer(ctxt, valueType).getNullValue(ctxt);
@@ -3819,43 +3764,44 @@ public class ObjectMapper
         } else { // pointing to event other than null
             JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
             // ok, let's get the value
-            if (cfg.useRootWrapping()) {
-                result = _unwrapAndDeserialize(p, ctxt, cfg, valueType, deser);
+            if (config.useRootWrapping()) {
+                result = _unwrapAndDeserialize(p, ctxt, config, valueType, deser);
             } else {
                 result = deser.deserialize(p, ctxt);
             }
         }
         // Need to consume the token too
         p.clearCurrentToken();
-        if (cfg.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
+        if (config.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
             _verifyNoTrailingTokens(p, ctxt, valueType);
         }
         return result;
     }
 
-    protected Object _readMapAndClose(JsonParser p0, JavaType valueType)
+    protected Object _readMapAndClose(DefaultDeserializationContext ctxt,
+            JsonParser p0, JavaType valueType)
         throws IOException
     {
+        ctxt.assignParser(p0);
         try (JsonParser p = p0) {
             Object result;
             JsonToken t = _initForReading(p, valueType);
-            final DeserializationConfig cfg = getDeserializationConfig();
-            final DeserializationContext ctxt = createDeserializationContext(p, cfg);
             if (t == JsonToken.VALUE_NULL) {
                 // Ask JsonDeserializer what 'null value' to use:
                 result = _findRootDeserializer(ctxt, valueType).getNullValue(ctxt);
             } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
                 result = null;
             } else {
+                final DeserializationConfig config = ctxt.getConfig();
                 JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
-                if (cfg.useRootWrapping()) {
-                    result = _unwrapAndDeserialize(p, ctxt, cfg, valueType, deser);
+                if (config.useRootWrapping()) {
+                    result = _unwrapAndDeserialize(p, ctxt, config, valueType, deser);
                 } else {
                     result = deser.deserialize(p, ctxt);
                 }
                 ctxt.checkUnresolvedObjectId();
             }
-            if (cfg.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
+            if (ctxt.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
                 _verifyNoTrailingTokens(p, ctxt, valueType);
             }
             return result;
@@ -3863,21 +3809,18 @@ public class ObjectMapper
     }
 
     /**
-     * Similar to {@link #_readMapAndClose} but specialized for <code>JsonNode</code>
-     * reading.
-     *
-     * @since 2.9
+     * Similar to {@link #_readMapAndClose} but specialized for <code>JsonNode</code> reading.
      */
-    protected JsonNode _readTreeAndClose(JsonParser p0) throws IOException
+    protected JsonNode _readTreeAndClose(DeserializationContext ctxt,
+            JsonParser p0) throws IOException
     {
         try (JsonParser p = p0) {
             final JavaType valueType = JSON_NODE_TYPE;
 
             DeserializationConfig cfg = getDeserializationConfig();
+
             // 27-Oct-2016, tatu: Need to inline `_initForReading()` due to
             //   special requirements by tree reading (no fail on eof)
-            
-            cfg.initialize(p); // since 2.5
             JsonToken t = p.currentToken();
             if (t == null) {
                 t = p.nextToken();
@@ -3888,7 +3831,6 @@ public class ObjectMapper
             if (t == JsonToken.VALUE_NULL) {
                 return cfg.getNodeFactory().nullNode();
             }
-            DeserializationContext ctxt = createDeserializationContext(p, cfg);
             JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
             Object result;
             if (cfg.useRootWrapping()) {
@@ -3950,11 +3892,24 @@ public class ObjectMapper
      * for deserializing a single root value.
      * Can be overridden if a custom context is needed.
      */
-    protected DefaultDeserializationContext createDeserializationContext(JsonParser p,
-            DeserializationConfig cfg) {
-        return _deserializationContext.createInstance(cfg, p, _injectableValues);
+    protected DefaultDeserializationContext createDeserializationContext(JsonParser p) {
+        return _deserializationContext.createInstance(getDeserializationConfig(),
+                /* FormatSchema */ null, _injectableValues)
+                .assignParser(p);
     }
 
+    protected DefaultDeserializationContext createDeserializationContext() {
+        return _deserializationContext.createInstance(getDeserializationConfig(),
+                /* FormatSchema */ null, _injectableValues);
+    }
+
+    protected DefaultDeserializationContext createDeserializationContext(DeserializationConfig config,
+            JsonParser p) {
+        return _deserializationContext.createInstance(config,
+                /* FormatSchema */ null, _injectableValues)
+                .assignParser(p);
+    }
+    
     /**
      * Method called to ensure that given parser is ready for reading
      * content for data binding.
@@ -3972,8 +3927,6 @@ public class ObjectMapper
      */
     protected JsonToken _initForReading(JsonParser p, JavaType targetType) throws IOException
     {
-        _deserializationConfig.initialize(p); // since 2.5
-
         // First: must point to a token; if not pointing to one, advance.
         // This occurs before first read from JsonParser, as well as
         // after clearing of current token.
@@ -4030,9 +3983,6 @@ public class ObjectMapper
         return deser;
     }
 
-    /**
-     * @since 2.2
-     */
     protected void _verifySchemaType(FormatSchema schema)
     {
         if (schema != null) {

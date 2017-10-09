@@ -11,7 +11,10 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.fasterxml.jackson.annotation.ObjectIdResolver;
 
 import com.fasterxml.jackson.core.*;
-
+import com.fasterxml.jackson.core.tree.ArrayTreeNode;
+import com.fasterxml.jackson.core.tree.ObjectTreeNode;
+import com.fasterxml.jackson.core.type.ResolvedType;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.ObjectIdReader;
@@ -49,7 +52,8 @@ import com.fasterxml.jackson.databind.util.*;
  */
 public abstract class DeserializationContext
     extends DatabindContext
-    implements java.io.Serializable
+    implements java.io.Serializable,
+        ObjectReadContext // 3.0
 {
     private static final long serialVersionUID = 3L;
 
@@ -100,18 +104,29 @@ public abstract class DeserializationContext
     protected final Class<?> _view;
 
     /**
-     * Currently active parser used for deserialization.
-     * May be different from the outermost parser
-     * when content is buffered.
+     * Schema for underlying parser to use, if any.
      */
-    protected transient JsonParser _parser;
-    
+    protected final FormatSchema _schema;
+
     /**
      * Object used for resolving references to injectable
      * values.
      */
     protected final InjectableValues _injectableValues;
+
+    /*
+    /**********************************************************
+    /* State (not for blueprints)
+    /**********************************************************
+     */
     
+    /**
+     * Currently active parser used for deserialization.
+     * May be different from the outermost parser
+     * when content is buffered.
+     */
+    protected transient JsonParser _parser;
+
     /*
     /**********************************************************
     /* Per-operation reusable helper objects (not for blueprints)
@@ -126,8 +141,6 @@ public abstract class DeserializationContext
 
     /**
      * Lazily-constructed holder for per-call attributes.
-     * 
-     * @since 2.3
      */
     protected transient ContextAttributes _attributes;
 
@@ -135,8 +148,6 @@ public abstract class DeserializationContext
      * Type of {@link JsonDeserializer} (or, more specifically,
      *   {@link ContextualDeserializer}) that is being
      *   contextualized currently.
-     *
-     * @since 2.5
      */
     protected LinkedNode<JavaType> _currentType;
     
@@ -166,6 +177,7 @@ public abstract class DeserializationContext
         _injectableValues = null;
         _view = null;
         _attributes = null;
+        _schema = null;
     }
 
     protected DeserializationContext(DeserializationContext src,
@@ -177,7 +189,7 @@ public abstract class DeserializationContext
         _config = src._config;
         _featureFlags = src._featureFlags;
         _view = src._view;
-        _parser = src._parser;
+        _schema = src._schema;
         _injectableValues = src._injectableValues;
         _attributes = src._attributes;
     }
@@ -186,7 +198,7 @@ public abstract class DeserializationContext
      * Constructor used for creating actual per-call instances.
      */
     protected DeserializationContext(DeserializationContext src,
-            DeserializationConfig config, JsonParser p,
+            DeserializationConfig config, FormatSchema schema,
             InjectableValues injectableValues)
     {
         _cache = src._cache;
@@ -195,7 +207,8 @@ public abstract class DeserializationContext
         _config = config;
         _featureFlags = config.getDeserializationFeatures();
         _view = config.getActiveView();
-        _parser = p;
+        _schema = schema;
+
         _injectableValues = injectableValues;
         _attributes = config.getAttributes();
     }
@@ -210,6 +223,8 @@ public abstract class DeserializationContext
         _config = src._config;
         _featureFlags = src._featureFlags;
         _view = src._view;
+        _schema = src._schema;
+
         _injectableValues = null;
     }
     
@@ -274,7 +289,7 @@ public abstract class DeserializationContext
 
     /*
     /**********************************************************
-    /* Access to per-call state, like generic attributes (2.3+)
+    /* Access to per-call state, like generic attributes
     /**********************************************************
      */
 
@@ -297,14 +312,111 @@ public abstract class DeserializationContext
      * do not get passed (or do not retain) type information when being
      * constructed: happens for example for deserializers constructed
      * from annotations.
-     * 
-     * @since 2.5
      *
      * @return Type of {@link ContextualDeserializer} being contextualized,
      *   if process is on-going; null if not.
      */
     public JavaType getContextualType() {
         return (_currentType == null) ? null : _currentType.value();
+    }
+
+    /*
+    /**********************************************************
+    /* ObjectReadContext impl, config access
+    /**********************************************************
+     */
+    
+    @Override
+    public FormatSchema getSchema() {
+        return _schema;
+    }
+
+    @Override
+    public int getParserFeatures(int defaults) {
+        return _config.getParserFeatures(defaults);
+    }
+
+    @Override
+    public int getFormatReadFeatures(int defaults) {
+        return _config.getFormatReadFeatures(defaults);
+    }
+
+    /*
+    /**********************************************************
+    /* ObjectReadContext impl, Tree creation
+    /**********************************************************
+     */
+    
+    @Override
+    public ArrayTreeNode createArrayNode() {
+        return getNodeFactory().arrayNode();
+    }
+
+    @Override
+    public ObjectTreeNode createObjectNode() {
+        return getNodeFactory().objectNode();
+    }        
+
+    /*
+    /**********************************************************
+    /* ObjectReadContext impl, databind
+    /**********************************************************
+     */
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends TreeNode> T readTree(JsonParser p) throws IOException {
+        // NOTE: inlined version of `_bindAsTree()` from `ObjectReader`
+        JsonToken t = p.currentToken();
+        if (t == null) {
+            t = p.nextToken();
+            if (t == null) { // [databind#1406]: expose end-of-input as `null`
+                return null;
+            }
+        }
+        if (t == JsonToken.VALUE_NULL) {
+            return (T) getNodeFactory().nullNode();
+        }
+        JsonDeserializer<Object> deser = findRootValueDeserializer(ObjectReader.JSON_NODE_TYPE);
+        return (T) deser.deserialize(p, this);
+    }
+
+    /**
+     * Convenience method that may be used by composite or container deserializers,
+     * for reading one-off values contained (for sequences, it is more efficient
+     * to actually fetch deserializer once for the whole collection).
+     *<p>
+     * NOTE: when deserializing values of properties contained in composite types,
+     * rather use {@link #readPropertyValue(JsonParser, BeanProperty, Class)};
+     * this method does not allow use of contextual annotations.
+     */
+    @Override
+    public <T> T readValue(JsonParser p, Class<T> type) throws IOException {
+        return readValue(p, getTypeFactory().constructType(type));
+    }
+
+    @Override
+    public <T> T readValue(JsonParser p, TypeReference<?> refType) throws IOException {
+        return readValue(p, getTypeFactory().constructType(refType));
+    }
+    
+    @Override
+    public <T> T readValue(JsonParser p, ResolvedType type) throws IOException {
+        if (!(type instanceof JavaType)) {
+            throw new UnsupportedOperationException(
+"Only support `JavaType` implementation of `ResolvedType`, not: "+type.getClass().getName());
+        }
+        return readValue(p, (JavaType) type);
+    }
+    
+    @SuppressWarnings("unchecked")
+    public <T> T readValue(JsonParser p, JavaType type) throws IOException {
+        JsonDeserializer<Object> deser = findRootValueDeserializer(type);
+        if (deser == null) {
+            reportBadDefinition(type,
+                    "Could not find JsonDeserializer for type "+type);
+        }
+        return (T) deser.deserialize(p, this);
     }
 
     /*
@@ -413,9 +525,6 @@ public abstract class DeserializationContext
     /**
      * Method for checking whether we could find a deserializer
      * for given type.
-     *
-     * @param type
-     * @since 2.3
      */
     public boolean hasValueDeserializerFor(JavaType type, AtomicReference<Throwable> cause) {
         try {
@@ -730,50 +839,17 @@ public abstract class DeserializationContext
     /* Convenience methods for reading parsed values
     /**********************************************************
      */
-
-    /**
-     * Convenience method that may be used by composite or container deserializers,
-     * for reading one-off values contained (for sequences, it is more efficient
-     * to actually fetch deserializer once for the whole collection).
-     *<p>
-     * NOTE: when deserializing values of properties contained in composite types,
-     * rather use {@link #readPropertyValue(JsonParser, BeanProperty, Class)};
-     * this method does not allow use of contextual annotations.
-     * 
-     * @since 2.4
-     */
-    public <T> T readValue(JsonParser p, Class<T> type) throws IOException {
-        return readValue(p, getTypeFactory().constructType(type));
-    }
-
-    /**
-     * @since 2.4
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(JsonParser p, JavaType type) throws IOException {
-        JsonDeserializer<Object> deser = findRootValueDeserializer(type);
-        if (deser == null) {
-            reportBadDefinition(type,
-                    "Could not find JsonDeserializer for type "+type);
-        }
-        return (T) deser.deserialize(p, this);
-    }
-
+    
     /**
      * Convenience method that may be used by composite or container deserializers,
      * for reading one-off values for the composite type, taking into account
      * annotations that the property (passed to this method -- usually property that
      * has custom serializer that called this method) has.
-     * 
-     * @since 2.4
      */
     public <T> T readPropertyValue(JsonParser p, BeanProperty prop, Class<T> type) throws IOException {
         return readPropertyValue(p, prop, getTypeFactory().constructType(type));
     }
 
-    /**
-     * @since 2.4
-     */
     @SuppressWarnings("unchecked")
     public <T> T readPropertyValue(JsonParser p, BeanProperty prop, JavaType type) throws IOException {
         JsonDeserializer<Object> deser = findContextualValueDeserializer(type, prop);
@@ -1454,8 +1530,8 @@ trailingToken, ClassUtil.nameOf(targetType)
     public JsonMappingException wrongTokenException(JsonParser p, Class<?> targetType,
             JsonToken expToken, String extra)
     {
-        String msg = String.format("Unexpected token (%s), expected %s",
-                p.currentToken(), expToken);
+        JsonToken t = (p == null) ? null : p.currentToken();
+        String msg = String.format("Unexpected token (%s), expected %s", t, expToken);
         msg = _colonConcat(msg, extra);
         return MismatchedInputException.from(p, targetType, msg);
     }
