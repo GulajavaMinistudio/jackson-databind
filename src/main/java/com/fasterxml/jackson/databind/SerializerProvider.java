@@ -9,15 +9,18 @@ import java.util.TimeZone;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
+
 import com.fasterxml.jackson.core.FormatSchema;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.ObjectWriteContext;
 import com.fasterxml.jackson.core.PrettyPrinter;
 import com.fasterxml.jackson.core.SerializableString;
+import com.fasterxml.jackson.core.TokenStreamFactory;
 import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.tree.ArrayTreeNode;
 import com.fasterxml.jackson.core.tree.ObjectTreeNode;
+
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.cfg.GeneratorSettings;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
@@ -55,8 +58,11 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  */
 public abstract class SerializerProvider
     extends DatabindContext
-    implements ObjectWriteContext // 3.0, for use by jackson-core
+    implements java.io.Serializable, // because we don't have no-args constructor
+        ObjectWriteContext // 3.0, for use by jackson-core
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Setting for determining whether mappings for "unknown classes" should be
      * cached for faster resolution. Usually this isn't needed, but maybe it
@@ -87,6 +93,12 @@ public abstract class SerializerProvider
      */
     final protected SerializationConfig _config;
 
+    /**
+     * Low-level {@link TokenStreamFactory} that may be used for constructing
+     * embedded generators.
+     */
+    final protected TokenStreamFactory _streamFactory;
+    
     /**
      * View used for currently active serialization, if any.
      * Only set for non-blueprint instances.
@@ -207,8 +219,9 @@ public abstract class SerializerProvider
      * which is only used as the template for constructing per-binding
      * instances.
      */
-    public SerializerProvider()
+    public SerializerProvider(TokenStreamFactory streamFactory)
     {
+        _streamFactory = streamFactory;
         _config = null;
         _generatorConfig = null;
         _serializerFactory = null;
@@ -233,6 +246,7 @@ public abstract class SerializerProvider
             SerializationConfig config, GeneratorSettings generatorConfig,
             SerializerFactory f)
     {
+        _streamFactory = src._streamFactory;
         _serializerFactory = f;
         _config = config;
         _generatorConfig = generatorConfig;
@@ -259,6 +273,8 @@ public abstract class SerializerProvider
      */
     protected SerializerProvider(SerializerProvider src)
     {
+        _streamFactory = src._streamFactory;
+
         // since this is assumed to be a blue-print instance, many settings missing:
         _config = null;
         _generatorConfig = null;
@@ -283,8 +299,11 @@ public abstract class SerializerProvider
     /**********************************************************
      */
 
-    // // // Configuration access
-    
+    @Override
+    public TokenStreamFactory getGeneratorFactory() {
+        return _streamFactory;
+    }
+
     @Override
     public FormatSchema getSchema() { return _generatorConfig.getSchema(); }
 

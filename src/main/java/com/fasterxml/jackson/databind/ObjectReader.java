@@ -302,6 +302,8 @@ public class ObjectReader
     protected JsonToken _initForReading(DefaultDeserializationContext ctxt, JsonParser p)
         throws IOException
     {
+        ctxt.assignParser(p);
+
         // First: must point to a token; if not pointing to one, advance.
         // This occurs before first read from JsonParser, as well as
         // after clearing of current token.
@@ -714,6 +716,8 @@ public class ObjectReader
     }
 
     public boolean isEnabled(JsonParser.Feature f) {
+        // !!! 09-Oct-2017, tatu: Actually for full answer we really should check
+        //   what actual combined settings are....
         return _parserFactory.isEnabled(f);
     }
 
@@ -721,11 +725,17 @@ public class ObjectReader
         return _config;
     }
 
-    public TokenStreamFactory getFactory() {
+    /**
+     * @since 3.0
+     */
+    public TokenStreamFactory parserFactory() {
         return _parserFactory;
     }
 
-    public TypeFactory getTypeFactory() {
+    /**
+     * @since 3.0
+     */
+    public TypeFactory typeFactory() {
         return _config.getTypeFactory();
     }
 
@@ -735,6 +745,146 @@ public class ObjectReader
 
     public InjectableValues getInjectableValues() {
         return _injectableValues;
+    }
+
+    /**
+     * @deprecated Since 3.0 use {@link #parserFactory}
+     */
+    @Deprecated
+    public TokenStreamFactory getFactory() {
+        return parserFactory();
+    }
+
+    /**
+     * @deprecated Since 3.0 use {@link #typeFactory}
+     */
+    @Deprecated
+    public TypeFactory getTypeFactory() {
+        return typeFactory();
+    }
+
+    /*
+    /**********************************************************
+    /* Public API: constructing Parsers that are properly linked
+    /* to `ObjectReadContext`
+    /**********************************************************
+     */
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,java.io.File)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(File src) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,java.net.URL)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(URL src) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,InputStream)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(InputStream in) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, in));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,Reader)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(Reader r) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, r));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,byte[])}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(byte[] data) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, data));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,byte[],int,int)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(byte[] data, int offset, int len) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, data, offset, len));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,String)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(String content) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,char[])}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(char[] content) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
+    }
+
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,char[],int,int)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(char[] content, int offset, int len) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content, offset, len));
     }
 
     /*

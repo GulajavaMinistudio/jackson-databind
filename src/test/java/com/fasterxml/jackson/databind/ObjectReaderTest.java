@@ -23,7 +23,7 @@ public class ObjectReaderTest extends BaseMapTest
     public void testSimpleViaParser() throws Exception
     {
         final String JSON = "[1]";
-        JsonParser p = MAPPER.getFactory().createParser(JSON);
+        JsonParser p = MAPPER.createParser(JSON);
         Object ob = MAPPER.readerFor(Object.class)
                 .readValue(p);
         p.close();
@@ -98,9 +98,9 @@ public class ObjectReaderTest extends BaseMapTest
     public void testMiscSettings() throws Exception
     {
         ObjectReader r = MAPPER.reader();
-        assertSame(MAPPER.getFactory(), r.getFactory());
+        assertSame(MAPPER.tokenStreamFactory(), r.parserFactory());
 
-        assertNotNull(r.getTypeFactory());
+        assertNotNull(r.typeFactory());
         assertNull(r.getInjectableValues());
 
         r = r.withAttributes(Collections.emptyMap());

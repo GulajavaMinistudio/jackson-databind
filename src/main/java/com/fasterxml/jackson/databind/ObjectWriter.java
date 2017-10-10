@@ -533,6 +533,74 @@ public class ObjectWriter
 
     /*
     /**********************************************************
+    /* Public API: constructing Generator that are properly linked
+    /* to `ObjectWriteContext`
+    /**********************************************************
+     */
+
+    /**
+     * Factory method for constructing {@link JsonGenerator} that is properly
+     * wired to allow callbacks for serialization: basically
+     * constructs a {@link ObjectWriteContext} and then calls
+     * {@link TokenStreamFactory#createGenerator(ObjectWriteContext,OutputStream)}.
+     *
+     * @since 3.0
+     */
+    public JsonGenerator createGenerator(OutputStream out) throws IOException {
+        return _generatorFactory.createGenerator(_serializerProvider(), out);
+    }
+
+    /**
+     * Factory method for constructing {@link JsonGenerator} that is properly
+     * wired to allow callbacks for serialization: basically
+     * constructs a {@link ObjectWriteContext} and then calls
+     * {@link TokenStreamFactory#createGenerator(ObjectWriteContext,OutputStream,JsonEncoding)}.
+     *
+     * @since 3.0
+     */
+    public JsonGenerator createGenerator(OutputStream out, JsonEncoding enc) throws IOException {
+        return _generatorFactory.createGenerator(_serializerProvider(), out, enc);
+    }
+
+    /**
+     * Factory method for constructing {@link JsonGenerator} that is properly
+     * wired to allow callbacks for serialization: basically
+     * constructs a {@link ObjectWriteContext} and then calls
+     * {@link TokenStreamFactory#createGenerator(ObjectWriteContext,Writer)}.
+     *
+     * @since 3.0
+     */
+    public JsonGenerator createGenerator(Writer w) throws IOException {
+        return _generatorFactory.createGenerator(_serializerProvider(), w);
+    }
+
+    /**
+     * Factory method for constructing {@link JsonGenerator} that is properly
+     * wired to allow callbacks for serialization: basically
+     * constructs a {@link ObjectWriteContext} and then calls
+     * {@link TokenStreamFactory#createGenerator(ObjectWriteContext,File,JsonEncoding)}.
+     *
+     * @since 3.0
+     */
+    public JsonGenerator createGenerator(File f, JsonEncoding enc)
+        throws IOException {
+        return _generatorFactory.createGenerator(_serializerProvider(), f, enc);
+    }
+
+    /**
+     * Factory method for constructing {@link JsonGenerator} that is properly
+     * wired to allow callbacks for serialization: basically
+     * constructs a {@link ObjectWriteContext} and then calls
+     * {@link TokenStreamFactory#createGenerator(ObjectWriteContext,DataOutput)}.
+     *
+     * @since 3.0
+     */
+    public JsonGenerator createGenerator(DataOutput out) throws IOException {
+        return _generatorFactory.createGenerator(_serializerProvider(), out);
+    }
+
+    /*
+    /**********************************************************
     /* Convenience methods for JsonNode creation
     /**********************************************************
      */
@@ -721,6 +789,8 @@ public class ObjectWriter
     }
 
     public boolean isEnabled(JsonGenerator.Feature f) {
+        // !!! 09-Oct-2017, tatu: Actually for full answer we really should check
+        //   what actual combined settings are....
         return _generatorFactory.isEnabled(f);
     }
 
@@ -728,11 +798,14 @@ public class ObjectWriter
         return _config;
     }
 
-    public TokenStreamFactory getFactory() {
+    /**
+     * @since 3.0
+     */
+    public TokenStreamFactory generatorFactory() {
         return _generatorFactory;
     }
-    
-    public TypeFactory getTypeFactory() {
+
+    public TypeFactory typeFactory() {
         return _config.getTypeFactory();
     }
 
@@ -749,7 +822,23 @@ public class ObjectWriter
     public ContextAttributes getAttributes() {
         return _config.getAttributes();
     }
-    
+
+    /**
+     * @deprecated Since 3.0 use {@link #generatorFactory()}
+     */
+    @Deprecated
+    public TokenStreamFactory getFactory() {
+        return generatorFactory();
+    }
+
+    /**
+     * @deprecated Since 3.0 use {@link #typeFactory}
+     */
+    @Deprecated
+    public TypeFactory getTypeFactory() {
+        return typeFactory();
+    }
+
     /*
     /**********************************************************
     /* Serialization methods; ones from ObjectCodec first

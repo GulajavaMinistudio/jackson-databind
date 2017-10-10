@@ -1,4 +1,4 @@
-package com.fasterxml.jackson.failing;
+package com.fasterxml.jackson.databind;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -6,10 +6,9 @@ import java.io.StringReader;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.io.SerializedString;
-import com.fasterxml.jackson.databind.BaseMapTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class MapperViaParserTest  extends BaseMapTest
+public class MapperViaParserTest extends BaseMapTest
 {
     final static int TWO_BYTE_ESCAPED = 0x111;
     final static int THREE_BYTE_ESCAPED = 0x1111;
@@ -73,27 +72,23 @@ public class MapperViaParserTest  extends BaseMapTest
     /********************************************************
      */
 
+    private final ObjectMapper MAPPER = newObjectMapper();
+
     @SuppressWarnings("resource")
-    public void testPojoReadingFailing()
-        throws IOException
+    public void testPojoReadingOk() throws IOException
     {
-        // regular factory can't do it, without a call to setCodec()
-        JsonFactory jf = new JsonFactory();
-        try {
-            final String JSON = "{ \"x\" : 9 }";
-            JsonParser jp = jf.createParser(new StringReader(JSON));
-            Pojo p = jp.readValueAs(Pojo.class);
-            fail("Expected an exception: got "+p);
-        } catch (IllegalStateException e) {
-            verifyException(e, "No ObjectCodec defined");
-        }
+        final String JSON = "{ \"x\" : 9 }";
+        JsonParser jp = MAPPER.createParser(new StringReader(JSON));
+        jp.nextToken();
+        Pojo p = jp.readValueAs(Pojo.class);
+        assertNotNull(p);
     }
-    
-    // for [JACKSON-672]
+
     public void testEscapingUsingMapper() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, true);
-        mapper.writeValueAsString(String.valueOf((char) 257));
+        final String json = mapper.writeValueAsString(String.valueOf((char) 258));
+        assertEquals(quote("\\u0102"), json);
     }
 }
