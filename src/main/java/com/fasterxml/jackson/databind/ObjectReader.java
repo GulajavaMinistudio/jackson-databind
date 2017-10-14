@@ -887,6 +887,32 @@ public class ObjectReader
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content, offset, len));
     }
 
+    /**
+     * Factory method for constructing {@link JsonParser} that is properly
+     * wired to allow callbacks for deserialization: basically
+     * constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,DataInput)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createParser(DataInput content) throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
+    }
+
+    /**
+     * Factory method for constructing non-blocking {@link JsonParser} that is properly
+     * wired to allow configuration access (and, if relevant for parser, callbacks):
+     * essentially constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createParser(ObjectReadContext,DataInput)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createNonBlockingByteArrayParser() throws IOException {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createNonBlockingByteArrayParser(ctxt));
+    }
+    
     /*
     /**********************************************************
     /* Convenience methods for JsonNode creation
