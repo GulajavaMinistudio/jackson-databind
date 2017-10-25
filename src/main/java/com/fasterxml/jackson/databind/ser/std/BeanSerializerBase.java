@@ -45,9 +45,6 @@ public abstract class BeanSerializerBase
     /**********************************************************
      */
 
-    /**
-     * @since 2.9
-     */
     final protected JavaType _beanType;
 
     /**
@@ -126,6 +123,14 @@ public abstract class BeanSerializerBase
         }
     }
 
+    /**
+     * Copy-constructor that is useful for sub-classes that just want to
+     * copy all super-class properties without modifications.
+     */
+    protected BeanSerializerBase(BeanSerializerBase src) {
+        this(src, src._props, src._filteredProps);
+    }
+
     public BeanSerializerBase(BeanSerializerBase src,
             BeanPropertyWriter[] properties, BeanPropertyWriter[] filteredProperties)
     {
@@ -146,10 +151,7 @@ public abstract class BeanSerializerBase
     {
         this(src, objectIdWriter, src._propertyFilterId);
     }
-    
-    /**
-     * @since 2.3
-     */
+
     protected BeanSerializerBase(BeanSerializerBase src,
             ObjectIdWriter objectIdWriter, Object filterId)
     {
@@ -201,8 +203,6 @@ public abstract class BeanSerializerBase
     /**
      * Mutant factory used for creating a new instance with different
      * {@link ObjectIdWriter}.
-     * 
-     * @since 2.0
      */
     public abstract BeanSerializerBase withObjectIdWriter(ObjectIdWriter objectIdWriter);
 
@@ -225,14 +225,13 @@ public abstract class BeanSerializerBase
      */
     @Override
     public abstract BeanSerializerBase withFilterId(Object filterId);
-    
+
     /**
-     * Copy-constructor that is useful for sub-classes that just want to
-     * copy all super-class properties without modifications.
+     * Lets force sub-classes to implement this, to avoid accidental missing
+     * of handling...
      */
-    protected BeanSerializerBase(BeanSerializerBase src) {
-        this(src, src._props, src._filteredProps);
-    }
+    @Override
+    public abstract JsonSerializer<Object> unwrappingSerializer(NameTransformer unwrapper);
 
     /**
      * Copy-constructor that will also rename properties with given prefix
@@ -241,7 +240,7 @@ public abstract class BeanSerializerBase
     protected BeanSerializerBase(BeanSerializerBase src, NameTransformer unwrapper) {
         this(src, rename(src._props, unwrapper), rename(src._filteredProps, unwrapper));
     }
-    
+
     private final static BeanPropertyWriter[] rename(BeanPropertyWriter[] props,
             NameTransformer transformer)
     {
@@ -261,7 +260,7 @@ public abstract class BeanSerializerBase
 
     /*
     /**********************************************************
-    /* Post-constriction processing: resolvable, contextual
+    /* Post-construction processing: resolvable, contextual
     /**********************************************************
      */
 
@@ -290,7 +289,7 @@ public abstract class BeanSerializerBase
                     }
                 }
             }
-            
+
             if (prop.hasSerializer()) {
                 continue;
             }
@@ -312,9 +311,8 @@ public abstract class BeanSerializerBase
                     }
                 }
                 ser = provider.findValueSerializer(type, prop);
-                /* 04-Feb-2010, tatu: We may have stashed type serializer for content types
-                 *   too, earlier; if so, it's time to connect the dots here:
-                 */
+                // 04-Feb-2010, tatu: We may have stashed type serializer for content types
+                //   too, earlier; if so, it's time to connect the dots here:
                 if (type.isContainerType()) {
                     TypeSerializer typeSer = type.getContentType().getTypeHandler();
                     if (typeSer != null) {
@@ -353,8 +351,6 @@ public abstract class BeanSerializerBase
      * Helper method that can be used to see if specified property is annotated
      * to indicate use of a converter for property value (in case of container types,
      * it is container type itself, not key or content type).
-     * 
-     * @since 2.2
      */
     protected JsonSerializer<Object> findConvertingSerializer(SerializerProvider provider,
             BeanPropertyWriter prop)
@@ -532,13 +528,44 @@ public abstract class BeanSerializerBase
 
     /*
     /**********************************************************
-    /* Accessors
+    /* Public accessors
     /**********************************************************
      */
 
     @Override
     public Iterator<PropertyWriter> properties() {
         return Arrays.<PropertyWriter>asList(_props).iterator();
+    }
+
+    /**
+     * @since 3.0
+     */
+    public int propertyCount() {
+        return _props.length;
+    }
+
+    /*
+    /**********************************************************
+    /* Helper methods for implementation classes
+    /**********************************************************
+     */
+
+    /**
+     * Helper method for sub-classes to check if it should be possible to
+     * construct an "as-array" serializer. Returns if all of following
+     * hold true:
+     *<ul>
+     * <li>have Object Id (may be allowed in future)</li>
+     * <li>have "any getter"</li>
+     * <li>have per-property filters</li>
+     * </ul>
+     *
+     * @since 3.0
+     */
+    public boolean canCreateArraySerializer() {
+        return (_objectIdWriter == null)
+                && (_anyGetterWriter == null)
+                && (_propertyFilterId == null);
     }
 
     /*
@@ -564,11 +591,9 @@ public abstract class BeanSerializerBase
         throws IOException
     {
         if (_objectIdWriter != null) {
-            gen.setCurrentValue(bean); // [databind#631]
             _serializeWithObjectId(bean, gen, provider, typeSer);
             return;
         }
-
         gen.setCurrentValue(bean); // [databind#631]
         WritableTypeId typeIdDef = _typeIdDef(typeSer, bean, JsonToken.START_OBJECT);
         typeSer.writeTypePrefix(gen, typeIdDef);
@@ -580,9 +605,10 @@ public abstract class BeanSerializerBase
         typeSer.writeTypeSuffix(gen, typeIdDef);
     }
 
-    protected final void _serializeWithObjectId(Object bean, JsonGenerator gen, SerializerProvider provider,
-            boolean startEndObject) throws IOException
+    protected final void _serializeWithObjectId(Object bean, JsonGenerator gen,
+            SerializerProvider provider, boolean startEndObject) throws IOException
     {
+        gen.setCurrentValue(bean);
         final ObjectIdWriter w = _objectIdWriter;
         WritableObjectId objectId = provider.findObjectId(bean, w.generator);
         // If possible, write as id already
@@ -612,6 +638,7 @@ public abstract class BeanSerializerBase
     protected final void _serializeWithObjectId(Object bean, JsonGenerator gen, SerializerProvider provider,
             TypeSerializer typeSer) throws IOException
     {
+        gen.setCurrentValue(bean);
         final ObjectIdWriter w = _objectIdWriter;
         WritableObjectId objectId = provider.findObjectId(bean, w.generator);
         // If possible, write as id already
