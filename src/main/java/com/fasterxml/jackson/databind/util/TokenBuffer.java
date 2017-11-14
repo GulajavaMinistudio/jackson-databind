@@ -8,6 +8,7 @@ import java.util.TreeMap;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.json.JsonWriteContext;
+import com.fasterxml.jackson.core.sym.FieldNameMatcher;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
 import com.fasterxml.jackson.databind.*;
 
@@ -1320,13 +1321,17 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
         public JsonToken nextToken() throws IOException
         {
             // If we are closed, nothing more to do
-            if (_closed || (_segment == null)) return null;
+            if (_closed || (_segment == null)) {
+                _currToken = null;
+                return null;
+            }
 
             // Ok, then: any more tokens?
             if (++_segmentPtr >= Segment.TOKENS_PER_SEGMENT) {
                 _segmentPtr = 0;
                 _segment = _segment.next();
                 if (_segment == null) {
+                    _currToken = null;
                     return null;
                 }
             }
@@ -1352,17 +1357,33 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
         public String nextFieldName() throws IOException
         {
             // inlined common case from nextToken()
-            if (_closed || (_segment == null)) return null;
+            if (_closed || (_segment == null)) {
+                return null;
+            }
 
             int ptr = _segmentPtr+1;
-            if (ptr < Segment.TOKENS_PER_SEGMENT && _segment.type(ptr) == JsonToken.FIELD_NAME) {
+            if ((ptr < Segment.TOKENS_PER_SEGMENT) && (_segment.type(ptr) == JsonToken.FIELD_NAME)) {
                 _segmentPtr = ptr;
+                _currToken = JsonToken.FIELD_NAME;
                 Object ob = _segment.get(ptr); // inlined _currentObject();
                 String name = (ob instanceof String) ? ((String) ob) : ob.toString();
                 _parsingContext.setCurrentName(name);
                 return name;
             }
             return (nextToken() == JsonToken.FIELD_NAME) ? getCurrentName() : null;
+        }
+
+        // NOTE: since we know there's no native matching just use simpler way:
+        @Override // since 3.0
+        public int nextFieldName(FieldNameMatcher matcher) throws IOException {
+            String str = nextFieldName();
+            if (str != null) {
+                return matcher.matchName(str);
+            }
+            if (hasToken(JsonToken.END_OBJECT)) {
+                return FieldNameMatcher.MATCH_END_OBJECT;
+            }
+            return FieldNameMatcher.MATCH_ODD_TOKEN;
         }
 
         @Override

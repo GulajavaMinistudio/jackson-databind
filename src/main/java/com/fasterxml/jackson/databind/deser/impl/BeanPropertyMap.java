@@ -61,15 +61,11 @@ public class BeanPropertyMap
      * This is is used for constructing actual reverse lookup mapping, if
      * needed, taking into account possible case-insensitivity, as well
      * as possibility of name prefixes.
-     *
-     * @since 2.9
      */
     private final Map<String,List<PropertyName>> _aliasDefs;
 
     /**
      * Mapping from secondary names (aliases) to primary names.
-     *
-     * @since 2.9
      */
     private final Map<String,String> _aliasMapping;
 
@@ -284,8 +280,6 @@ public class BeanPropertyMap
      * Mutant factory method that will use this instance as the base, and
      * construct an instance that is otherwise same except for excluding
      * properties with specified names.
-     *
-     * @since 2.8
      */
     public BeanPropertyMap withoutProperties(Collection<String> toExclude)
     {
@@ -369,16 +363,10 @@ public class BeanPropertyMap
 
     public int size() { return _size; }
 
-    /**
-     * @since 2.9
-     */
     public boolean isCaseInsensitive() {
         return _caseInsensitive;
     }
 
-    /**
-     * @since 2.9
-     */
     public boolean hasAliases() {
         return !_aliasDefs.isEmpty();
     }
@@ -401,14 +389,12 @@ public class BeanPropertyMap
         }
         return p;
     }
-    
+
     /**
      * Method that will re-create initial insertion-ordering of
      * properties contained in this map. Note that if properties
      * have been removed, array may contain nulls; otherwise
      * it should be consecutive.
-     * 
-     * @since 2.1
      */
     public SettableBeanProperty[] getPropertiesInInsertionOrder() {
         return _propsInOrder;
@@ -425,10 +411,7 @@ public class BeanPropertyMap
     /* Public API, property lookup
     /**********************************************************
      */
-    
-    /**
-     * @since 2.3
-     */
+
     public SettableBeanProperty find(int index)
     {
         // note: will scan the whole area, including primary, secondary and
@@ -467,7 +450,6 @@ public class BeanPropertyMap
     private final SettableBeanProperty _find2(String key, int slot, Object match)
     {
         if (match == null) {
-            // 26-Feb-2017, tatu: Need to consider aliases
             return _findWithAlias(_aliasMapping.get(key));
         }
         // no? secondary?
@@ -486,7 +468,6 @@ public class BeanPropertyMap
                 }
             }
         }
-        // 26-Feb-2017, tatu: Need to consider aliases
         return _findWithAlias(_aliasMapping.get(key));
     }
 
@@ -528,36 +509,6 @@ public class BeanPropertyMap
             }
         }
         return null;
-    }
-
-    /*
-    /**********************************************************
-    /* Public API, deserialization support
-    /**********************************************************
-     */
-
-    /**
-     * Convenience method that tries to find property with given name, and
-     * if it is found, call {@link SettableBeanProperty#deserializeAndSet}
-     * on it, and return true; or, if not found, return false.
-     * Note, too, that if deserialization is attempted, possible exceptions
-     * are wrapped if and as necessary, so caller need not handle those.
-     * 
-     * @since 2.5
-     */
-    public boolean findDeserializeAndSet(JsonParser p, DeserializationContext ctxt,
-            Object bean, String key) throws IOException
-    {
-        final SettableBeanProperty prop = find(key);
-        if (prop == null) {
-            return false;
-        }
-        try {
-            prop.deserializeAndSet(p, ctxt, bean);
-        } catch (Exception e) {
-            wrapAndThrow(e, bean, key, ctxt);
-        }
-        return true;
     }
 
     /*
@@ -618,35 +569,11 @@ public class BeanPropertyMap
         return prop;
     }
 
-    protected void wrapAndThrow(Throwable t, Object bean, String fieldName, DeserializationContext ctxt)
-        throws IOException
-    {
-        // inlined 'throwOrReturnThrowable'
-        while (t instanceof InvocationTargetException && t.getCause() != null) {
-            t = t.getCause();
-        }
-        // Errors to be passed as is
-        ClassUtil.throwIfError(t);
-        // StackOverflowErrors are tricky ones; need to be careful...
-        boolean wrap = (ctxt == null) || ctxt.isEnabled(DeserializationFeature.WRAP_EXCEPTIONS);
-        // Ditto for IOExceptions; except we may want to wrap JSON exceptions
-        if (t instanceof IOException) {
-            if (!wrap || !(t instanceof JsonProcessingException)) {
-                throw (IOException) t;
-            }
-        } else if (!wrap) { // allow disabling wrapping for unchecked exceptions
-            ClassUtil.throwIfRTE(t);
-        }
-        throw JsonMappingException.wrapWithPath(t, bean, fieldName);
-    }
-
     /**
      * Helper method used to find exact location of a property with name
      * given exactly, not subject to case changes, within hash area.
      * Expectation is that such property SHOULD exist, although no
      * exception is thrown.
-     *
-     * @since 2.7
      */
     private final int _findIndexInHash(String key)
     {
