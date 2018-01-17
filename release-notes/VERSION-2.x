@@ -5,6 +5,9 @@ Project: jackson-databind
 
 2.9.4 (not yet released)
 
+#1673: Serialising generic value classes via Reference Types (like Optional) fails
+  to include type information
+ (reported by Pier-Luc W)
 #1729: Integer bounds verification when calling `TokenBuffer.getIntValue()`
  (reported by Kevin G)
 #1854: NPE deserializing collection with `@JsonCreator` and `ACCEPT_CASE_INSENSITIVE_PROPERTIES`
@@ -17,6 +20,10 @@ Project: jackson-databind
 #1870: Remove `final` on inherited methods in `BuilderBasedDeserializer` to allow
   overriding by subclasses
   (requested by Ville K)
+#1878: `@JsonBackReference` property is always ignored when deserializing since 2.9.0
+ (reported by reda-alaoui@github)
+#1895: Per-type config override "JsonFormat.Shape.OBJECT" for Map.Entry not working
+ (reported by mcortella@github)
 
 2.9.3 (09-Dec-2017)
 
