@@ -1,7 +1,8 @@
+------------------------------------------------------------------------
 Project: jackson-databind
 ------------------------------------------------------------------------
+
 === Releases === 
-------------------------------------------------------------------------
 
 2.9.4 (not yet released)
 
@@ -28,6 +29,10 @@ Project: jackson-databind
  (reported by mcortella@github)
 #1899: Another two gadgets to exploit default typing issue in jackson-databind
  (reported by OneSourceCat@github)
+#1906: Add string format specifier for error message in `PropertyValueBuffer`
+ (reported by Joe S)
+#1907: Remove `getClass()` from `_valueType` argument for error reporting
+ (reported by Joe S)
 
 2.9.3 (09-Dec-2017)
 
