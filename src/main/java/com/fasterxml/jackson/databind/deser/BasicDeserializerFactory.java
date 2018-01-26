@@ -45,7 +45,7 @@ public abstract class BasicDeserializerFactory
 {
     private final static Class<?> CLASS_OBJECT = Object.class;
     private final static Class<?> CLASS_STRING = String.class;
-    private final static Class<?> CLASS_CHAR_BUFFER = CharSequence.class;
+    private final static Class<?> CLASS_CHAR_SEQUENCE = CharSequence.class;
     private final static Class<?> CLASS_ITERABLE = Iterable.class;
     private final static Class<?> CLASS_MAP_ENTRY = Map.Entry.class;
 
@@ -978,7 +978,7 @@ nonAnnotatedParamIndex, ctor);
     {
         // otherwise either 'simple' number, String, or general delegate:
         Class<?> type = ctor.getRawParameterType(0);
-        if (type == String.class || type == CharSequence.class) {
+        if (type == String.class || type == CLASS_CHAR_SEQUENCE) {
             if (isCreator || isVisible) {
                 creators.addStringCreator(ctor, isCreator);
             }
@@ -1206,8 +1206,14 @@ nonAnnotatedParamIndex, ctor);
         if (deser == null) {
             Class<?> collectionClass = type.getRawClass();
             if (contentDeser == null) { // not defined by annotation
+                // [databind#1853]: Map `Set<ENUM>` to `EnumSet<ENUM>`
+                if (contentType.isEnumType() && (collectionClass == Set.class)) {
+                    collectionClass = EnumSet.class;
+                    type = (CollectionType) config.getTypeFactory().constructSpecializedType(type, collectionClass);
+                }
                 // One special type: EnumSet:
                 if (EnumSet.class.isAssignableFrom(collectionClass)) {
+                    // 25-Jan-2018, tatu: shouldn't we pass `contentDeser`?
                     deser = new EnumSetDeserializer(contentType, null);
                 }
             }
@@ -1343,6 +1349,12 @@ nonAnnotatedParamIndex, ctor);
         if (deser == null) {
             // Value handling is identical for all, but EnumMap requires special handling for keys
             Class<?> mapClass = type.getRawClass();
+            // [databind#1853]: Map `Map<ENUM,x>` to `EnumMap<ENUM,x>`
+            if ((mapClass == Map.class) && keyType.isEnumType()) {
+                mapClass = EnumMap.class;
+                type = (MapType) config.getTypeFactory().constructSpecializedType(type, mapClass);
+//                type = (MapType) config.getTypeFactory().constructMapType(mapClass, keyType, contentType);
+            }
             if (EnumMap.class.isAssignableFrom(mapClass)) {
                 ValueInstantiator inst;
 
@@ -1813,7 +1825,7 @@ nonAnnotatedParamIndex, ctor);
             }
             return new UntypedObjectDeserializer(lt, mt);
         }
-        if (rawType == CLASS_STRING || rawType == CLASS_CHAR_BUFFER) {
+        if (rawType == CLASS_STRING || rawType == CLASS_CHAR_SEQUENCE) {
             return StringDeserializer.instance;
         }
         if (rawType == CLASS_ITERABLE) {
