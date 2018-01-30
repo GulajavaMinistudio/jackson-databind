@@ -8,7 +8,6 @@ import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.*;
@@ -24,8 +23,8 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import com.fasterxml.jackson.databind.jsontype.*;
+import com.fasterxml.jackson.databind.jsontype.impl.DefaultTypeResolverBuilder;
 import com.fasterxml.jackson.databind.jsontype.impl.StdSubtypeResolver;
-import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
 import com.fasterxml.jackson.databind.node.*;
 import com.fasterxml.jackson.databind.ser.*;
 import com.fasterxml.jackson.databind.type.*;
@@ -177,90 +176,20 @@ public class ObjectMapper
     }
 
     /**
-     * Customized {@link TypeResolverBuilder} that provides type resolver builders
-     * used with so-called "default typing"
-     * (see {@link ObjectMapper#enableDefaultTyping()} for details).
-     *<p>
-     * Type resolver construction is based on configuration: implementation takes care
-     * of only providing builders in cases where type information should be applied.
-     * This is important since build calls may be sent for any and all types, and
-     * type information should NOT be applied to all of them.
+     * Base implementation for "Vanilla" {@link ObjectMapper}, used with JSON backend
+     * as well as for some of simpler formats that do not require mapper level overrides.
+     *
+     * @since 3.0
      */
-    public static class DefaultTypeResolverBuilder
-        extends StdTypeResolverBuilder
-        implements java.io.Serializable
+    public static class Builder extends MapperBuilder<ObjectMapper, Builder>
     {
-        private static final long serialVersionUID = 1L;
-
-        /**
-         * Definition of what types is this default typer valid for.
-         */
-        protected final DefaultTyping _appliesFor;
-
-        public DefaultTypeResolverBuilder(DefaultTyping t) {
-            _appliesFor = t;
+        public Builder(TokenStreamFactory tsf) {
+            super(tsf);
         }
 
         @Override
-        public TypeDeserializer buildTypeDeserializer(DeserializationConfig config,
-                JavaType baseType, Collection<NamedType> subtypes)
-        {
-            return useForType(baseType) ? super.buildTypeDeserializer(config, baseType, subtypes) : null;
-        }
-
-        @Override
-        public TypeSerializer buildTypeSerializer(SerializationConfig config,
-                JavaType baseType, Collection<NamedType> subtypes)
-        {
-            return useForType(baseType) ? super.buildTypeSerializer(config, baseType, subtypes) : null;            
-        }
-
-        /**
-         * Method called to check if the default type handler should be
-         * used for given type.
-         * Note: "natural types" (String, Boolean, Integer, Double) will never
-         * use typing; that is both due to them being concrete and final,
-         * and since actual serializers and deserializers will also ignore any
-         * attempts to enforce typing.
-         */
-        public boolean useForType(JavaType t)
-        {
-            // 03-Oct-2016, tatu: As per [databind#1395], need to skip
-            //  primitive types too, regardless
-            if (t.isPrimitive()) {
-                return false;
-            }
-
-            switch (_appliesFor) {
-            case NON_CONCRETE_AND_ARRAYS:
-                while (t.isArrayType()) {
-                    t = t.getContentType();
-                }
-                // fall through
-            case OBJECT_AND_NON_CONCRETE:
-                // 19-Apr-2016, tatu: ReferenceType like Optional also requires similar handling:
-                while (t.isReferenceType()) {
-                    t = t.getReferencedType();
-                }
-                return t.isJavaLangObject()
-                        || (!t.isConcrete()
-                                // [databind#88] Should not apply to JSON tree models:
-                                && !TreeNode.class.isAssignableFrom(t.getRawClass()));
-
-            case NON_FINAL:
-                while (t.isArrayType()) {
-                    t = t.getContentType();
-                }
-                // 19-Apr-2016, tatu: ReferenceType like Optional also requires similar handling:
-                while (t.isReferenceType()) {
-                    t = t.getReferencedType();
-                }
-                // [databind#88] Should not apply to JSON tree models:
-                return !t.isFinal() && !TreeNode.class.isAssignableFrom(t.getRawClass());
-            default:
-            //case JAVA_LANG_OBJECT:
-                return t.isJavaLangObject();
-            }
+        public ObjectMapper build() {
+            return new ObjectMapper(this);
         }
     }
 
@@ -372,7 +301,7 @@ public class ObjectMapper
      * mappers and readers need to access additional API defined by
      * {@link DefaultSerializerProvider}
      */
-    protected DefaultSerializerProvider _serializerProvider;
+    protected final DefaultSerializerProvider _serializerProvider;
 
     /**
      * Serializer factory used for constructing serializers.
@@ -436,7 +365,7 @@ public class ObjectMapper
      * (should very quickly converge to zero after startup), let's
      * explicitly define a low concurrency setting.
      *<p>
-     * Since version 1.5, these may are either "raw" deserializers (when
+     * These may are either "raw" deserializers (when
      * no type information is needed for base type), or type-wrapped
      * deserializers (if it is needed)
      */
@@ -462,7 +391,7 @@ public class ObjectMapper
      * but does not support JAXB annotations.
      */
     public ObjectMapper() {
-        this(null, null, null);
+        this(new JsonFactory(), null, null);
     }
 
     /**
@@ -518,14 +447,9 @@ public class ObjectMapper
      *    actual context objects; if null, will construct standard
      *    {@link DeserializationContext}
      */
-    public ObjectMapper(TokenStreamFactory jf,
+    protected ObjectMapper(TokenStreamFactory jf,
             DefaultSerializerProvider sp, DefaultDeserializationContext dc)
     {
-        // 06-OCt-2017, tatu: Should probably change dependency one of these days...
-        //   but not today.
-        if (jf == null) {
-            jf = new JsonFactory();
-        }
         _jsonFactory = jf;
         _subtypeResolver = new StdSubtypeResolver();
         RootNameLookup rootNames = new RootNameLookup();
@@ -552,6 +476,52 @@ public class ObjectMapper
                 new DefaultDeserializationContext.Impl(BeanDeserializerFactory.instance, _jsonFactory) : dc;
         // Default serializer factory is stateless, can just assign
         _serializerFactory = BeanSerializerFactory.instance;
+    }
+
+    public ObjectMapper(Builder builder)
+    {
+        // General framework factories
+        _jsonFactory = builder.streamFactory();
+        _typeFactory = builder.getTypeFactory();
+
+        // Ser/deser framework factories
+        _serializerProvider = builder.serializerProvider();
+        _deserializationContext = builder.deserializationContext();
+        _serializerFactory = builder.serializerFactory();
+
+        _subtypeResolver = new StdSubtypeResolver();
+        RootNameLookup rootNames = new RootNameLookup();
+
+        SimpleMixInResolver mixins = new SimpleMixInResolver(null);
+        _mixIns = mixins;
+        BaseSettings base = DEFAULT_BASE.withClassIntrospector(defaultClassIntrospector());
+        _configOverrides = new ConfigOverrides();
+        _serializationConfig = new SerializationConfig(base,
+                    _subtypeResolver, mixins, rootNames, _configOverrides);
+        _deserializationConfig = new DeserializationConfig(base,
+                    _subtypeResolver, mixins, rootNames, _configOverrides);
+
+        // Some overrides we may need
+        final boolean needOrder = _jsonFactory.requiresPropertyOrdering();
+        if (needOrder ^ _serializationConfig.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)) {
+            configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, needOrder);
+        }
+    }
+
+    /**
+     * Short-cut for:
+     *<pre>
+     *   return builder(new JsonFactory());
+     *</pre>
+     *
+     * @since 3.0
+     */
+    public static Builder builder() {
+        return new Builder(new JsonFactory());
+    }
+
+    public Builder builder(TokenStreamFactory streamFactory) {
+        return new Builder(streamFactory);
     }
 
     /**
@@ -974,15 +944,6 @@ public class ObjectMapper
     /* Configuration: ser/deser factory, provider access
     /**********************************************************
      */
-    
-    /**
-     * Method for setting specific {@link SerializerFactory} to use
-     * for constructing (bean) serializers.
-     */
-    public ObjectMapper setSerializerFactory(SerializerFactory f) {
-        _serializerFactory = f;
-        return this;
-    }
 
     /**
      * Method for getting current {@link SerializerFactory}.
@@ -993,16 +954,6 @@ public class ObjectMapper
      */
     public SerializerFactory getSerializerFactory() {
         return _serializerFactory;
-    }
-
-    /**
-     * Method for setting "blueprint" {@link SerializerProvider} instance
-     * to use as the base for actual provider instances to use for handling
-     * caching of {@link JsonSerializer} instances.
-     */
-    public ObjectMapper setSerializerProvider(DefaultSerializerProvider p) {
-        _serializerProvider = p;
-        return this;
     }
 
     /**
@@ -2659,74 +2610,8 @@ public class ObjectMapper
             throw new IllegalArgumentException(e.getMessage(), e);
         }
         return (T) result;
-    } 
-
-    /*
-    /**********************************************************
-    /* Public API, accessors
-    /**********************************************************
-     */
-
-    /**
-     * Method that can be called to check whether mapper thinks
-     * it could serialize an instance of given Class.
-     * Check is done
-     * by checking whether a serializer can be found for the type.
-     *<p>
-     * NOTE: since this method does NOT throw exceptions, but internal
-     * processing may, caller usually has little information as to why
-     * serialization would fail. If you want access to internal {@link Exception},
-     * call {@link #canSerialize(Class, AtomicReference)} instead.
-     *
-     * @return True if mapper can find a serializer for instances of
-     *  given class (potentially serializable), false otherwise (not
-     *  serializable)
-     */
-    public boolean canSerialize(Class<?> type) {
-        return _serializerProvider().hasSerializerFor(type, null);
     }
 
-    /**
-     * Method similar to {@link #canSerialize(Class)} but that can return
-     * actual {@link Throwable} that was thrown when trying to construct
-     * serializer: this may be useful in figuring out what the actual problem is.
-     */
-    public boolean canSerialize(Class<?> type, AtomicReference<Throwable> cause) {
-        return _serializerProvider().hasSerializerFor(type, cause);
-    }
-    
-    /**
-     * Method that can be called to check whether mapper thinks
-     * it could deserialize an Object of given type.
-     * Check is done by checking whether a registered deserializer can
-     * be found or built for the type; if not (either by no mapping being
-     * found, or through an <code>Exception</code> being thrown, false
-     * is returned.
-     *<p>
-     * <b>NOTE</b>: in case an exception is thrown during course of trying
-     * co construct matching deserializer, it will be effectively swallowed.
-     * If you want access to that exception, call
-     * {@link #canDeserialize(JavaType, AtomicReference)} instead.
-     *
-     * @return True if mapper can find a serializer for instances of
-     *  given class (potentially serializable), false otherwise (not
-     *  serializable)
-     */
-    public boolean canDeserialize(JavaType type)
-    {
-        return createDeserializationContext().hasValueDeserializerFor(type, null);
-    }
-
-    /**
-     * Method similar to {@link #canDeserialize(JavaType)} but that can return
-     * actual {@link Throwable} that was thrown when trying to construct
-     * serializer: this may be useful in figuring out what the actual problem is.
-     */
-    public boolean canDeserialize(JavaType type, AtomicReference<Throwable> cause)
-    {
-        return createDeserializationContext().hasValueDeserializerFor(type, cause);
-    }
-    
     /*
     /**********************************************************
     /* Public API, deserialization,
