@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.core.util.Instantiatable;
 
 import com.fasterxml.jackson.databind.cfg.*;
+import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
 import com.fasterxml.jackson.databind.introspect.SimpleMixInResolver;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
@@ -95,11 +96,11 @@ public final class SerializationConfig
     /**
      * Constructor used by ObjectMapper to create default configuration object instance.
      */
-    public SerializationConfig(BaseSettings base,
-            SubtypeResolver str, SimpleMixInResolver mixins, RootNameLookup rootNames,
-            ConfigOverrides configOverrides)
+    public SerializationConfig(BaseSettings base, ClassIntrospector classIntrospector,
+            SubtypeResolver str,
+            SimpleMixInResolver mixins, RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
-        super(base, str, mixins, rootNames, configOverrides);
+        super(base, classIntrospector, str, mixins, rootNames, configOverrides);
         _serFeatures = collectFeatureDefaults(SerializationFeature.class);
         _filterProvider = null;
         _defaultPrettyPrinter = DEFAULT_PRETTY_PRINTER;
@@ -111,8 +112,6 @@ public final class SerializationConfig
 
     /**
      * Copy-constructor used for making a copy to be used by new {@link ObjectMapper}.
-     *
-     * @since 2.9
      */
     protected SerializationConfig(SerializationConfig src,
             SimpleMixInResolver mixins, RootNameLookup rootNames,

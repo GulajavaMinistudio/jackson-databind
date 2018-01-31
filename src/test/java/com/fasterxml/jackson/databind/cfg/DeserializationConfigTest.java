@@ -5,7 +5,6 @@ import java.util.Collections;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
 
 public class DeserializationConfigTest extends BaseMapTest
 {
@@ -98,7 +97,6 @@ public class DeserializationConfigTest extends BaseMapTest
         ObjectMapper m = new ObjectMapper();
         DeserializationConfig cfg = m.getDeserializationConfig();
         // and finally, ensure we could override introspectors
-        cfg = cfg.with((ClassIntrospector) null); // no way to verify tho
         cfg = cfg.with((AnnotationIntrospector) null);
         assertNull(cfg.getAnnotationIntrospector());
     }

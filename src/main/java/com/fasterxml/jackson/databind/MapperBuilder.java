@@ -1,9 +1,13 @@
 package com.fasterxml.jackson.databind;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.cfg.BaseSettings;
 import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.introspect.BasicClassIntrospector;
+import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.jsontype.impl.StdSubtypeResolver;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.ser.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
@@ -19,14 +23,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 {
     /*
     /**********************************************************
-    /* Simple feature bitmasks
+    /* Basic settings
     /**********************************************************
      */
 
-    /**
-     * Set of {@link MapperFeature}s enabled, as bitmask.
-     */
-    protected int _mapperFeatures;
+    protected BaseSettings _baseSettings;
 
     /*
     /**********************************************************
@@ -39,8 +40,14 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     protected final TokenStreamFactory _streamFactory;
 
-    protected TypeFactory _typeFactory;
-
+    
+    /**
+     * Introspector used to figure out Bean properties needed for bean serialization
+     * and deserialization. Overridable so that it is possible to change low-level
+     * details of introspection, like adding new annotation types.
+     */
+    protected ClassIntrospector _classIntrospector;
+    
     protected SubtypeResolver _subtypeResolver;
 
     /*
@@ -83,9 +90,10 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected MapperBuilder(TokenStreamFactory streamFactory)
     {
+        _baseSettings = BaseSettings.std();
         _streamFactory = streamFactory;
 
-        _typeFactory = TypeFactory.defaultInstance();
+        _classIntrospector = null;
         _subtypeResolver = null;
 
         _serializerFactory = BeanSerializerFactory.instance;
@@ -99,9 +107,10 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected MapperBuilder(MapperBuilder<?,?> base)
     {
+        _baseSettings = base._baseSettings;
         _streamFactory = base._streamFactory;
 
-        _typeFactory = base._typeFactory;
+        _classIntrospector = base._classIntrospector;
         _subtypeResolver = base._subtypeResolver;
 
         _serializerFactory = base._serializerFactory;
@@ -118,16 +127,31 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************
-    /* Accessors for framework factories
+    /* Accessors, general
     /**********************************************************
      */
+
+    public BaseSettings baseSettings() {
+        return _baseSettings;
+    }
 
     public TokenStreamFactory streamFactory() {
         return _streamFactory;
     }
 
-    public TypeFactory getTypeFactory() {
-        return _typeFactory;
+    public TypeFactory typeFactory() {
+        return _baseSettings.getTypeFactory();
+    }
+
+    public ClassIntrospector classIntrospector() {
+        return (_classIntrospector != null) ? _classIntrospector : defaultClassIntrospector();
+    }
+
+    /**
+     * Overridable method for changing default {@link SubtypeResolver} instance to use
+     */
+    protected ClassIntrospector defaultClassIntrospector() {
+        return new BasicClassIntrospector();
     }
 
     public SubtypeResolver subtypeResolver() {
@@ -141,6 +165,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected SubtypeResolver defaultSubtypeResolver() {
         return new StdSubtypeResolver();
     }
+
+    /*
+    /**********************************************************
+    /* Accessors, serialization
+    /**********************************************************
+     */
 
     public SerializerFactory serializerFactory() {
         return _serializerFactory;
@@ -157,6 +187,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected DefaultSerializerProvider defaultSerializerProvider() {
         return new DefaultSerializerProvider.Impl(_streamFactory);
     }
+
+    /*
+    /**********************************************************
+    /* Accessors, deserialization
+    /**********************************************************
+     */
 
     public DeserializerFactory deserializerFactory() {
         return _deserializerFactory;
@@ -178,18 +214,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************
-    /* Changing simple features
-    /**********************************************************
-     */
-
-    /*
-    /**********************************************************
-    /* Changing factories
+    /* Changing factories, general
     /**********************************************************
      */
 
     public B typeFactory(TypeFactory f) {
-        _typeFactory = f;
+        _baseSettings = _baseSettings.with(f);
+        return _this();
+    }
+
+    protected B nodeFactory(JsonNodeFactory f) {
+        _baseSettings = _baseSettings.with(f);
         return _this();
     }
 
@@ -198,6 +233,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
+    public B classIntrospector(ClassIntrospector ci) {
+        _classIntrospector = ci;
+        return _this();
+    }
+
+    /*
+    /**********************************************************
+    /* Changing factories, serialization
+    /**********************************************************
+     */
+    
     public B serializerFactory(SerializerFactory f) {
         _serializerFactory = f;
         return _this();
@@ -207,6 +253,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _serializerProvider = prov;
         return _this();
     }
+
+    /*
+    /**********************************************************
+    /* Changing factories, deserialization
+    /**********************************************************
+     */
 
     public B deserializerFactory(DeserializerFactory f) {
         _deserializerFactory = f;

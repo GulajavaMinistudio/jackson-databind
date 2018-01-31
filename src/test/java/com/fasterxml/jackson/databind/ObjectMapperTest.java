@@ -49,7 +49,7 @@ public class ObjectMapperTest extends BaseMapTest
     @SuppressWarnings("serial")
     static class NoCopyMapper extends ObjectMapper { }
 
-    final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = new ObjectMapper();
 
     /*
     /**********************************************************
@@ -106,9 +106,8 @@ public class ObjectMapperTest extends BaseMapTest
         assertTrue(m.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
         assertFalse(m2.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
 
-        // // Also, underlying JsonFactory instances should be distinct
-        
-        assertNotSame(m.tokenStreamFactory(), m2.tokenStreamFactory());
+        // 30-Jan-2018, tatu: With 3.0, stream factories are immutable so
+        assertSame(m.tokenStreamFactory(), m2.tokenStreamFactory());
 
         // [databind#122]: Need to ensure mix-ins are not shared
         assertEquals(0, m.getSerializationConfig().mixInCount());
@@ -190,11 +189,12 @@ public class ObjectMapperTest extends BaseMapTest
 
     public void testProps()
     {
-        ObjectMapper m = new ObjectMapper();
         // should have default factory
-        assertNotNull(m.getNodeFactory());
+        assertNotNull(MAPPER.getNodeFactory());
         JsonNodeFactory nf = new JsonNodeFactory(true);
-        m.setNodeFactory(nf);
+        ObjectMapper m = ObjectMapper.builder()
+                .nodeFactory(nf)
+                .build();
         assertNull(m.getInjectableValues());
         assertSame(nf, m.getNodeFactory());
     }
