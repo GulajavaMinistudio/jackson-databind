@@ -436,12 +436,12 @@ public class ObjectMapper
         );
     }
 
-    public ObjectMapper(Builder builder)
+    public ObjectMapper(MapperBuilder<?,?> builder)
     {
         this(builder, builder.serializerProvider(), builder.deserializationContext());
     }
 
-    public ObjectMapper(Builder builder,
+    public ObjectMapper(MapperBuilder<?,?> builder,
             DefaultSerializerProvider sp, DefaultDeserializationContext dc)            
     {
         // General framework factories
@@ -456,23 +456,10 @@ public class ObjectMapper
         _subtypeResolver = builder.subtypeResolver();
         RootNameLookup rootNames = new RootNameLookup();
 
-        SimpleMixInResolver mixins = new SimpleMixInResolver(null);
-        _mixIns = mixins;
+        _mixIns = new SimpleMixInResolver(null);
         _configOverrides = new ConfigOverrides();
-        // 30-Jan-2018, tatu: Note that we need to weave in TypeFactory
-        ClassIntrospector ci = builder.classIntrospector();
-        _serializationConfig = new SerializationConfig(base, ci,
-                _subtypeResolver, mixins, rootNames, _configOverrides)
-                .with(_typeFactory);
-        _deserializationConfig = new DeserializationConfig(base, ci,
-                _subtypeResolver, mixins, rootNames, _configOverrides)
-                .with(_typeFactory);
-
-        // Some overrides we may need
-        final boolean needOrder = _streamFactory.requiresPropertyOrdering();
-        if (needOrder ^ _serializationConfig.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)) {
-            configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, needOrder);
-        }
+        _serializationConfig = builder.buildSerializationConfig(_mixIns, rootNames, _configOverrides);
+        _deserializationConfig = builder.buildDeserializationConfig(_mixIns, rootNames, _configOverrides);
     }
 
     /**
@@ -483,12 +470,14 @@ public class ObjectMapper
      *
      * @since 3.0
      */
-    public static Builder builder() {
-        return new Builder(new JsonFactory());
+    @SuppressWarnings("unchecked")
+    public static <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> builder() {
+//      public static <M extends ObjectMapper> MapperBuilder<> builder() {
+        return (MapperBuilder<M,B>) new ObjectMapper.Builder(new JsonFactory());
     }
 
-    public Builder builder(TokenStreamFactory streamFactory) {
-        return new Builder(streamFactory);
+    public static ObjectMapper.Builder builder(TokenStreamFactory streamFactory) {
+        return new ObjectMapper.Builder(streamFactory);
     }
 
     /*
@@ -594,7 +583,6 @@ public class ObjectMapper
 
             @Override
             public Object getOwner() {
-                // why do we need the cast here?!?
                 return ObjectMapper.this;
             }
 
@@ -1437,91 +1425,12 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * Method for removing all registered {@link DeserializationProblemHandler}s
-     * instances from this mapper.
-     */
-    public ObjectMapper clearProblemHandlers() {
-        _deserializationConfig = _deserializationConfig.withNoProblemHandlers();
-        return this;
-    }
-
-    /*
-    /**********************************************************
-    /* Configuration, serialization
-    /**********************************************************
-     */
-
-    /**
-     * Method for configuring this mapper to use specified {@link FilterProvider} for
-     * mapping Filter Ids to actual filter instances.
-     *<p>
-     * Note that usually it is better to use method {@link #writer(FilterProvider)};
-     * however, sometimes
-     * this method is more convenient. For example, some frameworks only allow configuring
-     * of ObjectMapper instances and not {@link ObjectWriter}s.
-     */
-    public ObjectMapper setFilterProvider(FilterProvider filterProvider) {
-        _serializationConfig = _serializationConfig.withFilters(filterProvider);
-        return this;
-    }
-
-    /**
-     * Method that will configure default {@link Base64Variant} that
-     * <code>byte[]</code> serializers and deserializers will use.
-     * 
-     * @param v Base64 variant to use
-     * 
-     * @return This mapper, for convenience to allow chaining
-     */
-    public ObjectMapper setBase64Variant(Base64Variant v) {
-        _serializationConfig = _serializationConfig.with(v);
-        _deserializationConfig = _deserializationConfig.with(v);
-        return this;
-    }
-
     /*
     /**********************************************************
     /* Configuration, other
     /**********************************************************
      */
 
-    /**
-     * Method for configuring the default {@link DateFormat} to use when serializing time
-     * values as Strings, and deserializing from JSON Strings.
-     * This is preferably to directly modifying {@link SerializationConfig} and
-     * {@link DeserializationConfig} instances.
-     * If you need per-request configuration, use {@link #writer(DateFormat)} to
-     * create properly configured {@link ObjectWriter} and use that; this because
-     * {@link ObjectWriter}s are thread-safe whereas ObjectMapper itself is only
-     * thread-safe when configuring methods (such as this one) are NOT called.
-     */
-    public ObjectMapper setDateFormat(DateFormat dateFormat)
-    {
-        _deserializationConfig = _deserializationConfig.with(dateFormat);
-        _serializationConfig = _serializationConfig.with(dateFormat);
-        return this;
-    }
-
-    public DateFormat getDateFormat() {
-        // arbitrary choice but let's do:
-        return _serializationConfig.getDateFormat();
-    }
-
-    /**
-     * Method for configuring {@link HandlerInstantiator} to use for creating
-     * instances of handlers (such as serializers, deserializers, type and type
-     * id resolvers), given a class.
-     *
-     * @param hi Instantiator to use; if null, use the default implementation
-     */
-    public ObjectMapper setHandlerInstantiator(HandlerInstantiator hi)
-    {
-        _deserializationConfig = _deserializationConfig.with(hi);
-        _serializationConfig = _serializationConfig.with(hi);
-        return this;
-    }
-    
     /**
      * Method for configuring {@link InjectableValues} which used to find
      * values to inject.
@@ -1531,31 +1440,8 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * @since 2.6
-     */
     public InjectableValues getInjectableValues() {
         return _injectableValues;
-    }
-
-    /**
-     * Method for overriding default locale to use for formatting.
-     * Default value used is {@link Locale#getDefault()}.
-     */
-    public ObjectMapper setLocale(Locale l) {
-        _deserializationConfig = _deserializationConfig.with(l);
-        _serializationConfig = _serializationConfig.with(l);
-        return this;
-    }
-
-    /**
-     * Method for overriding default TimeZone to use for formatting.
-     * Default value used is UTC (NOT default TimeZone of JVM).
-     */
-    public ObjectMapper setTimeZone(TimeZone tz) {
-        _deserializationConfig = _deserializationConfig.with(tz);
-        _serializationConfig = _serializationConfig.with(tz);
-        return this;
     }
 
     /*
@@ -1595,7 +1481,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for disabling specified {@link MapperConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper disable(MapperFeature... f) {
@@ -1629,7 +1515,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for enabling specified {@link DeserializationConfig} feature.
+     * Method for enabling specified {@link SerializationConfig} feature.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper enable(SerializationFeature f) {
@@ -1638,7 +1524,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for enabling specified {@link SerializationConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper enable(SerializationFeature first,
@@ -1648,7 +1534,7 @@ public class ObjectMapper
     }
     
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for disabling specified {@link SerializationConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper disable(SerializationFeature f) {
@@ -1657,7 +1543,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for disabling specified {@link SerializationConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper disable(SerializationFeature first,
@@ -1710,7 +1596,7 @@ public class ObjectMapper
     }
     
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for disabling specified {@link DeserializationConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper disable(DeserializationFeature feature) {
@@ -1719,7 +1605,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for enabling specified {@link DeserializationConfig} features.
+     * Method for disabling specified {@link DeserializationConfig} features.
      * Modifies and returns this instance; no new object is created.
      */
     public ObjectMapper disable(DeserializationFeature first,
