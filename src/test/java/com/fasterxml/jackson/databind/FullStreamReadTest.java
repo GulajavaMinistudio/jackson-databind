@@ -39,8 +39,9 @@ public class FullStreamReadTest extends BaseMapTest
     public void testMapperFailOnTrailing() throws Exception
     {
         // but things change if we enforce checks
-        ObjectMapper strict = newObjectMapper()
-                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        ObjectMapper strict = ObjectMapper.builder()
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
         assertTrue(strict.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS));
 
         // some still ok
@@ -83,7 +84,7 @@ public class FullStreamReadTest extends BaseMapTest
 
         ObjectMapper strictWithComments = new ObjectMapper(
                 strict.tokenStreamFactory().rebuild()
-                .with(JsonParser.Feature.ALLOW_COMMENTS)
+                .enable(JsonParser.Feature.ALLOW_COMMENTS)
                 .build());
         _verifyArray(strictWithComments.readTree(JSON_OK_ARRAY_WITH_COMMENT));
         _verifyCollection(strictWithComments.readValue(JSON_OK_ARRAY_WITH_COMMENT, List.class));

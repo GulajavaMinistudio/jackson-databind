@@ -364,11 +364,11 @@ public class NumberNodesTest extends NodeTestBase
 
     public void testBigDecimalAsPlain() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
-                .with(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN)
-                .build());
-        mapper.enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
-
+        ObjectMapper mapper = ObjectMapper.builder(JsonFactory.builder()
+                .enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN)
+                .build())
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
         final String INPUT = "{\"x\":1e2}";
         final JsonNode node = mapper.readTree(INPUT);
         String result = mapper.writeValueAsString(node);

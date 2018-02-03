@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.cfg.BaseSettings;
 import com.fasterxml.jackson.databind.cfg.ConfigOverrides;
 import com.fasterxml.jackson.databind.cfg.HandlerInstantiator;
@@ -34,6 +35,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected final static int DEFAULT_SER_FEATURES = MapperConfig.collectFeatureDefaults(SerializationFeature.class);
     protected final static int DEFAULT_DESER_FEATURES = MapperConfig.collectFeatureDefaults(DeserializationFeature.class);
 
+    protected final static PrettyPrinter DEFAULT_PRETTY_PRINTER = new DefaultPrettyPrinter();
+
     /*
     /**********************************************************
     /* Basic settings
@@ -42,18 +45,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected BaseSettings _baseSettings;
 
-    /*
-    /**********************************************************
-    /* Factories for framework itself, general
-    /**********************************************************
-     */
-
     /**
      * Underlying stream factory
      */
     protected final TokenStreamFactory _streamFactory;
 
-    
+    /*
+    /**********************************************************
+    /* Handlers, introspection
+    /**********************************************************
+     */
+
     /**
      * Introspector used to figure out Bean properties needed for bean serialization
      * and deserialization. Overridable so that it is possible to change low-level
@@ -68,7 +70,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /* Factories for serialization
     /**********************************************************
      */
-    
+
     protected SerializerFactory _serializerFactory;
 
     /**
@@ -78,6 +80,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected FilterProvider _filterProvider;
 
+    protected PrettyPrinter _defaultPrettyPrinter;
+
     /*
     /**********************************************************
     /* Factories for deserialization
@@ -85,7 +89,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
 
     protected DeserializerFactory _deserializerFactory;
-    
+
     /**
      * Prototype (about same as factory) to use for creating per-operation contexts.
      */
@@ -124,19 +128,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected int _generatorFeatures;
 
     /**
-     * Bitflag of {@link com.fasterxml.jackson.core.JsonGenerator.Feature}s to enable/disable
+     * States of {@link com.fasterxml.jackson.core.JsonParser.Feature}s to enable/disable.
      */
-    protected int _generatorFeaturesToChange;
-
-    /**
-     * States of {@link com.fasterxml.jackson.core.FormatFeature}s to enable/disable.
-     */
-    protected int _formatWriteFeatures;
-
-    /**
-     * Bitflag of {@link com.fasterxml.jackson.core.FormatFeature}s to enable/disable
-     */
-    protected int _formatWriteFeaturesToChange;
+    protected int _parserFeatures;
 
     /*
     /**********************************************************
@@ -149,13 +143,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _streamFactory = streamFactory;
         _baseSettings = BaseSettings.std();
 
+        _parserFeatures = streamFactory.getParserFeatures();
+        _generatorFeatures = streamFactory.getGeneratorFeatures();
+
         _mapperFeatures = DEFAULT_MAPPER_FEATURES;
-        _serFeatures = DEFAULT_SER_FEATURES;
-        _deserFeatures = DEFAULT_DESER_FEATURES;
         // Some overrides we may need based on format
         if (streamFactory.requiresPropertyOrdering()) {
             _mapperFeatures |= MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.getMask();
         }
+        _deserFeatures = DEFAULT_DESER_FEATURES;
+        _serFeatures = DEFAULT_SER_FEATURES;
 
         _classIntrospector = null;
         _subtypeResolver = null;
@@ -172,6 +169,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     {
         _streamFactory = base._streamFactory;
         _baseSettings = base._baseSettings;
+
+        _parserFeatures = base._parserFeatures;
+        _generatorFeatures = base._deserFeatures;
 
         _mapperFeatures = base._mapperFeatures;
         _serFeatures = base._serFeatures;
@@ -202,14 +202,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     public SerializationConfig buildSerializationConfig(SimpleMixInResolver mixins,
             RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
-        return new SerializationConfig(this, _mapperFeatures, _serFeatures,
+        return new SerializationConfig(this,
+                _mapperFeatures, _serFeatures, _generatorFeatures,
                 mixins, rootNames, configOverrides);
     }
 
     public DeserializationConfig buildDeserializationConfig(SimpleMixInResolver mixins,
             RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
-        return new DeserializationConfig(this, _mapperFeatures, _deserFeatures,
+        return new DeserializationConfig(this,
+                _mapperFeatures, _deserFeatures, _parserFeatures,
                 mixins, rootNames, configOverrides);
     }
 
@@ -289,6 +291,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _filterProvider;
     }
     
+    public PrettyPrinter defaultPrettyPrinter() {
+        if (_defaultPrettyPrinter == null) {
+            _defaultPrettyPrinter = _defaultPrettyPrinter();
+        }
+        return _defaultPrettyPrinter;
+    }
+
+    protected PrettyPrinter _defaultPrettyPrinter() {
+        return DEFAULT_PRETTY_PRINTER;
+    }
+
     /*
     /**********************************************************
     /* Accessors, deserialization
@@ -338,9 +351,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     public B configure(MapperFeature feature, boolean state)
     {
         if (state) {
-            _serFeatures |= feature.getMask();
+            _mapperFeatures |= feature.getMask();
         } else {
-            _serFeatures &= ~feature.getMask();
+            _mapperFeatures &= ~feature.getMask();
         }
         return _this();
     }
@@ -368,7 +381,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         }
         return _this();
     }
-    
+
     public B enable(DeserializationFeature... features) {
         for (DeserializationFeature f : features) {
             _deserFeatures |= f.getMask();
@@ -395,7 +408,59 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************
-    /* Changing factories, general
+    /* Changing features: parser, generator
+    /**********************************************************
+     */
+
+    public B enable(JsonParser.Feature... features) {
+        for (JsonParser.Feature f : features) {
+            _parserFeatures |= f.getMask();
+        }
+        return _this();
+    }
+
+    public B disable(JsonParser.Feature... features) {
+        for (JsonParser.Feature f : features) {
+            _parserFeatures &= ~f.getMask();
+        }
+        return _this();
+    }
+
+    public B configure(JsonParser.Feature feature, boolean state) {
+        if (state) {
+            _parserFeatures |= feature.getMask();
+        } else {
+            _parserFeatures &= ~feature.getMask();
+        }
+        return _this();
+    }
+
+    public B enable(JsonGenerator.Feature... features) {
+        for (JsonGenerator.Feature f : features) {
+            _generatorFeatures |= f.getMask();
+        }
+        return _this();
+    }
+
+    public B disable(JsonGenerator.Feature... features) {
+        for (JsonGenerator.Feature f : features) {
+            _generatorFeatures &= ~f.getMask();
+        }
+        return _this();
+    }
+
+    public B configure(JsonGenerator.Feature feature, boolean state) {
+        if (state) {
+            _generatorFeatures |= feature.getMask();
+        } else {
+            _generatorFeatures &= ~feature.getMask();
+        }
+        return _this();
+    }
+
+    /*
+    /**********************************************************
+    /* Changing factories/handlers, general
     /**********************************************************
      */
 
@@ -431,6 +496,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
+    public B propertyNamingStrategy(PropertyNamingStrategy s) {
+        _baseSettings = _baseSettings.with(s);
+        return _this();
+    }
+
     /*
     /**********************************************************
     /* Changing factories, serialization
@@ -457,6 +527,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     public B filterProvider(FilterProvider prov) {
         _filterProvider = prov;
+        return _this();
+    }
+
+    public B defaultPrettyPrinter(PrettyPrinter pp) {
+        _defaultPrettyPrinter = pp;
         return _this();
     }
 
@@ -536,7 +611,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /* Other helper methods
     /**********************************************************
      */
-    
+
     // silly convenience cast method we need
     @SuppressWarnings("unchecked")
     protected final B _this() { return (B) this; }

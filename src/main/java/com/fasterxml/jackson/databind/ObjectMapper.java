@@ -1089,31 +1089,14 @@ public class ObjectMapper
         _deserializationConfig = _deserializationConfig.with(deserializerAI);
         return this;
     }
-    
+
     /**
      * Method for setting custom property naming strategy to use.
      */
+    @Deprecated
     public ObjectMapper setPropertyNamingStrategy(PropertyNamingStrategy s) {
         _serializationConfig = _serializationConfig.with(s);
         _deserializationConfig = _deserializationConfig.with(s);
-        return this;
-    }
-
-    public PropertyNamingStrategy getPropertyNamingStrategy() {
-        // arbitrary choice but let's do:
-        return _serializationConfig.getPropertyNamingStrategy();
-    }
-
-    /**
-     * Method for specifying {@link PrettyPrinter} to use when "default pretty-printing"
-     * is enabled (by enabling {@link SerializationFeature#INDENT_OUTPUT})
-     * 
-     * @param pp Pretty printer to use by default.
-     * 
-     * @return This mapper, useful for call-chaining
-     */
-    public ObjectMapper setDefaultPrettyPrinter(PrettyPrinter pp) {
-        _serializationConfig = _serializationConfig.withDefaultPrettyPrinter(pp);
         return this;
     }
 
@@ -1450,18 +1433,7 @@ public class ObjectMapper
     /**********************************************************
      */
 
-    /**
-     * Method for checking whether given {@link MapperFeature} is enabled.
-     */
-    public boolean isEnabled(MapperFeature f) {
-        // ok to use either one, should be kept in sync
-        return _serializationConfig.isEnabled(f);
-    }
-    
-    /**
-     * Method for changing state of an on/off mapper feature for
-     * this mapper instance.
-     */
+    @Deprecated
     public ObjectMapper configure(MapperFeature f, boolean state) {
         _serializationConfig = state ?
                 _serializationConfig.with(f) : _serializationConfig.without(f);
@@ -1470,39 +1442,25 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * Method for enabling specified {@link MapperConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
+    @Deprecated
     public ObjectMapper enable(MapperFeature... f) {
         _deserializationConfig = _deserializationConfig.with(f);
         _serializationConfig = _serializationConfig.with(f);
         return this;
     }
 
-    /**
-     * Method for disabling specified {@link MapperConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
+    @Deprecated
     public ObjectMapper disable(MapperFeature... f) {
         _deserializationConfig = _deserializationConfig.without(f);
         _serializationConfig = _serializationConfig.without(f);
         return this;
     }
-    
+
     /*
     /**********************************************************
     /* Configuration, simple features: SerializationFeature
     /**********************************************************
      */
-
-    /**
-     * Method for checking whether given serialization-specific
-     * feature is enabled.
-     */
-    public boolean isEnabled(SerializationFeature f) {
-        return _serializationConfig.isEnabled(f);
-    }
 
     /**
      * Method for changing state of an on/off serialization feature for
@@ -1558,6 +1516,51 @@ public class ObjectMapper
     /**********************************************************
      */
 
+    @Deprecated
+    public ObjectMapper configure(DeserializationFeature f, boolean state) {
+        _deserializationConfig = state ?
+                _deserializationConfig.with(f) : _deserializationConfig.without(f);
+        return this;
+    }
+
+    @Deprecated
+    public ObjectMapper enable(DeserializationFeature feature) {
+        _deserializationConfig = _deserializationConfig.with(feature);
+        return this;
+    }
+
+    @Deprecated
+    public ObjectMapper disable(DeserializationFeature feature) {
+        _deserializationConfig = _deserializationConfig.without(feature);
+        return this;
+    }
+
+    /*
+    /**********************************************************
+    /* Configuration, accessing features
+    /**********************************************************
+     */
+
+    public boolean isEnabled(JsonFactory.Feature f) {
+        return _streamFactory.isEnabled(f);
+    }
+
+    public boolean isEnabled(JsonParser.Feature f) {
+        return _deserializationConfig.isEnabled(f);
+    }
+
+    public boolean isEnabled(JsonGenerator.Feature f) {
+        return _serializationConfig.isEnabled(f);
+    }
+
+    /**
+     * Method for checking whether given {@link MapperFeature} is enabled.
+     */
+    public boolean isEnabled(MapperFeature f) {
+        // ok to use either one, should be kept in sync
+        return _serializationConfig.isEnabled(f);
+    }
+
     /**
      * Method for checking whether given deserialization-specific
      * feature is enabled.
@@ -1567,75 +1570,11 @@ public class ObjectMapper
     }
 
     /**
-     * Method for changing state of an on/off deserialization feature for
-     * this object mapper.
+     * Method for checking whether given serialization-specific
+     * feature is enabled.
      */
-    public ObjectMapper configure(DeserializationFeature f, boolean state) {
-        _deserializationConfig = state ?
-                _deserializationConfig.with(f) : _deserializationConfig.without(f);
-        return this;
-    }
-
-    /**
-     * Method for enabling specified {@link DeserializationConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
-    public ObjectMapper enable(DeserializationFeature feature) {
-        _deserializationConfig = _deserializationConfig.with(feature);
-        return this;
-    }
-
-    /**
-     * Method for enabling specified {@link DeserializationConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
-    public ObjectMapper enable(DeserializationFeature first,
-            DeserializationFeature... f) {
-        _deserializationConfig = _deserializationConfig.with(first, f);
-        return this;
-    }
-    
-    /**
-     * Method for disabling specified {@link DeserializationConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
-    public ObjectMapper disable(DeserializationFeature feature) {
-        _deserializationConfig = _deserializationConfig.without(feature);
-        return this;
-    }
-
-    /**
-     * Method for disabling specified {@link DeserializationConfig} features.
-     * Modifies and returns this instance; no new object is created.
-     */
-    public ObjectMapper disable(DeserializationFeature first,
-            DeserializationFeature... f) {
-        _deserializationConfig = _deserializationConfig.without(first, f);
-        return this;
-    }
-    
-    /*
-    /**********************************************************
-    /* Configuration, accessing features
-    /**********************************************************
-     */
-
-    /**
-     * Convenience method, equivalent to:
-     *<pre>
-     *  tokenStreamFactory().isEnabled(f);
-     *</pre>
-     */
-    public boolean isEnabled(JsonFactory.Feature f) {
-        return _streamFactory.isEnabled(f);
-    }
-
-    public boolean isEnabled(JsonParser.Feature f) {
-        return _deserializationConfig.isEnabled(f, _streamFactory);
-    }
-
-    public boolean isEnabled(JsonGenerator.Feature f) {
-        return _serializationConfig.isEnabled(f, _streamFactory);
+    public boolean isEnabled(SerializationFeature f) {
+        return _serializationConfig.isEnabled(f);
     }
 
     /*

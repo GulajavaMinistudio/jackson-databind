@@ -78,12 +78,11 @@ public class ObjectMapperTest extends BaseMapTest
     // [databind#28]: ObjectMapper.copy()
     public void testCopy() throws Exception
     {
-        ObjectMapper m = new ObjectMapper(JsonFactory.builder()
-                .with(JsonParser.Feature.ALLOW_COMMENTS)
-                .build());
-        assertTrue(m.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
+        ObjectMapper m = ObjectMapper.builder(JsonFactory.builder()
+                .enable(JsonParser.Feature.ALLOW_COMMENTS).build()
+                ).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
         assertTrue(m.isEnabled(JsonParser.Feature.ALLOW_COMMENTS));
-        m.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         assertFalse(m.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
         InjectableValues inj = new InjectableValues.Std();
         m.setInjectableValues(inj);
@@ -92,8 +91,6 @@ public class ObjectMapperTest extends BaseMapTest
         
         ObjectMapper m2 = m.copy();
         assertFalse(m2.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
-        m2.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        assertTrue(m2.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
         assertSame(inj, m2.getInjectableValues());
 
         // but should NOT change the original
@@ -101,9 +98,6 @@ public class ObjectMapperTest extends BaseMapTest
 
         // nor vice versa:
         assertFalse(m.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
-        assertFalse(m2.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
-        m.enable(DeserializationFeature.UNWRAP_ROOT_VALUE);
-        assertTrue(m.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
         assertFalse(m2.isEnabled(DeserializationFeature.UNWRAP_ROOT_VALUE));
 
         // 30-Jan-2018, tatu: With 3.0, stream factories are immutable so
@@ -213,7 +207,9 @@ public class ObjectMapperTest extends BaseMapTest
         assertFalse(dc.shouldSortPropertiesAlphabetically());
 
         // but when enabled, should be visible:
-        m.enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY);
+        m = ObjectMapper.builder()
+                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .build();
         sc = m.getSerializationConfig();
         assertTrue(sc.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
         assertTrue(sc.shouldSortPropertiesAlphabetically());
@@ -249,8 +245,9 @@ public class ObjectMapperTest extends BaseMapTest
     // For [databind#689]
     public void testCustomDefaultPrettyPrinter() throws Exception
     {
-        final ObjectMapper m = new ObjectMapper();
         final int[] input = new int[] { 1, 2 };
+
+        ObjectMapper m = new ObjectMapper();
 
         // without anything else, compact:
         assertEquals("[1,2]", m.writeValueAsString(input));
@@ -262,7 +259,10 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals("[ 1, 2 ]", m.writer().withDefaultPrettyPrinter().writeValueAsString(input));
 
         // but then with our custom thingy...
-        m.setDefaultPrettyPrinter(new FooPrettyPrinter());
+        m = ObjectMapper.builder()
+                .defaultPrettyPrinter(new FooPrettyPrinter())
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .build();
         assertEquals("[1 , 2]", m.writeValueAsString(input));
         assertEquals("[1 , 2]", m.writerWithDefaultPrettyPrinter().writeValueAsString(input));
         assertEquals("[1 , 2]", m.writer().withDefaultPrettyPrinter().writeValueAsString(input));
@@ -288,7 +288,7 @@ public class ObjectMapperTest extends BaseMapTest
     {
         // ensure we have "fresh" instance to start with
         ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
-                .with(JsonParser.Feature.ALLOW_COMMENTS).build());
+                .enable(JsonParser.Feature.ALLOW_COMMENTS).build());
         assertTrue(mapper.isEnabled(JsonParser.Feature.ALLOW_COMMENTS));
 
         ObjectMapper copy = mapper.copy();
@@ -312,7 +312,6 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(exp, bytes.toString("UTF-8"));
     }
 
-    // since 2.8
     @SuppressWarnings("unchecked")
     public void testDataInputViaMapper() throws Exception
     {
