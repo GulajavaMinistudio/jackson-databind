@@ -57,20 +57,6 @@ public abstract class DefaultDeserializationContext
         super(src, factory);
     }
 
-    protected DefaultDeserializationContext(DefaultDeserializationContext src) {
-        super(src);
-    }
-    
-    /**
-     * Method needed to ensure that {@link ObjectMapper#copy} will work
-     * properly; specifically, that caches are cleared, but settings
-     * will otherwise remain identical; and that no sharing of state
-     * occurs.
-     */
-    public DefaultDeserializationContext copy() {
-        throw new IllegalStateException("DefaultDeserializationContext sub-class not overriding copy()");
-    }
-
     public DefaultDeserializationContext assignParser(JsonParser p) {
         _parser = p;
         return this;
@@ -82,9 +68,9 @@ public abstract class DefaultDeserializationContext
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Abstract methods impls, Object Id
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -194,9 +180,9 @@ public abstract class DefaultDeserializationContext
     }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Abstract methods impls, other factory methods
-    /**********************************************************
+    /**********************************************************************
      */
     
     @SuppressWarnings("unchecked")
@@ -212,9 +198,8 @@ public abstract class DefaultDeserializationContext
         if (deserDef instanceof JsonDeserializer) {
             deser = (JsonDeserializer<?>) deserDef;
         } else {
-            /* Alas, there's no way to force return type of "either class
-             * X or Y" -- need to throw an exception after the fact
-             */
+            // Alas, there's no way to force return type of "either class
+            // X or Y" -- need to throw an exception after the fact
             if (!(deserDef instanceof Class)) {
                 throw new IllegalStateException("AnnotationIntrospector returned deserializer definition of type "+deserDef.getClass().getName()+"; expected type JsonDeserializer or Class<JsonDeserializer> instead");
             }
@@ -278,9 +263,9 @@ public abstract class DefaultDeserializationContext
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended API
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -297,9 +282,9 @@ public abstract class DefaultDeserializationContext
             FormatSchema schema, InjectableValues values);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* And then the concrete implementation class
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -323,18 +308,10 @@ public abstract class DefaultDeserializationContext
             super(src, config, schema, values);
         }
 
-        protected Impl(Impl src) { super(src); }
-        
         protected Impl(Impl src, DeserializerFactory factory) {
             super(src, factory);
         }
 
-        @Override
-        public DefaultDeserializationContext copy() {
-            ClassUtil.verifyMustOverride(Impl.class, this, "copy");
-           return new Impl(this);
-        }
-        
         @Override
         public DefaultDeserializationContext createInstance(DeserializationConfig config,
                 FormatSchema schema, InjectableValues values) {

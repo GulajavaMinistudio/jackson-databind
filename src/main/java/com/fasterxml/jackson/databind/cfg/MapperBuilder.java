@@ -1,4 +1,4 @@
-package com.fasterxml.jackson.databind;
+package com.fasterxml.jackson.databind.cfg;
 
 import java.text.DateFormat;
 import java.util.Locale;
@@ -6,10 +6,8 @@ import java.util.TimeZone;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.cfg.BaseSettings;
-import com.fasterxml.jackson.databind.cfg.ConfigOverrides;
-import com.fasterxml.jackson.databind.cfg.HandlerInstantiator;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
+
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.introspect.BasicClassIntrospector;
 import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
@@ -123,14 +121,24 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
 
     /**
+     * States of {@link com.fasterxml.jackson.core.JsonParser.Feature}s to enable/disable.
+     */
+    protected int _parserFeatures;
+
+    /**
      * States of {@link com.fasterxml.jackson.core.JsonGenerator.Feature}s to enable/disable.
      */
     protected int _generatorFeatures;
 
     /**
-     * States of {@link com.fasterxml.jackson.core.JsonParser.Feature}s to enable/disable.
+     * Optional per-format parser feature flags.
      */
-    protected int _parserFeatures;
+    protected int _formatParserFeatures;
+
+    /**
+     * Optional per-format generator feature flags.
+     */
+    protected int _formatGeneratorFeatures;
 
     /*
     /**********************************************************
@@ -145,6 +153,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
         _parserFeatures = streamFactory.getParserFeatures();
         _generatorFeatures = streamFactory.getGeneratorFeatures();
+        _formatParserFeatures = streamFactory.getFormatParserFeatures();
+        _formatGeneratorFeatures = streamFactory.getFormatGeneratorFeatures();
 
         _mapperFeatures = DEFAULT_MAPPER_FEATURES;
         // Some overrides we may need based on format
@@ -170,12 +180,14 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _streamFactory = base._streamFactory;
         _baseSettings = base._baseSettings;
 
-        _parserFeatures = base._parserFeatures;
-        _generatorFeatures = base._deserFeatures;
-
         _mapperFeatures = base._mapperFeatures;
         _serFeatures = base._serFeatures;
         _deserFeatures = base._deserFeatures;
+
+        _parserFeatures = base._parserFeatures;
+        _generatorFeatures = base._deserFeatures;
+        _formatParserFeatures = base._formatParserFeatures;
+        _formatGeneratorFeatures = base._formatGeneratorFeatures;
 
         _classIntrospector = base._classIntrospector;
         _subtypeResolver = base._subtypeResolver;
@@ -203,7 +215,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
             RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
         return new SerializationConfig(this,
-                _mapperFeatures, _serFeatures, _generatorFeatures,
+                _mapperFeatures, _serFeatures, _generatorFeatures, _formatGeneratorFeatures,
                 mixins, rootNames, configOverrides);
     }
 
@@ -211,7 +223,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
             RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
         return new DeserializationConfig(this,
-                _mapperFeatures, _deserFeatures, _parserFeatures,
+                _mapperFeatures, _deserFeatures, _parserFeatures, _formatParserFeatures,
                 mixins, rootNames, configOverrides);
     }
 
@@ -312,7 +324,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _deserializerFactory;
     }
 
-    protected DefaultDeserializationContext deserializationContext() {
+    public DefaultDeserializationContext deserializationContext() {
         if (_deserializationContext == null) {
             _deserializationContext = _defaultDeserializationContext();
         }
@@ -469,7 +481,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
-    protected B nodeFactory(JsonNodeFactory f) {
+    public B nodeFactory(JsonNodeFactory f) {
         _baseSettings = _baseSettings.with(f);
         return _this();
     }
