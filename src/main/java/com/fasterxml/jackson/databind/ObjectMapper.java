@@ -393,6 +393,7 @@ public class ObjectMapper
         // General framework factories
         _streamFactory = builder.streamFactory();
         BaseSettings base = builder.baseSettings();
+        _configOverrides = builder.configOverrides();
 
         // general type handling
         _typeFactory = base.getTypeFactory();
@@ -409,9 +410,8 @@ public class ObjectMapper
         RootNameLookup rootNames = new RootNameLookup();
 
         _mixIns = new SimpleMixInResolver(null);
-        _configOverrides = new ConfigOverrides();
-        _serializationConfig = builder.buildSerializationConfig(_mixIns, rootNames, _configOverrides);
-        _deserializationConfig = builder.buildDeserializationConfig(_mixIns, rootNames, _configOverrides);
+        _serializationConfig = builder.buildSerializationConfig(_mixIns, rootNames);
+        _deserializationConfig = builder.buildDeserializationConfig(_mixIns, rootNames);
     }
 
     /**
@@ -506,7 +506,17 @@ public class ObjectMapper
             }
 
             @Override
-            public TypeFactory getTypeFactory() {
+            public String getFormatName() {
+                return _streamFactory.getFormatName();
+            }
+
+            @Override
+            public TokenStreamFactory tokenStreamFactory() {
+                return _streamFactory;
+            }
+            
+            @Override
+            public TypeFactory typeFactory() {
                 return _typeFactory;
             }
             
