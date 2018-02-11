@@ -184,8 +184,9 @@ public class TestScalaLikeImplicitProperties extends BaseMapTest
     
     private ObjectMapper manglingMapper()
     {
-        ObjectMapper m = new ObjectMapper();
-        m.setAnnotationIntrospector(new NameMangler());
+        ObjectMapper m = ObjectMapper.builder()
+                .annotationIntrospector(new NameMangler())
+                .build();
         return m;
     }
 }
