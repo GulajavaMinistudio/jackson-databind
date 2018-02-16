@@ -166,7 +166,11 @@ public class ObjectMapper
 
         @Override
         public ObjectMapper build() {
-            return new ObjectMapper(this);
+            ObjectMapper m = new ObjectMapper(this);
+            if (_modules != null) {
+                m.registerModules(_modules.values());
+            }
+            return m;
         }
     }
 
@@ -286,20 +290,6 @@ public class ObjectMapper
      */
     protected DefaultDeserializationContext _deserializationContext;
 
-    /*
-    /**********************************************************
-    /* Module-related
-    /**********************************************************
-     */
-
-    /**
-     * Set of module types (as per {@link Module#getTypeId()} that have been
-     * registered; kept track of iff {@link MapperFeature#IGNORE_DUPLICATE_MODULE_REGISTRATIONS}
-     * is enabled, so that duplicate registration calls can be ignored
-     * (to avoid adding same handlers multiple times, mostly).
-     */
-    protected Set<Object> _registeredModuleTypes;
-    
     /*
     /**********************************************************
     /* Caching
@@ -427,10 +417,11 @@ public class ObjectMapper
      *
      * @since 3.0
      */
-    @SuppressWarnings("unchecked")
-    public static <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> builder() {
+//    @SuppressWarnings("unchecked")
+//    public static <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> builder() {
 //      public static <M extends ObjectMapper> MapperBuilder<> builder() {
-        return (MapperBuilder<M,B>) new ObjectMapper.Builder(new JsonFactory());
+    public static ObjectMapper.Builder builder() {
+        return new ObjectMapper.Builder(new JsonFactory());
     }
 
     public static ObjectMapper.Builder builder(TokenStreamFactory streamFactory) {
@@ -467,25 +458,9 @@ public class ObjectMapper
      */
     public ObjectMapper registerModule(Module module)
     {
-        if (isEnabled(MapperFeature.IGNORE_DUPLICATE_MODULE_REGISTRATIONS)) {
-            Object typeId = module.getTypeId();
-            if (typeId != null) {
-                if (_registeredModuleTypes == null) {
-                    // plus let's keep them in order too, easier to debug or expose
-                    // in registration order if that matter
-                    _registeredModuleTypes = new LinkedHashSet<Object>();
-                }
-                // try adding; if already had it, should skip
-                if (!_registeredModuleTypes.add(typeId)) {
-                    return this;
-                }
-            }
-        }
-        
-        /* Let's ensure we have access to name and version information, 
-         * even if we do not have immediate use for either. This way we know
-         * that they will be available from beginning
-         */
+        // Let's ensure we have access to name and version information, 
+        // even if we do not have immediate use for either. This way we know
+        // that they will be available from beginning
         String name = module.getModuleName();
         if (name == null) {
             throw new IllegalArgumentException("Module without defined name");
@@ -660,15 +635,7 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * Convenience method for registering specified modules in order;
-     * functionally equivalent to:
-     *<pre>
-     *   for (Module module : modules) {
-     *      registerModule(module);
-     *   }
-     *</pre>
-     */
+    @Deprecated
     public ObjectMapper registerModules(Module... modules)
     {
         for (Module module : modules) {
@@ -677,15 +644,7 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * Convenience method for registering specified modules in order;
-     * functionally equivalent to:
-     *<pre>
-     *   for (Module module : modules) {
-     *      registerModule(module);
-     *   }
-     *</pre>
-     */
+    @Deprecated
     public ObjectMapper registerModules(Iterable<? extends Module> modules)
     {
         for (Module module : modules) {
@@ -693,25 +652,11 @@ public class ObjectMapper
         }
         return this;
     }
-    
-    /**
-     * Method for locating available methods, using JDK {@link ServiceLoader}
-     * facility, along with module-provided SPI.
-     *<p>
-     * Note that method does not do any caching, so calls should be considered
-     * potentially expensive.
-     */
+    @Deprecated
     public static List<Module> findModules() {
         return findModules(null);
     }
-
-    /**
-     * Method for locating available methods, using JDK {@link ServiceLoader}
-     * facility, along with module-provided SPI.
-     *<p>
-     * Note that method does not do any caching, so calls should be considered
-     * potentially expensive.
-     */
+    @Deprecated
     public static List<Module> findModules(ClassLoader classLoader)
     {
         ArrayList<Module> modules = new ArrayList<Module>();
@@ -736,17 +681,7 @@ public class ObjectMapper
             }
         });
     }
-
-    /**
-     * Convenience method that is functionally equivalent to:
-     *<code>
-     *   mapper.registerModules(mapper.findModules());
-     *</code>
-     *<p>
-     * As with {@link #findModules()}, no caching is done for modules, so care
-     * needs to be taken to either create and share a single mapper instance;
-     * or to cache introspected set of modules.
-     */
+    @Deprecated
     public ObjectMapper findAndRegisterModules() {
         return registerModules(findModules());
     }
@@ -1155,6 +1090,7 @@ public class ObjectMapper
      * {@link java.util.Date} (possibly further overridden by per-property
      * annotations)
      */
+    @Deprecated
     public MutableConfigOverride configOverride(Class<?> type) {
         return _configOverrides.findOrCreateOverride(type);
     }

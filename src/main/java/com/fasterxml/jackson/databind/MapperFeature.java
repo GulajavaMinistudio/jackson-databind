@@ -289,52 +289,9 @@ public enum MapperFeature implements ConfigFeature
 
     /*
     /******************************************************
-    /* Coercion features
-    /******************************************************
-     */
-
-    /**
-     * Feature that determines whether coercions from secondary representations are allowed
-     * for simple non-textual scalar types: numbers and booleans. This includes `primitive`
-     * types and their wrappers, but excludes `java.lang.String` and date/time types.
-     *<p>
-     * When feature is disabled, only strictly compatible input may be bound: numbers for
-     * numbers, boolean values for booleans. When feature is enabled, conversions from
-     * JSON String are allowed, as long as textual value matches (for example, String
-     * "true" is allowed as equivalent of JSON boolean token `true`; or String "1.0"
-     * for `double`).
-     *<p>
-     * Note that it is possible that other configurability options can override this
-     * in closer scope (like on per-type or per-property basis); this is just the global
-     * default.
-     *<p>
-     * Feature is enabled by default (for backwards compatibility since this was the
-     * default behavior)
-     */
-    ALLOW_COERCION_OF_SCALARS(true),
-
-    /*
-    /******************************************************
     /* Other features
     /******************************************************
      */
-
-    /**
-     * Feature that determines whether multiple registrations of same module
-     * should be ignored or not; if enabled, only the first registration call
-     * results in module being called, and possible duplicate calls are silently
-     * ignored; if disabled, no checking is done and all registration calls are
-     * dispatched to module.
-     *<p>
-     * Definition of "same module" is based on using {@link Module#getTypeId()};
-     * modules with same non-null <code>type id</code> are considered same for
-     * purposes of duplicate registration. This also avoids having to keep track
-     * of actual module instances; only ids will be kept track of (and only if
-     * this feature is enabled).
-     *<p>
-     * Feature is enabled by default.
-     */
-    IGNORE_DUPLICATE_MODULE_REGISTRATIONS(true),
 
     /**
      * Setting that determines what happens if an attempt is made to explicitly

@@ -1,9 +1,9 @@
 package com.fasterxml.jackson.databind.cfg;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.text.DateFormat;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -55,7 +55,18 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected final TokenStreamFactory _streamFactory;
 
     protected final ConfigOverrides _configOverrides;
-    
+
+    /*
+    /**********************************************************
+    /* Modules
+    /**********************************************************
+     */
+
+    /**
+     * Modules registered for addition, indexed by registration id.
+     */
+    protected Map<Object, com.fasterxml.jackson.databind.Module> _modules;
+
     /*
     /**********************************************************
     /* Handlers, introspection
@@ -505,7 +516,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * Method for changing config overrides for specific type, through
      * callback to specific handler.
      */
-    public B withConfigOverrides(Class<?> forType,
+    public B withConfigOverride(Class<?> forType,
             Consumer<MutableConfigOverride> handler) {
         handler.accept(_configOverrides.findOrCreateOverride(forType));
         return _this();
@@ -541,9 +552,137 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* Module registration, discovery, access
+    /**********************************************************************
+     */
+
+    /**
+     * Method that will drop all modules added (via {@link #addModule} and similar
+     * calls) to this builder.
+     */
+    public B removeAllModules() {
+        _modules = null;
+        return _this();
+    }
+
+    /**
+     * Method will add given module to be registered when mapper is built, possibly
+     * replacing an earlier instance of the module (as specified by its
+     * {@link Module#getRegistrationId()}).
+     * Actual registration occurs in addition order (considering last add to count,
+     * in case of re-registration for same id) when {@link #build()} is called.
+     */
+    public B addModule(com.fasterxml.jackson.databind.Module module)
+    {
+        if (module.getModuleName() == null) {
+            throw new IllegalArgumentException("Module without defined name");
+        }
+        if (module.version() == null) {
+            throw new IllegalArgumentException("Module without defined version");
+        }
+        // If dups are ok we still need a key, but just need to ensure it is unique so:
+        final Object moduleId = module.getRegistrationId();
+        if (_modules == null) {
+            _modules = new LinkedHashMap<>();
+        } else {
+            // Important: since order matters, we won't try to simply replace existing one.
+            // Could do in different order (put, and only re-order if there was old value),
+            // but simple does it for now.
+            _modules.remove(moduleId);
+        }
+        _modules.put(moduleId, module);
+        return _this();
+    }
+
+    public B addModules(com.fasterxml.jackson.databind.Module... modules)
+    {
+        for (com.fasterxml.jackson.databind.Module module : modules) {
+            addModule(module);
+        }
+        return _this();
+    }
+
+    public B addModules(Iterable<? extends com.fasterxml.jackson.databind.Module> modules)
+    {
+        for (com.fasterxml.jackson.databind.Module module : modules) {
+            addModule(module);
+        }
+        return _this();
+    }
+
+    /**
+     * Method for locating available methods, using JDK {@link ServiceLoader}
+     * facility, along with module-provided SPI.
+     *<p>
+     * Note that method does not do any caching, so calls should be considered
+     * potentially expensive.
+     */
+    public static List<com.fasterxml.jackson.databind.Module> findModules() {
+        return findModules(null);
+    }
+
+    /**
+     * Method for locating available methods, using JDK {@link ServiceLoader}
+     * facility, along with module-provided SPI.
+     *<p>
+     * Note that method does not do any caching, so calls should be considered
+     * potentially expensive.
+     */
+    public static List<com.fasterxml.jackson.databind.Module> findModules(ClassLoader classLoader)
+    {
+        ArrayList<com.fasterxml.jackson.databind.Module> modules = new ArrayList<>();
+        ServiceLoader<com.fasterxml.jackson.databind.Module> loader = secureGetServiceLoader(com.fasterxml.jackson.databind.Module.class, classLoader);
+        for (com.fasterxml.jackson.databind.Module module : loader) {
+            modules.add(module);
+        }
+        return modules;
+    }
+
+    private static <T> ServiceLoader<T> secureGetServiceLoader(final Class<T> clazz, final ClassLoader classLoader) {
+        final SecurityManager sm = System.getSecurityManager();
+        if (sm == null) {
+            return (classLoader == null) ?
+                    ServiceLoader.load(clazz) : ServiceLoader.load(clazz, classLoader);
+        }
+        return AccessController.doPrivileged(new PrivilegedAction<ServiceLoader<T>>() {
+            @Override
+            public ServiceLoader<T> run() {
+                return (classLoader == null) ?
+                        ServiceLoader.load(clazz) : ServiceLoader.load(clazz, classLoader);
+            }
+        });
+    }
+
+    /**
+     * Convenience method that is functionally equivalent to:
+     *<code>
+     *   addModules(builder.findModules());
+     *</code>
+     *<p>
+     * As with {@link #findModules()}, no caching is done for modules, so care
+     * needs to be taken to either create and share a single mapper instance;
+     * or to cache introspected set of modules.
+     */
+    public B findAndAddModules() {
+        return addModules(findModules());
+    }
+
+    /**
+     * "Accessor" method that will expose set of registered modules, in addition
+     * order, to given handler.
+     */
+    public B withModules(Consumer<com.fasterxml.jackson.databind.Module> handler) {
+        if (_modules != null) {
+            _modules.values().forEach(handler);
+        }
+        return _this();
+    }
+
+    /*
+    /**********************************************************************
     /* Changing factories/handlers, general
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**

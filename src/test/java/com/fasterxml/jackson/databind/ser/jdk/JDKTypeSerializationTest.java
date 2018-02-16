@@ -79,10 +79,11 @@ public class JDKTypeSerializationTest
     public void testLocale() throws IOException
     {
         assertEquals(quote("en"), MAPPER.writeValueAsString(new Locale("en")));
-        assertEquals(quote("es_ES"), MAPPER.writeValueAsString(new Locale("es", "ES")));
-        assertEquals(quote("fi_FI_savo"), MAPPER.writeValueAsString(new Locale("FI", "fi", "savo")));
+        assertEquals(quote("es-ES"), MAPPER.writeValueAsString(new Locale("es", "ES")));
+        // 15-Feb-2017, tatu: wrt [databind#1600], can only assume this is expected...
+        assertEquals(quote("fi-FI-x-lvariant-savo"), MAPPER.writeValueAsString(new Locale("FI", "fi", "savo")));
 
-        assertEquals(quote("en_US"), MAPPER.writeValueAsString(Locale.US));
+        assertEquals(quote("en-US"), MAPPER.writeValueAsString(Locale.US));
 
         // [databind#1123]
         assertEquals(quote(""), MAPPER.writeValueAsString(Locale.ROOT));
@@ -94,9 +95,10 @@ public class JDKTypeSerializationTest
         InetAddress input = InetAddress.getByName("google.com");
         assertEquals(quote("google.com"), MAPPER.writeValueAsString(input));
 
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configOverride(InetAddress.class)
-            .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.NUMBER));
+        ObjectMapper mapper = objectMapperBuilder()
+                .withConfigOverride(InetAddress.class,
+                        o -> o.setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.NUMBER)))
+                .build();
         String json = mapper.writeValueAsString(input);
         assertEquals(quote(input.getHostAddress()), json);
 
