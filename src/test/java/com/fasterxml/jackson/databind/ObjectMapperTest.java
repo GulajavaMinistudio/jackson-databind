@@ -79,11 +79,9 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(ConfigOverrides.INCLUDE_ALL, config.getDefaultPropertyInclusion());
         assertEquals(JsonSetter.Value.empty(), config.getDefaultSetterInfo());
         assertNull(config.getDefaultMergeable());
-        VisibilityChecker<?> defaultVis = m.getVisibilityChecker();
-        assertEquals(VisibilityChecker.Std.class, defaultVis.getClass());
 
         // change
-        VisibilityChecker<?> customVis = VisibilityChecker.Std.defaultInstance()
+        VisibilityChecker customVis = VisibilityChecker.defaultInstance()
                 .withFieldVisibility(Visibility.ANY);
         m = ObjectMapper.builder()
                 .changeDefaultVisibility(vc -> customVis)
@@ -94,7 +92,6 @@ public class ObjectMapperTest extends BaseMapTest
         JsonSetter.Value customSetter = JsonSetter.Value.forValueNulls(Nulls.SKIP);
         m.setDefaultSetterInfo(customSetter);
         m.setDefaultMergeable(Boolean.TRUE);
-        assertSame(customVis, m.getVisibilityChecker());
     }
 
     /*
@@ -106,13 +103,13 @@ public class ObjectMapperTest extends BaseMapTest
     public void testProps()
     {
         // should have default factory
-        assertNotNull(MAPPER.getNodeFactory());
+        assertNotNull(MAPPER.nodeFactory());
         JsonNodeFactory nf = new JsonNodeFactory(true);
         ObjectMapper m = ObjectMapper.builder()
                 .nodeFactory(nf)
                 .build();
         assertNull(m.getInjectableValues());
-        assertSame(nf, m.getNodeFactory());
+        assertSame(nf, m.nodeFactory());
     }
 
     // Test to ensure that we can check property ordering defaults...
@@ -201,7 +198,7 @@ public class ObjectMapperTest extends BaseMapTest
     {
         // ensure we have "fresh" instance, just in case
         ObjectMapper mapper = new ObjectMapper();
-        JsonSerializer<?> ser = mapper.getSerializerProviderInstance()
+        JsonSerializer<?> ser = mapper.serializerProviderInstance()
                 .findValueSerializer(Bean.class);
         assertNotNull(ser);
         assertEquals(Bean.class, ser.handledType());

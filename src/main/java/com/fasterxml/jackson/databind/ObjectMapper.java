@@ -240,7 +240,7 @@ public class ObjectMapper
      * you can think of it as injecting annotations between the target
      * class and its sub-classes (or interfaces)
      */
-    protected SimpleMixInResolver _mixIns;
+    protected final MixInHandler _mixIns;
 
     /*
     /**********************************************************
@@ -404,11 +404,16 @@ public class ObjectMapper
 
         RootNameLookup rootNames = new RootNameLookup();
 
-        _mixIns = new SimpleMixInResolver(null);
+        _mixIns = builder.mixInHandler();
         _serializationConfig = builder.buildSerializationConfig(_mixIns, rootNames);
         _deserializationConfig = builder.buildDeserializationConfig(_mixIns, rootNames);
     }
 
+    // 16-Feb-2018, tatu: Arggghh. Due to Java Type Erasure rules, override, even static methods
+    //    are apparently bound to compatibility rules (despite them not being real overrides at all).
+    //    And because there is no "JsonMapper" we need to use odd weird typing here. Instead of simply
+    //    using `MapperBuilder` we already go
+    
     /**
      * Short-cut for:
      *<pre>
@@ -417,13 +422,18 @@ public class ObjectMapper
      *
      * @since 3.0
      */
-//    @SuppressWarnings("unchecked")
-//    public static <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> builder() {
+    @SuppressWarnings("unchecked")
+    public static <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> builder() {
 //      public static <M extends ObjectMapper> MapperBuilder<> builder() {
-    public static ObjectMapper.Builder builder() {
-        return new ObjectMapper.Builder(new JsonFactory());
+//    public static ObjectMapper.Builder builder() {
+        return (MapperBuilder<M,B>) jsonBuilder();
     }
 
+    // But here we can just use simple typing. Since there are no overloads of any kind.
+    public static ObjectMapper.Builder jsonBuilder() {
+        return new ObjectMapper.Builder(new JsonFactory());
+    }
+    
     public static ObjectMapper.Builder builder(TokenStreamFactory streamFactory) {
         return new ObjectMapper.Builder(streamFactory);
     }
@@ -760,7 +770,7 @@ public class ObjectMapper
      * are created by calling {@link DefaultSerializerProvider#createInstance}.
      * Note that returned instance cannot be directly used as it is not properly
      * configured: to get a properly configured instance to call, use
-     * {@link #getSerializerProviderInstance()} instead.
+     * {@link #serializerProviderInstance()} instead.
      */
     public SerializerProvider getSerializerProvider() {
         return _serializerProvider;
@@ -771,7 +781,7 @@ public class ObjectMapper
      * instance that may be used for accessing serializers. This is same as
      * calling {@link #getSerializerProvider}, and calling <code>createInstance</code> on it.
      */
-    public SerializerProvider getSerializerProviderInstance() {
+    public SerializerProvider serializerProviderInstance() {
         return _serializerProvider();
     }
 
@@ -780,28 +790,6 @@ public class ObjectMapper
     /* Configuration: mix-in annotations
     /**********************************************************
      */
-
-    /**
-     * Method to use for defining mix-in annotations to use for augmenting
-     * annotations that processable (serializable / deserializable)
-     * classes have.
-     * Mixing in is done when introspecting class annotations and properties.
-     * Map passed contains keys that are target classes (ones to augment
-     * with new annotation overrides), and values that are source classes
-     * (have annotations to use for augmentation).
-     * Annotations from source classes (and their supertypes)
-     * will <b>override</b>
-     * annotations that target classes (and their super-types) have.
-     *<p>
-     * Note that this method will CLEAR any previously defined mix-ins
-     * for this mapper.
-     */
-    public ObjectMapper setMixIns(Map<Class<?>, Class<?>> sourceMixins)
-    {
-        // NOTE: does NOT change possible externally configured resolver, just local defs
-        _mixIns.setLocalDefinitions(sourceMixins);
-        return this;
-    }
 
     /**
      * Method to use for adding mix-in annotations to use for augmenting
@@ -819,46 +807,16 @@ public class ObjectMapper
         return this;
     }
 
-    /**
-     * Method that can be called to specify given resolver for locating
-     * mix-in classes to use, overriding directly added mappings.
-     * Note that direct mappings are not cleared, but they are only applied
-     * if resolver does not provide mix-in matches.
-     */
-    public ObjectMapper setMixInResolver(ClassIntrospector.MixInResolver resolver)
-    {
-        SimpleMixInResolver r = _mixIns.withOverrides(resolver);
-        if (r != _mixIns) {
-            _mixIns = r;
-            _deserializationConfig = new DeserializationConfig(_deserializationConfig, r);
-            _serializationConfig = new SerializationConfig(_serializationConfig, r);
-        }
-        return this;
+    // For testing only:
+    public MixInHandler mixInHandler() {
+        return _mixIns;
     }
     
-    public Class<?> findMixInClassFor(Class<?> cls) {
-        return _mixIns.findMixInClassFor(cls);
-    }
-
-    // For testing only:
-    public int mixInCount() {
-        return _mixIns.localSize();
-    }
-
     /*
     /**********************************************************
     /* Configuration, introspection
     /**********************************************************
      */
-
-    /**
-     * Method for accessing currently configured visibility checker;
-     * object used for determining whether given property element
-     * (method, field, constructor) can be auto-detected or not.
-     */
-    public VisibilityChecker<?> getVisibilityChecker() {
-        return _configOverrides.getDefaultVisibility();
-    }
 
     /**
      * Method for accessing subtype resolver in use.
@@ -1108,13 +1066,7 @@ public class ObjectMapper
         return _typeFactory;
     }
 
-    /**
-     * Method that can be used to override {@link TypeFactory} instance
-     * used by this mapper.
-     *<p>
-     * Note: will also set {@link TypeFactory} that deserialization and
-     * serialization config objects use.
-     */
+    @Deprecated
     public ObjectMapper setTypeFactory(TypeFactory f)
     {
         _typeFactory = f;
@@ -1148,7 +1100,7 @@ public class ObjectMapper
      *   getDeserializationConfig().getNodeFactory()
      *</pre>
      */
-    public JsonNodeFactory getNodeFactory() {
+    public JsonNodeFactory nodeFactory() {
         return _deserializationConfig.getNodeFactory();
     }
 
@@ -1156,6 +1108,7 @@ public class ObjectMapper
      * Method for adding specified {@link DeserializationProblemHandler}
      * to be used for handling specific problems during deserialization.
      */
+    @Deprecated
     public ObjectMapper addHandler(DeserializationProblemHandler h) {
         _deserializationConfig = _deserializationConfig.withHandler(h);
         return this;
@@ -1657,7 +1610,7 @@ public class ObjectMapper
         DeserializationContext ctxt = createDeserializationContext(p);
         JsonNode n = (JsonNode) _readValue(ctxt, p, JSON_NODE_TYPE);
         if (n == null) {
-            n = getNodeFactory().nullNode();
+            n = nodeFactory().nullNode();
         }
         @SuppressWarnings("unchecked")
         T result = (T) n;
@@ -2304,8 +2257,7 @@ public class ObjectMapper
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T readValue(byte[] src, int offset, int len, 
-                               Class<T> valueType)
+    public <T> T readValue(byte[] src, int offset, int len, Class<T> valueType)
         throws IOException, JsonParseException, JsonMappingException
     {
         DefaultDeserializationContext ctxt = createDeserializationContext();
@@ -2323,8 +2275,7 @@ public class ObjectMapper
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public <T> T readValue(byte[] src, int offset, int len,
-                           TypeReference valueTypeRef)
+    public <T> T readValue(byte[] src, int offset, int len, TypeReference valueTypeRef)
         throws IOException, JsonParseException, JsonMappingException
     {
         DefaultDeserializationContext ctxt = createDeserializationContext();

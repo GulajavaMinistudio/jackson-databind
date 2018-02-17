@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.Annotated;
 import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
 import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
+import com.fasterxml.jackson.databind.introspect.MixInResolver;
 import com.fasterxml.jackson.databind.introspect.NopAnnotationIntrospector;
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
@@ -35,7 +36,7 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  * that is shared between different types of instances.
  */
 public abstract class MapperConfig<T extends MapperConfig<T>>
-    implements ClassIntrospector.MixInResolver,
+    implements MixInResolver,
         java.io.Serializable
 {
     private static final long serialVersionUID = 3L; // since 3.0
@@ -447,7 +448,7 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
      * can further override active checker used (using
      * {@link JsonAutoDetect} annotation)
      */
-    public abstract VisibilityChecker<?> getDefaultVisibilityChecker();
+    public abstract VisibilityChecker getDefaultVisibilityChecker();
 
     /**
      * Accessor for object used for determining whether specific property elements
@@ -457,7 +458,7 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
      * then modified by possible class annotation (see {@link JsonAutoDetect})
      * and/or per-type config override (see {@link ConfigOverride#getVisibility()}).
      */
-    public abstract VisibilityChecker<?> getDefaultVisibilityChecker(Class<?> baseType,
+    public abstract VisibilityChecker getDefaultVisibilityChecker(Class<?> baseType,
             AnnotatedClass actualClass);
 
     /**
