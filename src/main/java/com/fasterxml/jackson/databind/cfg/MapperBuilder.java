@@ -5,7 +5,7 @@ import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.jsontype.impl.StdSubtypeResolver;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.ser.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.type.TypeModifier;
 import com.fasterxml.jackson.databind.util.LinkedNode;
 import com.fasterxml.jackson.databind.util.RootNameLookup;
 
@@ -186,7 +187,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * various problem situations during deserialization
      */
     protected LinkedNode<DeserializationProblemHandler> _problemHandlers;
-    
+
     /*
     /**********************************************************************
     /* Life-cycle
@@ -259,15 +260,54 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************************
-    /* Build methods
+    /* Methods for actual build process
     /**********************************************************************
      */
 
     /**
      * Method to call to create an initialize actual mapper instance
      */
-    public abstract M build();
+    public M build() {
+        MapperBuilderState state = _constructState();
+        if (_modules != null) {
+            _registerModules(_modules.values());
+        }
+        return _constructMapper(state);
+    }
 
+    /**
+     * Method usually called during {@link #build}, to give modules change to
+     * actually make changes, via context we construct (usually by calling
+     * {@link #_constructModuleContext}).
+     */
+    public void _registerModules(Collection<? extends com.fasterxml.jackson.databind.Module> modules) {
+        ModuleContextBase ctxt = _constructModuleContext();
+        _modules.values().forEach(m -> m.setupModule(ctxt));
+        ctxt.applyChanges();
+    }
+
+    /**
+     * Method usually called during {@link #build},
+     * after applying all changes, to construct actual typed mapper instance.
+     */
+    public abstract M _constructMapper(MapperBuilderState state);
+
+    public ModuleContextBase _constructModuleContext() {
+        return new ModuleContextBase(this,
+                _configOverrides, baseSettings());
+    }
+
+    public MapperBuilderState _constructState() {
+        // !!! TBI
+        return null;
+    }
+
+    /*
+    /**********************************************************************
+    /* Secondary factory methods
+    /**********************************************************************
+     */
+    
     public SerializationConfig buildSerializationConfig(MixInHandler mixins,
             RootNameLookup rootNames)
     {
@@ -282,6 +322,29 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return new DeserializationConfig(this,
                 _mapperFeatures, _deserFeatures, _parserFeatures, _formatParserFeatures,
                 mixins, rootNames, _configOverrides);
+    }
+
+    /*
+    /**********************************************************************
+    /* Accessors, features
+    /**********************************************************************
+     */
+
+    public boolean isEnabled(MapperFeature f) {
+        return f.enabledIn(_mapperFeatures);
+    }
+    public boolean isEnabled(DeserializationFeature f) {
+        return f.enabledIn(_deserFeatures);
+    }
+    public boolean isEnabled(SerializationFeature f) {
+        return f.enabledIn(_serFeatures);
+    }
+
+    public boolean isEnabled(JsonParser.Feature f) {
+        return f.enabledIn(_parserFeatures);
+    }
+    public boolean isEnabled(JsonGenerator.Feature f) {
+        return f.enabledIn(_generatorFeatures);
     }
 
     /*
@@ -343,7 +406,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /**
-     * Overridable method for changing default {@link StdMixInResolver} prototype
+     * Overridable method for changing default {@link MixInHandler} prototype
      * to use.
      */
     protected MixInHandler _defaultMixInHandler() {
@@ -589,7 +652,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      *    needs to return either checker as is, or a new instance created using one or more of
      *    {@code withVisibility} (and similar) calls.
      */
-    public B changeDefaultVisibility(Function<VisibilityChecker,VisibilityChecker> handler) {
+    public B changeDefaultVisibility(UnaryOperator<VisibilityChecker> handler) {
         VisibilityChecker oldV = _configOverrides.getDefaultVisibility();
         VisibilityChecker newV = handler.apply(oldV);
         if (newV != oldV) {
@@ -733,6 +796,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
+    public B baseSettings(BaseSettings b) {
+        _baseSettings = b;
+        return _this();
+    }
+
     /**
      * Method for replacing {@link AnnotationIntrospector} used by the
      * mapper instance to be built.
@@ -750,6 +818,13 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     public B typeFactory(TypeFactory f) {
         _baseSettings = _baseSettings.with(f);
+        return _this();
+    }
+
+    public B addTypeModifier(TypeModifier modifier) {
+        TypeFactory tf = _baseSettings.getTypeFactory()
+                .withModifier(modifier);
+        _baseSettings = _baseSettings.with(tf);
         return _this();
     }
 
@@ -782,26 +857,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     public B propertyNamingStrategy(PropertyNamingStrategy s) {
         _baseSettings = _baseSettings.with(s);
-        return _this();
-    }
-
-    /**
-     * Method that may be used to completely change mix-in handling by providing
-     * alternate {@link MixInHandler} implementation.
-     * Most of the time this is NOT the method you want to call, and rather are looking
-     * for {@link #mixInOverrides}.
-     */
-    public B mixInHandler(MixInHandler h) {
-        _mixInHandler = h;
-        return _this();
-    }
-
-    /**
-     * Method that allows defining "override" mix-in resolver: something that is checked first,
-     * before simple mix-in definitions.
-     */
-    public B mixInOverrides(MixInResolver r) {
-        _mixInHandler = mixInHandler().withOverrides(r);
         return _this();
     }
 
@@ -847,6 +902,10 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     public B deserializerFactory(DeserializerFactory f) {
         _deserializerFactory = f;
+        // 19-Feb-2018, tatu: Hopefully not needed in future but is needed for now
+        if (_deserializationContext != null) {
+            _deserializationContext = _deserializationContext.with(f);
+        }
         return _this();
     }
 
@@ -880,7 +939,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _problemHandlers = null;
         return _this();
     }
-    
+
     /*
     /**********************************************************************
     /* Changing settings, date/time
@@ -942,6 +1001,26 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
+    /**
+     * Method that may be used to completely change mix-in handling by providing
+     * alternate {@link MixInHandler} implementation.
+     * Most of the time this is NOT the method you want to call, and rather are looking
+     * for {@link #mixInOverrides}.
+     */
+    public B mixInHandler(MixInHandler h) {
+        _mixInHandler = h;
+        return _this();
+    }
+
+    /**
+     * Method that allows defining "override" mix-in resolver: something that is checked first,
+     * before simple mix-in definitions.
+     */
+    public B mixInOverrides(MixInResolver r) {
+        _mixInHandler = mixInHandler().withOverrides(r);
+        return _this();
+    }
+    
     /**
      * Method to use for defining mix-in annotations to use for augmenting
      * annotations that processable (serializable / deserializable)
