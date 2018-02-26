@@ -3,7 +3,6 @@ package com.fasterxml.jackson.databind.deser.merge;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonMerge;
-import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.*;
 
@@ -51,10 +50,10 @@ public class MapMergeTest extends BaseMapTest
             .disable(MapperFeature.IGNORE_MERGE_FOR_UNMERGEABLE)
             .build();
 
-    private final ObjectMapper MAPPER_SKIP_NULLS = newObjectMapper()
-            .setDefaultSetterInfo(JsonSetter.Value.forContentNulls(Nulls.SKIP));
-    ;
-    
+    private final ObjectMapper MAPPER_SKIP_NULLS = objectMapperBuilder()
+            .changeDefaultNullHandling(n -> n.withContentNulls(Nulls.SKIP))
+            .build();
+
     public void testShallowMapMerging() throws Exception
     {
         final String JSON = aposToQuotes("{'values':{'c':'y','d':null}}");
@@ -166,9 +165,10 @@ public class MapMergeTest extends BaseMapTest
 
     public void testDisabledMergeViaGlobal() throws Exception
     {
-        ObjectMapper mapper = newObjectMapper();
         // disable merging, globally; does not affect main level
-        mapper.setDefaultMergeable(false);
+        ObjectMapper mapper = objectMapperBuilder()
+                .defaultMergeable(false)
+                .build();
 
         HashMap<String,Object> input = new HashMap<>();
         input.put("list", new ArrayList<>(Arrays.asList("a")));
@@ -203,9 +203,8 @@ public class MapMergeTest extends BaseMapTest
         mapper = objectMapperBuilder()
                 .withConfigOverride(Object.class,
                         o -> o.setMergeable(true))
+                .defaultMergeable(Boolean.FALSE)
                 .build();
-        mapper.setDefaultMergeable(false);
-
         input = new HashMap<>();
         input.put("list", new ArrayList<>(Arrays.asList("x")));
 

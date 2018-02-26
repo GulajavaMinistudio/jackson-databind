@@ -6,15 +6,16 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSetter;
 
+import com.fasterxml.jackson.core.util.Snapshottable;
+
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
-import com.fasterxml.jackson.databind.util.Copyable;
 
 /**
  * Container for individual {@link ConfigOverride} values.
  */
 public class ConfigOverrides
     implements java.io.Serializable,
-        Copyable<ConfigOverrides>
+        Snapshottable<ConfigOverrides>
 {
     private static final long serialVersionUID = 1L;
 
@@ -35,7 +36,7 @@ public class ConfigOverrides
 
     protected JsonInclude.Value _defaultInclusion;
 
-    protected JsonSetter.Value _defaultSetterInfo;
+    protected JsonSetter.Value _defaultNullHandling;
 
     protected VisibilityChecker _visibilityChecker;
 
@@ -63,13 +64,13 @@ public class ConfigOverrides
             Boolean defMergeable) {
         _overrides = overrides;
         _defaultInclusion = defIncl;
-        _defaultSetterInfo = defSetter;
+        _defaultNullHandling = defSetter;
         _visibilityChecker = defVisibility;
         _defaultMergeable = defMergeable;
     }
 
     @Override
-    public ConfigOverrides copy()
+    public ConfigOverrides snapshot()
     {
         Map<Class<?>, MutableConfigOverride> newOverrides;
         if (_overrides == null) {
@@ -81,7 +82,7 @@ public class ConfigOverrides
             }
         }
         return new ConfigOverrides(newOverrides,
-                _defaultInclusion, _defaultSetterInfo, _visibilityChecker, _defaultMergeable);
+                _defaultInclusion, _defaultNullHandling, _visibilityChecker, _defaultMergeable);
     }
 
     /*
@@ -119,8 +120,8 @@ public class ConfigOverrides
         return _defaultInclusion;
     }
 
-    public JsonSetter.Value getDefaultSetterInfo() {
-        return _defaultSetterInfo;
+    public JsonSetter.Value getDefaultNullHandling() {
+        return _defaultNullHandling;
     }
 
     public Boolean getDefaultMergeable() {
@@ -142,8 +143,8 @@ public class ConfigOverrides
         return this;
     }
 
-    public ConfigOverrides setDefaultSetterInfo(JsonSetter.Value v) {
-        _defaultSetterInfo = v;
+    public ConfigOverrides setDefaultNullHandling(JsonSetter.Value v) {
+        _defaultNullHandling = v;
         return this;
     }
 

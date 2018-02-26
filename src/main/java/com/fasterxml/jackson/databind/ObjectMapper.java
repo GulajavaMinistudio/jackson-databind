@@ -4,7 +4,6 @@ import java.io.*;
 import java.lang.reflect.Type;
 import java.net.URL;
 import java.text.DateFormat;
-import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -542,72 +541,9 @@ public class ObjectMapper
     /**********************************************************************
      */
 
-    /**
-     * Method to use for adding mix-in annotations to use for augmenting
-     * specified class or interface. All annotations from
-     * <code>mixinSource</code> are taken to override annotations
-     * that <code>target</code> (or its supertypes) has.
-     *
-     * @param target Class (or interface) whose annotations to effectively override
-     * @param mixinSource Class (or interface) whose annotations are to
-     *   be "added" to target's annotations, overriding as necessary
-     */
-    @Deprecated
-    public ObjectMapper addMixIn(Class<?> target, Class<?> mixinSource)
-    {
-        _mixIns.addLocalDefinition(target, mixinSource);
-        return this;
-    }
-
     // For testing only:
     public MixInHandler mixInHandler() {
         return _mixIns;
-    }
-
-    /*
-    /**********************************************************************
-    /* Configuration: global-default/per-type override settings
-    /**********************************************************************
-     */
-
-    /**
-     * Method for setting default POJO property inclusion strategy for serialization,
-     * applied for all properties for which there are no per-type or per-property
-     * overrides (via annotations or config overrides).
-     */
-    public ObjectMapper setDefaultPropertyInclusion(JsonInclude.Value incl) {
-        _configOverrides.setDefaultInclusion(incl);
-        return this;
-    }
-
-    /**
-     * Short-cut for:
-     *<pre>
-     *  setDefaultPropertyInclusion(JsonInclude.Value.construct(incl, incl));
-     *</pre>
-     */
-    public ObjectMapper setDefaultPropertyInclusion(JsonInclude.Include incl) {
-        return setDefaultPropertyInclusion(JsonInclude.Value.construct(incl, incl));
-    }
-
-    /**
-     * Method for setting default Setter configuration, regarding things like
-     * merging, null-handling; used for properties for which there are
-     * no per-type or per-property overrides (via annotations or config overrides).
-     */
-    public ObjectMapper setDefaultSetterInfo(JsonSetter.Value v) {
-        _configOverrides.setDefaultSetterInfo(v);
-        return this;
-    }
-
-    /**
-     * Method for setting default Setter configuration, regarding things like
-     * merging, null-handling; used for properties for which there are
-     * no per-type or per-property overrides (via annotations or config overrides).
-     */
-    public ObjectMapper setDefaultMergeable(Boolean b) {
-        _configOverrides.setDefaultMergeable(b);
-        return this;
     }
 
     /*
@@ -729,86 +665,6 @@ public class ObjectMapper
     public ObjectMapper setDefaultTyping(TypeResolverBuilder<?> typer) {
         _deserializationConfig = _deserializationConfig.with(typer);
         _serializationConfig = _serializationConfig.with(typer);
-        return this;
-    }
-
-    /*
-    /**********************************************************************
-    /* Subtype resolution
-    /**********************************************************************
-     */
-    
-    /**
-     * Method for registering specified class as a subtype, so that
-     * typename-based resolution can link supertypes to subtypes
-     * (as an alternative to using annotations).
-     * Type for given class is determined from appropriate annotation;
-     * or if missing, default name (unqualified class name)
-     */
-    @Deprecated
-    public void registerSubtypes(Class<?>... classes) {
-        getSubtypeResolver().registerSubtypes(classes);
-    }
-
-    /**
-     * Method for registering specified class as a subtype, so that
-     * typename-based resolution can link supertypes to subtypes
-     * (as an alternative to using annotations).
-     * Name may be provided as part of argument, but if not will
-     * be based on annotations or use default name (unqualified
-     * class name).
-     */
-    @Deprecated
-    public void registerSubtypes(NamedType... types) {
-        getSubtypeResolver().registerSubtypes(types);
-    }
-
-    @Deprecated
-    public void registerSubtypes(Collection<Class<?>> subtypes) {
-        getSubtypeResolver().registerSubtypes(subtypes);
-    }
-
-    /*
-    /**********************************************************************
-    /* Configuration, simple features: MapperFeature
-    /**********************************************************************
-     */
-
-    @Deprecated
-    public ObjectMapper enable(MapperFeature f) {
-        _deserializationConfig = _deserializationConfig.with(f);
-        _serializationConfig = _serializationConfig.with(f);
-        return this;
-    }
-
-    @Deprecated
-    public ObjectMapper disable(MapperFeature f) {
-        _deserializationConfig = _deserializationConfig.without(f);
-        _serializationConfig = _serializationConfig.without(f);
-        return this;
-    }
-
-    @Deprecated
-    public ObjectMapper enable(SerializationFeature f) {
-        _serializationConfig = _serializationConfig.with(f);
-        return this;
-    }
-
-    @Deprecated
-    public ObjectMapper disable(SerializationFeature f) {
-        _serializationConfig = _serializationConfig.without(f);
-        return this;
-    }
-
-    @Deprecated
-    public ObjectMapper enable(DeserializationFeature feature) {
-        _deserializationConfig = _deserializationConfig.with(feature);
-        return this;
-    }
-
-    @Deprecated
-    public ObjectMapper disable(DeserializationFeature feature) {
-        _deserializationConfig = _deserializationConfig.without(feature);
         return this;
     }
 
