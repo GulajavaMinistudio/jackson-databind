@@ -5,12 +5,14 @@ import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.SimpleLookupCache;
 
@@ -20,7 +22,7 @@ import com.fasterxml.jackson.databind.util.SimpleLookupCache;
  * platforms, such as Android, where memory management is handled
  * much more aggressively.
  */
-public class TestJDKSerialization extends BaseMapTest
+public class MapperJDKSerializationTest extends BaseMapTest
 {
     static class MyPojo {
         public int x;
@@ -80,7 +82,7 @@ public class TestJDKSerialization extends BaseMapTest
         assertNotNull(jdkDeserialize(base));
 
         // first things first: underlying BaseSettings
-        
+
         DeserializationConfig origDC = MAPPER.deserializationConfig();
         SerializationConfig origSC = MAPPER.serializationConfig();
         byte[] dcBytes = jdkSerialize(origDC);
@@ -174,6 +176,51 @@ public class TestJDKSerialization extends BaseMapTest
         MyPojo p2 = mapper2.readValue(EXP_JSON, MyPojo.class);
         assertEquals(p.x, p2.x);
         assertEquals(p.y, p2.y);
+    }
+
+    public void testMapperWithModule() throws IOException
+    {
+        SimpleModule module = new SimpleModule("JDKSerTestModule", Version.unknownVersion());
+        {
+            byte[] b = jdkSerialize(module);
+            assertNotNull(b);
+        }
+        
+        ObjectMapper mapper = ObjectMapper.builder()
+                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+                .addModule(module)
+                .build();
+
+        // just force serialization first
+        final String EXP_JSON = "{\"x\":2,\"y\":3}";
+        final MyPojo p = new MyPojo(2, 3);
+        assertEquals(EXP_JSON, mapper.writeValueAsString(p));
+
+        byte[] bytes = jdkSerialize(mapper);
+        ObjectMapper mapper2 = jdkDeserialize(bytes);
+
+        // verify settings
+        assertTrue(mapper.isEnabled(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS));
+        assertTrue(mapper.isEnabled(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY));
+        
+        assertEquals(EXP_JSON, mapper2.writeValueAsString(p));
+        MyPojo p2 = mapper2.readValue(EXP_JSON, MyPojo.class);
+        assertEquals(p.x, p2.x);
+        assertEquals(p.y, p2.y);
+
+        // and then reconfigure a bit
+        ObjectMapper mapper3 = mapper2.rebuild()
+                .disable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .disable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+                .build();
+        assertFalse(mapper3.isEnabled(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS));
+        assertFalse(mapper3.isEnabled(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY));
+        bytes = jdkSerialize(mapper3);
+        ObjectMapper mapper4 = jdkDeserialize(bytes);
+
+        assertFalse(mapper4.isEnabled(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS));
+        assertFalse(mapper4.isEnabled(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY));
     }
 
     public void testTypeFactory() throws Exception

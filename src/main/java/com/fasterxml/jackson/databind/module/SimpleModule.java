@@ -1,10 +1,6 @@
 package com.fasterxml.jackson.databind.module;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.*;
@@ -12,6 +8,7 @@ import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.util.UniqueId;
 
 /**
  * Vanilla {@link Module} implementation that allows registration
@@ -48,6 +45,9 @@ public class SimpleModule
     /**
      * Unique id generated to avoid instances from ever matching so all
      * registrations succeed.
+     *<p>
+     * NOTE! Id should be {@link java.io.Serializable} to allow serialization
+     * of mapper instances.
      *
      * @since 3.0
      */
@@ -102,13 +102,7 @@ public class SimpleModule
      * use actual name and version number information.
      */
     public SimpleModule() {
-        // can't chain when making reference to 'this'
-        // note: generate different name for direct instantiation, sub-classing
-        _name = (getClass() == SimpleModule.class) ?
-                "SimpleModule-"+System.identityHashCode(this)
-                : getClass().getName();
-        _version = Version.unknownVersion();
-        _id = new Object();
+        this((String) null);
     }
 
     /**
@@ -137,34 +131,24 @@ public class SimpleModule
      * @param version Version of the module
      */
     public SimpleModule(String name, Version version) {
+        this(name, version, null);
+    }
+
+    public SimpleModule(String name, Version version, Object registrationId) {
+        if (name == null) {
+            name = (getClass() == SimpleModule.class) ?
+                    "SimpleModule-"+System.identityHashCode(this)
+                    : getClass().getName();
+        }
         _name = name;
         _version = version;
-        _id = new Object();
+        _id = (registrationId == null) ? _createId() : registrationId;
     }
-
-    public SimpleModule(String name, Version version,
-            Map<Class<?>,JsonDeserializer<?>> deserializers) {
-        this(name, version, deserializers, null);
-    }
-
-    public SimpleModule(String name, Version version,
-            List<JsonSerializer<?>> serializers) {
-        this(name, version, null, serializers);
-    }
-
-    public SimpleModule(String name, Version version,
-            Map<Class<?>,JsonDeserializer<?>> deserializers,
-            List<JsonSerializer<?>> serializers)
-    {
-        _name = name;
-        _version = version;
-        _id = new Object();
-        if (deserializers != null) {
-            _deserializers = new SimpleDeserializers(deserializers);
-        }
-        if (serializers != null) {
-            _serializers = new SimpleSerializers(serializers);
-        }
+    
+    // 27-Feb-2018, tatu: Need to create Registration Id that never matches any
+    //    other id, but is serializable
+    protected Object _createId() {
+        return new UniqueId();
     }
 
     /*
@@ -195,43 +179,49 @@ public class SimpleModule
     /**
      * Resets all currently configured serializers.
      */
-    public void setSerializers(SimpleSerializers s) {
+    public SimpleModule setSerializers(SimpleSerializers s) {
         _serializers = s;
+        return this;
     }
 
     /**
      * Resets all currently configured deserializers.
      */
-    public void setDeserializers(SimpleDeserializers d) {
+    public SimpleModule setDeserializers(SimpleDeserializers d) {
         _deserializers = d;
+        return this;
     }
 
     /**
      * Resets all currently configured key serializers.
      */
-    public void setKeySerializers(SimpleSerializers ks) {
+    public SimpleModule setKeySerializers(SimpleSerializers ks) {
         _keySerializers = ks;
+        return this;
     }
 
     /**
      * Resets all currently configured key deserializers.
      */
-    public void setKeyDeserializers(SimpleKeyDeserializers kd) {
+    public SimpleModule setKeyDeserializers(SimpleKeyDeserializers kd) {
         _keyDeserializers = kd;
+        return this;
     }
 
     /**
      * Resets currently configured abstract type mappings
      */
-    public void setAbstractTypes(SimpleAbstractTypeResolver atr) {
+    public SimpleModule setAbstractTypes(SimpleAbstractTypeResolver atr) {
         _abstractTypes = atr;        
+        return this;
     }
 
     /**
      * Resets all currently configured value instantiators
      */
-    public void setValueInstantiators(SimpleValueInstantiators svi) {
+    public SimpleModule setValueInstantiators(SimpleValueInstantiators svi) {
         _valueInstantiators = svi;
+        return this;
     }
 
     public SimpleModule setDeserializerModifier(BeanDeserializerModifier mod) {

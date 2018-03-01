@@ -167,6 +167,32 @@ public class ObjectMapper
         public ObjectMapper build() {
             return new ObjectMapper(this);
         }
+
+        @Override
+        protected MapperBuilderState _saveState() {
+            return new StateImpl(this);
+        }
+
+        public Builder(MapperBuilderState state) {
+            super(state);
+        }
+
+        /**
+         * We also need actual instance of state as base class can not implement logic
+         * for reinstating mapper (via mapper builder) from state.
+         */
+        static class StateImpl extends MapperBuilderState {
+            private static final long serialVersionUID = 3L;
+
+            public StateImpl(Builder b) {
+                super(b);
+            }
+
+            @Override
+            protected Object readResolve() {
+                return new Builder(this).build();
+            }
+        }
     }
 
     /*
@@ -332,7 +358,7 @@ public class ObjectMapper
 
     /*
     /**********************************************************************
-    /* Life-cycle: constructing instance
+    /* Life-cycle: legacy constructors
     /**********************************************************************
      */
 
@@ -353,6 +379,12 @@ public class ObjectMapper
     public ObjectMapper(TokenStreamFactory streamFactory) {
         this(new Builder(streamFactory));
     }
+
+    /*
+    /**********************************************************************
+    /* Life-cycle: builder-style construction
+    /**********************************************************************
+     */
 
     /**
      * Constructor usually called either by {@link MapperBuilder#build} or
@@ -417,6 +449,41 @@ public class ObjectMapper
     
     public static ObjectMapper.Builder builder(TokenStreamFactory streamFactory) {
         return new ObjectMapper.Builder(streamFactory);
+    }
+
+    /**
+     * Method for creating a new {@link MapperBuilder} for constructing differently configured
+     * {@link ObjectMapper} instance, starting with current configuration including base settings
+     * and registered modules.
+     *
+     * @since 3.0
+     */
+    @SuppressWarnings("unchecked")
+    public <M extends ObjectMapper, B extends MapperBuilder<M,B>> MapperBuilder<M,B> rebuild() {
+        // 27-Feb-2018, tatu: since we still have problem with `ObjectMapper` being both API
+        //    and implementation for JSON, need more checking here
+        ClassUtil.verifyMustOverride(ObjectMapper.class, this, "rebuild");
+        return (MapperBuilder<M,B>) new ObjectMapper.Builder(_savedBuilderState);
+    }
+
+    /*
+    /**********************************************************************
+    /* Life-cycle: JDK serialization support
+    /**********************************************************************
+     */
+
+    // Logic here is simple: instead of serializing mapper via its contents,
+    // we have pre-packaged `MapperBuilderState` in a way that makes serialization
+    // easier, and we go with that.
+    // But note that return direction has to be supported, then, by that state object
+    // and NOT anything in here.
+    protected Object writeReplace() {
+        return _savedBuilderState;
+    }
+
+    // Just as a sanity check verify there is no attempt at directly instantiating mapper here
+    protected Object readResolve() {
+        throw new IllegalStateException("Should never deserialize `"+getClass().getName()+"` directly");
     }
 
     /*
@@ -2381,7 +2448,7 @@ public class ObjectMapper
      * of container to update) are modified, unless properties themselves indicate that
      * merging should be applied for contents. Such merging can be specified using
      * annotations (see <code>JsonMerge</code>) as well as using "config overrides" (see
-     * {@link #configOverride(Class)} and {@link #setDefaultMergeable(Boolean)}).
+     * {@link MapperBuilder#withConfigOverride} and {@link MapperBuilder#defaultMergeable}).
      *
      * @param valueToUpdate Object to update
      * @param overrides Object to conceptually serialize and merge into value to
