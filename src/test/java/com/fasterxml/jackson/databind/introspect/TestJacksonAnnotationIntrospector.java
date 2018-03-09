@@ -125,7 +125,6 @@ public class TestJacksonAnnotationIntrospector
     @JsonTypeResolver(DummyBuilder.class)
     static class TypeResolverBean { }
 
-    // @since 1.7
     @JsonIgnoreType
     static class IgnoredType { }
 
@@ -189,7 +188,8 @@ public class TestJacksonAnnotationIntrospector
         AnnotatedClass ac = AnnotatedClassResolver.resolveWithoutSuperTypes(mapper.serializationConfig(),
                 TypeResolverBean.class);
         JavaType baseType = TypeFactory.defaultInstance().constructType(TypeResolverBean.class);
-        TypeResolverBuilder<?> rb = ai.findTypeResolver(mapper.deserializationConfig(), ac, baseType);
+        TypeResolverBuilder<?> rb = ai.findTypeResolver(mapper.deserializationConfig(), ac, baseType,
+                ai.findPolymorphicTypeInfo(mapper.deserializationConfig(), ac));
         assertNotNull(rb);
         assertSame(DummyBuilder.class, rb.getClass());
     }

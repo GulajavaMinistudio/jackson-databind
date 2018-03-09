@@ -45,31 +45,61 @@ public class StdTypeResolverBuilder
 
     public StdTypeResolverBuilder() { }
 
+    public StdTypeResolverBuilder(JsonTypeInfo.Value settings) {
+        if (settings != null) {
+            _idType = settings.getIdType();
+            if (_idType == null) {
+                throw new IllegalArgumentException("idType cannot be null");
+            }
+            _includeAs = settings.getInclusionType();
+            _typeProperty = _propName(settings.getPropertyName(), _idType);
+            _defaultImpl = settings.getDefaultImpl();
+        }
+    }
+
     /**
      * @since 2.9
      */
-    protected StdTypeResolverBuilder(JsonTypeInfo.Id idType,
-            JsonTypeInfo.As idAs, String propName) {
-        _idType = idType;
-        _includeAs = idAs;
-        _typeProperty = propName;
-    }
-
-    public static StdTypeResolverBuilder noTypeInfoBuilder() {
-        return new StdTypeResolverBuilder().init(JsonTypeInfo.Id.NONE, null);
-    }
-
-    @Override
-    public StdTypeResolverBuilder init(JsonTypeInfo.Id idType, TypeIdResolver idRes)
+    public StdTypeResolverBuilder(JsonTypeInfo.Id idType,
+            JsonTypeInfo.As idAs, String propName)
     {
-        // sanity checks
         if (idType == null) {
             throw new IllegalArgumentException("idType cannot be null");
         }
         _idType = idType;
+        _includeAs = idAs;
+        _typeProperty = _propName(propName, _idType);
+    }
+
+    protected static String _propName(String propName, JsonTypeInfo.Id idType) {
+        if (propName == null) {
+            propName = idType.getDefaultPropertyName();
+        }
+        return propName;
+    }
+
+    public static StdTypeResolverBuilder noTypeInfoBuilder() {
+        return new StdTypeResolverBuilder(JsonTypeInfo.Id.NONE, null, null);
+    }
+
+    @Override
+    public StdTypeResolverBuilder init(JsonTypeInfo.Value settings, TypeIdResolver idRes)
+    {
+        _idType = settings.getIdType();
+        if (_idType == null) {
+            throw new IllegalArgumentException("idType cannot be null");
+        }
         _customIdResolver = idRes;
+        _includeAs = settings.getInclusionType();
+
         // Let's also initialize property name as per idType default
-        _typeProperty = idType.getDefaultPropertyName();
+        _typeProperty = settings.getPropertyName();
+        if (_typeProperty == null) {
+            _typeProperty = _idType.getDefaultPropertyName();
+        }
+        _typeIdVisible = settings.getIdVisible();
+        _defaultImpl = settings.getDefaultImpl();
+        
         return this;
     }
 
@@ -127,6 +157,8 @@ public class StdTypeResolverBuilder
             // 20-Mar-2016, tatu: Can finally add a check for type compatibility BUT
             //   if so, need to add explicit checks for marker types. Not ideal, but
             //   seems like a reasonable compromise.
+            // NOTE: `Void` actually means that for unknown type id we should get `null`
+            //  value -- NOT that there is no default implementation.
             if (_defaultImpl == Void.class) {
                 defaultImpl = config.getTypeFactory().constructType(_defaultImpl);
             } else {
@@ -161,40 +193,11 @@ public class StdTypeResolverBuilder
      */
 
     @Override
-    public StdTypeResolverBuilder inclusion(JsonTypeInfo.As includeAs) {
-        if (includeAs == null) {
-            throw new IllegalArgumentException("includeAs cannot be null");
-        }
-        _includeAs = includeAs;
-        return this;
-    }
-
-    /**
-     * Method for constructing an instance with specified type property name
-     * (property name to use for type id when using "as-property" inclusion).
-     */
-    @Override
-    public StdTypeResolverBuilder typeProperty(String typeIdPropName) {
-        // ok to have null/empty; will restore to use defaults
-        if (typeIdPropName == null || typeIdPropName.length() == 0) {
-            typeIdPropName = _idType.getDefaultPropertyName();
-        }
-        _typeProperty = typeIdPropName;
-        return this;
-    }
-
-    @Override
     public StdTypeResolverBuilder defaultImpl(Class<?> defaultImpl) {
         _defaultImpl = defaultImpl;
         return this;
     }
 
-    @Override
-    public StdTypeResolverBuilder typeIdVisibility(boolean isVisible) {
-        _typeIdVisible = isVisible;
-        return this;
-    }
-    
     /*
     /**********************************************************
     /* Accessors
