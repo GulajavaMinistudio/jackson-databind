@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.util.Instantiatable;
 
 import com.fasterxml.jackson.databind.cfg.*;
 import com.fasterxml.jackson.databind.introspect.MixInHandler;
-import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.SerializerFactory;
 import com.fasterxml.jackson.databind.util.RootNameLookup;
@@ -96,9 +95,7 @@ public final class SerializationConfig
             int mapperFeatures, int serFeatures, int genFeatures, int formatWriteFeatures,
             MixInHandler mixins, RootNameLookup rootNames, ConfigOverrides configOverrides)
     {
-        super(b.baseSettings(), mapperFeatures,
-                b.classIntrospector(), b.subtypeResolver(),
-                mixins, rootNames, configOverrides);
+        super(b, mapperFeatures, mixins, rootNames, configOverrides);
         _serFeatures = serFeatures;
         _filterProvider = b.filterProvider();
         _defaultPrettyPrinter = b.defaultPrettyPrinter();
@@ -107,26 +104,16 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, secondary constructors to support
     /* "mutant factories", with single property changes
-    /**********************************************************
+    /**********************************************************************
      */
 
-    private SerializationConfig(SerializationConfig src, SubtypeResolver str)
-    {
-        super(src, str);
-        _serFeatures = src._serFeatures;
-        _filterProvider = src._filterProvider;
-        _defaultPrettyPrinter = src._defaultPrettyPrinter;
-        _generatorFeatures = src._generatorFeatures;
-        _formatWriteFeatures = src._formatWriteFeatures;
-    }
-
-    private SerializationConfig(SerializationConfig src, int mapperFeatures,
+    private SerializationConfig(SerializationConfig src,
             int serFeatures, int generatorFeatures, int formatWriteFeatures)
     {
-        super(src, mapperFeatures);
+        super(src);
         _serFeatures = serFeatures;
         _filterProvider = src._filterProvider;
         _defaultPrettyPrinter = src._defaultPrettyPrinter;
@@ -184,16 +171,6 @@ public final class SerializationConfig
         _formatWriteFeatures = src._formatWriteFeatures;
     }
 
-    protected SerializationConfig(SerializationConfig src, MixInHandler mixins)
-    {
-        super(src, mixins);
-        _serFeatures = src._serFeatures;
-        _filterProvider = src._filterProvider;
-        _defaultPrettyPrinter = src._defaultPrettyPrinter;
-        _generatorFeatures = src._generatorFeatures;
-        _formatWriteFeatures = src._formatWriteFeatures;
-    }
-
     protected SerializationConfig(SerializationConfig src, PrettyPrinter defaultPP)
     {
         super(src);
@@ -205,20 +182,14 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, factory methods from MapperConfig(Base)
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
     protected final SerializationConfig _withBase(BaseSettings newBase) {
         return (_base == newBase) ? this : new SerializationConfig(this, newBase);
-    }
-
-    @Override
-    protected final SerializationConfig _withMapperFeatures(int mapperFeatures) {
-        return new SerializationConfig(this, mapperFeatures, _serFeatures,
-                        _generatorFeatures, _formatWriteFeatures);
     }
 
     @Override
@@ -234,11 +205,6 @@ public final class SerializationConfig
     }
 
     @Override
-    public SerializationConfig with(SubtypeResolver str) {
-        return (str == _subtypeResolver)? this : new SerializationConfig(this, str);
-    }
-
-    @Override
     public SerializationConfig withView(Class<?> view) {
         return (_view == view) ? this : new SerializationConfig(this, view);
     }
@@ -249,9 +215,9 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory method overrides
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -270,9 +236,9 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory methods for SerializationFeature
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -283,7 +249,7 @@ public final class SerializationConfig
     {
         int newSerFeatures = _serFeatures | feature.getMask();
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures,
+                : new SerializationConfig(this,
                         newSerFeatures, _generatorFeatures, _formatWriteFeatures);
     }
 
@@ -298,7 +264,7 @@ public final class SerializationConfig
             newSerFeatures |= f.getMask();
         }
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures,
+                : new SerializationConfig(this,
                         newSerFeatures, _generatorFeatures, _formatWriteFeatures);
     }
 
@@ -313,7 +279,7 @@ public final class SerializationConfig
             newSerFeatures |= f.getMask();
         }
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures,
+                : new SerializationConfig(this,
                         newSerFeatures, _generatorFeatures, _formatWriteFeatures);
     }
 
@@ -325,7 +291,7 @@ public final class SerializationConfig
     {
         int newSerFeatures = _serFeatures & ~feature.getMask();
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures,
+                : new SerializationConfig(this,
                         newSerFeatures, _generatorFeatures,  _formatWriteFeatures);
     }
 
@@ -340,7 +306,7 @@ public final class SerializationConfig
             newSerFeatures &= ~f.getMask();
         }
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures, newSerFeatures,
+                : new SerializationConfig(this, newSerFeatures,
                         _generatorFeatures, _formatWriteFeatures);
     }
 
@@ -355,14 +321,14 @@ public final class SerializationConfig
             newSerFeatures &= ~f.getMask();
         }
         return (newSerFeatures == _serFeatures) ? this
-                : new SerializationConfig(this, _mapperFeatures, newSerFeatures,
+                : new SerializationConfig(this, newSerFeatures,
                         _generatorFeatures, _formatWriteFeatures);
     }
 
     /*
-    /**********************************************************
-    /* Factory methods for JsonGenerator.Feature (2.5)
-    /**********************************************************
+    /**********************************************************************
+    /* Factory methods for JsonGenerator.Feature
+    /**********************************************************************
      */
 
     /**
@@ -373,7 +339,7 @@ public final class SerializationConfig
     {
         int newSet = _generatorFeatures | feature.getMask();
         return (_generatorFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures, _serFeatures, newSet,
+            new SerializationConfig(this, _serFeatures, newSet,
                     _formatWriteFeatures);
     }
 
@@ -388,7 +354,7 @@ public final class SerializationConfig
             newSet |= f.getMask();
         }
         return (_generatorFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures, _serFeatures, newSet,
+            new SerializationConfig(this, _serFeatures, newSet,
                     _formatWriteFeatures);
     }
 
@@ -400,7 +366,7 @@ public final class SerializationConfig
     {
         int newSet = _generatorFeatures & ~feature.getMask();
         return (_generatorFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures, _serFeatures, newSet,
+            new SerializationConfig(this, _serFeatures, newSet,
                     _formatWriteFeatures);
     }
 
@@ -415,14 +381,14 @@ public final class SerializationConfig
             newSet &= ~f.getMask();
         }
         return (_generatorFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures, _serFeatures, newSet,
+            new SerializationConfig(this, _serFeatures, newSet,
                     _formatWriteFeatures);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory methods for FormatFeature
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -433,7 +399,7 @@ public final class SerializationConfig
     {
         int newSet = _formatWriteFeatures | feature.getMask();
         return (_formatWriteFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures,
+            new SerializationConfig(this,
                     _serFeatures, _generatorFeatures, newSet);
     }
 
@@ -448,7 +414,7 @@ public final class SerializationConfig
             newSet |= f.getMask();
         }
         return (_formatWriteFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures,
+            new SerializationConfig(this,
                     _serFeatures, _generatorFeatures, newSet);
     }
 
@@ -460,7 +426,7 @@ public final class SerializationConfig
     {
         int newSet = _formatWriteFeatures & ~feature.getMask();
         return (_formatWriteFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures,
+            new SerializationConfig(this,
                     _serFeatures, _generatorFeatures, newSet);
     }
 
@@ -475,14 +441,13 @@ public final class SerializationConfig
             newSet &= ~f.getMask();
         }
         return (_formatWriteFeatures == newSet) ? this :
-            new SerializationConfig(this,  _mapperFeatures,
-                    _serFeatures, _generatorFeatures, newSet);
+            new SerializationConfig(this, _serFeatures, _generatorFeatures, newSet);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory methods, other
-    /**********************************************************
+    /**********************************************************************
      */
 
     public SerializationConfig withFilters(FilterProvider filterProvider) {
@@ -494,9 +459,9 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factories for objects configured here
-    /**********************************************************
+    /**********************************************************************
      */
 
     public PrettyPrinter constructDefaultPrettyPrinter() {
@@ -508,29 +473,29 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Support for ObjectWriteContext
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * @since 3.0
      */
-    public int getGeneratorFeatures(int defaults) {
+    public int getGeneratorFeatures() {
         return _generatorFeatures;
     }
 
     /**
      * @since 3.0
      */
-    public int getFormatWriteFeatures(int defaults) {
+    public int getFormatWriteFeatures() {
         return _formatWriteFeatures;
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: other
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -590,9 +555,9 @@ public final class SerializationConfig
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Introspection methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**

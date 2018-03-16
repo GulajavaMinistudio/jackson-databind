@@ -11,35 +11,9 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 public abstract class SerializerFactory
 {
     /*
-    /**********************************************************
-    /* Additional configuration methods
-    /**********************************************************
-     */
-
-    /**
-     * Convenience method for creating a new factory instance with additional serializer
-     * provider; equivalent to calling
-     *<pre>
-     *   withConfig(getConfig().withAdditionalSerializers(additional));
-     *</pre>
-     */
-    public abstract SerializerFactory withAdditionalSerializers(Serializers additional);
-
-    public abstract SerializerFactory withAdditionalKeySerializers(Serializers additional);
-    
-    /**
-     * Convenience method for creating a new factory instance with additional bean
-     * serializer modifier; equivalent to calling
-     *<pre>
-     *   withConfig(getConfig().withSerializerModifier(modifier));
-     *</pre>
-     */
-    public abstract SerializerFactory withSerializerModifier(BeanSerializerModifier modifier);
-    
-    /*
-    /**********************************************************
-    /* Basic SerializerFactory API:
-    /**********************************************************
+    /**********************************************************************
+    /* Basic `SerializerFactory` API
+    /**********************************************************************
      */
 
     /**
@@ -47,13 +21,11 @@ public abstract class SerializerFactory
       * 
       * @param prov Provider that needs to be used to resolve annotation-provided
       *    serializers (but NOT for others)
-      *    
-      * @since 2.1 (earlier versions had method with different signature)
       */
     public abstract JsonSerializer<Object> createSerializer(SerializerProvider prov,
             JavaType baseType)
         throws JsonMappingException;
-    
+
     /**
      * Method called to create a type information serializer for given base type,
      * if one is needed. If not needed (no polymorphic handling configured), should
@@ -82,4 +54,42 @@ public abstract class SerializerFactory
     public abstract JsonSerializer<Object> createKeySerializer(SerializationConfig config,
             JavaType type, JsonSerializer<Object> defaultImpl)
         throws JsonMappingException;
+
+    public abstract JsonSerializer<Object> getDefaultNullKeySerializer();
+
+    public abstract JsonSerializer<Object> getDefaultNullValueSerializer();
+
+    /*
+    /**********************************************************************
+    /* Additional mutant factories for registering serializer overrides
+    /**********************************************************************
+     */
+
+    /**
+     * Mutant factory method for creating a new factory instance with additional serializer
+     * provider: provider will get inserted as the first one to be checked.
+     */
+    public abstract SerializerFactory withAdditionalSerializers(Serializers additional);
+
+    /**
+     * Mutant factory method for creating a new factory instance with additional key serializer
+     * provider: provider will get inserted as the first one to be checked.
+     */
+    public abstract SerializerFactory withAdditionalKeySerializers(Serializers additional);
+
+    /**
+     * Mutant factory method for creating a new factory instance with additional serializer modifier:
+     * modifier will get inserted as the first one to be checked.
+     */
+    public abstract SerializerFactory withSerializerModifier(BeanSerializerModifier modifier);
+
+    /**
+     * @since 3.0
+     */
+    public abstract SerializerFactory withNullValueSerializer(JsonSerializer<?> nvs);
+
+    /**
+     * @since 3.0
+     */
+    public abstract SerializerFactory withNullKeySerializer(JsonSerializer<?> nks);
 }

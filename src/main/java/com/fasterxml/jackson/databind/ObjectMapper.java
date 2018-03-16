@@ -225,12 +225,12 @@ public class ObjectMapper
      * needed to allow modules to add more custom type handling
      * (mostly to support types of non-Java JVM languages)
      */
-    protected /*final*/ TypeFactory _typeFactory;
+    protected final TypeFactory _typeFactory;
 
     /**
      * Provider for values to inject in deserialized POJOs.
      */
-    protected InjectableValues _injectableValues;
+    protected final InjectableValues _injectableValues;
 
     /**
      * Thing used for registering sub-types, resolving them to
@@ -269,6 +269,7 @@ public class ObjectMapper
     /**********************************************************
      */
 
+    // !!! TODO 15-Mar-2018: Only mutable for Default Typing
     /**
      * Configuration object that defines basic global
      * settings for the serialization process
@@ -290,7 +291,7 @@ public class ObjectMapper
     /**
      * Serializer factory used for constructing serializers.
      */
-    protected SerializerFactory _serializerFactory;
+    protected final SerializerFactory _serializerFactory;
 
     /*
     /**********************************************************
@@ -298,6 +299,7 @@ public class ObjectMapper
     /**********************************************************
      */
 
+    // !!! TODO 15-Mar-2018: Only mutable for Default Typing
     /**
      * Configuration object that defines basic global
      * settings for the serialization process
@@ -309,7 +311,7 @@ public class ObjectMapper
      * sub-classes. Contains references to objects needed for
      * deserialization construction (cache, factory).
      */
-    protected DefaultDeserializationContext _deserializationContext;
+    protected final DefaultDeserializationContext _deserializationContext;
 
     /*
     /**********************************************************
@@ -339,7 +341,7 @@ public class ObjectMapper
      * no type information is needed for base type), or type-wrapped
      * deserializers (if it is needed)
      */
-    final protected ConcurrentHashMap<JavaType, JsonDeserializer<Object>> _rootDeserializers
+    protected final ConcurrentHashMap<JavaType, JsonDeserializer<Object>> _rootDeserializers
         = new ConcurrentHashMap<JavaType, JsonDeserializer<Object>>(64, 0.6f, 2);
 
     /*
@@ -354,7 +356,7 @@ public class ObjectMapper
      *
      * @since 3.0
      */
-    final protected MapperBuilderState _savedBuilderState;
+    protected final MapperBuilderState _savedBuilderState;
 
     /*
     /**********************************************************************
@@ -398,7 +400,6 @@ public class ObjectMapper
 
         // General framework factories
         _streamFactory = builder.streamFactory();
-        BaseSettings base = builder.baseSettings();
         // bit tricky as we do NOT want to expose simple accessors (to a mutable thing)
         {
             final AtomicReference<ConfigOverrides> ref = new AtomicReference<>();
@@ -406,7 +407,7 @@ public class ObjectMapper
             _configOverrides = ref.get();
         }
         // general type handling
-        _typeFactory = base.getTypeFactory();
+        _typeFactory = builder.typeFactory();
 
         _subtypeResolver = builder.subtypeResolver();
         
@@ -507,10 +508,22 @@ public class ObjectMapper
     /**********************************************************************
      */
 
+    /**
+     * Accessor for internal configuration object that contains settings for
+     * serialization operations (<code>writeValue(...)</code> methods)
+     *<br>
+     * NOTE: Not to be used by application code; needed by some tests
+     */
     public SerializationConfig serializationConfig() {
         return _serializationConfig;
     }
 
+    /**
+     * Accessor for internal configuration object that contains settings for
+     * deserialization operations (<code>readValue(...)</code> methods)
+     *<br>
+     * NOTE: Not to be used by application code; needed by some tests
+     */
     public DeserializationConfig deserializationConfig() {
         return _deserializationConfig;
     }
@@ -546,7 +559,7 @@ public class ObjectMapper
      *   getDeserializationConfig().getNodeFactory()
      *</pre>
      */
-    public JsonNodeFactory nodeFactory() {
+    public JsonNodeFactory getNodeFactory() {
         return _deserializationConfig.getNodeFactory();
     }
 
@@ -554,32 +567,6 @@ public class ObjectMapper
         return _injectableValues;
     }
 
-    /**
-     * Method for accessing subtype resolver in use.
-     */
-    public SubtypeResolver getSubtypeResolver() {
-        return _subtypeResolver;
-    }
-
-    /*
-    /**********************************************************************
-    /* Configuration: ser/deser factory, provider access
-    /**********************************************************************
-     */
-
-    public SerializerProvider getSerializerProvider() {
-        return _serializerProvider;
-    }
-
-    /**
-     * Accessor for constructing and returning a {@link SerializerProvider}
-     * instance that may be used for accessing serializers. This is same as
-     * calling {@link #getSerializerProvider}, and calling <code>createInstance</code> on it.
-     */
-    public SerializerProvider serializerProviderInstance() {
-        return _serializerProvider();
-    }
-    
     /*
     /**********************************************************************
     /* Configuration, access to type factory, type resolution
@@ -600,17 +587,6 @@ public class ObjectMapper
      */
     public JavaType constructType(Type t) {
         return _typeFactory.constructType(t);
-    }
-    
-    /*
-    /**********************************************************************
-    /* Configuration: mix-in annotations
-    /**********************************************************************
-     */
-
-    // For testing only:
-    public MixInHandler mixInHandler() {
-        return _mixIns;
     }
 
     /*
@@ -1126,7 +1102,7 @@ public class ObjectMapper
         DeserializationContext ctxt = createDeserializationContext(p);
         JsonNode n = (JsonNode) _readValue(ctxt, p, JSON_NODE_TYPE);
         if (n == null) {
-            n = nodeFactory().nullNode();
+            n = getNodeFactory().nullNode();
         }
         @SuppressWarnings("unchecked")
         T result = (T) n;
@@ -2501,6 +2477,12 @@ public class ObjectMapper
         throws JsonMappingException
     {
         acceptJsonFormatVisitor(_typeFactory.constructType(type), visitor);
+    }
+
+    public void acceptJsonFormatVisitor(TypeReference<?> typeRef, JsonFormatVisitorWrapper visitor)
+        throws JsonMappingException
+    {
+        acceptJsonFormatVisitor(_typeFactory.constructType(typeRef), visitor);
     }
 
     /**

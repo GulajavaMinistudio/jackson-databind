@@ -81,14 +81,6 @@ public class TestSerConfig
         assertTrue(cfg.isEnabled(MapperFeature.DEFAULT_VIEW_INCLUSION));
     }
 
-    public void testOverrideIntrospectors()
-    {
-        SerializationConfig cfg = MAPPER.serializationConfig();
-        // and finally, ensure we could override introspectors
-        cfg = cfg.with((AnnotationIntrospector) null);
-        assertNull(cfg.getAnnotationIntrospector());
-    }
-
     public void testIndentation() throws Exception
     {
         Map<String,Integer> map = new HashMap<String,Integer>();
@@ -114,12 +106,19 @@ public class TestSerConfig
         assertEquals(1, result.size());
     }
 
+    @SuppressWarnings("serial")
+    static class TestObjectMapper
+        extends ObjectMapper
+    {
+        public SerializerProvider getSerializerProvider() { return _serializerProvider; }    
+    }
+
     /**
-     * Test for verifying working of [JACKSON-191]
+     * Test for verifying some aspects of serializer caching
      */
     public void testProviderConfig() throws Exception   
     {
-        ObjectMapper mapper = new ObjectMapper();
+        TestObjectMapper mapper = new TestObjectMapper();
         DefaultSerializerProvider prov = (DefaultSerializerProvider) mapper.getSerializerProvider();
         assertEquals(0, prov.cachedSerializersCount());
         // and then should get one constructed for:
@@ -128,14 +127,11 @@ public class TestSerConfig
         assertEquals(Integer.valueOf(1), result.get("x"));
         assertEquals(Integer.valueOf(2), result.get("y"));
 
-        /* Note: it is 2 because we'll also get serializer for basic 'int', not
-         * just AnnoBean
-         */
-        /* 12-Jan-2010, tatus: Actually, probably more, if and when we typing
-         *   aspects are considered (depending on what is cached)
-         */
+        // Note: it is 2 because we'll also get serializer for basic 'int', not just AnnoBean
+        // 12-Jan-2010, tatus: Actually, probably more, if and when we typing
+        //   aspects are considered (depending on what is cached)
         int count = prov.cachedSerializersCount();
-        if (count < 2) {
+        if (count < 2 || count > 10) {
             fail("Should have at least 2 cached serializers, got "+count);
         }
         prov.flushCachedSerializers();

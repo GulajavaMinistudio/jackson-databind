@@ -10,13 +10,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 
-import com.fasterxml.jackson.core.FormatSchema;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.ObjectWriteContext;
-import com.fasterxml.jackson.core.PrettyPrinter;
-import com.fasterxml.jackson.core.SerializableString;
-import com.fasterxml.jackson.core.TokenStreamFactory;
-import com.fasterxml.jackson.core.TreeNode;
+import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.tree.ArrayTreeNode;
 import com.fasterxml.jackson.core.tree.ObjectTreeNode;
@@ -29,7 +23,6 @@ import com.fasterxml.jackson.databind.introspect.Annotated;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.*;
-import com.fasterxml.jackson.databind.ser.impl.FailingSerializer;
 import com.fasterxml.jackson.databind.ser.impl.ReadOnlyClassToSerializerMap;
 import com.fasterxml.jackson.databind.ser.impl.TypeWrappedSerializer;
 import com.fasterxml.jackson.databind.ser.impl.UnknownSerializer;
@@ -60,7 +53,7 @@ public abstract class SerializerProvider
     implements java.io.Serializable, // because we don't have no-args constructor
         ObjectWriteContext // 3.0, for use by jackson-core
 {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3L;
 
     /**
      * Setting for determining whether mappings for "unknown classes" should be
@@ -68,9 +61,6 @@ public abstract class SerializerProvider
      * is in some cases?
      */
     protected final static boolean CACHE_UNKNOWN_MAPPINGS = false;
-
-    public final static JsonSerializer<Object> DEFAULT_NULL_KEY_SERIALIZER =
-        new FailingSerializer("Null key for a Map not allowed in JSON (use a converting NullKeySerializer?)");
 
     /**
      * Placeholder serializer used when <code>java.lang.Object</code> typed property
@@ -82,9 +72,9 @@ public abstract class SerializerProvider
     protected final static JsonSerializer<Object> DEFAULT_UNKNOWN_SERIALIZER = new UnknownSerializer();
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration, general
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -112,9 +102,9 @@ public abstract class SerializerProvider
     final protected GeneratorSettings _generatorConfig;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration, factories
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -124,9 +114,9 @@ public abstract class SerializerProvider
     final protected SerializerFactory _serializerFactory;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper objects for caching, reuse
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -141,9 +131,9 @@ public abstract class SerializerProvider
     protected transient ContextAttributes _attributes;
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration, specialized serializers
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -152,20 +142,7 @@ public abstract class SerializerProvider
      *<p>
      * The default serializer will simply thrown an exception.
      */
-    protected JsonSerializer<Object> _unknownTypeSerializer = DEFAULT_UNKNOWN_SERIALIZER;
-
-    /**
-     * Serializer used to output non-null keys of Maps (which will get
-     * output as JSON Objects), if not null; if null, us the standard
-     * default key serializer.
-     */
-    protected JsonSerializer<Object> _keySerializer;
-
-    /**
-     * Serializer used to output a null value. Default implementation
-     * writes nulls using {@link JsonGenerator#writeNull}.
-     */
-    protected JsonSerializer<Object> _nullValueSerializer = NullSerializer.instance;
+    protected final JsonSerializer<Object> _unknownTypeSerializer;
 
     /**
      * Serializer used to (try to) output a null key, due to an entry of
@@ -174,12 +151,18 @@ public abstract class SerializerProvider
      * alternative implementation (like one that would write an Empty String)
      * can be defined.
      */
-    protected JsonSerializer<Object> _nullKeySerializer = DEFAULT_NULL_KEY_SERIALIZER;
+    protected final JsonSerializer<Object> _nullKeySerializer;
+
+    /**
+     * Serializer used to output a null value. Default implementation
+     * writes nulls using {@link JsonGenerator#writeNull}.
+     */
+    protected final JsonSerializer<Object> _nullValueSerializer;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* State, for non-blueprint instances
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -201,16 +184,16 @@ public abstract class SerializerProvider
     protected final boolean _stdNullValueSerializer;
 
     /**
-     * Token stream generator actively used.
+     * Token stream generator actively used; only set for per-call instances
      *
      * @since 3.0
      */
     protected transient JsonGenerator _generator;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -230,9 +213,12 @@ public abstract class SerializerProvider
 
         _serializationView = null;
         _attributes = null;
+        _unknownTypeSerializer = DEFAULT_UNKNOWN_SERIALIZER;
 
         // not relevant for blueprint instance, could set either way:
         _stdNullValueSerializer = true;
+        _nullKeySerializer = null;
+        _nullValueSerializer = null;
     }
 
     /**
@@ -252,18 +238,25 @@ public abstract class SerializerProvider
 
         _serializerCache = src._serializerCache;
         _unknownTypeSerializer = src._unknownTypeSerializer;
-        _keySerializer = src._keySerializer;
-        _nullValueSerializer = src._nullValueSerializer;
-        _nullKeySerializer = src._nullKeySerializer;
 
-        _stdNullValueSerializer = (_nullValueSerializer == DEFAULT_NULL_KEY_SERIALIZER);
+        // Default null key, value serializers configured via SerializerFactory:
+        _nullKeySerializer = f.getDefaultNullKeySerializer();
+        {
+            JsonSerializer<Object> ser = f.getDefaultNullValueSerializer();
+            if (ser == null) {
+                _stdNullValueSerializer = true;
+                ser = NullSerializer.instance;
+            } else {
+                _stdNullValueSerializer = false;
+            }
+            _nullValueSerializer = ser;
+        }
 
         _serializationView = config.getActiveView();
         _attributes = config.getAttributes();
 
-        /* Non-blueprint instances do have a read-only map; one that doesn't
-         * need synchronization for lookups.
-         */
+        // Non-blueprint instances do have a read-only map; one that doesn't
+        // need synchronization for lookups.
         _knownSerializers = _serializerCache.getReadOnlyLookupMap();
     }
 
@@ -285,7 +278,6 @@ public abstract class SerializerProvider
         _serializerCache = new SerializerCache();
 
         _unknownTypeSerializer = src._unknownTypeSerializer;
-        _keySerializer = src._keySerializer;
         _nullValueSerializer = src._nullValueSerializer;
         _nullKeySerializer = src._nullKeySerializer;
 
@@ -293,9 +285,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* ObjectWriteContext impl, config access
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -327,18 +319,18 @@ public abstract class SerializerProvider
 
     @Override
     public int getGeneratorFeatures(int defaults) {
-        return _config.getGeneratorFeatures(defaults);
+        return _config.getGeneratorFeatures();
     }
 
     @Override
     public int getFormatWriteFeatures(int defaults) {
-        return _config.getFormatWriteFeatures(defaults);
+        return _config.getFormatWriteFeatures();
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* ObjectWriteContext impl, databind integration
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -381,64 +373,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
-    /* Methods for configuring default settings
-    /**********************************************************
-     */
-
-    /**
-     * Method that can be used to specify serializer that will be
-     * used to write JSON property names matching null keys for Java
-     * Maps (which will throw an exception if try write such property
-     * name)
-     */
-    public void setDefaultKeySerializer(JsonSerializer<Object> ks)
-    {
-        if (ks == null) {
-            throw new IllegalArgumentException("Cannot pass null JsonSerializer");
-        }
-        _keySerializer = ks;
-    }
-
-    /**
-     * Method that can be used to specify serializer that will be
-     * used to write JSON values matching Java null values
-     * instead of default one (which simply writes JSON null).
-     *<p>
-     * Note that you can get finer control over serializer to use by overriding
-     * {@link #findNullValueSerializer}, which gets called once per each
-     * property.
-     */
-    public void setNullValueSerializer(JsonSerializer<Object> nvs)
-    {
-        if (nvs == null) {
-            throw new IllegalArgumentException("Cannot pass null JsonSerializer");
-        }
-        _nullValueSerializer = nvs;
-    }
-
-    /**
-     * Method that can be used to specify serializer to use for serializing
-     * all non-null JSON property names, unless more specific key serializer
-     * is found (i.e. if not custom key serializer has been registered for
-     * Java type).
-     *<p>
-     * Note that key serializer registration are different from value serializer
-     * registrations.
-     */
-    public void setNullKeySerializer(JsonSerializer<Object> nks)
-    {
-        if (nks == null) {
-            throw new IllegalArgumentException("Cannot pass null JsonSerializer");
-        }
-        _nullKeySerializer = nks;
-    }
-        
-    /*
-    /**********************************************************
-    /* DatabindContext implementation (and closely related
-    /* but ser-specific)
-    /**********************************************************
+    /**********************************************************************
+    /* DatabindContext implementation (and closely related but ser-specific)
+    /**********************************************************************
      */
 
     /**
@@ -502,9 +439,9 @@ public abstract class SerializerProvider
     }
     
     /*
-    /**********************************************************
-    /* Generic attributes (2.3+)
-    /**********************************************************
+    /**********************************************************************
+    /* Generic attributes
+    /**********************************************************************
      */
 
     @Override
@@ -520,9 +457,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Access to general configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -561,9 +498,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Access to Object Id aspects
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -576,9 +513,9 @@ public abstract class SerializerProvider
         ObjectIdGenerator<?> generatorType);
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* General serializer locating functionality
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -729,8 +666,6 @@ public abstract class SerializerProvider
      * 
      * @param property Property that is being handled; will never be null, and its
      *    type has to match <code>valueType</code> parameter.
-     * 
-     * @since 2.3
      */
     @SuppressWarnings("unchecked")
     public JsonSerializer<Object> findPrimaryPropertySerializer(JavaType valueType, BeanProperty property)
@@ -754,9 +689,6 @@ public abstract class SerializerProvider
         return (JsonSerializer<Object>) handlePrimaryContextualization(ser, property);
     }
 
-    /**
-     * @since 2.3
-     */
     @SuppressWarnings("unchecked")
     public JsonSerializer<Object> findPrimaryPropertySerializer(Class<?> valueType,
             BeanProperty property)
@@ -892,14 +824,12 @@ public abstract class SerializerProvider
     public JsonSerializer<Object> findKeySerializer(JavaType keyType, BeanProperty property)
         throws JsonMappingException
     {
-        JsonSerializer<Object> ser = _serializerFactory.createKeySerializer(_config, keyType, _keySerializer);
-        // 25-Feb-2011, tatu: As per [JACKSON-519], need to ensure contextuality works here, too
+        // 16-Mar-2018, tatu: Used to have "default key serializer" in 2.x; dropped to let/make
+        //    custom code use Module interface or similar to provide key serializers
+        JsonSerializer<Object> ser = _serializerFactory.createKeySerializer(_config, keyType, null);
         return _handleContextualResolvable(ser, property);
     }
 
-    /**
-     * @since 2.7
-     */
     public JsonSerializer<Object> findKeySerializer(Class<?> rawKeyType, BeanProperty property)
         throws JsonMappingException
     {
@@ -907,41 +837,20 @@ public abstract class SerializerProvider
     }
 
     /*
-    /********************************************************
+    /**********************************************************************
     /* Accessors for specialized serializers
-    /********************************************************
+    /**********************************************************************
      */
 
-    /**
-     * @since 2.0
-     */
-    public JsonSerializer<Object> getDefaultNullKeySerializer() {
-        return _nullKeySerializer;
-    }
-
-    /**
-     * @since 2.0
-     */
     public JsonSerializer<Object> getDefaultNullValueSerializer() {
         return _nullValueSerializer;
     }
-    
-    /**
-     * Method called to get the serializer to use for serializing
-     * Map keys that are nulls: this is needed since JSON does not allow
-     * any non-String value as key, including null.
-     *<p>
-     * Typically, returned serializer
-     * will either throw an exception, or use an empty String; but
-     * other behaviors are possible.
-     */
+
     /**
      * Method called to find a serializer to use for null values for given
      * declared type. Note that type is completely based on declared type,
      * since nulls in Java have no type and thus runtime type cannot be
      * determined.
-     * 
-     * @since 2.0
      */
     public JsonSerializer<Object> findNullKeySerializer(JavaType serializationType,
             BeanProperty property)
@@ -958,11 +867,10 @@ public abstract class SerializerProvider
      * can be overridden to add custom null serialization for properties
      * of certain type or name. This gives method full granularity to basically
      * override null handling for any specific property or class of properties.
-     * 
-     * @since 2.0
      */
     public JsonSerializer<Object> findNullValueSerializer(BeanProperty property)
-        throws JsonMappingException {
+        throws JsonMappingException
+    {
         return _nullValueSerializer;
     }
 
@@ -991,8 +899,6 @@ public abstract class SerializerProvider
      * Helper method called to see if given serializer is considered to be
      * something returned by {@link #getUnknownTypeSerializer}, that is, something
      * for which no regular serializer was found or constructed.
-     * 
-     * @since 2.5
      */
     public boolean isUnknownTypeSerializer(JsonSerializer<?> ser) {
         if ((ser == _unknownTypeSerializer) || (ser == null)) {
@@ -1007,11 +913,11 @@ public abstract class SerializerProvider
         }
         return false;
     }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Methods for creating instances based on annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1048,9 +954,9 @@ public abstract class SerializerProvider
         throws JsonMappingException;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Support for contextualization
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1096,9 +1002,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /********************************************************
+    /**********************************************************************
     /* Convenience methods for serializing using default methods
-    /********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1133,9 +1039,8 @@ public abstract class SerializerProvider
     {
         gen.writeFieldName(fieldName);
         if (value == null) {
-            /* Note: can't easily check for suppression at this point
-             * any more; caller must check it.
-             */
+            // Note: can't easily check for suppression at this point
+            // any more; caller must check it.
             if (_stdNullValueSerializer) { // minor perf optimization
                 gen.writeNull();
             } else {
@@ -1208,7 +1113,14 @@ public abstract class SerializerProvider
         }
     }
 
-    public final void defaultSerializeNull(JsonGenerator gen) throws IOException
+    /**
+     * Method to call when serializing a `null` value (POJO property, Map entry value,
+     * Collection/array element) using configured standard mechanism. Note that this
+     * does NOT consider filtering any more as value is expected.
+     *
+     * @since 3.0 (in 2.x was called <code>defaultSerializeNull</code>)
+     */
+    public final void defaultSerializeNullValue(JsonGenerator gen) throws IOException
     {
         if (_stdNullValueSerializer) { // minor perf optimization
             gen.writeNull();
@@ -1218,9 +1130,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /********************************************************
+    /**********************************************************************
     /* Error reporting
-    /********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1299,8 +1211,6 @@ public abstract class SerializerProvider
      * Helper method called to indicate problem; default behavior is to construct and
      * throw a {@link JsonMappingException}, but in future may collect more than one
      * and only throw after certain number, or at the end of serialization.
-     *
-     * @since 2.8
      */
     public void reportMappingProblem(Throwable t, String message, Object... msgArgs) throws JsonMappingException {
         message = _format(message, msgArgs);
@@ -1316,9 +1226,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /********************************************************
+    /**********************************************************************
     /* Helper methods
-    /********************************************************
+    /**********************************************************************
      */
 
     protected void _reportIncompatibleRootType(Object value, JavaType rootType) throws IOException
@@ -1337,10 +1247,10 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Low-level methods for actually constructing and initializing
     /* serializers
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1424,9 +1334,9 @@ public abstract class SerializerProvider
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected final DateFormat _dateFormat()

@@ -118,17 +118,6 @@ public abstract class BasicSerializerFactory
     protected BasicSerializerFactory(SerializerFactoryConfig config) {
         _factoryConfig = (config == null) ? new SerializerFactoryConfig() : config;
     }
-    
-    /**
-     * Method for getting current {@link SerializerFactoryConfig}.
-      *<p>
-     * Note that since instances are immutable, you can NOT change settings
-     * by accessing an instance and calling methods: this will simply create
-     * new instance of config object.
-     */
-    public SerializerFactoryConfig getFactoryConfig() {
-        return _factoryConfig;
-    }
 
     /**
      * Method used for creating a new instance of this factory, but with different
@@ -140,7 +129,7 @@ public abstract class BasicSerializerFactory
      * factory type. Check out javadocs for
      * {@link com.fasterxml.jackson.databind.ser.BeanSerializerFactory} for more details.
      */
-    public abstract SerializerFactory withConfig(SerializerFactoryConfig config);
+    protected abstract SerializerFactory withConfig(SerializerFactoryConfig config);
 
     /**
      * Convenience method for creating a new factory instance with an additional
@@ -169,10 +158,20 @@ public abstract class BasicSerializerFactory
         return withConfig(_factoryConfig.withSerializerModifier(modifier));
     }
 
+    @Override
+    public final SerializerFactory withNullValueSerializer(JsonSerializer<?> nvs) {
+        return withConfig(_factoryConfig.withNullValueSerializer(nvs));
+    }
+
+    @Override
+    public final SerializerFactory withNullKeySerializer(JsonSerializer<?> nks) {
+        return withConfig(_factoryConfig.withNullKeySerializer(nks));
+    }
+
     /*
-    /**********************************************************
-    /* SerializerFactory impl
-    /**********************************************************
+    /**********************************************************************
+    /* `SerializerFactory` impl
+    /**********************************************************************
      */
     
     // Implemented by sub-classes
@@ -201,29 +200,30 @@ public abstract class BasicSerializerFactory
             }
         }
         if (ser == null) {
-            ser = defaultImpl;
+            ser = StdKeySerializers.getStdKeySerializer(config, keyType.getRawClass(), false);
+            // As per [databind#47], also need to support @JsonValue
             if (ser == null) {
-                ser = StdKeySerializers.getStdKeySerializer(config, keyType.getRawClass(), false);
-                // As per [databind#47], also need to support @JsonValue
-                if (ser == null) {
-                    beanDesc = config.introspect(keyType);
-                    AnnotatedMember am = beanDesc.findJsonValueAccessor();
-                    if (am != null) {
-                        final Class<?> rawType = am.getRawType();
-                        JsonSerializer<?> delegate = StdKeySerializers.getStdKeySerializer(config,
-                                rawType, true);
-                        if (config.canOverrideAccessModifiers()) {
-                            ClassUtil.checkAndFixAccess(am.getMember(),
-                                    config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
-                        }
-                        ser = new JsonValueSerializer(am, delegate);
-                    } else {
+                beanDesc = config.introspect(keyType);
+                AnnotatedMember am = beanDesc.findJsonValueAccessor();
+                if (am != null) {
+                    final Class<?> rawType = am.getRawType();
+                    JsonSerializer<?> delegate = StdKeySerializers.getStdKeySerializer(config,
+                            rawType, true);
+                    if (config.canOverrideAccessModifiers()) {
+                        ClassUtil.checkAndFixAccess(am.getMember(),
+                                config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
+                    }
+                    ser = new JsonValueSerializer(am, delegate);
+                } else {
+                    // And aside from JDK defaults, use `defaultImpl` if any specified
+                    ser = defaultImpl;
+                    if (ser == null) {
                         ser = StdKeySerializers.getFallbackKeySerializer(config, keyType.getRawClass());
                     }
                 }
             }
         }
-        
+
         // [databind#120]: Allow post-processing
         if (_factoryConfig.hasSerializerModifiers()) {
             for (BeanSerializerModifier mod : _factoryConfig.serializerModifiers()) {
@@ -245,40 +245,66 @@ public abstract class BasicSerializerFactory
         BeanDescription bean = config.introspectClassAnnotations(baseType.getRawClass());
         return config.getTypeResolverProvider().findTypeSerializer(config,
                 bean.getClassInfo(), baseType);
+    }
 
-        /*
-        AnnotationIntrospector ai = config.getAnnotationIntrospector();
-        JsonTypeInfo.Value typeInfo = ai.findPolymorphicTypeInfo(config, ac);
-        TypeResolverBuilder<?> b = ai.findTypeResolver(config, ac, baseType, typeInfo);
-        // Ok: if there is no explicit type info handler, we may want to
-        // use a default. If so, config object knows what to use.
-        Collection<NamedType> subtypes = null;
-        if (b == null) {
-            b = config.getDefaultTyper(baseType);
-        } else {
-            subtypes = config.getSubtypeResolver().collectAndResolveSubtypesByClass(config, ac);
-        }
-        if (b == null) {
-            return null;
-        }
-        // 10-Jun-2015, tatu: Since not created for Bean Property, no need for post-processing
-        //    wrt EXTERNAL_PROPERTY
-        return b.buildTypeSerializer(config, baseType, subtypes);
-        */
+    @Override
+    public JsonSerializer<Object> getDefaultNullKeySerializer() {
+        return _factoryConfig.getNullKeySerializer();
+    }
+
+    @Override
+    public JsonSerializer<Object> getDefaultNullValueSerializer() {
+        return _factoryConfig.getNullValueSerializer();
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Additional API for other core classes
-    /**********************************************************
+    /**********************************************************************
      */
 
-    protected abstract Iterable<Serializers> customSerializers();
+    protected Iterable<Serializers> customSerializers() {
+        return _factoryConfig.serializers();
+    }
 
+    /**
+     * Method called to create a type information serializer for values of given
+     * non-container property
+     * if one is needed. If not needed (no polymorphic handling configured), should
+     * return null.
+     *
+     * @param baseType Declared type to use as the base type for type information serializer
+     * 
+     * @return Type serializer to use for property values, if one is needed; null if not.
+     */
+    public TypeSerializer findPropertyTypeSerializer(JavaType baseType,
+            SerializationConfig config, AnnotatedMember accessor)
+        throws JsonMappingException
+    {
+        return config.getTypeResolverProvider().findPropertyTypeSerializer(config, accessor, baseType);
+    }
+
+    /**
+     * Method called to create a type information serializer for values of given
+     * container property
+     * if one is needed. If not needed (no polymorphic handling configured), should
+     * return null.
+     *
+     * @param containerType Declared type of the container to use as the base type for type information serializer
+     * 
+     * @return Type serializer to use for property value contents, if one is needed; null if not.
+     */    
+    public TypeSerializer findPropertyContentTypeSerializer(JavaType containerType,
+            SerializationConfig config, AnnotatedMember accessor)
+        throws JsonMappingException
+    {
+        return config.getTypeResolverProvider().findPropertyContentTypeSerializer(config, accessor, containerType);
+    }
+    
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Overridable secondary serializer accessor methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1114,9 +1140,6 @@ public abstract class BasicSerializerFactory
         return new IteratorSerializer(valueType, staticTyping, findTypeSerializer(config, valueType));
     }
 
-    /**
-     * @since 2.5
-     */
     protected JsonSerializer<?> buildIterableSerializer(SerializationConfig config,
             JavaType type, BeanDescription beanDesc, boolean staticTyping,
             JavaType valueType)
@@ -1206,8 +1229,6 @@ public abstract class BasicSerializerFactory
      * annotations for the bean class indicate that static typing
      * (declared types)  should be used for properties.
      * (instead of dynamic runtime types).
-     * 
-     * @since 2.1 (earlier had variant with additional 'property' parameter)
      */
     protected boolean usesStaticTyping(SerializationConfig config,
             BeanDescription beanDesc, TypeSerializer typeSer)
@@ -1225,22 +1246,4 @@ public abstract class BasicSerializerFactory
         }
         return config.isEnabled(MapperFeature.USE_STATIC_TYPING);
     }
-
-    // Commented out in 2.9
-    /*
-    protected Class<?> _verifyAsClass(Object src, String methodName, Class<?> noneClass)
-    {
-        if (src == null) {
-            return null;
-        }
-        if (!(src instanceof Class)) {
-            throw new IllegalStateException("AnnotationIntrospector."+methodName+"() returned value of type "+src.getClass().getName()+": expected type JsonSerializer or Class<JsonSerializer> instead");
-        }
-        Class<?> cls = (Class<?>) src;
-        if (cls == noneClass || ClassUtil.isBogusClass(cls)) {
-            return null;
-        }
-        return cls;
-    }
-    */
 }

@@ -48,9 +48,9 @@ public class ObjectReader
     protected final static JavaType JSON_NODE_TYPE = SimpleType.constructUnsafe(JsonNode.class);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Immutable configuration from ObjectMapper
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -80,11 +80,11 @@ public class ObjectReader
      * Default value to be null as filter not considered.
      */
     private final TokenFilter _filter;
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration that can be changed during building
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -127,9 +127,9 @@ public class ObjectReader
     protected final InjectableValues _injectableValues;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Caching
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -139,9 +139,9 @@ public class ObjectReader
     final protected ConcurrentHashMap<JavaType, JsonDeserializer<Object>> _rootDeserializers;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, construction
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -214,26 +214,7 @@ public class ObjectReader
         _unwrapRoot = config.useRootWrapping();
         _filter = base._filter;
     }
-    
-    protected ObjectReader(ObjectReader base, TokenStreamFactory f)
-    {
-        // may need to override ordering, based on data format capabilities
-        _config = base._config
-            .with(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, f.requiresPropertyOrdering());
-        _context = base._context;
 
-        _rootDeserializers = base._rootDeserializers;
-        _parserFactory = f;
-
-        _valueType = base._valueType;
-        _rootDeserializer = base._rootDeserializer;
-        _valueToUpdate = base._valueToUpdate;
-        _schema = base._schema;
-        _injectableValues = base._injectableValues;
-        _unwrapRoot = base._unwrapRoot;
-        _filter = base._filter;
-    }
-    
     protected ObjectReader(ObjectReader base, TokenFilter filter) {
         _config = base._config;
         _context = base._context;
@@ -258,11 +239,11 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods used internally for invoking constructors
     /* Need to be overridden if sub-classing (not recommended)
     /* is used.
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -294,9 +275,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Methods for initializing parser instance to use
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected JsonToken _initForReading(DefaultDeserializationContext ctxt, JsonParser p)
@@ -333,9 +314,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factory methods for DeserializationFeatures
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -390,9 +371,9 @@ public class ObjectReader
     }    
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factory methods for JsonParser.Features
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -428,9 +409,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
-    /* Life-cycle, fluent factory methods for FormatFeature (2.7)
-    /**********************************************************
+    /**********************************************************************
+    /* Life-cycle, fluent factory methods for FormatFeature
+    /**********************************************************************
      */
 
     /**
@@ -466,9 +447,9 @@ public class ObjectReader
     }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factory methods, other
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -689,9 +670,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal factory methods
-    /**********************************************************
+    /**********************************************************************
      */
     
     protected final ObjectReader _with(DeserializationConfig newConfig) {
@@ -700,11 +681,11 @@ public class ObjectReader
         }
         return _new(this, newConfig);
     }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Simple accessors
-    /**********************************************************
+    /**********************************************************************
      */
     
     public boolean isEnabled(DeserializationFeature f) {
@@ -716,9 +697,7 @@ public class ObjectReader
     }
 
     public boolean isEnabled(JsonParser.Feature f) {
-        // !!! 09-Oct-2017, tatu: Actually for full answer we really should check
-        //   what actual combined settings are....
-        return _parserFactory.isEnabled(f);
+        return _config.isEnabled(f);
     }
 
     public DeserializationConfig getConfig() {
@@ -748,14 +727,6 @@ public class ObjectReader
     }
 
     /**
-     * @deprecated Since 3.0 use {@link #parserFactory}
-     */
-    @Deprecated
-    public TokenStreamFactory getFactory() {
-        return parserFactory();
-    }
-
-    /**
      * @deprecated Since 3.0 use {@link #typeFactory}
      */
     @Deprecated
@@ -764,10 +735,10 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API: constructing Parsers that are properly linked
     /* to `ObjectReadContext`
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -914,9 +885,9 @@ public class ObjectReader
     }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Convenience methods for JsonNode creation
-    /**********************************************************
+    /**********************************************************************
      */
 
     public ObjectNode createObjectNode() {
@@ -928,10 +899,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
-    /* Deserialization methods; first ones for pre-constructed
-    /* parsers
-    /**********************************************************
+    /**********************************************************************
+    /* Deserialization methods; first ones for pre-constructed parsers
+    /**********************************************************************
      */
 
     /**
@@ -1101,9 +1071,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* TreeCodec impl
-    /**********************************************************
+    /**********************************************************************
      */
 
     public JsonParser treeAsTokens(TreeNode n) {
@@ -1131,9 +1101,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization methods; others similar to what ObjectMapper has
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1307,9 +1277,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization methods; reading sequence of values
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -1433,9 +1403,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Implementation of rest of ObjectCodec methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     public <T> T treeToValue(TreeNode n, Class<T> valueType) throws JsonProcessingException
@@ -1450,9 +1420,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods, data-binding
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1644,9 +1614,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods, other
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected void _verifySchemaType(FormatSchema schema)
@@ -1689,9 +1659,9 @@ public class ObjectReader
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods, locating deserializers etc
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**

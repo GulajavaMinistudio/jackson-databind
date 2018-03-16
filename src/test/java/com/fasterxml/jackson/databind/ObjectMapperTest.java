@@ -100,13 +100,13 @@ public class ObjectMapperTest extends BaseMapTest
     public void testProps()
     {
         // should have default factory
-        assertNotNull(MAPPER.nodeFactory());
+        assertNotNull(MAPPER.getNodeFactory());
         JsonNodeFactory nf = new JsonNodeFactory(true);
         ObjectMapper m = ObjectMapper.builder()
                 .nodeFactory(nf)
                 .build();
         assertNull(m.getInjectableValues());
-        assertSame(nf, m.nodeFactory());
+        assertSame(nf, m.getNodeFactory());
     }
 
     // Test to ensure that we can check property ordering defaults...
@@ -188,17 +188,6 @@ public class ObjectMapperTest extends BaseMapTest
         // and yet, can disable too
         assertEquals("[1,2]", m.writer().without(SerializationFeature.INDENT_OUTPUT)
                 .writeValueAsString(input));
-    }
-
-    // for [databind#898]
-    public void testSerializerProviderAccess() throws Exception
-    {
-        // ensure we have "fresh" instance, just in case
-        ObjectMapper mapper = new ObjectMapper();
-        JsonSerializer<?> ser = mapper.serializerProviderInstance()
-                .findValueSerializer(Bean.class);
-        assertNotNull(ser);
-        assertEquals(Bean.class, ser.handledType());
     }
 
     public void testDataOutputViaMapper() throws Exception

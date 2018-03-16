@@ -23,7 +23,10 @@ import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
  * @since 3.0
  */
 public class TypeResolverProvider
+    implements java.io.Serializable
 {
+    private static final long serialVersionUID = 3L;
+
     protected final static StdTypeResolverBuilder NO_RESOLVER = StdTypeResolverBuilder.noTypeInfoBuilder();
 
     /*
@@ -244,7 +247,7 @@ public class TypeResolverProvider
                     typeInfo = typeInfo.withInclusionType(JsonTypeInfo.As.PROPERTY);
                 }
             }
-            b = _constructStdTypeResolverBuilder(typeInfo);
+            b = _constructStdTypeResolverBuilder(config, typeInfo, baseType);
         }
         // Does it define a custom type id resolver?
         Object customIdResolverOb = ai.findTypeIdResolver(config, ann);
@@ -262,7 +265,8 @@ public class TypeResolverProvider
         return b;
     }
 
-    protected StdTypeResolverBuilder _constructStdTypeResolverBuilder(JsonTypeInfo.Value typeInfo) {
+    protected TypeResolverBuilder<?> _constructStdTypeResolverBuilder(MapperConfig<?> config,
+            JsonTypeInfo.Value typeInfo, JavaType baseType) {
         return new StdTypeResolverBuilder(typeInfo);
     }
 }

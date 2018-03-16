@@ -5,17 +5,14 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import com.fasterxml.jackson.annotation.*;
+
 import com.fasterxml.jackson.core.Base64Variant;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.core.type.TypeReference;
+
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.introspect.Annotated;
-import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
-import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
-import com.fasterxml.jackson.databind.introspect.MixInResolver;
-import com.fasterxml.jackson.databind.introspect.NopAnnotationIntrospector;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
+import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.jsontype.TypeIdResolver;
 import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
@@ -57,20 +54,14 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     protected final BaseSettings _base;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle: constructors
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected MapperConfig(BaseSettings base, int mapperFeatures)
     {
         _base = base;
-        _mapperFeatures = mapperFeatures;
-    }
-
-    protected MapperConfig(MapperConfig<T> src, int mapperFeatures)
-    {
-        _base = src._base;
         _mapperFeatures = mapperFeatures;
     }
 
@@ -102,29 +93,9 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     }
 
     /*
-    /**********************************************************
-    /* Life-cycle: factory methods
-    /**********************************************************
-     */
-    
-    /**
-     * Method for constructing and returning a new instance with specified
-     * mapper features enabled.
-     */
-    public abstract T with(MapperFeature... features);
-
-    /**
-     * Method for constructing and returning a new instance with specified
-     * mapper features disabled.
-     */
-    public abstract T without(MapperFeature... features);
-
-    public abstract T with(MapperFeature feature, boolean state);
-    
-    /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: simple features
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -184,9 +155,9 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     public abstract boolean useRootWrapping();
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: factory methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -199,17 +170,15 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
      * @return Optimized text object constructed
      */
     public SerializableString compileString(String src) {
-        /* 20-Jan-2014, tatu: For now we will just construct it directly, but
-         *    for 2.4 need to allow overriding to support non-standard extensions
-         *    to be used by extensions like Afterburner.
-         */
+        // 20-Jan-2014, tatu: For now we will just construct it directly but in distant
+        //   future might want to allow overriding somehow?
         return new SerializedString(src);
     }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: introspectors, mix-ins
-    /**********************************************************
+    /**********************************************************************
      */
 
     public abstract ClassIntrospector getClassIntrospector();
@@ -236,9 +205,9 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: type and subtype handling
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -251,20 +220,14 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
         return _base.getDefaultTyper();
     }
 
-private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeResolverProvider();
-
     /**
      * @since 3.0
      */
-    public TypeResolverProvider getTypeResolverProvider() {
-        return STD_TYPE_RESOLVER_PROVIDER;
-    }
-    
+    public abstract TypeResolverProvider getTypeResolverProvider();
+
     public abstract SubtypeResolver getSubtypeResolver();
 
-    public final TypeFactory getTypeFactory() {
-        return _base.getTypeFactory();
-    }
+    public abstract TypeFactory getTypeFactory();
 
     /**
      * Helper method that will construct {@link JavaType} for given
@@ -274,9 +237,7 @@ private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeR
      *    getTypeFactory().constructType(cls);
      *</pre>
      */
-    public final JavaType constructType(Class<?> cls) {
-        return getTypeFactory().constructType(cls);
-    }
+    public abstract JavaType constructType(Class<?> cls);
 
     /**
      * Helper method that will construct {@link JavaType} for given
@@ -286,13 +247,9 @@ private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeR
      *    getTypeFactory().constructType(valueTypeRef);
      *</pre>
      */
-    public final JavaType constructType(TypeReference<?> valueTypeRef) {
-        return getTypeFactory().constructType(valueTypeRef.getType());
-    }
+    public abstract JavaType constructType(TypeReference<?> valueTypeRef);
 
-    public JavaType constructSpecializedType(JavaType baseType, Class<?> subclass) {
-        return getTypeFactory().constructSpecializedType(baseType, subclass);
-    }
+    public abstract JavaType constructSpecializedType(JavaType baseType, Class<?> subclass);
 
     /*
     /**********************************************************************
@@ -335,9 +292,9 @@ private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeR
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: default settings with per-type overrides
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -500,9 +457,9 @@ private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeR
     public abstract Boolean getDefaultMergeable(Class<?> baseType);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration: other
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -568,9 +525,9 @@ private final static TypeResolverProvider STD_TYPE_RESOLVER_PROVIDER = new TypeR
     public abstract PropertyName findRootName(Class<?> rawRootType);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Methods for instantiating handlers
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
