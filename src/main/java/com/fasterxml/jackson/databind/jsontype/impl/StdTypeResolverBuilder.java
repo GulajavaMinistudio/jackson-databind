@@ -157,8 +157,25 @@ public class StdTypeResolverBuilder
             if (_defaultImpl == Void.class) {
                 defaultImpl = config.getTypeFactory().constructType(_defaultImpl);
             } else {
-                defaultImpl = config.getTypeFactory()
-                    .constructSpecializedType(baseType, _defaultImpl);
+                if (baseType.hasRawClass(_defaultImpl)) { // common enough to check
+                    defaultImpl = baseType;
+                } else if (baseType.isTypeOrSuperTypeOf(_defaultImpl)) {
+                    // most common case with proper base type...
+                    defaultImpl = config.getTypeFactory()
+                            .constructSpecializedType(baseType, _defaultImpl);
+                } else {
+                    // 05-Apr-2018, tatu: As [databind#1565] and [databind#1861] need to allow
+                    //    some cases of seemingly incompatible `defaultImpl`. Easiest to just clear
+                    //    the setting.
+
+                    /*
+                    throw new IllegalArgumentException(
+                            String.format("Invalid \"defaultImpl\" (%s): not a subtype of basetype (%s)",
+                                    ClassUtil.nameOf(_defaultImpl), ClassUtil.nameOf(baseType.getRawClass()))
+                            );
+                            */
+                    defaultImpl = null;
+                }
             }
         }
 
