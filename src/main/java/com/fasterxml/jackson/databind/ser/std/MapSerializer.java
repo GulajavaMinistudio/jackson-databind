@@ -44,9 +44,9 @@ public class MapSerializer
     public final static Object MARKER_FOR_EMPTY = JsonInclude.Include.NON_EMPTY;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Basic information about referring property, type
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -71,9 +71,9 @@ public class MapSerializer
     protected final JavaType _valueType;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serializers used
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -98,9 +98,9 @@ public class MapSerializer
     protected PropertySerializerMap _dynamicValueSerializers;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Config settings, filtering
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -110,8 +110,6 @@ public class MapSerializer
 
     /**
      * Id of the property filter to use, if any; null if none.
-     *
-     * @since 2.3
      */
     protected final Object _filterId;
 
@@ -122,42 +120,33 @@ public class MapSerializer
      * non-null values.
      * Note that inclusion value for Map instance itself is handled by caller (POJO
      * property that refers to the Map value).
-     * 
-     * @since 2.5
      */
     protected final Object _suppressableValue;
 
     /**
      * Flag that indicates what to do with `null` values, distinct from
      * handling of {@link #_suppressableValue}
-     *
-     * @since 2.9
      */
     protected final boolean _suppressNulls;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Config settings, other
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Flag set if output is forced to be sorted by keys (usually due
      * to annotation).
-     * 
-     * @since 2.4
      */
     protected final boolean _sortKeys;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
-    
-    /**
-     * @since 2.5
-     */
+
     @SuppressWarnings("unchecked")
     protected MapSerializer(Set<String> ignoredEntries,
             JavaType keyType, JavaType valueType, boolean valueTypeIsStatic,
@@ -203,9 +192,6 @@ public class MapSerializer
         _suppressNulls = src._suppressNulls;
     }
 
-    /**
-     * @since 2.9
-     */
     protected MapSerializer(MapSerializer src, TypeSerializer vts,
             Object suppressableValue, boolean suppressNulls)
     {
@@ -252,9 +238,6 @@ public class MapSerializer
         return new MapSerializer(this, vts, _suppressableValue, _suppressNulls);
     }
 
-    /**
-     * @since 2.4
-     */
     public MapSerializer withResolved(BeanProperty property,
             JsonSerializer<?> keySerializer, JsonSerializer<?> valueSerializer,
             Set<String> ignored, boolean sortKeys)
@@ -279,8 +262,6 @@ public class MapSerializer
     /**
      * Mutant factory for constructing an instance with different inclusion strategy
      * for content (Map values).
-     * 
-     * @since 2.9
      */
     public MapSerializer withContentInclusion(Object suppressableValue, boolean suppressNulls) {
         if ((suppressableValue == _suppressableValue) && (suppressNulls == _suppressNulls)) {
@@ -290,9 +271,6 @@ public class MapSerializer
         return new MapSerializer(this, _valueTypeSerializer, suppressableValue, suppressNulls);
     }
 
-    /**
-     * @since 2.8
-     */
     public static MapSerializer construct(Set<String> ignoredEntries, JavaType mapType,
             boolean staticValueType, TypeSerializer vts,
             JsonSerializer<Object> keySerializer, JsonSerializer<Object> valueSerializer,
@@ -328,9 +306,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Post-processing (contextualization)
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -345,14 +323,10 @@ public class MapSerializer
 
         // First: if we have a property, may have property-annotation overrides
         if (_neitherNull(propertyAcc, intr)) {
-            Object serDef = intr.findKeySerializer(provider.getConfig(), propertyAcc);
-            if (serDef != null) {
-                keySer = provider.serializerInstance(propertyAcc, serDef);
-            }
-            serDef = intr.findContentSerializer(provider.getConfig(), propertyAcc);
-            if (serDef != null) {
-                ser = provider.serializerInstance(propertyAcc, serDef);
-            }
+            keySer = provider.serializerInstance(propertyAcc,
+                    intr.findKeySerializer(provider.getConfig(), propertyAcc));
+            ser = provider.serializerInstance(propertyAcc,
+                    intr.findContentSerializer(provider.getConfig(), propertyAcc));
         }
         if (ser == null) {
             ser = _valueSerializer;
@@ -394,7 +368,7 @@ public class MapSerializer
         JsonFormat.Value format = findFormatOverrides(provider, property, Map.class);
         if (format != null) {
             Boolean B = format.getFeature(JsonFormat.Feature.WRITE_SORTED_MAP_ENTRIES);
-            if (B != null) {
+            if (B != null) { // do NOT override if not defined
                 sortKeys = B.booleanValue();
             }
         }
@@ -402,9 +376,8 @@ public class MapSerializer
 
         // [databind#307]: allow filtering
         if (property != null) {
-            AnnotatedMember m = property.getMember();
-            if (m != null) {
-                Object filterId = intr.findFilterId(m);
+            if (propertyAcc != null) {
+                Object filterId = intr.findFilterId(propertyAcc);
                 if (filterId != null) {
                     mser = mser.withFilterId(filterId);
                 }
@@ -462,9 +435,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -541,9 +514,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended API
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -553,17 +526,15 @@ public class MapSerializer
      * (which can be overridden by custom implementations), but for some
      * dynamic types, it is possible that serializer is only resolved
      * during actual serialization.
-     * 
-     * @since 2.0
      */
     public JsonSerializer<?> getKeySerializer() {
         return _keySerializer;
     }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* JsonSerializer implementation
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -617,9 +588,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Secondary serialization methods
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -771,8 +742,6 @@ public class MapSerializer
     /**
      * Helper method used when we have a JSON Filter to use for potentially
      * filtering out Map entries.
-     * 
-     * @since 2.5
      */
     public void serializeFilteredFields(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
             PropertyFilter filter,
@@ -830,9 +799,6 @@ public class MapSerializer
         }
     }
 
-    /**
-     * @since 2.5
-     */
     public void serializeTypedFields(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
             Object suppressableValue) // since 2.5
         throws IOException
@@ -889,8 +855,6 @@ public class MapSerializer
      * "any properties" of a POJO.
      *
      * @param bean Enclosing POJO that has any-getter used to obtain "any properties"
-     * 
-     * @since 2.9
      */
     public void serializeFilteredAnyProperties(SerializerProvider provider, JsonGenerator gen,
             Object bean, Map<?,?> value, PropertyFilter filter,
@@ -949,9 +913,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Schema related functionality
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -971,9 +935,9 @@ public class MapSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal helper methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected final JsonSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
@@ -1023,9 +987,6 @@ public class MapSerializer
         return new TreeMap<Object,Object>(input);
     }
 
-    /**
-     * @since 2.8.7
-     */
     protected boolean _hasNullKey(Map<?,?> input) {
         // 19-Feb-2017, tatu: As per [databind#1513] there are many cases where `null`
         //   keys are not allowed, and even attempt to check for presence can cause

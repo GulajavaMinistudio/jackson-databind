@@ -1,9 +1,9 @@
 package com.fasterxml.jackson.databind.deser;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.deser.std.StdDelegatingDeserializer;
@@ -11,71 +11,78 @@ import com.fasterxml.jackson.databind.introspect.Annotated;
 import com.fasterxml.jackson.databind.type.*;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.Converter;
+import com.fasterxml.jackson.databind.util.SimpleLookupCache;
 
 /**
- * Class that defines caching layer between callers (like
- * {@link ObjectMapper},
+ * Class that defines caching layer between callers (like {@link ObjectMapper},
  * {@link com.fasterxml.jackson.databind.DeserializationContext})
  * and classes that construct deserializers
  * ({@link com.fasterxml.jackson.databind.deser.DeserializerFactory}).
  */
 public final class DeserializerCache
-    implements java.io.Serializable // since 2.1 -- needs to be careful tho
+    implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3L;
+
+    /**
+     * By default allow caching of up to 4000 deserializers.
+     */
+    public final static int DEFAULT_MAX_CACHED = 4000;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Caching
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * We will also cache some dynamically constructed deserializers;
      * specifically, ones that are expensive to construct.
-     * This currently means bean and Enum deserializers; starting with
-     * 2.5, container deserializers will also be cached.
-     *<p>
-     * Given that we don't expect much concurrency for additions
-     * (should very quickly converge to zero after startup), let's
-     * define a relatively low concurrency setting.
+     * This currently (3.0) means POJO, Enum and Container (collection,
+     * map) deserializers.
      */
-    final protected ConcurrentHashMap<JavaType, JsonDeserializer<Object>> _cachedDeserializers
-        = new ConcurrentHashMap<JavaType, JsonDeserializer<Object>>(64, 0.75f, 4);
+    private final SimpleLookupCache<JavaType, JsonDeserializer<Object>> _cachedDeserializers;
 
     /**
      * During deserializer construction process we may need to keep track of partially
      * completed deserializers, to resolve cyclic dependencies. This is the
      * map used for storing deserializers before they are fully complete.
      */
-    final protected HashMap<JavaType, JsonDeserializer<Object>> _incompleteDeserializers
-        = new HashMap<JavaType, JsonDeserializer<Object>>(8);
+    private final transient HashMap<JavaType, JsonDeserializer<Object>> _incompleteDeserializers
+        = new HashMap<>(8);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
-    public DeserializerCache() { }
+    public DeserializerCache() { this(DEFAULT_MAX_CACHED); }
 
-    /*
-    /**********************************************************
-    /* JDK serialization handling
-    /**********************************************************
-     */
-
-    Object writeReplace() {
-        // instead of making this transient, just clear it:
-        _incompleteDeserializers.clear();
-        // TODO: clear out "cheap" cached deserializers?
-        return this;
+    public DeserializerCache(int maxSize) {
+        int initial = Math.min(64, maxSize>>2);
+        _cachedDeserializers = new SimpleLookupCache<>(initial, maxSize);
     }
-    
+
+    private DeserializerCache(DeserializerCache src) {
+        _cachedDeserializers = src._cachedDeserializers;
+    }
+
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* JDK serialization handling
+    /**********************************************************************
+     */
+
+    //  Need to re-create just to initialize `transient` fields
+    protected Object readResolve() {
+        return new DeserializerCache(this);
+    }
+
+    /*
+    /**********************************************************************
     /* Access to caching aspects
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -106,9 +113,9 @@ public final class DeserializerCache
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* General deserializer locating method
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -194,9 +201,9 @@ public final class DeserializerCache
 
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods that handle cache lookups
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected JsonDeserializer<Object> _findCachedDeserializer(JavaType type)
@@ -301,9 +308,9 @@ public final class DeserializerCache
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods for actual construction of deserializers
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -532,9 +539,9 @@ public final class DeserializerCache
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods, other
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -579,9 +586,9 @@ public final class DeserializerCache
     }
 
     /*
-    /**********************************************************
-    /* Overridable error reporting methods
-    /**********************************************************
+    /**********************************************************************
+    /* Error reporting methods
+    /**********************************************************************
      */
 
     protected JsonDeserializer<Object> _handleUnknownValueDeserializer(DeserializationContext ctxt, JavaType type)

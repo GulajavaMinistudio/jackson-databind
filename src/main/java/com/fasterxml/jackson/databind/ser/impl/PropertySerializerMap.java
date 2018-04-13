@@ -50,14 +50,6 @@ public abstract class PropertySerializerMap
      * 
      * @throws JsonMappingException 
      */
-    public final SerializerAndMapResult findAndAddPrimarySerializer(Class<?> type,
-            SerializerProvider provider, BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<Object> serializer = provider.findPrimaryPropertySerializer(type, property);
-        return new SerializerAndMapResult(serializer, newWith(type, serializer));
-    }
-
     public final SerializerAndMapResult findAndAddPrimarySerializer(JavaType type,
             SerializerProvider provider, BeanProperty property)
         throws JsonMappingException
@@ -71,9 +63,7 @@ public abstract class PropertySerializerMap
      * serializer (one that is not directly attached to a property).
      * Will both find serializer
      * and construct new map instance if warranted, and return both.
-     * 
-     * @since 2.3
-     * 
+     *
      * @throws JsonMappingException 
      */
     public final SerializerAndMapResult findAndAddSecondarySerializer(Class<?> type,
@@ -99,8 +89,6 @@ public abstract class PropertySerializerMap
      * around it. Will both find the serializer
      * and construct new map instance if warranted, and return both.
      * 
-     * @since 2.5
-     * 
      * @throws JsonMappingException 
      */
     public final SerializerAndMapResult findAndAddRootValueSerializer(Class<?> type,
@@ -111,9 +99,6 @@ public abstract class PropertySerializerMap
         return new SerializerAndMapResult(serializer, newWith(type, serializer));
     }
 
-    /**
-     * @since 2.5
-     */
     public final SerializerAndMapResult findAndAddRootValueSerializer(JavaType type,
             SerializerProvider provider)
         throws JsonMappingException
@@ -127,8 +112,6 @@ public abstract class PropertySerializerMap
      * serializer (possible attached indirectly to a property)
      * Will both find serializer
      * and construct new map instance if warranted, and return both.
-     * 
-     * @since 2.7
      */
     public final SerializerAndMapResult findAndAddKeySerializer(Class<?> type,
             SerializerProvider provider, BeanProperty property)
@@ -141,8 +124,6 @@ public abstract class PropertySerializerMap
     /**
      * Method that can be used to 'register' a serializer that caller has resolved
      * without help of this map.
-     * 
-     * @since 2.5
      */
     public final SerializerAndMapResult addSerializer(Class<?> type, JsonSerializer<Object> serializer) {
         return new SerializerAndMapResult(serializer, newWith(type, serializer));
@@ -163,9 +144,9 @@ public abstract class PropertySerializerMap
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper classes
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -200,9 +181,9 @@ public abstract class PropertySerializerMap
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Implementations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**

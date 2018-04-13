@@ -78,16 +78,12 @@ public class MapEntrySerializer
      * non-null values.
      * Note that inclusion value for Map instance itself is handled by caller (POJO
      * property that refers to the Map value).
-     * 
-     * @since 2.5
      */
     protected final Object _suppressableValue;
 
     /**
      * Flag that indicates what to do with `null` values, distinct from
      * handling of {@link #_suppressableValue}
-     *
-     * @since 2.9
      */
     protected final boolean _suppressNulls;
 
@@ -166,15 +162,11 @@ public class MapEntrySerializer
         final AnnotatedMember propertyAcc = (property == null) ? null : property.getMember();
 
         // First: if we have a property, may have property-annotation overrides
-        if (propertyAcc != null && intr != null) {
-            Object serDef = intr.findKeySerializer(provider.getConfig(), propertyAcc);
-            if (serDef != null) {
-                keySer = provider.serializerInstance(propertyAcc, serDef);
-            }
-            serDef = intr.findContentSerializer(provider.getConfig(), propertyAcc);
-            if (serDef != null) {
-                ser = provider.serializerInstance(propertyAcc, serDef);
-            }
+        if (_neitherNull(propertyAcc, intr)) {
+            keySer = provider.serializerInstance(propertyAcc,
+                    intr.findKeySerializer(provider.getConfig(), propertyAcc));
+            ser = provider.serializerInstance(propertyAcc,
+                    intr.findContentSerializer(provider.getConfig(), propertyAcc));
         }
         if (ser == null) {
             ser = _valueSerializer;
