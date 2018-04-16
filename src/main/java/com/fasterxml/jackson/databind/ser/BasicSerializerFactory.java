@@ -174,11 +174,8 @@ public abstract class BasicSerializerFactory
     /**********************************************************************
      */
     
-    // Implemented by sub-classes
-    @Override
-    public abstract JsonSerializer<Object> createSerializer(SerializerProvider prov,
-            JavaType type)
-        throws JsonMappingException;
+// Implemented by sub-classes
+//    public abstract JsonSerializer<Object> createSerializer(SerializerProvider prov, ....)
 
     @Override
     @SuppressWarnings("unchecked")
@@ -388,7 +385,7 @@ public abstract class BasicSerializerFactory
 
         if (type.isTypeOrSubTypeOf(Number.class)) {
             // 21-May-2014, tatu: Couple of alternatives actually
-            JsonFormat.Value format = beanDesc.findExpectedFormat(null);
+            JsonFormat.Value format = beanDesc.findExpectedFormat();
             if (format != null) {
                 switch (format.getShape()) {
                 case STRING:
@@ -658,7 +655,7 @@ public abstract class BasicSerializerFactory
             if (ser == null) {
                 // We may also want to use serialize Collections "as beans", if (and only if)
                 // this is specified with `@JsonFormat(shape=Object)`
-                JsonFormat.Value format = beanDesc.findExpectedFormat(null);
+                JsonFormat.Value format = beanDesc.findExpectedFormat();
                 if ((format != null) && format.getShape() == JsonFormat.Shape.OBJECT) {
                     return null;
                 }
@@ -748,7 +745,7 @@ public abstract class BasicSerializerFactory
     {
         // [databind#467]: This is where we could allow serialization "as POJO": But! It's
         // nasty to undo, and does not apply on per-property basis. So, hardly optimal
-        JsonFormat.Value format = beanDesc.findExpectedFormat(null);
+        JsonFormat.Value format = beanDesc.findExpectedFormat();
         if ((format != null) && format.getShape() == JsonFormat.Shape.OBJECT) {
             return null;
         }
@@ -858,7 +855,7 @@ public abstract class BasicSerializerFactory
         // [databind#865]: Allow serialization "as POJO" -- note: to undo, declare
         //   serialization as `Shape.NATURAL` instead; that's JSON Object too.
         JsonFormat.Value formatOverride = prov.getDefaultPropertyFormat(Map.Entry.class);
-        JsonFormat.Value formatFromAnnotation = beanDesc.findExpectedFormat(null);
+        JsonFormat.Value formatFromAnnotation = beanDesc.findExpectedFormat();
         JsonFormat.Value format = JsonFormat.Value.merge(formatFromAnnotation, formatOverride);
         if (format.getShape() == JsonFormat.Shape.OBJECT) {
             return null;
@@ -1149,7 +1146,7 @@ public abstract class BasicSerializerFactory
          * POJO style serialization, so we must handle that special case separately;
          * otherwise pass it to EnumSerializer.
          */
-        JsonFormat.Value format = beanDesc.findExpectedFormat(null);
+        JsonFormat.Value format = beanDesc.findExpectedFormat();
         if (format != null && format.getShape() == JsonFormat.Shape.OBJECT) {
             // one special case: suppress serialization of "getDeclaringClass()"...
             ((BasicBeanDescription) beanDesc).removeProperty("declaringClass");
