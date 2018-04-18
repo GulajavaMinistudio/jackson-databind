@@ -26,11 +26,6 @@ public class MapEntrySerializer
     public final static Object MARKER_FOR_EMPTY = JsonInclude.Include.NON_EMPTY;
 
     /**
-     * Map-valued property being serialized with this instance
-     */
-    protected final BeanProperty _property;
-
-    /**
      * Whether static types should be used for serialization of values
      * or not (if not, dynamic runtime type is used)
      */
@@ -58,12 +53,6 @@ public class MapEntrySerializer
      * Type identifier serializer used for values, if any.
      */
     protected final TypeSerializer _valueTypeSerializer;
-
-    /**
-     * If value type cannot be statically determined, mapping from
-     * runtime value types to serializers are stored in this object.
-     */
-    protected PropertySerializerMap _dynamicValueSerializers;
 
     /*
     /**********************************************************************
@@ -97,14 +86,12 @@ public class MapEntrySerializer
             boolean staticTyping, TypeSerializer vts,
             BeanProperty property)
     {
-        super(type);
+        super(type, property);
         _entryType = type;
         _keyType = keyType;
         _valueType = valueType;
         _valueTypeIsStatic = staticTyping;
         _valueTypeSerializer = vts;
-        _property = property;
-        _dynamicValueSerializers = PropertySerializerMap.emptyForProperties();
         _suppressableValue = null;
         _suppressNulls = false;
     }
@@ -115,7 +102,7 @@ public class MapEntrySerializer
             JsonSerializer<?> keySer, JsonSerializer<?> valueSer,
             Object suppressableValue, boolean suppressNulls)
     {
-        super(Map.class, false);
+        super(src, property);
         _entryType = src._entryType;
         _keyType = src._keyType;
         _valueType = src._valueType;
@@ -123,8 +110,6 @@ public class MapEntrySerializer
         _valueTypeSerializer = src._valueTypeSerializer;
         _keySerializer = (JsonSerializer<Object>) keySer;
         _valueSerializer = (JsonSerializer<Object>) valueSer;
-        _dynamicValueSerializers = src._dynamicValueSerializers;
-        _property = src._property;
         _suppressableValue = suppressableValue;
         _suppressNulls = suppressNulls;
     }
@@ -178,7 +163,7 @@ public class MapEntrySerializer
             //   we can consider it a static case as well.
             // 20-Aug-2013, tatu: Need to avoid trying to access serializer for java.lang.Object tho
             if (_valueTypeIsStatic && !_valueType.isJavaLangObject()) {
-                ser = provider.findValueSerializer(_valueType, property);
+                ser = provider.findSecondaryPropertySerializer(_valueType, property);
             }
         }
         if (keySer == null) {
@@ -266,7 +251,7 @@ public class MapEntrySerializer
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider prov, Entry<?, ?> entry)  throws IOException
+    public boolean isEmpty(SerializerProvider ctxt, Entry<?, ?> entry)  throws IOException
     {
         Object value = entry.getValue();
         if (value == null) {
@@ -282,11 +267,11 @@ public class MapEntrySerializer
             Class<?> cc = value.getClass();
             valueSer = _dynamicValueSerializers.serializerFor(cc);
             if (valueSer == null) {
-                valueSer = _findAndAddDynamic(_dynamicValueSerializers, cc, prov);
+                valueSer = _findAndAddDynamic(ctxt, cc);
             }
         }
         if (_suppressableValue == MARKER_FOR_EMPTY) {
-            return valueSer.isEmpty(prov, value);
+            return valueSer.isEmpty(ctxt, value);
         }
         return _suppressableValue.equals(value);
     }
@@ -298,28 +283,28 @@ public class MapEntrySerializer
      */
 
     @Override
-    public void serialize(Map.Entry<?, ?> value, JsonGenerator gen, SerializerProvider provider)
+    public void serialize(Map.Entry<?, ?> value, JsonGenerator g, SerializerProvider ctxt)
         throws IOException
     {
-        gen.writeStartObject(value);
-        serializeDynamic(value, gen, provider);
-        gen.writeEndObject();
+        g.writeStartObject(value);
+        serializeDynamic(value, g, ctxt);
+        g.writeEndObject();
     }
 
     @Override
     public void serializeWithType(Map.Entry<?, ?> value, JsonGenerator g,
-            SerializerProvider provider, TypeSerializer typeSer) throws IOException
+            SerializerProvider ctxt, TypeSerializer typeSer) throws IOException
     {
         // [databind#631]: Assign current value, to be accessible by custom serializers
         g.setCurrentValue(value);
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g,
                 typeSer.typeId(value, JsonToken.START_OBJECT));
-        serializeDynamic(value, g, provider);
+        serializeDynamic(value, g, ctxt);
         typeSer.writeTypeSuffix(g, typeIdDef);
     }
 
     protected void serializeDynamic(Map.Entry<?, ?> value, JsonGenerator gen,
-            SerializerProvider provider)
+            SerializerProvider ctxt)
         throws IOException
     {
         final TypeSerializer vts = _valueTypeSerializer;
@@ -327,7 +312,7 @@ public class MapEntrySerializer
 
         JsonSerializer<Object> keySerializer;
         if (keyElem == null) {
-            keySerializer = provider.findNullKeySerializer(_keyType, _property);
+            keySerializer = ctxt.findNullKeySerializer(_keyType, _property);
         } else {
             keySerializer = _keySerializer;
         }
@@ -339,7 +324,7 @@ public class MapEntrySerializer
             if (_suppressNulls) {
                 return;
             }
-            valueSer = provider.getDefaultNullValueSerializer();
+            valueSer = ctxt.getDefaultNullValueSerializer();
         } else {
             valueSer = _valueSerializer;
             if (valueSer == null) {
@@ -347,17 +332,17 @@ public class MapEntrySerializer
                 valueSer = _dynamicValueSerializers.serializerFor(cc);
                 if (valueSer == null) {
                     if (_valueType.hasGenericTypes()) {
-                        valueSer = _findAndAddDynamic(_dynamicValueSerializers,
-                                provider.constructSpecializedType(_valueType, cc), provider);
+                        valueSer = _findAndAddDynamic(ctxt,
+                                ctxt.constructSpecializedType(_valueType, cc));
                     } else {
-                        valueSer = _findAndAddDynamic(_dynamicValueSerializers, cc, provider);
+                        valueSer = _findAndAddDynamic(ctxt, cc);
                     }
                 }
             }
             // also may need to skip non-empty values:
             if (_suppressableValue != null) {
                 if (_suppressableValue == MARKER_FOR_EMPTY) {
-                    if (valueSer.isEmpty(provider, valueElem)) {
+                    if (valueSer.isEmpty(ctxt, valueElem)) {
                         return;
                     }
                 } if (_suppressableValue.equals(valueElem)) {
@@ -365,42 +350,16 @@ public class MapEntrySerializer
                 }
             }
         }
-        keySerializer.serialize(keyElem, gen, provider);
+        keySerializer.serialize(keyElem, gen, ctxt);
         try {
             if (vts == null) {
-                valueSer.serialize(valueElem, gen, provider);
+                valueSer.serialize(valueElem, gen, ctxt);
             } else {
-                valueSer.serializeWithType(valueElem, gen, provider, vts);
+                valueSer.serializeWithType(valueElem, gen, ctxt, vts);
             }
         } catch (Exception e) {
             String keyDesc = ""+keyElem;
-            wrapAndThrow(provider, e, value, keyDesc);
+            wrapAndThrow(ctxt, e, value, keyDesc);
         }
-    }
-
-    /*
-    /**********************************************************************
-    /* Internal helper methods
-    /**********************************************************************
-     */
-
-    protected final JsonSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
-            Class<?> type, SerializerProvider provider) throws JsonMappingException
-    {
-        PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type, provider, _property);
-        if (map != result.map) {
-            _dynamicValueSerializers = result.map;
-        }
-        return result.serializer;
-    }
-
-    protected final JsonSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
-            JavaType type, SerializerProvider provider) throws JsonMappingException
-    {
-        PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type, provider, _property);
-        if (map != result.map) {
-            _dynamicValueSerializers = result.map;
-        }
-        return result.serializer;
     }
 }

@@ -32,12 +32,12 @@ public abstract class DefaultSerializerProvider
     extends SerializerProvider
     implements java.io.Serializable // only because ObjectWriter needs it
 {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3L;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* State, for non-blueprint instances
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -49,9 +49,9 @@ public abstract class DefaultSerializerProvider
     protected transient ArrayList<ObjectIdGenerator<?>> _objectIdGenerators;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected DefaultSerializerProvider(TokenStreamFactory streamFactory) {
@@ -77,9 +77,9 @@ public abstract class DefaultSerializerProvider
             GeneratorSettings genSettings, SerializerFactory jsf);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Abstract method impls, factory methods
-    /**********************************************************
+    /**********************************************************************
      */
     
     @Override
@@ -157,9 +157,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Object Id handling
-    /**********************************************************
+    /**********************************************************************
      */
     
     @Override
@@ -213,9 +213,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended API: simple accesors
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -229,9 +229,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended API called by ObjectMapper: value serialization
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -249,7 +249,7 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
         }
         final Class<?> cls = value.getClass();
         // true, since we do want to cache root-level typed serializers (ditto for null property)
-        final JsonSerializer<Object> ser = findTypedValueSerializer(cls, true, null);
+        final JsonSerializer<Object> ser = findTypedValueSerializer(cls, true);
         PropertyName rootName = _config.getFullRootName();
         if (rootName == null) { // not explicitly specified
             if (_config.isEnabled(SerializationFeature.WRAP_ROOT_VALUE)) {
@@ -286,7 +286,7 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
             _reportIncompatibleRootType(value, rootType);
         }
         // root value, not reached via property:
-        JsonSerializer<Object> ser = findTypedValueSerializer(rootType, true, null);
+        JsonSerializer<Object> ser = findTypedValueSerializer(rootType, true);
         PropertyName rootName = _config.getFullRootName();
         if (rootName == null) { // not explicitly specified
             if (_config.isEnabled(SerializationFeature.WRAP_ROOT_VALUE)) {
@@ -324,7 +324,7 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
         }
         // root value, not reached via property:
         if (ser == null) {
-            ser = findTypedValueSerializer(rootType, true, null);
+            ser = findTypedValueSerializer(rootType, true);
         }
         PropertyName rootName = _config.getFullRootName();
         if (rootName == null) { // not explicitly specified
@@ -345,8 +345,6 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     /**
      * Alternate serialization call used for polymorphic types, when {@link TypeSerializer}
      * is already known, but the actual serializer may or may not be.
-     *
-     * @since 2.6
      */
     public void serializePolymorphic(JsonGenerator gen, Object value, JavaType rootType,
             JsonSerializer<Object> valueSer, TypeSerializer typeSer)
@@ -368,9 +366,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
          */
         if (valueSer == null) {
             if ((rootType != null) && rootType.isContainerType()) {
-                valueSer = findValueSerializer(rootType, null);
+                valueSer = handleRootContextualization(findValueSerializer(rootType));
             } else {
-                valueSer = findValueSerializer(value.getClass(), null);
+                valueSer = handleRootContextualization(findValueSerializer(value.getClass()));
             }
         }
 
@@ -450,9 +448,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     }
 
     /*
-    /********************************************************
+    /**********************************************************************
     /* Access to caching details
-    /********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -481,9 +479,9 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended API called by ObjectMapper: other
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -499,17 +497,16 @@ filter.getClass().getName(), t.getClass().getName(), t.getMessage());
         if (javaType == null) {
             throw new IllegalArgumentException("A class must be provided");
         }
-        /* no need for embedded type information for JSON schema generation (all
-         * type information it needs is accessible via "untyped" serializer)
-         */
+        // no need for embedded type information for JSON schema generation (all
+        // type information it needs is accessible via "untyped" serializer)
         visitor.setProvider(this);
-        findValueSerializer(javaType, null).acceptJsonFormatVisitor(visitor, javaType);
+        findRootValueSerializer(javaType).acceptJsonFormatVisitor(visitor, javaType);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper classes
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**

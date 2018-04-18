@@ -25,12 +25,12 @@ import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 public class CollectionSerializer
     extends AsArraySerializerBase<Collection<?>>
 {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3L;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     public CollectionSerializer(JavaType elemType, boolean staticTyping, TypeSerializer vts,
@@ -57,9 +57,9 @@ public class CollectionSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -73,9 +73,9 @@ public class CollectionSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Actual serialization
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -96,17 +96,17 @@ public class CollectionSerializer
     }
     
     @Override
-    public void serializeContents(Collection<?> value, JsonGenerator g, SerializerProvider provider) throws IOException
+    public void serializeContents(Collection<?> value, JsonGenerator g, SerializerProvider ctxt) throws IOException
     {
         if (_elementSerializer != null) {
-            serializeContentsUsing(value, g, provider, _elementSerializer);
+            serializeContentsUsing(value, g, ctxt, _elementSerializer);
             return;
         }
         Iterator<?> it = value.iterator();
         if (!it.hasNext()) {
             return;
         }
-        PropertySerializerMap serializers = _dynamicSerializers;
+        PropertySerializerMap serializers = _dynamicValueSerializers;
         final TypeSerializer typeSer = _valueTypeSerializer;
 
         int i = 0;
@@ -114,29 +114,28 @@ public class CollectionSerializer
             do {
                 Object elem = it.next();
                 if (elem == null) {
-                    provider.defaultSerializeNullValue(g);
+                    ctxt.defaultSerializeNullValue(g);
                 } else {
                     Class<?> cc = elem.getClass();
                     JsonSerializer<Object> serializer = serializers.serializerFor(cc);
                     if (serializer == null) {
                         if (_elementType.hasGenericTypes()) {
-                            serializer = _findAndAddDynamic(serializers,
-                                    provider.constructSpecializedType(_elementType, cc), provider);
+                            serializer = _findAndAddDynamic(ctxt, ctxt.constructSpecializedType(_elementType, cc));
                         } else {
-                            serializer = _findAndAddDynamic(serializers, cc, provider);
+                            serializer = _findAndAddDynamic(ctxt, cc);
                         }
-                        serializers = _dynamicSerializers;
+                        serializers = _dynamicValueSerializers;
                     }
                     if (typeSer == null) {
-                        serializer.serialize(elem, g, provider);
+                        serializer.serialize(elem, g, ctxt);
                     } else {
-                        serializer.serializeWithType(elem, g, provider, typeSer);
+                        serializer.serializeWithType(elem, g, ctxt, typeSer);
                     }
                 }
                 ++i;
             } while (it.hasNext());
         } catch (Exception e) {
-            wrapAndThrow(provider, e, value, i);
+            wrapAndThrow(ctxt, e, value, i);
         }
     }
 

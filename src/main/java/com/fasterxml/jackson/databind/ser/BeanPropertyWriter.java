@@ -686,8 +686,6 @@ public class BeanPropertyWriter extends PropertyWriter // which extends
      * Alternative to {@link #serializeAsField} that is used when a POJO is
      * serialized as JSON Array; the difference is that no field names are
      * written.
-     * 
-     * @since 2.3
      */
     @Override
     public void serializeAsElement(Object bean, JsonGenerator gen,
@@ -768,7 +766,8 @@ public class BeanPropertyWriter extends PropertyWriter // which extends
     // Also part of BeanProperty implementation
     @Override
     public void depositSchemaProperty(JsonObjectFormatVisitor v,
-            SerializerProvider provider) throws JsonMappingException {
+            SerializerProvider provider) throws JsonMappingException
+    {
         if (v != null) {
             if (isRequired()) {
                 v.property(this);
@@ -779,9 +778,9 @@ public class BeanPropertyWriter extends PropertyWriter // which extends
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected JsonSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
