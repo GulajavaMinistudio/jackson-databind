@@ -116,8 +116,8 @@ public class BeanSerializerFactory
      */
     @Override
     @SuppressWarnings("unchecked")
-    public JsonSerializer<Object> createSerializer(SerializerProvider ctxt,
-            BeanDescription beanDesc, JavaType origType, JsonFormat.Value format)
+    public JsonSerializer<Object> createSerializer(SerializerProvider ctxt, JavaType origType,
+            BeanDescription beanDesc, JsonFormat.Value format)
         throws JsonMappingException
     {
         // Very first thing, let's check if there is explicit serializer annotation:
@@ -170,8 +170,8 @@ public class BeanSerializerFactory
     }
 
     protected JsonSerializer<?> _createSerializer2(SerializerProvider ctxt,
-            BeanDescription beanDesc, JavaType type,
-            JsonFormat.Value format, boolean staticTyping)
+            BeanDescription beanDesc, JavaType type, JsonFormat.Value format,
+            boolean staticTyping)
         throws JsonMappingException
     {
         JsonSerializer<?> ser = null;
@@ -184,7 +184,7 @@ public class BeanSerializerFactory
                 staticTyping = usesStaticTyping(config, beanDesc, null);
             }
             // 03-Aug-2012, tatu: As per [databind#40], may require POJO serializer...
-            ser =  buildContainerSerializer(ctxt, type, beanDesc, staticTyping);
+            ser =  buildContainerSerializer(ctxt, type, beanDesc, format, staticTyping);
             // Will return right away, since called method does post-processing:
             if (ser != null) {
                 return ser;
