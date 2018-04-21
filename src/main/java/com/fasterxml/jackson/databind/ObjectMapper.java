@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
-import com.fasterxml.jackson.databind.jsontype.*;
+import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.node.*;
 import com.fasterxml.jackson.databind.ser.*;
 import com.fasterxml.jackson.databind.type.*;
@@ -93,9 +93,9 @@ public class ObjectMapper
     private static final long serialVersionUID = 3L;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper classes, enums
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -135,6 +135,12 @@ public class ObjectMapper
                 super(b);
             }
 
+            /* 20-Apr-2018, tatu: This may look weird, but it's "trampoline" approach in which
+             *   `ObjectMapper` instances are actually serializer as `MapperBuilderState` and thus
+             *   need to be transmorphed back into mapper instance. So that's ... what's going on
+             *   in here -- state is frozen or hibernating version of `ObjectMapper` (for JDK)
+             *   OR `MapperBuilder` (in-memory)
+             */
             @Override
             protected Object readResolve() {
                 return new Builder(this).build();
@@ -143,9 +149,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal constants, singletons
-    /**********************************************************
+    /**********************************************************************
      */
     
     // Quick little shortcut, to avoid having to use global TypeFactory instance...
@@ -156,9 +162,9 @@ public class ObjectMapper
 //            TypeFactory.defaultInstance().constructType(JsonNode.class);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration settings, shared
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -179,91 +185,48 @@ public class ObjectMapper
      */
     protected final InjectableValues _injectableValues;
 
-    /**
-     * Thing used for registering sub-types, resolving them to
-     * super/sub-types as needed.
-     */
-    protected final SubtypeResolver _subtypeResolver;
-
-    /**
-     * Currently active per-type configuration overrides, accessed by
-     * declared type of property.
-     */
-    protected final ConfigOverrides _configOverrides;
-
     /*
-    /**********************************************************
-    /* Configuration settings: mix-in annotations
-    /**********************************************************
-     */
-
-    /**
-     * Mapping that defines how to apply mix-in annotations: key is
-     * the type to received additional annotations, and value is the
-     * type that has annotations to "mix in".
-     *<p>
-     * Annotations associated with the value classes will be used to
-     * override annotations of the key class, associated with the
-     * same field or method. They can be further masked by sub-classes:
-     * you can think of it as injecting annotations between the target
-     * class and its sub-classes (or interfaces)
-     */
-    protected final MixInHandler _mixIns;
-
-    /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration settings, serialization
-    /**********************************************************
+    /**********************************************************************
      */
 
-    // !!! TODO 15-Mar-2018: Only mutable for Default Typing
     /**
-     * Configuration object that defines basic global
-     * settings for the serialization process
-     */
-    protected SerializationConfig _serializationConfig;
-
-    /**
-     * Object that manages access to serializers used for serialization,
-     * including caching.
-     * It is configured with {@link #_serializerFactory} to allow
-     * for constructing custom serializers.
+     * Factory used for constructing per-call {@link SerializerProvider}s.
      *<p>
      * Note: while serializers are only exposed {@link SerializerProvider},
      * mappers and readers need to access additional API defined by
      * {@link DefaultSerializerProvider}
      */
-    protected final DefaultSerializerProvider _serializerProvider;
+    protected final SerializationContexts _serializationContexts;
 
-    /**
-     * Serializer factory used for constructing serializers.
-     */
-    protected final SerializerFactory _serializerFactory;
-
-    /*
-    /**********************************************************
-    /* Configuration settings, deserialization
-    /**********************************************************
-     */
-
-    // !!! TODO 15-Mar-2018: Only mutable for Default Typing
     /**
      * Configuration object that defines basic global
      * settings for the serialization process
      */
-    protected DeserializationConfig _deserializationConfig;
-
-    /**
-     * Blueprint context object; stored here to allow custom
-     * sub-classes. Contains references to objects needed for
-     * deserialization construction (cache, factory).
-     */
-    protected final DefaultDeserializationContext _deserializationContext;
+    protected final SerializationConfig _serializationConfig;
 
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* Configuration settings, deserialization
+    /**********************************************************************
+     */
+
+    /**
+     * Factory used for constructing per-call {@link DeserializationContext}s.
+     */
+    protected final DeserializationContexts _deserializationContexts;
+
+    /**
+     * Configuration object that defines basic global
+     * settings for the serialization process
+     */
+    protected final DeserializationConfig _deserializationConfig;
+
+    /*
+    /**********************************************************************
     /* Caching
-    /**********************************************************
+    /**********************************************************************
      */
 
     /* Note: handling of serializers and deserializers is not symmetric;
@@ -292,9 +255,9 @@ public class ObjectMapper
         = new ConcurrentHashMap<JavaType, JsonDeserializer<Object>>(64, 0.6f, 2);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Saved state to allow re-building
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -342,41 +305,61 @@ public class ObjectMapper
      */
     protected ObjectMapper(MapperBuilder<?,?> builder)
     {
-        // First things first: finalize building process:
+        // First things first: finalize building process. Saved state
+        // consists of snapshots and is safe to keep references to; used
+        // for rebuild()ing mapper instances
+
         _savedBuilderState = builder.saveStateApplyModules();
 
+        // But we will ALSO need to take snapshot of anything builder has,
+        // in case caller keeps on tweaking with builder. So rules are the
+        // as with above call, or when creating new builder for rebuild()ing
+        
         // General framework factories
         _streamFactory = builder.streamFactory();
-        // bit tricky as we do NOT want to expose simple accessors (to a mutable thing)
+        final ConfigOverrides configOverrides;
         {
+            // bit tricky as we do NOT want to expose simple accessors (to a mutable thing)
             final AtomicReference<ConfigOverrides> ref = new AtomicReference<>();
             builder.withAllConfigOverrides(overrides -> ref.set(overrides));
-            _configOverrides = ref.get();
+            configOverrides = Snapshottable.takeSnapshot(ref.get());
         }
-        // general type handling
-        _typeFactory = builder.typeFactory();
 
-        _subtypeResolver = builder.subtypeResolver();
-        
-        // Ser/deser framework factories
-        _serializerProvider = builder.serializerProvider();
-        _serializerFactory = builder.serializerFactory();
+        // Handlers, introspection
+        _typeFactory =  Snapshottable.takeSnapshot(builder.typeFactory());
+        ClassIntrospector classIntr = builder.classIntrospector().forMapper(this);
+        SubtypeResolver subtypeResolver =  Snapshottable.takeSnapshot(builder.subtypeResolver());
+        MixInHandler mixIns = (MixInHandler) Snapshottable.takeSnapshot(builder.mixInHandler());
+        // NOTE: TypeResolverProvider apparently ok without snapshot, hence config objects fetch
+        // it directly from MapperBuilder, not passed by us.
 
-        _deserializationContext = builder.deserializationContext();
-        _injectableValues = builder.injectableValues();
+        // Serialization factories
+        _serializationContexts = builder.serializationContexts()
+                .forMapper(this, _streamFactory, builder.serializerFactory());
+
+        // Deserialization factories
+
+        _deserializationContexts = builder.deserializationContexts()
+                .forMapper(this, _streamFactory, builder.deserializerFactory());
+        _injectableValues = Snapshottable.takeSnapshot(builder.injectableValues());
+
+        // And then finalize serialization/deserialization Config containers
 
         RootNameLookup rootNames = new RootNameLookup();
-
-        _mixIns = builder.mixInHandler();
-        _serializationConfig = builder.buildSerializationConfig(_mixIns, rootNames);
-        _deserializationConfig = builder.buildDeserializationConfig(_mixIns, rootNames);
+        FilterProvider filterProvider = Snapshottable.takeSnapshot(builder.filterProvider());
+        _deserializationConfig = builder.buildDeserializationConfig(configOverrides,
+                mixIns, _typeFactory, classIntr, subtypeResolver,
+                rootNames);
+        _serializationConfig = builder.buildSerializationConfig(configOverrides,
+                mixIns, _typeFactory, classIntr, subtypeResolver,
+                rootNames, filterProvider);
     }
 
     // 16-Feb-2018, tatu: Arggghh. Due to Java Type Erasure rules, override, even static methods
     //    are apparently bound to compatibility rules (despite them not being real overrides at all).
     //    And because there is no "JsonMapper" we need to use odd weird typing here. Instead of simply
     //    using `MapperBuilder` we already go
-    
+
     /**
      * Short-cut for:
      *<pre>
@@ -1189,9 +1172,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API: Tree Model support
-    /**********************************************************
+    /**********************************************************************
      */
 
     public void writeTree(JsonGenerator g, TreeNode rootNode)
@@ -1339,9 +1322,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
-    /* Public API, deserialization,
-    /**********************************************************
+    /**********************************************************************
+    /* Public API, deserialization (ext format to Java Objects)
+    /**********************************************************************
      */
 
     /**
@@ -1646,10 +1629,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
-    /* Public API: serialization
-    /* (mapping from Java types to JSON)
-    /**********************************************************
+    /**********************************************************************
+    /* Public API: serialization (mapping from Java types to external format)
+    /**********************************************************************
      */
 
     /**
@@ -1820,10 +1802,10 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API: constructing ObjectWriters
     /* for more advanced configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1968,10 +1950,10 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended Public API: constructing ObjectReaders
     /* for more advanced configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -2106,9 +2088,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended Public API: convenience type conversion
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -2294,9 +2276,9 @@ public class ObjectMapper
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended Public API: JSON Schema generation
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -2351,14 +2333,14 @@ public class ObjectMapper
      */
     protected DefaultSerializerProvider _serializerProvider(SerializationConfig config) {
         // 03-Oct-2017, tatu: Should be ok to pass "empty" generator settings...
-        return _serializerProvider.createInstance(config,
-                GeneratorSettings.empty(), _serializerFactory);
+        return _serializationContexts.createContext(config,
+                GeneratorSettings.empty());
     }
 
     protected DefaultSerializerProvider _serializerProvider() {
         // 03-Oct-2017, tatu: Should be ok to pass "empty" generator settings...
-        return _serializerProvider.createInstance(serializationConfig(),
-                GeneratorSettings.empty(), _serializerFactory);
+        return _serializationContexts.createContext(serializationConfig(),
+                GeneratorSettings.empty());
     }
 
     /*
@@ -2516,19 +2498,19 @@ public class ObjectMapper
      * Can be overridden if a custom context is needed.
      */
     protected DefaultDeserializationContext createDeserializationContext(JsonParser p) {
-        return _deserializationContext.createInstance(deserializationConfig(),
+        return _deserializationContexts.createContext(deserializationConfig(),
                 /* FormatSchema */ null, _injectableValues)
                 .assignParser(p);
     }
 
     protected DefaultDeserializationContext createDeserializationContext() {
-        return _deserializationContext.createInstance(deserializationConfig(),
+        return _deserializationContexts.createContext(deserializationConfig(),
                 /* FormatSchema */ null, _injectableValues);
     }
 
     protected DefaultDeserializationContext createDeserializationContext(DeserializationConfig config,
             JsonParser p) {
-        return _deserializationContext.createInstance(config,
+        return _deserializationContexts.createContext(config,
                 /* FormatSchema */ null, _injectableValues)
                 .assignParser(p);
     }

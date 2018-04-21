@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.ResolvedType;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
+import com.fasterxml.jackson.databind.cfg.DeserializationContexts;
 import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -41,10 +42,9 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  * should be extended by sub-classing.
  */
 public class ObjectReader
-    implements Versioned, java.io.Serializable
+    implements Versioned
+    // NOTE: since 3.x, NO LONGER JDK Serializable
 {
-    private static final long serialVersionUID = 3L;
-
     protected final static JavaType JSON_NODE_TYPE = SimpleType.constructUnsafe(JsonNode.class);
 
     /*
@@ -63,7 +63,7 @@ public class ObjectReader
      * Blueprint instance of deserialization context; used for creating
      * actual instance when needed.
      */
-    protected final DefaultDeserializationContext _context;
+    protected final DeserializationContexts _contexts;
 
     /**
      * Factory used for constructing {@link JsonParser}s
@@ -160,7 +160,7 @@ public class ObjectReader
             FormatSchema schema, InjectableValues injectableValues)
     {
         _config = config;
-        _context = mapper._deserializationContext;
+        _contexts = mapper._deserializationContexts;
         _rootDeserializers = mapper._rootDeserializers;
         _parserFactory = mapper._streamFactory;
         _valueType = valueType;
@@ -181,7 +181,7 @@ public class ObjectReader
             FormatSchema schema, InjectableValues injectableValues)
     {
         _config = config;
-        _context = base._context;
+        _contexts = base._contexts;
 
         _rootDeserializers = base._rootDeserializers;
         _parserFactory = base._parserFactory;
@@ -201,7 +201,7 @@ public class ObjectReader
     protected ObjectReader(ObjectReader base, DeserializationConfig config)
     {
         _config = config;
-        _context = base._context;
+        _contexts = base._contexts;
 
         _rootDeserializers = base._rootDeserializers;
         _parserFactory = base._parserFactory;
@@ -217,7 +217,7 @@ public class ObjectReader
 
     protected ObjectReader(ObjectReader base, TokenFilter filter) {
         _config = base._config;
-        _context = base._context;
+        _contexts = base._contexts;
         _rootDeserializers = base._rootDeserializers;
         _parserFactory = base._parserFactory;
         _valueType = base._valueType;
@@ -1635,14 +1635,14 @@ public class ObjectReader
      * Can be overridden if a custom context is needed.
      */
     protected DefaultDeserializationContext createDeserializationContext() {
-        return _context.createInstance(_config, _schema, _injectableValues);
+        return _contexts.createContext(_config, _schema, _injectableValues);
     }
 
     protected DefaultDeserializationContext createDeserializationContext(JsonParser p) {
-        return _context.createInstance(_config, _schema, _injectableValues)
+        return _contexts.createContext(_config, _schema, _injectableValues)
                 .assignParser(p);
     }
-    
+
     protected InputStream _inputStream(URL src) throws IOException {
         return src.openStream();
     }

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.*;
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.cfg.GeneratorSettings;
+import com.fasterxml.jackson.databind.cfg.SerializationContexts;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -31,14 +32,13 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  * reused in completely thread-safe manner with no explicit synchronization
  */
 public class ObjectWriter
-    implements Versioned, java.io.Serializable
+    implements Versioned
+    // NOTE: since 3.x, NO LONGER JDK Serializable
 {
-    private static final long serialVersionUID = 1;
-
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Immutable configuration from ObjectMapper
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -46,9 +46,14 @@ public class ObjectWriter
      */
     protected final SerializationConfig _config;
 
-    protected final DefaultSerializerProvider _serializerProvider;
-
-    protected final SerializerFactory _serializerFactory;
+    /**
+     * Factory used for constructing per-call {@link SerializerProvider}s.
+     *<p>
+     * Note: while serializers are only exposed {@link SerializerProvider},
+     * mappers and readers need to access additional API defined by
+     * {@link DefaultSerializerProvider}
+     */
+    protected final SerializationContexts _serializationContexts;
 
     /**
      * Factory used for constructing {@link JsonGenerator}s
@@ -56,9 +61,9 @@ public class ObjectWriter
     protected final TokenStreamFactory _generatorFactory;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration that can be changed via mutant factories
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -76,9 +81,9 @@ public class ObjectWriter
     protected final Prefetch _prefetch;
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, constructors
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -88,8 +93,7 @@ public class ObjectWriter
             JavaType rootType, PrettyPrinter pp)
     {
         _config = config;
-        _serializerProvider = mapper._serializerProvider;
-        _serializerFactory = mapper._serializerFactory;
+        _serializationContexts = mapper._serializationContexts;
         _generatorFactory = mapper._streamFactory;
         _generatorSettings = (pp == null) ? GeneratorSettings.empty
                 : new GeneratorSettings(pp, null, null, null);
@@ -109,8 +113,7 @@ public class ObjectWriter
     protected ObjectWriter(ObjectMapper mapper, SerializationConfig config)
     {
         _config = config;
-        _serializerProvider = mapper._serializerProvider;
-        _serializerFactory = mapper._serializerFactory;
+        _serializationContexts = mapper._serializationContexts;
         _generatorFactory = mapper._streamFactory;
 
         _generatorSettings = GeneratorSettings.empty;
@@ -125,8 +128,7 @@ public class ObjectWriter
     {
         _config = config;
 
-        _serializerProvider = mapper._serializerProvider;
-        _serializerFactory = mapper._serializerFactory;
+        _serializationContexts = mapper._serializationContexts;
         _generatorFactory = mapper._streamFactory;
 
         _generatorSettings = (s == null) ? GeneratorSettings.empty
@@ -142,8 +144,7 @@ public class ObjectWriter
     {
         _config = config;
 
-        _serializerProvider = base._serializerProvider;
-        _serializerFactory = base._serializerFactory;
+        _serializationContexts = base._serializationContexts;
         _generatorFactory = base._generatorFactory;
 
         _generatorSettings = genSettings;
@@ -157,8 +158,7 @@ public class ObjectWriter
     {
         _config = config;
 
-        _serializerProvider = base._serializerProvider;
-        _serializerFactory = base._serializerFactory;
+        _serializationContexts = base._serializationContexts;
         _generatorFactory = base._generatorFactory;
 
         _generatorSettings = base._generatorSettings;
@@ -175,10 +175,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
-    /* Methods sub-classes MUST override, used for constructing
-    /* writer instances, (re)configuring parser instances.
-    /**********************************************************
+    /**********************************************************************
+    /* Helper methdos to simplify mutant-factory implementation
+    /**********************************************************************
      */
 
     /**
@@ -217,9 +216,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factories for SerializationFeature
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -271,9 +270,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factories for JsonGenerator.Feature
-    /**********************************************************
+    /**********************************************************************
      */
 
     public ObjectWriter with(JsonGenerator.Feature feature)  {
@@ -293,9 +292,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factories for FormatFeature
-    /**********************************************************
+    /**********************************************************************
      */
 
     public ObjectWriter with(FormatFeature feature)  {
@@ -315,9 +314,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factories, type-related
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -354,9 +353,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle, fluent factories, other
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -502,10 +501,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
-    /* Public API: constructing Generator that are properly linked
-    /* to `ObjectWriteContext`
-    /**********************************************************
+    /**********************************************************************
+    /* Public API: constructing Generator that are properly linked to `ObjectWriteContext`
+    /**********************************************************************
      */
 
     /**
@@ -570,9 +568,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Convenience methods for JsonNode creation
-    /**********************************************************
+    /**********************************************************************
      */
 
     public ObjectNode createObjectNode() {
@@ -584,9 +582,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory methods for sequence writers
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -745,9 +743,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Simple accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     public boolean isEnabled(SerializationFeature f) {
@@ -802,9 +800,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization methods; ones from ObjectCodec first
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -836,9 +834,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization methods, others
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -987,9 +985,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Other public methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1015,9 +1013,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Overridable helper methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -1025,14 +1023,13 @@ public class ObjectWriter
      * {@link SerializerProvider} to use for serialization.
      */
     protected final DefaultSerializerProvider _serializerProvider() {
-        return _serializerProvider.createInstance(_config, _generatorSettings,
-                _serializerFactory);
+        return _serializationContexts.createContext(_config, _generatorSettings);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected void _verifySchemaType(FormatSchema schema)
@@ -1046,9 +1043,9 @@ public class ObjectWriter
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper classes for configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**

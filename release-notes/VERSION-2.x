@@ -8,9 +8,16 @@ Project: jackson-databind
 
 #1565: Deserialization failure with Polymorphism using JsonTypeInfo `defaultImpl`,
   subtype as target
+#1964: Failed to specialize `Map` type during serialization where key type
+  incompatibility overidden via "raw" types
+ (reported by ptirador@github)
+#1990: MixIn `@JsonProperty` for `Object.hashCode()` is ignored
+ (reported by Freddy B)
 #1998: Removing "type" attribute with Mixin not taken in account if
   using ObjectMapper.copy()
  (reported by SBKila@github)
+#1999: "Duplicate property" issue should mention which class it complains about
+ (reported by Ondrej Z)
 
 2.9.5 (26-Mar-2018)
 

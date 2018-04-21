@@ -7,14 +7,12 @@ import com.fasterxml.jackson.core.TokenStreamFactory;
 import com.fasterxml.jackson.core.util.Snapshottable;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.deser.DeserializerFactory;
 import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
 import com.fasterxml.jackson.databind.introspect.MixInHandler;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.jsontype.TypeResolverProvider;
-import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.SerializerFactory;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -83,8 +81,8 @@ public abstract class MapperBuilderState
     /**********************************************************************
      */
 
+    protected final SerializationContexts _serializationContexts;
     protected final SerializerFactory _serializerFactory;
-    protected final DefaultSerializerProvider _serializerProvider;
     protected final FilterProvider _filterProvider;
     protected final PrettyPrinter _defaultPrettyPrinter;
 
@@ -94,8 +92,8 @@ public abstract class MapperBuilderState
     /**********************************************************************
      */
 
+    protected final DeserializationContexts _deserializationContexts;
     protected final DeserializerFactory _deserializerFactory;
-    protected final DefaultDeserializationContext _deserializationContext;
     protected final InjectableValues _injectableValues;
 
     /**
@@ -112,15 +110,18 @@ public abstract class MapperBuilderState
     /**********************************************************************
      */
 
+    /**
+     * Constructor called when "saving" state of mapper, to be used as base for
+     * {@link ObjectMapper#rebuild()} functionality.
+     */
     public MapperBuilderState(MapperBuilder<?,?> src)
     {
         // Basic settings
-
         _baseSettings = src._baseSettings; // immutable
         _streamFactory = src._streamFactory; // immutable
         _configOverrides = Snapshottable.takeSnapshot(src._configOverrides);
 
-        // Feature flags
+        // Feature flags (simple ints, no copy needed)
         _mapperFeatures = src._mapperFeatures;
         _serFeatures = src._serFeatures;
         _deserFeatures = src._deserFeatures;
@@ -130,21 +131,21 @@ public abstract class MapperBuilderState
         _formatGeneratorFeatures = src._formatGeneratorFeatures;
 
         // Handlers, introspection
-        _typeFactory = src._typeFactory;
-        _classIntrospector = Snapshottable.takeSnapshot(src._classIntrospector);
+        _typeFactory = Snapshottable.takeSnapshot(src._typeFactory);
+        _classIntrospector = src._classIntrospector; // no snapshot needed (uses `forMapper()`)
         _typeResolverProvider = src._typeResolverProvider;
         _subtypeResolver = Snapshottable.takeSnapshot(src._subtypeResolver);
         _mixInHandler = (MixInHandler) Snapshottable.takeSnapshot(src._mixInHandler);
 
         // Factories for serialization
         _serializerFactory = src._serializerFactory;
-        _serializerProvider = src._serializerProvider;
-        _filterProvider = src._filterProvider;
+        _serializationContexts = src._serializationContexts; // no snapshot needed (uses `forMapper()`)
+        _filterProvider = Snapshottable.takeSnapshot(src._filterProvider);
         _defaultPrettyPrinter = src._defaultPrettyPrinter;
-        
+
         // Factories for deserialization
         _deserializerFactory = src._deserializerFactory;
-        _deserializationContext = src._deserializationContext;
+        _deserializationContexts = src._deserializationContexts;
         _injectableValues = Snapshottable.takeSnapshot(src._injectableValues);
         // assume our usage of LinkedNode-based list is immutable here (should be)
         _problemHandlers = src._problemHandlers;

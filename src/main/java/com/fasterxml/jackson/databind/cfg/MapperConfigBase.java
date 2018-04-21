@@ -111,15 +111,15 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
      * that of creating fluent copies)
      */
     protected MapperConfigBase(MapperBuilder<?,?> b, int mapperFeatures,
-            MixInHandler mixins, RootNameLookup rootNames,
-            ConfigOverrides configOverrides)
+            TypeFactory tf, ClassIntrospector classIntr, MixInHandler mixins, SubtypeResolver str,
+            ConfigOverrides configOverrides, RootNameLookup rootNames)
     {
         super(b.baseSettings(), mapperFeatures);
 
-        _typeFactory = b.typeFactory();
-        _classIntrospector = b.classIntrospector();
+        _typeFactory = tf;
+        _classIntrospector = classIntr;
         _typeResolverProvider = b.typeResolverProvider();
-        _subtypeResolver = b.subtypeResolver();
+        _subtypeResolver = str;
 
         _mixIns = mixins;
         _rootNames = rootNames;

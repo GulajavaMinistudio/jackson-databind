@@ -140,13 +140,13 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
-    protected SerializerFactory _serializerFactory;
-
     /**
-     * Prototype {@link SerializerProvider} to use for creating per-operation providers.
+     * {@link SerializationContexts} to use as factory for stateful {@link SerializerProvider}s
      */
-    protected DefaultSerializerProvider _serializerProvider;
+    protected SerializationContexts _serializationContexts;
 
+    protected SerializerFactory _serializerFactory;
+    
     protected FilterProvider _filterProvider;
 
     protected PrettyPrinter _defaultPrettyPrinter;
@@ -157,12 +157,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
-    protected DeserializerFactory _deserializerFactory;
-
     /**
-     * Prototype (about same as factory) to use for creating per-operation contexts.
+     * Factory to use for creating per-operation contexts.
      */
-    protected DefaultDeserializationContext _deserializationContext;
+    protected DeserializationContexts _deserializationContexts;
+
+    protected DeserializerFactory _deserializerFactory;
 
     /**
      * Provider for values to inject in deserialized POJOs.
@@ -271,11 +271,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _mixInHandler = null;
 
         _serializerFactory = null;
-        _serializerProvider = null;
+        _serializationContexts = null;
         _filterProvider = null;
 
         _deserializerFactory = null;
-        _deserializationContext = null;
+        _deserializationContexts = null;
         _injectableValues = null;
 
         _problemHandlers = null;
@@ -302,21 +302,22 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _serFeatures = state._serFeatures;
 
         // Handlers, introspection
-        _typeFactory = state._typeFactory;
-        _classIntrospector = Snapshottable.takeSnapshot(state._classIntrospector);
+        _typeFactory = Snapshottable.takeSnapshot(state._typeFactory);
+
+        _classIntrospector = state._classIntrospector;
         _typeResolverProvider = state._typeResolverProvider;
         _subtypeResolver = Snapshottable.takeSnapshot(state._subtypeResolver);
         _mixInHandler = (MixInHandler) Snapshottable.takeSnapshot(state._mixInHandler);
 
         // Factories for serialization
+        _serializationContexts = state._serializationContexts;
         _serializerFactory = state._serializerFactory;
-        _serializerProvider = state._serializerProvider;
         _filterProvider = state._filterProvider;
         _defaultPrettyPrinter = state._defaultPrettyPrinter;
 
         // Factories for deserialization
+        _deserializationContexts = state._deserializationContexts;
         _deserializerFactory = state._deserializerFactory;
-        _deserializationContext = state._deserializationContext;
         _injectableValues = Snapshottable.takeSnapshot(state._injectableValues);
         _problemHandlers = state._problemHandlers;
         _abstractTypeResolvers = state._abstractTypeResolvers;
@@ -332,6 +333,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         }
     }
 
+    /*
     protected MapperBuilder(MapperBuilder<?,?> base)
     {
         _streamFactory = base._streamFactory;
@@ -354,7 +356,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _mixInHandler = base._mixInHandler;
 
         _serializerFactory = base._serializerFactory;
-        _serializerProvider = base._serializerProvider;
+        _serializationContexts = base._serializationContexts;
         _filterProvider = base._filterProvider;
 
         _deserializerFactory = base._deserializerFactory;
@@ -363,6 +365,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
         _problemHandlers = base._problemHandlers;
     }
+    */
 
     /*
     /**********************************************************************
@@ -408,20 +411,26 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
     
-    public SerializationConfig buildSerializationConfig(MixInHandler mixins,
-            RootNameLookup rootNames)
+    public SerializationConfig buildSerializationConfig(ConfigOverrides configOverrides,
+            MixInHandler mixins, TypeFactory tf, ClassIntrospector classIntr, SubtypeResolver str,
+            RootNameLookup rootNames,
+            FilterProvider filterProvider)
     {
         return new SerializationConfig(this,
                 _mapperFeatures, _serFeatures, _generatorFeatures, _formatGeneratorFeatures,
-                mixins, rootNames, _configOverrides);
+                configOverrides,
+                tf, classIntr, mixins, str, rootNames,
+                filterProvider);
     }
 
-    public DeserializationConfig buildDeserializationConfig(MixInHandler mixins,
+    public DeserializationConfig buildDeserializationConfig(ConfigOverrides configOverrides,
+            MixInHandler mixins, TypeFactory tf, ClassIntrospector classIntr, SubtypeResolver str,
             RootNameLookup rootNames)
     {
         return new DeserializationConfig(this,
                 _mapperFeatures, _deserFeatures, _parserFeatures, _formatParserFeatures,
-                mixins, rootNames, _configOverrides,
+                configOverrides,
+                tf, classIntr, mixins, str, rootNames,
                 _abstractTypeResolvers);
     }
 
@@ -550,6 +559,21 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
+    public SerializationContexts serializationContexts() {
+        if (_serializationContexts == null) {
+            _serializationContexts = _defaultSerializationContexts();
+        }
+        return _serializationContexts;
+    }
+
+    /**
+     * Overridable method for changing default {@link SerializerProvider} prototype
+     * to use.
+     */
+    protected SerializationContexts _defaultSerializationContexts() {
+        return new SerializationContexts.DefaultImpl();
+    }
+
     public SerializerFactory serializerFactory() {
         if (_serializerFactory == null) {
             _serializerFactory = _defaultSerializerFactory();
@@ -559,21 +583,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected SerializerFactory _defaultSerializerFactory() {
         return BeanSerializerFactory.instance;
-    }
-
-    public DefaultSerializerProvider serializerProvider() {
-        if (_serializerProvider == null) {
-            _serializerProvider = _defaultSerializerProvider();
-        }
-        return _serializerProvider;
-    }
-
-    /**
-     * Overridable method for changing default {@link SerializerProvider} prototype
-     * to use.
-     */
-    protected DefaultSerializerProvider _defaultSerializerProvider() {
-        return new DefaultSerializerProvider.Impl(_streamFactory);
     }
 
     public FilterProvider filterProvider() {
@@ -597,6 +606,21 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**********************************************************************
      */
 
+    public DeserializationContexts deserializationContexts() {
+        if (_deserializationContexts == null) {
+            _deserializationContexts = _defaultDeserializationContexts();
+        }
+        return _deserializationContexts;
+    }
+
+    /**
+     * Overridable method for changing default {@link SerializerProvider} prototype
+     * to use.
+     */
+    protected DeserializationContexts _defaultDeserializationContexts() {
+        return new DeserializationContexts.DefaultImpl();
+    }
+
     public DeserializerFactory deserializerFactory() {
         if (_deserializerFactory == null) {
             _deserializerFactory = _defaultDeserializerFactory();
@@ -606,22 +630,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     DeserializerFactory _defaultDeserializerFactory() {
         return BeanDeserializerFactory.instance;
-    }
-
-    public DefaultDeserializationContext deserializationContext() {
-        if (_deserializationContext == null) {
-            _deserializationContext = _defaultDeserializationContext();
-        }
-        return _deserializationContext;
-    }
-
-    /**
-     * Overridable method for changing default {@link SerializerProvider} prototype
-     * to use.
-     */
-    protected DefaultDeserializationContext _defaultDeserializationContext() {
-        return new DefaultDeserializationContext.Impl(deserializerFactory(),
-                _streamFactory);
     }
 
     public InjectableValues injectableValues() {
@@ -1068,8 +1076,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
-    public B serializerProvider(DefaultSerializerProvider prov) {
-        _serializerProvider = prov;
+    public B serializationContexts(SerializationContexts ctxt) {
+        _serializationContexts = ctxt;
         return _this();
     }
 
@@ -1099,15 +1107,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     public B deserializerFactory(DeserializerFactory f) {
         _deserializerFactory = f;
-        // 19-Feb-2018, tatu: Hopefully not needed in future but is needed for now
-        if (_deserializationContext != null) {
-            _deserializationContext = _deserializationContext.with(f);
-        }
         return _this();
     }
 
-    public B deserializationContext(DefaultDeserializationContext ctxt) {
-        _deserializationContext = ctxt;
+    public B deserializationContext(DeserializationContexts ctxt) {
+        _deserializationContexts = ctxt;
         return _this();
     }
 

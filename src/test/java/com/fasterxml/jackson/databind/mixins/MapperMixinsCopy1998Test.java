@@ -87,8 +87,8 @@ public class MapperMixinsCopy1998Test extends BaseMapTest
         }
     }
 
-    // [databind#1998]: leakage of state via ObjectMapper.copy()
-    public void testIssue1998() throws Exception
+    // [databind#1998]: leakage of state via ObjectMapper.copy() (2.x) and similar (3.x)
+    public void testSharedBuilder() throws Exception
     {
         final MapperBuilder<?,?> B = defaultMapper();
         MyModelRoot myModelInstance = new MyModelRoot();
@@ -107,7 +107,29 @@ public class MapperMixinsCopy1998Test extends BaseMapTest
         String result = mapper
                 .writerWithView(MyModelView.class)
                 .writeValueAsString(myModelInstance);
-//System.out.println("result: "+result);
+        assertEquals(EXPECTED, result);
+    }
+
+    // [databind#1998]: leakage of state via ObjectMapper.copy() (2.x) and similar (3.x)
+    public void testSharingViaRebuild() throws Exception
+    {
+        final MapperBuilder<?,?> B = defaultMapper();
+        MyModelRoot myModelInstance = new MyModelRoot();
+        myModelInstance.setChild(new MyChildB("testB"));
+
+        ObjectMapper mapper = B.build();
+
+        String postResult = mapper.writeValueAsString(myModelInstance);
+        assertEquals(FULLMODEL, postResult);
+
+        mapper = mapper.rebuild()
+                .addMixIn(MyModelRoot.class, MixinConfig.MyModelRoot.class)
+                .addMixIn(MyModelChildBase.class, MixinConfig.MyModelChildBase.class)
+                .disable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+                .build();
+        String result = mapper
+                .writerWithView(MyModelView.class)
+                .writeValueAsString(myModelInstance);
         assertEquals(EXPECTED, result);
     }
 

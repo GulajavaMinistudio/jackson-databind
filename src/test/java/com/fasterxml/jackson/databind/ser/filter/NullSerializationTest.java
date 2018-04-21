@@ -3,13 +3,15 @@ package com.fasterxml.jackson.databind.ser.filter;
 import java.io.*;
 
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.core.json.JsonFactory;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.cfg.GeneratorSettings;
+import com.fasterxml.jackson.databind.cfg.SerializationContexts;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
+import com.fasterxml.jackson.databind.ser.SerializerCache;
 import com.fasterxml.jackson.databind.ser.SerializerFactory;
 
 public class NullSerializationTest
@@ -34,19 +36,35 @@ public class NullSerializationTest
     }
     
     @SuppressWarnings("serial")
-    static class MyNullProvider extends DefaultSerializerProvider
+    static class MyNullSerializerContexts extends SerializationContexts
     {
-        public MyNullProvider() { super(new JsonFactory()); }
-        public MyNullProvider(MyNullProvider base, SerializationConfig config, 
-                GeneratorSettings genSettings,
-                SerializerFactory jsf) {
-            super(base, config, genSettings, jsf);
+        public MyNullSerializerContexts() { super(); }
+        public MyNullSerializerContexts(TokenStreamFactory tsf, SerializerFactory serializerFactory,
+                SerializerCache cache) {
+            super(tsf, serializerFactory, cache);
         }
 
         @Override
-        public DefaultSerializerProvider createInstance(SerializationConfig config,
-                GeneratorSettings genSettings, SerializerFactory jsf) {
-            return new MyNullProvider(this, config, genSettings, jsf);
+        public SerializationContexts forMapper(Object mapper,
+                TokenStreamFactory tsf, SerializerFactory serializerFactory,
+                SerializerCache cache) {
+            return new MyNullSerializerContexts(tsf, serializerFactory, cache);
+        }
+
+        @Override
+        public DefaultSerializerProvider createContext(SerializationConfig config,
+                GeneratorSettings genSettings) {
+            return new MyNullSerializerProvider(_streamFactory, _cache,
+                    config, genSettings, _serializerFactory);
+        }
+    }
+
+    static class MyNullSerializerProvider extends DefaultSerializerProvider
+    {
+        public MyNullSerializerProvider(TokenStreamFactory streamFactory,
+                SerializerCache cache, SerializationConfig config,
+                GeneratorSettings genSettings, SerializerFactory f) {
+            super(streamFactory, config, genSettings, f, cache);
         }
 
         @Override
@@ -72,9 +90,9 @@ public class NullSerializationTest
 */
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     private final ObjectMapper MAPPER = objectMapper();
@@ -96,7 +114,7 @@ public class NullSerializationTest
     public void testCustomNulls() throws Exception
     {
         ObjectMapper m = ObjectMapper.builder()
-                .serializerProvider(new MyNullProvider())
+                .serializationContexts(new MyNullSerializerContexts())
                 .build();
         assertEquals("{\"name\":\"foobar\"}", m.writeValueAsString(new Bean1()));
         assertEquals("{\"type\":null}", m.writeValueAsString(new Bean2()));
@@ -111,9 +129,8 @@ public class NullSerializationTest
         assertEquals("{\"a\":null}", MAPPER.writeValueAsString(root));
 
         // but then we can customize it:
-        DefaultSerializerProvider prov = new MyNullProvider();
         ObjectMapper m = ObjectMapper.builder()
-                .serializerProvider(prov)
+                .serializationContexts(new MyNullSerializerContexts())
                 .addModule(new SimpleModule()
                         .setDefaultNullValueSerializer(new NullSerializer()))
                 .build();

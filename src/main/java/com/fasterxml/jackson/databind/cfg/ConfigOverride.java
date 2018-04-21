@@ -71,6 +71,8 @@ public abstract class ConfigOverride
         _include = src._include;
         _includeAsProperty = src._includeAsProperty;
         _ignorals = src._ignorals;
+        _nullHandling = src._nullHandling;
+        _visibility = src._visibility;
         _isIgnoredType = src._isIgnoredType;
         _mergeable = src._mergeable;
     }
@@ -104,7 +106,20 @@ public abstract class ConfigOverride
     public JsonAutoDetect.Value getVisibility() { return _visibility; }
 
     public Boolean getMergeable() { return _mergeable; }
-    
+
+    @Override
+    public String toString() {
+        return new StringBuilder("[ConfigOverrides ")
+                .append("format=").append(_format)
+                .append(", include=").append(_include).append("/").append(_includeAsProperty)
+                .append(", ignorals=").append(_ignorals)
+                .append(", ignoredType=").append(_isIgnoredType)
+                .append(", nulls=").append(_ignorals)
+                .append(", visibility=").append(_visibility)
+                .append(", merge=").append(_mergeable)
+                .toString();
+    }
+
     /**
      * Implementation used solely for "empty" instance; has no mutators
      * and is not changed by core functionality.
