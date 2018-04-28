@@ -982,7 +982,6 @@ nonAnnotatedParamIndex, ctor);
             JacksonInject.Value injectable)
         throws JsonMappingException
     {
-        final DeserializationConfig config = ctxt.getConfig();
         final AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
         PropertyMetadata metadata;
         {
@@ -1003,7 +1002,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer typeDeser = (TypeDeserializer) type.getTypeHandler();
         // or if not, based on type being referenced:
         if (typeDeser == null) {
-            typeDeser = findTypeDeserializer(config, type);
+            typeDeser = ctxt.findTypeDeserializer(type);
         }
         // Note: contextualization of typeDeser _should_ occur in constructor of CreatorProperty
         // so it is not called directly here
@@ -1096,7 +1095,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer elemTypeDeser = elemType.getTypeHandler();
         // but if not, may still be possible to find:
         if (elemTypeDeser == null) {
-            elemTypeDeser = findTypeDeserializer(config, elemType);
+            elemTypeDeser = ctxt.findTypeDeserializer(elemType);
         }
         // 23-Nov-2010, tatu: Custom array deserializer?
         JsonDeserializer<?>  deser = _findCustomArrayDeserializer(type,
@@ -1142,7 +1141,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer contentTypeDeser = contentType.getTypeHandler();
         // but if not, may still be possible to find:
         if (contentTypeDeser == null) {
-            contentTypeDeser = findTypeDeserializer(config, contentType);
+            contentTypeDeser = ctxt.findTypeDeserializer(contentType);
         }
         // 23-Nov-2010, tatu: Custom deserializer?
         JsonDeserializer<?> deser = _findCustomCollectionDeserializer(type,
@@ -1243,7 +1242,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer contentTypeDeser = contentType.getTypeHandler();
         // but if not, may still be possible to find:
         if (contentTypeDeser == null) {
-            contentTypeDeser = findTypeDeserializer(config, contentType);
+            contentTypeDeser = ctxt.findTypeDeserializer(contentType);
         }
         JsonDeserializer<?> deser = _findCustomCollectionLikeDeserializer(type, config, beanDesc,
                 contentTypeDeser, contentDeser);
@@ -1283,7 +1282,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer contentTypeDeser = contentType.getTypeHandler();
         // but if not, may still be possible to find:
         if (contentTypeDeser == null) {
-            contentTypeDeser = findTypeDeserializer(config, contentType);
+            contentTypeDeser = ctxt.findTypeDeserializer(contentType);
         }
 
         // 23-Nov-2010, tatu: Custom deserializer?
@@ -1400,7 +1399,7 @@ nonAnnotatedParamIndex, ctor);
         TypeDeserializer contentTypeDeser = contentType.getTypeHandler();
         // but if not, may still be possible to find:
         if (contentTypeDeser == null) {
-            contentTypeDeser = findTypeDeserializer(config, contentType);
+            contentTypeDeser = ctxt.findTypeDeserializer(contentType);
         }
         JsonDeserializer<?> deser = _findCustomMapLikeDeserializer(type, config,
                 beanDesc, keyDes, contentTypeDeser, contentDeser);
@@ -1499,7 +1498,7 @@ nonAnnotatedParamIndex, ctor);
         // Then optional type info: if type has been resolved, we may already know type deserializer:
         TypeDeserializer contentTypeDeser = contentType.getTypeHandler();
         if (contentTypeDeser == null) { // or if not, may be able to find:
-            contentTypeDeser = findTypeDeserializer(config, contentType);
+            contentTypeDeser = ctxt.findTypeDeserializer(contentType);
         }
         JsonDeserializer<?> deser = _findCustomReferenceDeserializer(type, config, beanDesc,
                 contentTypeDeser, contentDeser);
@@ -1546,59 +1545,6 @@ nonAnnotatedParamIndex, ctor);
     /* JsonDeserializerFactory impl (partial): type deserializers
     /**********************************************************************
      */
-
-    @Override
-    public TypeDeserializer findTypeDeserializer(final DeserializationConfig config,
-            JavaType baseType)
-        throws JsonMappingException
-    {
-        BeanDescription bean = config.introspectClassAnnotations(baseType.getRawClass());
-        return config.getTypeResolverProvider().findTypeDeserializer(config, baseType,
-                bean.getClassInfo());
-
-//      JavaType defaultType = mapAbstractType(config, baseType);
-        
-        /*
-        BeanDescription bean = config.introspectClassAnnotations(baseType.getRawClass());
-        AnnotatedClass ac = bean.getClassInfo();
-        AnnotationIntrospector ai = config.getAnnotationIntrospector();
-        TypeResolverBuilder<?> b = ai.findTypeResolver(config,
-                ac, baseType, ai.findPolymorphicTypeInfo(config, ac));
-
-        // Ok: if there is no explicit type info handler, we may want to
-        // use a default. If so, config object knows what to use.
-        Collection<NamedType> subtypes = null;
-        if (b == null) {
-            b = config.getDefaultTyper(baseType);
-            if (b == null) {
-                return null;
-            }
-        } else {
-            subtypes = config.getSubtypeResolver().collectAndResolveSubtypesByTypeId(config, ac);
-        }
-        // May need to figure out default implementation, if none found yet
-        // (note: check for abstract type is not 100% mandatory, more of an optimization)
-        if ((b.getDefaultImpl() == null) && baseType.isAbstract()) {
-            JavaType defaultType = mapAbstractType(config, baseType);
-            if ((defaultType != null) && !defaultType.hasRawClass(baseType.getRawClass())) {
-                b = b.defaultImpl(defaultType.getRawClass());
-            }
-        }
-        return b.buildTypeDeserializer(config, baseType, subtypes);
-        */
-/*
-        // 05-Apt-2018, tatu: Since we get non-mapping exception due to various limitations,
-        //    map to better type here
-        try {
-            return b.buildTypeDeserializer(config, baseType, subtypes);
-        } catch (IllegalArgumentException e0) {
-            InvalidDefinitionException e = InvalidDefinitionException.from((JsonParser) null,
-                    e0.getMessage(), baseType);
-            e.initCause(e0);
-            throw e;
-        }
-*/
-    }
 
     /**
      * Overridable method called after checking all other types.
@@ -1709,74 +1655,6 @@ nonAnnotatedParamIndex, ctor);
      */
 
     /**
-     * Method called to create a type information deserializer for values of
-     * given non-container property, if one is needed.
-     * If not needed (no polymorphic handling configured for property), should return null.
-     *<p>
-     * Note that this method is only called for non-container bean properties,
-     * and not for values in container types or root values (or container properties)
-     *
-     * @param baseType Declared base type of the value to deserializer (actual
-     *    deserializer type will be this type or its subtype)
-     * 
-     * @return Type deserializer to use for given base type, if one is needed; null if not.
-     */
-    public TypeDeserializer findPropertyTypeDeserializer(DeserializationConfig config,
-            JavaType baseType, AnnotatedMember accessor)
-        throws JsonMappingException
-    {
-        return config.getTypeResolverProvider().findPropertyTypeDeserializer(config, accessor, baseType);
-
-        /*
-        AnnotationIntrospector ai = config.getAnnotationIntrospector();
-        TypeResolverBuilder<?> b = ai.findPropertyTypeResolver(config,
-                annotated, baseType,
-                ai.findPolymorphicTypeInfo(config, annotated));
-        // Defaulting: if no annotations on member, check value class
-        if (b == null) {
-            return findTypeDeserializer(config, baseType);
-        }
-        // but if annotations found, may need to resolve subtypes:
-        Collection<NamedType> subtypes = config.getSubtypeResolver().collectAndResolveSubtypesByTypeId(
-                config, annotated, baseType);
-        return b.buildTypeDeserializer(config, baseType, subtypes);
-        */
-    }
-    
-    /**
-     * Method called to find and create a type information deserializer for values of
-     * given container (list, array, map) property, if one is needed.
-     * If not needed (no polymorphic handling configured for property), should return null.
-     *<p>
-     * Note that this method is only called for container bean properties,
-     * and not for values in container types or root values (or non-container properties)
-     * 
-     * @param containerType Type of property; must be a container type
-     * @param accessor Field or method that contains container property
-     */    
-    public TypeDeserializer findPropertyContentTypeDeserializer(DeserializationConfig config,
-            JavaType containerType, AnnotatedMember accessor)
-        throws JsonMappingException
-    {
-        return config.getTypeResolverProvider().findPropertyContentTypeDeserializer(config, accessor, containerType);
-/*
-        AnnotationIntrospector ai = config.getAnnotationIntrospector();
-        TypeResolverBuilder<?> b = ai.findPropertyContentTypeResolver(config,
-                accessor, containerType,
-                ai.findPolymorphicTypeInfo(config, accessor));
-        JavaType contentType = containerType.getContentType();
-        // Defaulting: if no annotations on member, check class
-        if (b == null) {
-            return findTypeDeserializer(config, contentType);
-        }
-        // but if annotations found, may need to resolve subtypes:
-        Collection<NamedType> subtypes = config.getSubtypeResolver().collectAndResolveSubtypesByTypeId(
-                config, accessor, contentType);
-        return b.buildTypeDeserializer(config, contentType, subtypes);
-        */
-    }
-
-    /**
      * Helper method called to find one of default serializers for "well-known"
      * platform types: JDK-provided types, and small number of public Jackson
      * API types.
@@ -1818,7 +1696,7 @@ nonAnnotatedParamIndex, ctor);
             JavaType vt = type.containedTypeOrUnknown(1);
             TypeDeserializer vts = (TypeDeserializer) vt.getTypeHandler();
             if (vts == null) {
-                vts = findTypeDeserializer(ctxt.getConfig(), vt);
+                vts = ctxt.findTypeDeserializer(vt);
             }
             JsonDeserializer<Object> valueDeser = vt.getValueHandler();
             KeyDeserializer keyDes = (KeyDeserializer) kt.getValueHandler();
@@ -2088,14 +1966,13 @@ nonAnnotatedParamIndex, ctor);
             if (cd != null) {
                 type = type.withContentValueHandler(cd);
             }
-            TypeDeserializer contentTypeDeser = findPropertyContentTypeDeserializer(
-                    ctxt.getConfig(), type, (AnnotatedMember) member);            	
+            TypeDeserializer contentTypeDeser = ctxt.findPropertyContentTypeDeserializer(type,
+                    (AnnotatedMember) member);            	
             if (contentTypeDeser != null) {
                 type = type.withContentTypeHandler(contentTypeDeser);
             }
         }
-        TypeDeserializer valueTypeDeser = findPropertyTypeDeserializer(ctxt.getConfig(),
-                    type, (AnnotatedMember) member);
+        TypeDeserializer valueTypeDeser = ctxt.findPropertyTypeDeserializer(type, (AnnotatedMember) member);
         if (valueTypeDeser != null) {
             type = type.withTypeHandler(valueTypeDeser);
         }

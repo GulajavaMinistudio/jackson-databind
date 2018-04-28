@@ -2,7 +2,6 @@ package com.fasterxml.jackson.databind.ser;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 
 /**
  * Abstract class that defines API used by {@link SerializerProvider}
@@ -20,36 +19,16 @@ public abstract class SerializerFactory
     /**
      * Method called to create (or, for immutable serializers, reuse) a serializer for given type. 
      * 
-     * @param prov (not null) Provider that needs to be used to resolve annotation-provided
+     * @param ctxt (not null) Context that needs to be used to resolve annotation-provided
      *    serializers (but NOT for others)
      * @param formatOverride (nullable) Possible format overrides (from property annotations)
      *    to use, above and beyond what `beanDesc` defines
      *
      * @since 3.0 (last argument added)
      */
-    public abstract JsonSerializer<Object> createSerializer(SerializerProvider prov,
+    public abstract JsonSerializer<Object> createSerializer(SerializerProvider ctxt,
             JavaType baseType, BeanDescription beanDesc, JsonFormat.Value formatOverride)
         throws JsonMappingException;
-
-    /**
-     * Method called to create a type information serializer for given base type,
-     * if one is needed. If not needed (no polymorphic handling configured), should
-     * return null.
-     *
-     * @param baseType Declared type to use as the base type for type information serializer
-     * 
-     * @return Type serializer to use for the base type, if one is needed; null if not.
-     */
-    public abstract TypeSerializer findTypeSerializer(SerializationConfig config,
-            JavaType baseType, BeanDescription beanDesc)
-        throws JsonMappingException;
-
-    public TypeSerializer findTypeSerializer(SerializationConfig config,
-            JavaType baseType) throws JsonMappingException
-    {
-        return findTypeSerializer(config, baseType,
-                config.introspectClassAnnotations(baseType));
-    }
 
     /**
      * Method called to create serializer to use for serializing JSON property names (which must
@@ -122,10 +101,10 @@ public abstract class SerializerFactory
      * @deprecated Since 3.0 use variant that takes {@code JsonFormat.Value} argument
      */
     @Deprecated // since 3.0
-    public JsonSerializer<Object> createSerializer(SerializerProvider prov, JavaType baseType)
+    public JsonSerializer<Object> createSerializer(SerializerProvider ctxt, JavaType baseType)
         throws JsonMappingException
     {
-        BeanDescription beanDesc = prov.introspect(baseType);
-        return createSerializer(prov, baseType, beanDesc, null);
+        BeanDescription beanDesc = ctxt.introspect(baseType);
+        return createSerializer(ctxt, baseType, beanDesc, null);
     }
 }
