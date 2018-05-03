@@ -1,13 +1,13 @@
 package com.fasterxml.jackson.databind;
 
 import com.fasterxml.jackson.core.*;
+
 import com.fasterxml.jackson.databind.cfg.*;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsontype.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.ArrayIterator;
-import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.LinkedNode;
 import com.fasterxml.jackson.databind.util.RootNameLookup;
 
@@ -576,7 +576,7 @@ public final class DeserializationConfig
         Class<?> currClass = type.getRawClass();
         for (AbstractTypeResolver resolver : abstractTypeResolvers()) {
             JavaType concrete = resolver.findTypeMapping(this, type);
-            if (ClassUtil.rawClass(concrete) != currClass) {
+            if ((concrete != null) && !concrete.hasRawClass(currClass)) {
                 return concrete;
             }
         }

@@ -1,10 +1,9 @@
 package com.fasterxml.jackson.databind.deser.creators;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-
-import java.util.Map;
+import java.util.*;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -82,14 +81,14 @@ public class TestCreatorsDelegating extends BaseMapTest
             this.map = map;
         }
     }
-    
+
     /*
     /**********************************************************
-    /* Unit tests
+    /* Test methods
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newObjectMapper();
     
     public void testBooleanDelegate() throws Exception
     {
