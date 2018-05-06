@@ -964,15 +964,21 @@ public class JacksonAnnotationIntrospector
     @Override
     public PropertyName findNameForSerialization(Annotated a)
     {
+        boolean useDefault = false;
         JsonGetter jg = _findAnnotation(a, JsonGetter.class);
         if (jg != null) {
-            return PropertyName.construct(jg.value());
+            String s = jg.value();
+            // 04-May-2018, tatu: Should allow for "nameless" `@JsonGetter` too
+            if (!s.isEmpty()) {
+                return PropertyName.construct(s);
+            }
+            useDefault = true;
         }
         JsonProperty pann = _findAnnotation(a, JsonProperty.class);
         if (pann != null) {
             return PropertyName.construct(pann.value());
         }
-        if (_hasOneOf(a, ANNOTATIONS_TO_INFER_SER)) {
+        if (useDefault || _hasOneOf(a, ANNOTATIONS_TO_INFER_SER)) {
             return PropertyName.USE_DEFAULT;
         }
         return null;
@@ -1162,16 +1168,23 @@ public class JacksonAnnotationIntrospector
     public PropertyName findNameForDeserialization(Annotated a)
     {
         // @JsonSetter has precedence over @JsonProperty, being more specific
-        // @JsonDeserialize implies that there is a property, but no name
+
+        boolean useDefault = false;
         JsonSetter js = _findAnnotation(a, JsonSetter.class);
         if (js != null) {
-            return PropertyName.construct(js.value());
+            String s = js.value();
+            // 04-May-2018, tatu: Need to allow for "nameless" `@JsonSetter` too
+            if (s.isEmpty()) {
+                useDefault = true;
+            } else {
+                return PropertyName.construct(s);
+            }
         }
         JsonProperty pann = _findAnnotation(a, JsonProperty.class);
         if (pann != null) {
             return PropertyName.construct(pann.value());
         }
-        if (_hasOneOf(a, ANNOTATIONS_TO_INFER_DESER)) {
+        if (useDefault || _hasOneOf(a, ANNOTATIONS_TO_INFER_DESER)) {
             return PropertyName.USE_DEFAULT;
         }
         return null;

@@ -60,6 +60,18 @@ public class NullConversionsGenericTest extends BaseMapTest
         }
     }
 
+    // [databind#2023] two-part coercion from "" to `null` to skip/empty/exception should work
+    public void testEmptyStringToNullToEmptyPojo() throws Exception
+    {
+        GeneralEmpty<Point> result = MAPPER.readerFor(new TypeReference<GeneralEmpty<Point>>() { })
+                .with(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+                .readValue(aposToQuotes("{'value':''}"));
+        assertNotNull(result.value);
+        Point p = result.value;
+        assertEquals(0, p.x);
+        assertEquals(0, p.y);
+    }
+
     public void testNullsToEmptyCollection() throws Exception
     {
         GeneralEmpty<List<String>> result = MAPPER.readValue(aposToQuotes("{'value':null}"),
