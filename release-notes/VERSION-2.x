@@ -6,6 +6,9 @@ Project: jackson-databind
 
 2.9.6 (not yet released)
 
+#955: Add `MapperFeature.USE_BASE_TYPE_AS_DEFAULT_IMPL` to use declared base type
+   as `defaultImpl` for polymorphic deserialization
+  (contributed by mikeldpl@github)
 #1565: Deserialization failure with Polymorphism using JsonTypeInfo `defaultImpl`,
   subtype as target
 #1964: Failed to specialize `Map` type during serialization where key type
@@ -37,6 +40,9 @@ Project: jackson-databind
  (reported by Guixiong Wu)
 #2034: Serialization problem with type specialization of nested generic types
  (reported by Reinhard P)
+#2038: JDK Serializing and using Deserialized `ObjectMapper` loses linkage
+  back from `JsonParser.getCodec()`
+ (reported by Chetan N)
 
 2.9.5 (26-Mar-2018)
 
