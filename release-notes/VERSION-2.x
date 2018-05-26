@@ -16,6 +16,8 @@ Project: jackson-databind
  (reported by ptirador@github)
 #1990: MixIn `@JsonProperty` for `Object.hashCode()` is ignored
  (reported by Freddy B)
+#1991: Context attributes are not passed/available to custom serializer if object is in POJO
+ (reported by dletin@github)
 #1998: Removing "type" attribute with Mixin not taken in account if
   using ObjectMapper.copy()
  (reported by SBKila@github)
@@ -43,6 +45,8 @@ Project: jackson-databind
 #2038: JDK Serializing and using Deserialized `ObjectMapper` loses linkage
   back from `JsonParser.getCodec()`
  (reported by Chetan N)
+#2051: Implicit constructor property names are not renamed properly with
+  `PropertyNamingStrategy`
 
 2.9.5 (26-Mar-2018)
 

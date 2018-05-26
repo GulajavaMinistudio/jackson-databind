@@ -1,11 +1,12 @@
-package com.fasterxml.jackson.failing;
+package com.fasterxml.jackson.databind.deser.creators;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.AnnotatedParameter;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
 
-public class ImplicitParamsForCreator806Test extends BaseMapTest
+public class CreatorWithNamingStrategyTest extends BaseMapTest
 {
     @SuppressWarnings("serial")
     static class MyParamIntrospector extends JacksonAnnotationIntrospector
@@ -20,34 +21,32 @@ public class ImplicitParamsForCreator806Test extends BaseMapTest
         }
     }
 
-    static class XY {
-        protected int x, y;
+    // [databind#2051]
+    static class OneProperty {
+        public String paramName0;
 
-        // annotation should NOT be needed with 2.6 any more (except for single-arg case)
-//        @com.fasterxml.jackson.annotation.JsonCreator
-        public XY(int x, int y) {
-            this.x = x;
-            this.y = y;
+        @JsonCreator
+        public OneProperty(String bogus) {
+            paramName0 = "CTOR:"+bogus;
         }
     }
 
     /*
-    /**********************************************************************
+    /**********************************************************
     /* Test methods
-    /**********************************************************************
+    /**********************************************************
      */
 
-    // for [databind#806]: problem is that renaming occurs too late for implicitly detected
-    // Creators
-    public void testImplicitNameWithNamingStrategy() throws Exception
+    // [databind#2051]
+    public void testSnakeCaseWithOneArg() throws Exception
     {
         ObjectMapper mapper = ObjectMapper.builder()
                 .propertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
                 .annotationIntrospector(new MyParamIntrospector())
                 .build();
-        XY value = mapper.readValue(aposToQuotes("{'param_name0':1,'param_name1':2}"), XY.class);
-        assertNotNull(value);
-        assertEquals(1, value.x);
-        assertEquals(2, value.y);
+        final String MSG = "1st";
+        OneProperty actual = mapper.readValue("{\"param_name0\":\""+MSG+"\"}",
+                OneProperty.class);
+        assertEquals("CTOR:"+MSG, actual.paramName0);
     }
 }
