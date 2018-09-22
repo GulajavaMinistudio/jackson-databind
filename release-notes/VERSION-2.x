@@ -8,21 +8,35 @@ Project: jackson-databind
 
 #2059: Remove `final` modifier for `TypeFactory`
  (requested by Thibaut R)
+#2115: Support naive deserialization of `Serializable` values as "untyped", same
+  as `java.lang.Object`
+ (requested by Christopher S)
+#2116: Make NumberSerializers.Base public and its inherited classes not final
+ (requested by Édouard M)
+#2126: `DeserializationContext.instantiationException()` throws `InvalidDefinitionException`
 
 2.9.7 (not yet released)
 
 #2060: `UnwrappingBeanPropertyWriter` incorrectly assumes the found serializer is
   of type `UnwrappingBeanSerializer`
  (reported by Petar T)
+#2064: Cannot set custom format for `SqlDateSerializer` globally
+ (reported by Brandon K)
 #2079: NPE when visiting StaticListSerializerBase
  (reported by WorldSEnder@github)
 #2082: `FactoryBasedEnumDeserializer` should be cachable
+#2088: `@JsonUnwrapped` fields are skipped when using `PropertyBasedCreator` if
+  they appear after the last creator property
+ (reported, fix contributed by 6bangs@github)
 #2096: `TreeTraversingParser` does not take base64 variant into account
  (reported by tangiel@github)
 #2097: Block more classes from polymorphic deserialization (CVE-2018-14718
   - CVE-2018-14721)
 #2109: Canonical string for reference type is built incorrectly
  (reported by svarzee@github)
+#2120: `NioPathDeserializer` improvement
+ (contributed by Semyon L)
+#2128: Location information included twice for some `JsonMappingException`s
 
 2.9.6 (12-Jun-2018)
 

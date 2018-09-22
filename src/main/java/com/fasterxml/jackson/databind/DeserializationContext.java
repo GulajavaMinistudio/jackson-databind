@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import com.fasterxml.jackson.databind.introspect.Annotated;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
@@ -830,7 +831,8 @@ public abstract class DeserializationContext
             return df.parse(dateStr);
         } catch (ParseException e) {
             throw new IllegalArgumentException(String.format(
-                    "Failed to parse Date value '%s': %s", dateStr, e.getMessage()));
+                    "Failed to parse Date value '%s': %s", dateStr,
+                    ClassUtil.exceptionMessage(e)));
         }
     }
 
@@ -1575,18 +1577,22 @@ trailingToken, ClassUtil.nameOf(targetType)
      * to indicate problem with physically constructing instance of
      * specified class (missing constructor, exception from constructor)
      *<p>
-     * Note that most of the time this method should NOT be called; instead,
+     * Note that most of the time this method should NOT be called directly; instead,
      * {@link #handleInstantiationProblem} should be called which will call this method
      * if necessary.
      */
     public JsonMappingException instantiationException(Class<?> instClass, Throwable cause) {
-        // Most likely problem with Creator definition, right?
-        JavaType type = constructType(instClass);
+        String excMsg;
+        if (cause == null) {
+            excMsg = "N/A";
+        } else if ((excMsg = ClassUtil.exceptionMessage(cause)) == null) {
+            excMsg = ClassUtil.nameOf(cause.getClass());
+        }
         String msg = String.format("Cannot construct instance of %s, problem: %s",
-                ClassUtil.nameOf(instClass), cause.getMessage());
-        InvalidDefinitionException e = InvalidDefinitionException.from(_parser, msg, type);
-        e.initCause(cause);
-        return e;
+                ClassUtil.nameOf(instClass), excMsg);
+        // [databind#2162]: use specific exception type as we don't know if it's
+        // due to type definition, input, or neither
+        return ValueInstantiationException.from(_parser, msg, constructType(instClass), cause);
     }
 
     /**
@@ -1599,11 +1605,12 @@ trailingToken, ClassUtil.nameOf(targetType)
      * if necessary.
      */
     public JsonMappingException instantiationException(Class<?> instClass, String msg0) {
-        // Most likely problem with Creator definition, right?
-        JavaType type = constructType(instClass);
-        String msg = String.format("Cannot construct instance of %s: %s",
-                ClassUtil.nameOf(instClass), msg0);
-        return InvalidDefinitionException.from(_parser, msg, type);
+        // [databind#2162]: use specific exception type as we don't know if it's
+        // due to type definition, input, or neither
+        return ValueInstantiationException.from(_parser,
+                String.format("Cannot construct instance of %s: %s",
+                        ClassUtil.nameOf(instClass), msg0),
+                constructType(instClass));
     }
 
     @Override
