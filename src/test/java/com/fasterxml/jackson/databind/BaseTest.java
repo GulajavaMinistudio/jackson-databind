@@ -6,6 +6,8 @@ import java.util.Arrays;
 import org.junit.Assert;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.json.JsonFactory;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 public abstract class BaseTest
 // 19-Sep-2017, tatu: Remove eventually from 3.x, but needs addition of metric ton of `@Test`s
@@ -137,7 +139,7 @@ public abstract class BaseTest
 
     protected ObjectMapper objectMapper() {
         if (SHARED_MAPPER == null) {
-            SHARED_MAPPER = newObjectMapper();
+            SHARED_MAPPER = newJsonMapper();
         }
         return SHARED_MAPPER;
     }
@@ -154,14 +156,18 @@ public abstract class BaseTest
         return objectMapper().readerFor(cls);
     }
 
-    protected static ObjectMapper newObjectMapper() {
-        return new ObjectMapper();
-    }
-    
-    protected static ObjectMapper.Builder objectMapperBuilder() {
-        return ObjectMapper.jsonBuilder();
+    protected static JsonMapper newJsonMapper() {
+        return new JsonMapper();
     }
 
+    protected static JsonMapper.Builder jsonMapperBuilder() {
+        return JsonMapper.builder();
+    }
+
+    protected static JsonMapper.Builder jsonMapperBuilder(JsonFactory f) {
+        return JsonMapper.builder(f);
+    }
+    
     /*
     /**********************************************************
     /* Pass-through to remove need for static import
