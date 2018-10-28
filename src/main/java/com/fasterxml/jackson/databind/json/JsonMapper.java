@@ -165,4 +165,18 @@ public class JsonMapper extends ObjectMapper
     public JsonFactory tokenStreamFactory() {
         return (JsonFactory) _streamFactory;
     }
+
+    /*
+    /**********************************************************
+    /* Format-specific
+    /**********************************************************
+     */
+
+    public boolean isEnabled(JsonReadFeature f) {
+        return _deserializationConfig.hasFormatFeature(f);
+    }
+
+    public boolean isEnabled(JsonWriteFeature f) {
+        return _serializationConfig.hasFormatFeature(f);
+    }
 }

@@ -102,13 +102,13 @@ public final class SerializationConfig
      */
 
     private SerializationConfig(SerializationConfig src,
-            int serFeatures, int generatorFeatures, int formatWriteFeatures)
+            int serFeatures, int streamWriteFeatures, int formatWriteFeatures)
     {
         super(src);
         _serFeatures = serFeatures;
         _filterProvider = src._filterProvider;
         _defaultPrettyPrinter = src._defaultPrettyPrinter;
-        _streamWriteFeatures = generatorFeatures;
+        _streamWriteFeatures = streamWriteFeatures;
         _formatWriteFeatures = formatWriteFeatures;
     }
     
@@ -510,7 +510,11 @@ public final class SerializationConfig
     public final boolean isEnabled(JsonGenerator.Feature f) {
         return (_streamWriteFeatures & f.getMask()) != 0;
     }
-    
+
+    public final boolean hasFormatFeature(FormatFeature f) {
+        return (_formatWriteFeatures & f.getMask()) != 0;
+    }
+
     /**
      * "Bulk" access method for checking that all features specified by
      * mask are enabled.

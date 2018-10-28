@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.json.JsonWriteFeature;
 import com.fasterxml.jackson.core.util.MinimalPrettyPrinter;
 import com.fasterxml.jackson.databind.cfg.ConfigOverrides;
 import com.fasterxml.jackson.databind.cfg.DeserializationContexts;
@@ -48,7 +49,7 @@ public class ObjectMapperTest extends BaseMapTest
         }
     }
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final JsonMapper MAPPER = new JsonMapper();
 
     /*
     /**********************************************************
@@ -61,9 +62,8 @@ public class ObjectMapperTest extends BaseMapTest
         assertTrue(MAPPER.isEnabled(TokenStreamFactory.Feature.CANONICALIZE_FIELD_NAMES));
 
         // and also for mapper
-        assertFalse(MAPPER.isEnabled(JsonGenerator.Feature.ESCAPE_NON_ASCII));
-        assertTrue(MAPPER.isEnabled(JsonGenerator.Feature.QUOTE_FIELD_NAMES));
-
+        assertTrue(MAPPER.isEnabled(JsonGenerator.Feature.AUTO_CLOSE_TARGET));
+        assertTrue(MAPPER.isEnabled(JsonWriteFeature.QUOTE_FIELD_NAMES));
         assertTrue(MAPPER.isEnabled(JsonParser.Feature.AUTO_CLOSE_SOURCE));
     }
 

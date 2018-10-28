@@ -254,34 +254,6 @@ public abstract class BaseMapTest
         String str = m.writeValueAsString(value);
         return (Map<String,Object>) m.readValue(str, Map.class);
     }
-    
-    protected String serializeAsString(ObjectMapper m, Object value)
-        throws IOException
-    {
-        return m.writeValueAsString(value);
-    }
-
-    protected String serializeAsString(Object value)
-        throws IOException
-    {
-        return serializeAsString(objectMapper(), value);
-    }
-
-    protected String asJSONObjectValueString(Object... args)
-        throws IOException
-    {
-        return asJSONObjectValueString(objectMapper(), args);
-    }
-
-    protected String asJSONObjectValueString(ObjectMapper m, Object... args)
-        throws IOException
-    {
-        LinkedHashMap<Object,Object> map = new LinkedHashMap<Object,Object>();
-        for (int i = 0, len = args.length; i < len; i += 2) {
-            map.put(args[i], args[i+1]);
-        }
-        return m.writeValueAsString(map);
-    }
 
     /*
     /**********************************************************************
