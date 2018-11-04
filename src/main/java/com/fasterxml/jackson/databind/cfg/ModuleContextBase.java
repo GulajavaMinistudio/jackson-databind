@@ -113,12 +113,12 @@ public class ModuleContextBase
     }
 
     @Override
-    public boolean isEnabled(JsonParser.Feature f) {
+    public boolean isEnabled(StreamReadFeature f) {
         return _builder.isEnabled(f);
     }
 
     @Override
-    public boolean isEnabled(JsonGenerator.Feature f) {
+    public boolean isEnabled(StreamWriteFeature f) {
         return _builder.isEnabled(f);
     }
 

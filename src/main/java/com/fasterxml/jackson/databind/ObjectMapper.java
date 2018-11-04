@@ -432,8 +432,8 @@ public class ObjectMapper
      * {@link TokenStreamFactory}, so changes to its configuration will "leak".
      * To avoid such observed changes you should always use "with()" and
      * "without()" method of {@link ObjectReader} and {@link ObjectWriter}
-     * for changing {@link com.fasterxml.jackson.core.JsonParser.Feature}
-     * and {@link com.fasterxml.jackson.core.JsonGenerator.Feature}
+     * for changing {@link StreamReadFeature}
+     * and {@link StreamWriteFeature}
      * settings to use on per-call basis.
      *
      * @return {@link TokenStreamFactory} that this mapper uses when it needs to
@@ -493,11 +493,11 @@ public class ObjectMapper
         return _streamFactory.isEnabled(f);
     }
 
-    public boolean isEnabled(JsonParser.Feature f) {
+    public boolean isEnabled(StreamReadFeature f) {
         return _deserializationConfig.isEnabled(f);
     }
 
-    public boolean isEnabled(JsonGenerator.Feature f) {
+    public boolean isEnabled(StreamWriteFeature f) {
         return _serializationConfig.isEnabled(f);
     }
 

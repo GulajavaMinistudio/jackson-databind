@@ -35,11 +35,11 @@ public class TestTokenBuffer extends BaseMapTest
         assertNotNull(buf.getOutputContext());
         assertFalse(buf.isClosed());
 
-        assertFalse(buf.isEnabled(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN));
-        buf.enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
-        assertTrue(buf.isEnabled(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN));
-        buf.disable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
-        assertFalse(buf.isEnabled(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN));
+        assertFalse(buf.isEnabled(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN));
+        buf.enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN);
+        assertTrue(buf.isEnabled(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN));
+        buf.disable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN);
+        assertFalse(buf.isEnabled(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN));
         buf.close();
         assertTrue(buf.isClosed());
     }
@@ -134,7 +134,7 @@ public class TestTokenBuffer extends BaseMapTest
                     p.getIntValue();
                     fail("Expected failure for `int` overflow");
                 } catch (JsonParseException e) {
-                    verifyException(e, "Numeric value ("+big+") out of range of int");
+                    verifyException(e, "Numeric value ("+big+") out of range of `int`");
                 }
             }
         }
@@ -149,7 +149,7 @@ public class TestTokenBuffer extends BaseMapTest
                     p.getIntValue();
                     fail("Expected failure for `int` overflow");
                 } catch (JsonParseException e) {
-                    verifyException(e, "Numeric value ("+big+") out of range of int");
+                    verifyException(e, "Numeric value ("+big+") out of range of `int`");
                 }
             }
         }
@@ -167,7 +167,7 @@ public class TestTokenBuffer extends BaseMapTest
                     p.getLongValue();
                     fail("Expected failure for `long` overflow");
                 } catch (JsonParseException e) {
-                    verifyException(e, "Numeric value ("+big+") out of range of long");
+                    verifyException(e, "Numeric value ("+big+") out of range of `long`");
                 }
             }
         }
