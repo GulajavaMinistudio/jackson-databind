@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.JsonSerializable;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 
 /**
@@ -102,5 +103,30 @@ public abstract class BaseJsonNode
     @Override
     public abstract void serializeWithType(JsonGenerator jgen, SerializerProvider provider,
             TypeSerializer typeSer)  throws IOException;
-}
 
+    /*
+   /**********************************************************
+   /* Std method overrides
+   /**********************************************************
+    */
+
+   @Override
+   public String toString() {
+       try {
+           return JsonMapper.shared().writeValueAsString(this);
+       } catch (IOException e) { // should never occur
+           throw new RuntimeException(e);
+       }
+   }
+
+   @Override
+   public String toPrettyString() {
+       try {
+           return JsonMapper.shared()
+                   .writerWithDefaultPrettyPrinter()
+                   .writeValueAsString(this);
+       } catch (IOException e) { // should never occur
+           throw new RuntimeException(e);
+       }
+   }
+}

@@ -93,6 +93,9 @@ public class ArrayNode
         return _children.size();
     }
 
+    @Override // since 2.10
+    public boolean isEmpty() { return _children.isEmpty(); }
+
     @Override
     public Iterator<JsonNode> elements() {
         return _children.iterator();
@@ -100,7 +103,7 @@ public class ArrayNode
 
     @Override
     public JsonNode get(int index) {
-        if (index >= 0 && index < _children.size()) {
+        if ((index >= 0) && (index < _children.size())) {
             return _children.get(index);
         }
         return null;
@@ -852,21 +855,6 @@ public class ArrayNode
     @Override
     public int hashCode() {
         return _children.hashCode();
-    }
-
-    @Override
-    public String toString()
-    {
-        StringBuilder sb = new StringBuilder(16 + (size() << 4));
-        sb.append('[');
-        for (int i = 0, len = _children.size(); i < len; ++i) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append(_children.get(i).toString());
-        }
-        sb.append(']');
-        return sb.toString();
     }
 
     /*
