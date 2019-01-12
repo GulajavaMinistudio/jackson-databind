@@ -19,6 +19,9 @@ Project: jackson-databind
 #2196: Type safety for `readValue()` with `TypeReference`
  (suggested by nguyenfilip@github)
 #2204: Add `JsonNode.isEmpty()` as convenience alias
+#2217: Suboptimal memory allocation in `TextNode.getBinaryValue()`
+ (reported by Christoph B)
+#2223: Add `missingNode()` method in `JsonNodeFactory`
 
 2.9.8 (15-Dec-2018)
 

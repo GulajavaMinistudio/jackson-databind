@@ -3,6 +3,7 @@ package com.fasterxml.jackson.databind.node;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.util.RawValue;
 
 /**
@@ -99,6 +100,9 @@ public class JsonNodeFactory
     public BooleanNode booleanNode(boolean v) {
         return v ? BooleanNode.getTrue() : BooleanNode.getFalse();
     }
+
+    @Override
+    public JsonNode missingNode() { return MissingNode.getInstance(); }
 
     /**
      * Factory method for getting an instance of JSON null node (which
