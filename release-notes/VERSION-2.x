@@ -16,6 +16,8 @@ Project: jackson-databind
 #2126: `DeserializationContext.instantiationException()` throws `InvalidDefinitionException`
 #2153: Add `JsonMapper` to replace generic `ObjectMapper` usage
 #2187: Make `JsonNode.toString()` use shared `ObjectMapper` to produce valid json
+#2189: `TreeTraversingParser` does not check int bounds
+ (reported by Alexander S)
 #2196: Type safety for `readValue()` with `TypeReference`
  (suggested by nguyenfilip@github)
 #2204: Add `JsonNode.isEmpty()` as convenience alias
@@ -27,6 +29,9 @@ Project: jackson-databind
 
 #1408: Call to `TypeVariable.getBounds()` without synchronization unsafe on some platforms
  (reported by Thomas K)
+#2221: `DeserializationProblemHandler.handleUnknownTypeId()` returning `Void.class`,
+  enableDefaultTyping causing NPE
+ (repoted by MeyerNils@github)
 
 2.9.8 (15-Dec-2018)
 
