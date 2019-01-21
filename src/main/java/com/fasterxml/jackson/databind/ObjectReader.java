@@ -1216,6 +1216,12 @@ public class ObjectReader
                 _considerFilter(_parserFactory.createParser(ctxt, src), false));
     }
 
+    /*
+    /**********************************************************
+    /* Deserialization methods; JsonNode ("tree")
+    /**********************************************************
+     */
+    
     /**
      * Method that reads content from given input source,
      * using configuration of this reader, and binds it as JSON Tree.
@@ -1262,6 +1268,20 @@ public class ObjectReader
         DefaultDeserializationContext ctxt = createDeserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, json), false));
+    }
+
+    public JsonNode readTree(byte[] json) throws IOException
+    {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return _bindAndCloseAsTree(ctxt,
+                _considerFilter(_parserFactory.createParser(ctxt, json), false));
+    }
+
+    public JsonNode readTree(byte[] json, int offset, int len) throws IOException
+    {
+        DefaultDeserializationContext ctxt = createDeserializationContext();
+        return _bindAndCloseAsTree(ctxt,
+                _considerFilter(_parserFactory.createParser(ctxt, json, offset, len), false));
     }
 
     public JsonNode readTree(DataInput src) throws IOException
