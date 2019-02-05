@@ -66,6 +66,13 @@ public class PropertyNamingStrategy
      */
     public static final PropertyNamingStrategy KEBAB_CASE = new KebabCaseStrategy();
 
+    /**
+     * Naming convention widely used as configuration properties name, where words are in
+     * lower-case letters, separated by dots.
+     * See {@link LowerDotCaseStrategy} for details.
+     */
+    public static final PropertyNamingStrategy LOWER_DOT_CASE = new LowerDotCaseStrategy();
+
     /*
     /**********************************************************
     /* API
@@ -184,6 +191,45 @@ public class PropertyNamingStrategy
         }
         
         public abstract String translate(String propertyName);
+
+        /**
+         * Helper method to share implementation between snake and dotted case.
+         */
+        protected static String translateLowerCaseWithSeparator(final String input, final char separator)
+        {
+            if (input == null) {
+                return input; // garbage in, garbage out
+            }
+            final int length = input.length();
+            if (length == 0) {
+                return input;
+            }
+    
+            final StringBuilder result = new StringBuilder(length + (length >> 1));
+            int upperCount = 0;
+            for (int i = 0; i < length; ++i) {
+                char ch = input.charAt(i);
+                char lc = Character.toLowerCase(ch);
+    
+                if (lc == ch) { // lower-case letter means we can get new word
+                    // but need to check for multi-letter upper-case (acronym), where assumption
+                    // is that the last upper-case char is start of a new word
+                    if (upperCount > 1) {
+                        // so insert hyphen before the last character now
+                        result.insert(result.length() - 1, separator);
+                    }
+                    upperCount = 0;
+                } else {
+                    // Otherwise starts new word, unless beginning of string
+                    if ((upperCount == 0) && (i > 0)) {
+                        result.append(separator);
+                    }
+                    ++upperCount;
+                }
+                result.append(lc);
+            }
+            return result.toString();
+        }
     }
 
     /*
@@ -343,40 +389,19 @@ public class PropertyNamingStrategy
     public static class KebabCaseStrategy extends PropertyNamingStrategyBase
     {
         @Override
-        public String translate(String input)
-        {
-            if (input == null) return input; // garbage in, garbage out
-            int length = input.length();
-            if (length == 0) {
-                return input;
-            }
+        public String translate(String input) {
+            return translateLowerCaseWithSeparator(input, '-');
+        }
+    }
 
-            StringBuilder result = new StringBuilder(length + (length >> 1));
-
-            int upperCount = 0;
-
-            for (int i = 0; i < length; ++i) {
-                char ch = input.charAt(i);
-                char lc = Character.toLowerCase(ch);
-                
-                if (lc == ch) { // lower-case letter means we can get new word
-                    // but need to check for multi-letter upper-case (acronym), where assumption
-                    // is that the last upper-case char is start of a new word
-                    if (upperCount > 1) {
-                        // so insert hyphen before the last character now
-                        result.insert(result.length() - 1, '-');
-                    }
-                    upperCount = 0;
-                } else {
-                    // Otherwise starts new word, unless beginning of string
-                    if ((upperCount == 0) && (i > 0)) {
-                        result.append('-');
-                    }
-                    ++upperCount;
-                }
-                result.append(lc);
-            }
-            return result.toString();
+    /**
+     * Naming strategy similar to {@link KebabCaseStrategy}, but instead of hyphens
+     * as separators, uses dots. Naming convention widely used as configuration properties name.
+     */
+    public static class LowerDotCaseStrategy extends PropertyNamingStrategyBase {
+        @Override
+        public String translate(String input){
+            return translateLowerCaseWithSeparator(input, '.');
         }
     }
 }

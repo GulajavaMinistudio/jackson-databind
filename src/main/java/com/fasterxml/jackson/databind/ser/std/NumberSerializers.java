@@ -1,6 +1,7 @@
 package com.fasterxml.jackson.databind.ser.std;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -89,6 +90,9 @@ public class NumberSerializers {
             if (format != null) {
                 switch (format.getShape()) {
                 case STRING:
+                    if (((Class<?>) handledType()) == BigDecimal.class) {
+                        return NumberSerializer.bigDecimalAsStringSerializer();
+                    }
                     return ToStringSerializer.instance;
                 default:
                 }
@@ -122,11 +126,8 @@ public class NumberSerializers {
      * This is the special serializer for regular {@link java.lang.Integer}s
      * (and primitive ints)
      * <p>
-     * Since this is one of "native" types, no type information is ever included
-     * on serialization (unlike for most scalar types)
-     * <p>
-     * NOTE: as of 2.6, generic signature changed to Object, to avoid generation
-     * of bridge methods.
+     * Since this is one of "natural" types, no type information is ever included
+     * on serialization (unlike for most scalar types, except for {@code double}).
      */
     @JacksonStdImpl
     public static class IntegerSerializer extends Base<Object> {

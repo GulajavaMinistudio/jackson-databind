@@ -6,6 +6,9 @@ Project: jackson-databind
 
 2.10.0 (not yet released)
 
+#1675: Remove "impossible" `IOException` in `readTree()` and `readValue()` `ObjectMapper`
+  methods which accept Strings
+ (requested by matthew-pwnieexpress@github)
 #2059: Remove `final` modifier for `TypeFactory`
  (requested by Thibaut R)
 #2115: Support naive deserialization of `Serializable` values as "untyped", same
@@ -28,6 +31,10 @@ Project: jackson-databind
 #2223: Add `missingNode()` method in `JsonNodeFactory`
 #2227: Minor cleanup of exception message for `Enum` binding failure
  (reported by RightHandedMonkey@github)
+#2230: `WRITE_BIGDECIMAL_AS_PLAIN` is ignored if `@JsonFormat` is used
+ (reported by Pavel C)
+#2241: Add `JsonPropertyNamingStrategy.LOWER_DOT_CASE` for dot-delimited names
+ (contributed by zenglian@github.com)
 
 2.9.9 (not yet released)
 
