@@ -5,6 +5,8 @@ import java.io.IOException;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 public class MinimalClassNameIdResolver
@@ -22,9 +24,10 @@ public class MinimalClassNameIdResolver
      */
     protected final String _basePackagePrefix;
 
-    protected MinimalClassNameIdResolver(JavaType baseType, TypeFactory typeFactory)
+    protected MinimalClassNameIdResolver(JavaType baseType, TypeFactory typeFactory,
+            PolymorphicTypeValidator ptv)
     {
-        super(baseType, typeFactory);
+        super(baseType, typeFactory, ptv);
         String base = baseType.getRawClass().getName();
         int ix = base.lastIndexOf('.');
         if (ix < 0) { // can this ever occur?
@@ -34,6 +37,11 @@ public class MinimalClassNameIdResolver
             _basePackagePrefix = base.substring(0, ix+1);
             _basePackageName = base.substring(0, ix);
         }
+    }
+
+    public static MinimalClassNameIdResolver construct(JavaType baseType, MapperConfig<?> config,
+            PolymorphicTypeValidator ptv) {
+        return new MinimalClassNameIdResolver(baseType, config.getTypeFactory(), ptv);
     }
 
     @Override

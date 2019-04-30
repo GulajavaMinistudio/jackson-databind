@@ -5,6 +5,8 @@ import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
@@ -18,8 +20,17 @@ public class ClassNameIdResolver
 {
     private final static String JAVA_UTIL_PKG = "java.util.";
 
-    public ClassNameIdResolver(JavaType baseType, TypeFactory typeFactory) {
+    protected final PolymorphicTypeValidator _subTypeValidator;
+
+    public ClassNameIdResolver(JavaType baseType, TypeFactory typeFactory,
+            PolymorphicTypeValidator ptv) {
         super(baseType, typeFactory);
+        _subTypeValidator = ptv;
+    }
+
+    public static ClassNameIdResolver construct(JavaType baseType, MapperConfig<?> config,
+            PolymorphicTypeValidator ptv) {
+        return new ClassNameIdResolver(baseType, config.getTypeFactory(), ptv);
     }
 
     @Override
@@ -47,7 +58,7 @@ public class ClassNameIdResolver
     protected JavaType _typeFromId(String id, DatabindContext ctxt) throws IOException
     {
         // 24-Apr-2019, tatu: [databind#2195] validate as well as resolve:
-        JavaType t = ctxt.resolveAndValidateSubType(_baseType, id);
+        JavaType t = ctxt.resolveAndValidateSubType(_baseType, id, _subTypeValidator);
         if (t == null) {
             if (ctxt instanceof DeserializationContext) {
                 // First: we may have problem handlers that can deal with it?
