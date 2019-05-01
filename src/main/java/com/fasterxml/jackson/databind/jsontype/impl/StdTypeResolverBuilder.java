@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.*;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator.Validity;
+import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
  * Default {@link TypeResolverBuilder} implementation.
@@ -106,8 +108,8 @@ public class StdTypeResolverBuilder
     }
 
     @Override
-    public TypeSerializer buildTypeSerializer(SerializationConfig config,
-            JavaType baseType, Collection<NamedType> subtypes)
+    public TypeSerializer buildTypeSerializer(SerializerProvider ctxt,
+            JavaType baseType, Collection<NamedType> subtypes) throws JsonMappingException
     {
         if (_idType == JsonTypeInfo.Id.NONE) { return null; }
         // 03-Oct-2016, tatu: As per [databind#1395] better prevent use for primitives,
@@ -115,7 +117,7 @@ public class StdTypeResolverBuilder
         if (baseType.isPrimitive()) {
             return null;
         }
-        TypeIdResolver idRes = idResolver(config, baseType, subTypeValidator(config),
+        TypeIdResolver idRes = idResolver(ctxt, baseType, subTypeValidator(ctxt),
                 subtypes, true, false);
         switch (_includeAs) {
         case WRAPPER_ARRAY:
@@ -134,8 +136,8 @@ public class StdTypeResolverBuilder
     }
 
     @Override
-    public TypeDeserializer buildTypeDeserializer(DeserializationConfig config,
-            JavaType baseType, Collection<NamedType> subtypes)
+    public TypeDeserializer buildTypeDeserializer(DeserializationContext ctxt,
+            JavaType baseType, Collection<NamedType> subtypes) throws JsonMappingException
     {
         if (_idType == JsonTypeInfo.Id.NONE) { return null; }
         // 03-Oct-2016, tatu: As per [databind#1395] better prevent use for primitives,
@@ -146,10 +148,10 @@ public class StdTypeResolverBuilder
 
         // 27-Apr-2019, tatu: Part of [databind#2195]; must first check whether any subtypes
         //    of basetypes might be denied or allowed
-        final PolymorphicTypeValidator subTypeValidator = verifyBaseTypeValidity(config, baseType);
-        
-        TypeIdResolver idRes = idResolver(config, baseType, subTypeValidator, subtypes, false, true);
-        JavaType defaultImpl = defineDefaultImpl(config, baseType);
+        final PolymorphicTypeValidator subTypeValidator = verifyBaseTypeValidity(ctxt, baseType);
+
+        TypeIdResolver idRes = idResolver(ctxt, baseType, subTypeValidator, subtypes, false, true);
+        JavaType defaultImpl = defineDefaultImpl(ctxt, baseType);
 
         // First, method for converting type info to type id:
         switch (_includeAs) {
@@ -170,11 +172,11 @@ public class StdTypeResolverBuilder
         throw new IllegalStateException("Do not know how to construct standard type serializer for inclusion type: "+_includeAs);
     }
 
-    protected JavaType defineDefaultImpl(DeserializationConfig config, JavaType baseType) {
+    protected JavaType defineDefaultImpl(DatabindContext ctxt, JavaType baseType) {
         JavaType defaultImpl;
         if (_defaultImpl == null) {
             //Fis of issue #955
-            if (config.isEnabled(MapperFeature.USE_BASE_TYPE_AS_DEFAULT_IMPL) && !baseType.isAbstract()) {
+            if (ctxt.isEnabled(MapperFeature.USE_BASE_TYPE_AS_DEFAULT_IMPL) && !baseType.isAbstract()) {
                 defaultImpl = baseType;
             } else {
                 defaultImpl = null;
@@ -186,13 +188,13 @@ public class StdTypeResolverBuilder
             // NOTE: `Void` actually means that for unknown type id we should get `null`
             //  value -- NOT that there is no default implementation.
             if (_defaultImpl == Void.class) {
-                defaultImpl = config.getTypeFactory().constructType(_defaultImpl);
+                defaultImpl = ctxt.getTypeFactory().constructType(_defaultImpl);
             } else {
                 if (baseType.hasRawClass(_defaultImpl)) { // common enough to check
                     defaultImpl = baseType;
                 } else if (baseType.isTypeOrSuperTypeOf(_defaultImpl)) {
                     // most common case with proper base type...
-                    defaultImpl = config.getTypeFactory()
+                    defaultImpl = ctxt.getTypeFactory()
                             .constructSpecializedType(baseType, _defaultImpl);
                 } else {
                     // 05-Apr-2018, tatu: As [databind#1565] and [databind#1861] need to allow
@@ -246,7 +248,7 @@ public class StdTypeResolverBuilder
      * type id resolver, or construct a standard resolver
      * given configuration.
      */
-    protected TypeIdResolver idResolver(MapperConfig<?> config,
+    protected TypeIdResolver idResolver(DatabindContext ctxt,
             JavaType baseType, PolymorphicTypeValidator subtypeValidator,
             Collection<NamedType> subtypes, boolean forSer, boolean forDeser)
     {
@@ -255,11 +257,11 @@ public class StdTypeResolverBuilder
         if (_idType == null) throw new IllegalStateException("Cannot build, 'init()' not yet called");
         switch (_idType) {
         case CLASS:
-            return ClassNameIdResolver.construct(baseType, config, subtypeValidator);
+            return ClassNameIdResolver.construct(baseType, ctxt.getConfig(), subtypeValidator);
         case MINIMAL_CLASS:
-            return MinimalClassNameIdResolver.construct(baseType, config, subtypeValidator);
+            return MinimalClassNameIdResolver.construct(baseType, ctxt.getConfig(), subtypeValidator);
         case NAME:
-            return TypeNameIdResolver.construct(config, baseType, subtypes, forSer, forDeser);
+            return TypeNameIdResolver.construct(ctxt.getConfig(), baseType, subtypes, forSer, forDeser);
         case NONE: // hmmh. should never get this far with 'none'
             return null;
         case CUSTOM: // need custom resolver...
@@ -273,23 +275,47 @@ public class StdTypeResolverBuilder
     /**********************************************************
      */
 
-    
-    protected PolymorphicTypeValidator verifyBaseTypeValidity(MapperConfig<?> config,
-            JavaType baseType)
-    {
-        return subTypeValidator(config);
-    }
-    
     /**
      * Overridable helper method for determining actual validator to use when constructing
      * type serializers and type deserializers.
      *<p>
      * Default implementation simply uses one configured and accessible using
      * {@link MapperConfig#getPolymorphicTypeValidator()}.
-     *
-     * @since 2.10
      */
-    public PolymorphicTypeValidator subTypeValidator(MapperConfig<?> config) {
-        return config.getPolymorphicTypeValidator();
+    public PolymorphicTypeValidator subTypeValidator(DatabindContext ctxt) {
+        return ctxt.getConfig().getPolymorphicTypeValidator();
+    }
+
+    /**
+     * Helper method called to check that base type is valid regarding possible constraints
+     * on basetype/subtype combinations allowed for polymorphic type handling.
+     * Currently limits are verified for class name - based methods only.
+     */
+    protected PolymorphicTypeValidator verifyBaseTypeValidity(DatabindContext ctxt,
+            JavaType baseType) throws JsonMappingException
+    {
+        final PolymorphicTypeValidator ptv = subTypeValidator(ctxt);
+        if (_idType == JsonTypeInfo.Id.CLASS || _idType == JsonTypeInfo.Id.MINIMAL_CLASS) {
+            final Validity validity = ptv.validateBaseType(ctxt, baseType);
+            // If no subtypes are legal (that is, base type itself is invalid), indicate problem
+            if (validity == Validity.DENIED) {
+                return reportInvalidBaseType(ctxt, baseType, ptv);
+            }
+            // If there's indication that any and all subtypes are fine, replace validator itself:
+            if (validity == Validity.ALLOWED) {
+                return LaissezFaireSubTypeValidator.instance;
+            }
+            // otherwise just return validator, is to be called for each distinct type
+        }
+        return ptv;
+    }
+
+    protected PolymorphicTypeValidator reportInvalidBaseType(DatabindContext ctxt,
+            JavaType baseType, PolymorphicTypeValidator ptv) throws JsonMappingException
+    {
+        return ctxt.reportBadDefinition(baseType, String.format(
+"Configured `PolymorphicTypeValidator` (of type %s) denied resolution of all subtypes of base type %s",
+                        ClassUtil.classNameOf(ptv), ClassUtil.classNameOf(baseType.getRawClass()))
+                );
     }
 }

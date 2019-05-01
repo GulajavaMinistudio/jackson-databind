@@ -2,7 +2,6 @@ package com.fasterxml.jackson.databind.jsontype.vld;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 
@@ -64,12 +63,12 @@ public class ValidatePolymSubTypeTest extends BaseMapTest
 
         // No categoric determination, depends on subtype
         @Override
-        public Validity validateBaseType(MapperConfig<?> ctxt, JavaType baseType) {
+        public Validity validateBaseType(DatabindContext ctxt, JavaType baseType) {
             return Validity.INDETERMINATE;
         }
 
         @Override
-        public Validity validateSubClassName(MapperConfig<?> ctxt, JavaType baseType, String subClassName) {
+        public Validity validateSubClassName(DatabindContext ctxt, JavaType baseType, String subClassName) {
             if (subClassName.equals(BadValue.class.getName())) {
                 return Validity.DENIED;
             }
@@ -80,7 +79,7 @@ public class ValidatePolymSubTypeTest extends BaseMapTest
         }
 
         @Override
-        public Validity validateSubType(MapperConfig<?> ctxt, JavaType baseType, JavaType subType) {
+        public Validity validateSubType(DatabindContext ctxt, JavaType baseType, JavaType subType) {
             return Validity.DENIED;
         }
     }
@@ -89,17 +88,17 @@ public class ValidatePolymSubTypeTest extends BaseMapTest
         private static final long serialVersionUID = 1L;
 
         @Override
-        public Validity validateBaseType(MapperConfig<?> ctxt, JavaType baseType) {
+        public Validity validateBaseType(DatabindContext ctxt, JavaType baseType) {
             return Validity.INDETERMINATE;
         }
 
         @Override
-        public Validity validateSubClassName(MapperConfig<?> ctxt, JavaType baseType, String subClassName) {
+        public Validity validateSubClassName(DatabindContext ctxt, JavaType baseType, String subClassName) {
             return Validity.INDETERMINATE;
         }
 
         @Override
-        public Validity validateSubType(MapperConfig<?> ctxt, JavaType baseType, JavaType subType) {
+        public Validity validateSubType(DatabindContext ctxt, JavaType baseType, JavaType subType) {
             if (subType.hasRawClass(BadValue.class)) {
                 return Validity.DENIED;
             }
@@ -113,13 +112,11 @@ public class ValidatePolymSubTypeTest extends BaseMapTest
     // // // Mappers with Default Typing
     
     private final ObjectMapper MAPPER_DEF_TYPING_NAME_CHECK = jsonMapperBuilder()
-            .polymorphicTypeValidator(new SimpleNameBasedValidator())
-            .enableDefaultTyping()
+            .enableDefaultTyping(new SimpleNameBasedValidator())
             .build();
 
     private final ObjectMapper MAPPER_DEF_TYPING_CLASS_CHECK = jsonMapperBuilder()
-            .polymorphicTypeValidator(new SimpleClassBasedValidator())
-            .enableDefaultTyping()
+            .enableDefaultTyping(new SimpleNameBasedValidator())
             .build();
 
     // // // Mappers without Default Typing (explicit annotation needed)

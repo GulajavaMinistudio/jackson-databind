@@ -189,16 +189,6 @@ public abstract class DatabindContext
 
     /**
      * Lookup method similar to {@link #resolveSubType} but one that also validates
-     * that resulting subtype is valid according to the default {@link PolymorphicTypeValidator}
-     * for the originating {@link ObjectMapper}.
-     *
-     * @since 2.10
-     */
-    public abstract JavaType resolveAndValidateSubType(JavaType baseType, String subClass)
-        throws JsonMappingException;
-
-    /**
-     * Lookup method similar to {@link #resolveSubType} but one that also validates
      * that resulting subtype is valid according to given {@link PolymorphicTypeValidator}.
      *
      * @since 2.10
@@ -212,8 +202,7 @@ public abstract class DatabindContext
         if (ltIndex > 0) {
             return _resolveAndValidateGeneric(baseType, subClass, ptv, ltIndex);
         }
-        final MapperConfig<?> config = getConfig();
-        PolymorphicTypeValidator.Validity vld = ptv.validateSubClassName(config, baseType, subClass);
+        PolymorphicTypeValidator.Validity vld = ptv.validateSubClassName(this, baseType, subClass);
         if (vld == Validity.DENIED) {
             return _throwSubtypeNameNotAllowed(baseType, subClass, ptv);
         }
@@ -231,10 +220,10 @@ public abstract class DatabindContext
         if (!baseType.isTypeOrSuperTypeOf(cls)) {
             return _throwNotASubtype(baseType, subClass);
         }
-        final JavaType subType = config.getTypeFactory().constructSpecializedType(baseType, cls);
+        final JavaType subType = getTypeFactory().constructSpecializedType(baseType, cls);
         // May skip check if type was allowed by subclass name already
         if (vld != Validity.ALLOWED) {
-            if (ptv.validateSubType(config, baseType, subType) != Validity.ALLOWED) {
+            if (ptv.validateSubType(this, baseType, subType) != Validity.ALLOWED) {
                 return _throwSubtypeClassNotAllowed(baseType, subClass, ptv);
             }
         }
@@ -245,11 +234,10 @@ public abstract class DatabindContext
             PolymorphicTypeValidator ptv, int ltIndex)
         throws JsonMappingException
     {
-        final MapperConfig<?> config = getConfig();
         // 24-Apr-2019, tatu: Not 100% sure if we should pass name with type parameters
         //    or not, but guessing it's more convenient not to have to worry about it so
         //    strip out
-        PolymorphicTypeValidator.Validity vld = ptv.validateSubClassName(config, baseType, subClass.substring(0, ltIndex));
+        PolymorphicTypeValidator.Validity vld = ptv.validateSubClassName(this, baseType, subClass.substring(0, ltIndex));
         if (vld == Validity.DENIED) {
             return _throwSubtypeNameNotAllowed(baseType, subClass, ptv);
         }
@@ -259,7 +247,7 @@ public abstract class DatabindContext
         }
         // Unless we were approved already by name, check that actual sub-class acceptable:
         if (vld != Validity.ALLOWED) {
-            if (ptv.validateSubType(config, baseType, subType) != Validity.ALLOWED) {
+            if (ptv.validateSubType(this, baseType, subType) != Validity.ALLOWED) {
                 return _throwSubtypeClassNotAllowed(baseType, subClass, ptv);
             }
         }

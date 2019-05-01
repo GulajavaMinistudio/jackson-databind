@@ -1,7 +1,6 @@
 package com.fasterxml.jackson.databind.jsontype;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
 
 /**
  * Interface for classes that handle validation of class name-based subtypes used
@@ -71,7 +70,7 @@ public abstract class PolymorphicTypeValidator
      *    (caller will usually throw an exception); otherwise (return {@link Validity#INDETERMINATE})
      *    per sub-type validation calls are made for each new subclass encountered.
      */
-    public abstract Validity validateBaseType(MapperConfig<?> ctxt, JavaType baseType)
+    public abstract Validity validateBaseType(DatabindContext ctxt, JavaType baseType)
             throws JsonMappingException;
 
     /**
@@ -95,8 +94,9 @@ public abstract class PolymorphicTypeValidator
      * @return Determination of validity of given class name, as a subtype of given base type:
      *   should NOT return {@code null}
      */
-    public abstract Validity validateSubClassName(MapperConfig<?> ctxt, JavaType baseType,
-            String subClassName) throws JsonMappingException;
+    public abstract Validity validateSubClassName(DatabindContext ctxt, JavaType baseType,
+            String subClassName)
+        throws JsonMappingException;
 
     /**
      * Method called after class name has been resolved to actual type, in cases where previous
@@ -115,6 +115,6 @@ public abstract class PolymorphicTypeValidator
      * @return Determination of validity of given class name, as a subtype of given base type:
      *   should NOT return {@code null}
      */
-    public abstract Validity validateSubType(MapperConfig<?> ctxt, JavaType baseType,
+    public abstract Validity validateSubType(DatabindContext ctxt, JavaType baseType,
             JavaType subType) throws JsonMappingException;
 }

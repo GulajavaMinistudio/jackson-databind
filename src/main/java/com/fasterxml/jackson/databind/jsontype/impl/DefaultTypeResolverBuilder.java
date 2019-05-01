@@ -6,11 +6,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import com.fasterxml.jackson.core.TreeNode;
 
-import com.fasterxml.jackson.databind.DefaultTyping;
-import com.fasterxml.jackson.databind.DeserializationConfig;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
@@ -32,26 +30,38 @@ public class DefaultTypeResolverBuilder
     private static final long serialVersionUID = 1L;
 
     /**
+     * Validator to use for checking that only valid subtypes are accepted
+     * from incoming content.
+     */
+    protected final PolymorphicTypeValidator _subtypeValidator;
+
+    /**
      * Definition of what types is this default typer valid for.
      */
     protected final DefaultTyping _appliesFor;
 
-    public DefaultTypeResolverBuilder(DefaultTyping t, JsonTypeInfo.As includeAs) {
+    public DefaultTypeResolverBuilder(PolymorphicTypeValidator subtypeValidator,
+            DefaultTyping t, JsonTypeInfo.As includeAs) {
+        _subtypeValidator = subtypeValidator;
         _appliesFor = t;
         _idType = JsonTypeInfo.Id.CLASS;
         _includeAs = includeAs;
         _typeProperty = _idType.getDefaultPropertyName();
     }
 
-    public DefaultTypeResolverBuilder(DefaultTyping t, String propertyName) {
+    public DefaultTypeResolverBuilder(PolymorphicTypeValidator subtypeValidator,
+            DefaultTyping t, String propertyName) {
+        _subtypeValidator = subtypeValidator;
         _appliesFor = t;
         _idType = JsonTypeInfo.Id.CLASS;
         _includeAs = JsonTypeInfo.As.PROPERTY;
         _typeProperty = propertyName;
     }
 
-    public DefaultTypeResolverBuilder(DefaultTyping t, JsonTypeInfo.As includeAs,
+    public DefaultTypeResolverBuilder(PolymorphicTypeValidator subtypeValidator,
+            DefaultTyping t, JsonTypeInfo.As includeAs,
             JsonTypeInfo.Id idType, String propertyName) {
+        _subtypeValidator = subtypeValidator;
         _appliesFor = t;
         _idType = idType;
         _includeAs = includeAs;
@@ -62,17 +72,22 @@ public class DefaultTypeResolverBuilder
     }
 
     @Override
-    public TypeDeserializer buildTypeDeserializer(DeserializationConfig config,
-            JavaType baseType, Collection<NamedType> subtypes)
-    {
-        return useForType(baseType) ? super.buildTypeDeserializer(config, baseType, subtypes) : null;
+    public PolymorphicTypeValidator subTypeValidator(DatabindContext ctxt) {
+        return _subtypeValidator;
     }
 
     @Override
-    public TypeSerializer buildTypeSerializer(SerializationConfig config,
-            JavaType baseType, Collection<NamedType> subtypes)
+    public TypeDeserializer buildTypeDeserializer(DeserializationContext ctxt,
+            JavaType baseType, Collection<NamedType> subtypes) throws JsonMappingException
     {
-        return useForType(baseType) ? super.buildTypeSerializer(config, baseType, subtypes) : null;            
+        return useForType(baseType) ? super.buildTypeDeserializer(ctxt, baseType, subtypes) : null;
+    }
+
+    @Override
+    public TypeSerializer buildTypeSerializer(SerializerProvider ctxt,
+            JavaType baseType, Collection<NamedType> subtypes) throws JsonMappingException
+    {
+        return useForType(baseType) ? super.buildTypeSerializer(ctxt, baseType, subtypes) : null;            
     }
 
     public DefaultTypeResolverBuilder typeIdVisibility(boolean isVisible) {
@@ -90,8 +105,7 @@ public class DefaultTypeResolverBuilder
      */
     public boolean useForType(JavaType t)
     {
-        // 03-Oct-2016, tatu: As per [databind#1395], need to skip
-        //  primitive types too, regardless
+        // Need to skip primitive types too, regardless
         if (t.isPrimitive()) {
             return false;
         }
@@ -116,7 +130,7 @@ public class DefaultTypeResolverBuilder
             while (t.isArrayType()) {
                 t = t.getContentType();
             }
-            // 19-Apr-2016, tatu: ReferenceType like Optional also requires similar handling:
+            // ReferenceType like Optional also requires similar handling:
             while (t.isReferenceType()) {
                 t = t.getReferencedType();
             }
