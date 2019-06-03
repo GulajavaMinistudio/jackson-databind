@@ -6,8 +6,10 @@ import java.math.BigInteger;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.MissingNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
@@ -880,7 +882,7 @@ public abstract class JsonNode
      * or if property exists and has value that is not Object node,
      * {@link UnsupportedOperationException} is thrown
      */
-    public JsonNode with(String propertyName) {
+    public ObjectNode with(String propertyName) {
         throw new UnsupportedOperationException("JsonNode not of type ObjectNode (but "
                 +getClass().getName()+"), cannot call with() on it");
     }
@@ -892,8 +894,10 @@ public abstract class JsonNode
      * If the node method is called on is not Object node,
      * or if property exists and has value that is not Array node,
      * {@link UnsupportedOperationException} is thrown
+     *<p>
+     * NOTE: since 2.10 has had co-variant return type
      */
-    public JsonNode withArray(String propertyName) {
+    public ArrayNode withArray(String propertyName) {
         throw new UnsupportedOperationException("JsonNode not of type ObjectNode (but "
                 +getClass().getName()+"), cannot call withArray() on it");
     }
