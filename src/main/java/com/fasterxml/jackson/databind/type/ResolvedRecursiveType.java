@@ -39,17 +39,26 @@ public class ResolvedRecursiveType extends TypeBase
     // 23-Jul-2019, tatu: [databind#2331] Need to also delegate this...
     @Override
     public TypeBindings getBindings() {
-        return _referencedType.getBindings();
+        if (_referencedType != null) { // `null` before resolution [databind#2395]
+            return _referencedType.getBindings();
+        }
+        return super.getBindings();
     }
 
     @Override
     public StringBuilder getGenericSignature(StringBuilder sb) {
-        return _referencedType.getGenericSignature(sb);
+        if (_referencedType != null) {
+            return _referencedType.getGenericSignature(sb);
+        }
+        return sb.append("?");
     }
 
     @Override
     public StringBuilder getErasedSignature(StringBuilder sb) {
-        return _referencedType.getErasedSignature(sb);
+        if (_referencedType != null) {
+            return _referencedType.getErasedSignature(sb);
+        }
+        return sb;
     }
 
     @Override
