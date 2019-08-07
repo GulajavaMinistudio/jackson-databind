@@ -8,6 +8,8 @@ Project: jackson-databind
 
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
  (reported by sunchezz89@github)
+#2392: `BeanDeserializerModifier.modifyDeserializer()` not applied to custom bean deserializers
+ (reported by andreasbaus@github)
 #2393: `TreeTraversingParser.getLongValue()` incorrectly checks `canConvertToInt()`
  (reported by RabbidDog@github)
 
@@ -61,7 +63,7 @@ Project: jackson-databind
 #2339: Suboptimal return type for `ObjectNode.set()`
  (reported by Victor N)
 
-2.9.9.3 (not yet released)
+2.9.9.3 (06-Aug-2019)
 
 #2395: `NullPointerException` from `ResolvedRecursiveType` (regression due to fix for #2331)
  (reported by Michael S)
@@ -70,7 +72,7 @@ Project: jackson-databind
 
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
 #2387: Block yet another deserialization gadget (CVE-2019-14379)
-#2389: Block yet another deserialization gadget (CVE-2019-14361)
+#2389: Block yet another deserialization gadget (CVE-2019-14439)
  (reported by xiexq)
 
 2.9.9.1 (03-Jul-2019)
@@ -415,7 +417,7 @@ Project: jackson-databind
 #2334: Block one more gadget type (CVE-2019-12384)
 #2341: Block one more gadget type (CVE-2019-12814)
 #2387: Block one more gadget type (CVE-2019-14379)
-#2389: Block one more gadget type (CVE-2019-14361)
+#2389: Block one more gadget type (CVE-2019-14439)
  (reported by xiexq)
 
 2.8.11.3 (23-Nov-2018)
