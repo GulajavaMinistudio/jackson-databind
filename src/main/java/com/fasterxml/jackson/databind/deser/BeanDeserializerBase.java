@@ -25,11 +25,8 @@ import com.fasterxml.jackson.databind.util.*;
  */
 public abstract class BeanDeserializerBase
     extends StdDeserializer<Object>
-    implements ValueInstantiator.Gettable,
-        java.io.Serializable
+    implements ValueInstantiator.Gettable
 {
-    private static final long serialVersionUID = 1;
-
     protected final static PropertyName TEMP_PROPERTY_NAME = new PropertyName("#temporary-name");
 
     /*
@@ -1501,23 +1498,27 @@ public abstract class BeanDeserializerBase
     /**
      * Helper method called for an unknown property, when using "vanilla"
      * processing.
+     *
+     * @param beanOrBuilder Either POJO instance (if constructed), or builder
+     *   (in case of builder-based approach), that has property we haven't been
+     *   able to handle yet.
      */
     protected void handleUnknownVanilla(JsonParser p, DeserializationContext ctxt,
-            Object bean, String propName)
+            Object beanOrBuilder, String propName)
         throws IOException
     {
         if ((_ignorableProps != null) && _ignorableProps.contains(propName)) {
-            handleIgnoredProperty(p, ctxt, bean, propName);
+            handleIgnoredProperty(p, ctxt, beanOrBuilder, propName);
         } else if (_anySetter != null) {
             try {
                // should we consider return type of any setter?
-                _anySetter.deserializeAndSet(p, ctxt, bean, propName);
+                _anySetter.deserializeAndSet(p, ctxt, beanOrBuilder, propName);
             } catch (Exception e) {
-                throw wrapAndThrow(e, bean, propName, ctxt);
+                throw wrapAndThrow(e, beanOrBuilder, propName, ctxt);
             }
         } else {
             // Unknown: let's call handler method
-            handleUnknownProperty(p, ctxt, bean, propName);         
+            handleUnknownProperty(p, ctxt, beanOrBuilder, propName);
         }
     }
 

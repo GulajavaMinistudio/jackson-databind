@@ -8,10 +8,16 @@ Project: jackson-databind
 
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
  (reported by sunchezz89@github)
+#2390: `Iterable` serialization breaks when adding `@JsonFilter` annotation
+ (reported by Chris M)
 #2392: `BeanDeserializerModifier.modifyDeserializer()` not applied to custom bean deserializers
  (reported by andreasbaus@github)
 #2393: `TreeTraversingParser.getLongValue()` incorrectly checks `canConvertToInt()`
  (reported by RabbidDog@github)
+#2415: Builder-based POJO deserializer should pass builder instance, not type,
+  to `handleUnknownVanilla()`
+ (proposed by Vladimir T, follow up to #822)
+#2416: Optimize `ValueInstantiator` construction for default `Collection`, `Map` types
 
 2.10.0.pr1 (19-Jul-2019)
 
