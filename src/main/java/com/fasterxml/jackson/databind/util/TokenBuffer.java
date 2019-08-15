@@ -23,9 +23,7 @@ import com.fasterxml.jackson.databind.*;
  * linked list of tokens; only modifications are via appends.
  */
 public class TokenBuffer
-/* Won't use JsonGeneratorBase, to minimize overhead for validity
- * checking
- */
+// Won't use JsonGeneratorBase, to minimize overhead for validity checking
     extends JsonGenerator
 {
     protected final static int DEFAULT_STREAM_WRITE_FEATURES = StreamWriteFeature.collectDefaults();
@@ -611,7 +609,17 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
      */
 
     @Override
-    public JsonWriteContext getOutputContext() { return _tokenWriteContext; }
+    public TokenStreamContext getOutputContext() { return _tokenWriteContext; }
+
+    @Override
+    public Object getCurrentValue() {
+        return _tokenWriteContext.getCurrentValue();
+    }
+
+    @Override
+    public void setCurrentValue(Object v) {
+        _tokenWriteContext.setCurrentValue(v);
+    }
 
     @Override
     public ObjectWriteContext getObjectWriteContext() { return _objectWriteContext; }
@@ -651,12 +659,6 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
         // 26-Oct-2018, tatu: Should not have anything format-specific... however,
         // not all features  default to "false" so this may not be right choice?
         return 0;
-    }
-    
-    @Override
-    public JsonGenerator useDefaultPrettyPrinter() {
-        // No-op: we don't indent
-        return this;
     }
 
     /*
@@ -701,7 +703,7 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
     {
         _tokenWriteContext.writeValue();
         _append(JsonToken.START_ARRAY);
-        _tokenWriteContext = _tokenWriteContext.createChildArrayContext();
+        _tokenWriteContext = _tokenWriteContext.createChildArrayContext(null);
     }
 
     @Override
@@ -728,7 +730,7 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
     {
         _tokenWriteContext.writeValue();
         _append(JsonToken.START_OBJECT);
-        _tokenWriteContext = _tokenWriteContext.createChildObjectContext();
+        _tokenWriteContext = _tokenWriteContext.createChildObjectContext(null);
     }
 
     @Override
