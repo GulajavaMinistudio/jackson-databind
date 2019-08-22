@@ -8,6 +8,8 @@ Project: jackson-databind
 
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
  (reported by sunchezz89@github)
+#2336: `MapDeserializer` can not merge `Map`s with polymorphic values
+ (reported by Robert G)
 #2390: `Iterable` serialization breaks when adding `@JsonFilter` annotation
  (reported by Chris M)
 #2392: `BeanDeserializerModifier.modifyDeserializer()` not applied to custom bean deserializers
@@ -18,6 +20,10 @@ Project: jackson-databind
   to `handleUnknownVanilla()`
  (proposed by Vladimir T, follow up to #822)
 #2416: Optimize `ValueInstantiator` construction for default `Collection`, `Map` types
+#2422: `scala.collection.immutable.ListMap` fails to serialize since 2.9.3
+ (reported by dejanlokar1@github)
+#2425: Add global config override setting for `@JsonFormat.lenient()`
+#2428: Use "activateDefaultTyping" over "enableDefaultTyping" in 2.10 with new methods
 
 2.10.0.pr1 (19-Jul-2019)
 

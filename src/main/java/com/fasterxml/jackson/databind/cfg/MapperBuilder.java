@@ -861,6 +861,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
+    /**
+     * Method for setting default Setter configuration, regarding things like
+     * merging, null-handling; used for properties for which there are
+     * no per-type or per-property overrides (via annotations or config overrides).
+     */
+    public B defaultLeniency(Boolean b) {
+        _configOverrides.setDefaultLeniency(b);
+        return _this();
+    }
+
     /*
     /**********************************************************************
     /* Module registration, discovery, access
@@ -1307,7 +1317,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**
      * Convenience method that is equivalent to calling
      *<pre>
-     *  enableDefaultTyping(DefaultTyping.OBJECT_AND_NON_CONCRETE);
+     *  activateDefaultTyping(DefaultTyping.OBJECT_AND_NON_CONCRETE);
      *</pre>
      *<p>
      * NOTE: choice of {@link PolymorphicTypeValidator} to configure is of
@@ -1317,14 +1327,14 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * allow-listing to specify acceptable types unless source of content
      * is fully trusted to only send safe types.
      */
-    public B enableDefaultTyping(PolymorphicTypeValidator subtypeValidator) {
-        return enableDefaultTyping(subtypeValidator, DefaultTyping.OBJECT_AND_NON_CONCRETE);
+    public B activateDefaultTyping(PolymorphicTypeValidator subtypeValidator) {
+        return activateDefaultTyping(subtypeValidator, DefaultTyping.OBJECT_AND_NON_CONCRETE);
     }
 
     /**
      * Convenience method that is equivalent to calling
      *<pre>
-     *  enableDefaultTyping(dti, JsonTypeInfo.As.WRAPPER_ARRAY);
+     *  activateDefaultTyping(dti, JsonTypeInfo.As.WRAPPER_ARRAY);
      *</pre>
      *<p>
      * NOTE: choice of {@link PolymorphicTypeValidator} to configure is of
@@ -1334,9 +1344,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * allow-listing to specify acceptable types unless source of content
      * is fully trusted to only send safe types.
      */
-    public B enableDefaultTyping(PolymorphicTypeValidator subtypeValidator,
+    public B activateDefaultTyping(PolymorphicTypeValidator subtypeValidator,
             DefaultTyping dti) {
-        return enableDefaultTyping(subtypeValidator,
+        return activateDefaultTyping(subtypeValidator,
                 dti, JsonTypeInfo.As.WRAPPER_ARRAY);
     }
 
@@ -1359,7 +1369,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * @param applicability Defines kinds of types for which additional type information
      *    is added; see {@link DefaultTyping} for more information.
      */
-    public B enableDefaultTyping(PolymorphicTypeValidator subtypeValidator,
+    public B activateDefaultTyping(PolymorphicTypeValidator subtypeValidator,
             DefaultTyping applicability, JsonTypeInfo.As includeAs)
     {
         // Use if "As.EXTERNAL_PROPERTY" will not work, check to ensure no attempts made
@@ -1385,7 +1395,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * allow-listing to specify acceptable types unless source of content
      * is fully trusted to only send safe types.
      */
-    public B enableDefaultTypingAsProperty(PolymorphicTypeValidator subtypeValidator,
+    public B activateDefaultTypingAsProperty(PolymorphicTypeValidator subtypeValidator,
             DefaultTyping applicability, String propertyName)
     {
         return setDefaultTyping(_defaultDefaultTypingResolver(subtypeValidator,
@@ -1398,7 +1408,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * {@link com.fasterxml.jackson.annotation.JsonTypeInfo}) will have
      * additional embedded type information.
      */
-    public B disableDefaultTyping() {
+    public B deactivateDefaultTyping() {
         return setDefaultTyping(null);
     }
 

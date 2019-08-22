@@ -3,6 +3,7 @@ package com.fasterxml.jackson.databind.cfg;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSetter;
 
@@ -42,6 +43,8 @@ public class ConfigOverrides
 
     protected Boolean _defaultMergeable;
 
+    protected Boolean _defaultLeniency;
+
     /*
     /**********************************************************************
     /* Life cycle
@@ -53,20 +56,20 @@ public class ConfigOverrides
                 INCLUDE_ALL,
                 JsonSetter.Value.empty(),
                 VisibilityChecker.defaultInstance(),
-                null
+                null, null
         );
     }
 
     protected ConfigOverrides(Map<Class<?>, MutableConfigOverride> overrides,
-            JsonInclude.Value defIncl,
-            JsonSetter.Value defSetter,
+            JsonInclude.Value defIncl, JsonSetter.Value defSetter,
             VisibilityChecker defVisibility,
-            Boolean defMergeable) {
+            Boolean defMergeable, Boolean defLeniency) {
         _overrides = overrides;
         _defaultInclusion = defIncl;
         _defaultNullHandling = defSetter;
         _visibilityChecker = defVisibility;
         _defaultMergeable = defMergeable;
+        _defaultLeniency = defLeniency;
     }
 
     @Override
@@ -82,7 +85,8 @@ public class ConfigOverrides
             }
         }
         return new ConfigOverrides(newOverrides,
-                _defaultInclusion, _defaultNullHandling, _visibilityChecker, _defaultMergeable);
+                _defaultInclusion, _defaultNullHandling, _visibilityChecker,
+                _defaultMergeable, _defaultLeniency);
     }
 
     /*
@@ -110,6 +114,34 @@ public class ConfigOverrides
         return override;
     }
 
+    /**
+     * Specific accessor for finding {code JsonFormat.Value} for given type,
+     * considering global default for leniency as well as per-type format
+     * override (if any).
+     *
+     * @return Default format settings for type; never null.
+     *
+     * @since 2.10
+     */
+    public JsonFormat.Value findFormatDefaults(Class<?> type) {
+        if (_overrides != null) {
+            ConfigOverride override = _overrides.get(type);
+            if (override != null) {
+                JsonFormat.Value format = override.getFormat();
+                if (format != null) {
+                    if (!format.hasLenient()) {
+                        return format.withLenient(_defaultLeniency);
+                    }
+                    return format;
+                }
+            }
+        }
+        if (_defaultLeniency == null) {
+            return JsonFormat.Value.empty();
+        }
+        return JsonFormat.Value.forLeniency(_defaultLeniency);
+    }
+
     /*
     /**********************************************************************
     /* Global defaults accessors
@@ -126,6 +158,10 @@ public class ConfigOverrides
 
     public Boolean getDefaultMergeable() {
         return _defaultMergeable;
+    }
+
+    public Boolean getDefaultLeniency() {
+        return _defaultLeniency;
     }
 
     public VisibilityChecker getDefaultVisibility() {
@@ -148,8 +184,13 @@ public class ConfigOverrides
         return this;
     }
 
-    public ConfigOverrides setDefaultMergeable(Boolean v) {
-        _defaultMergeable = v;
+    public ConfigOverrides setDefaultMergeable(Boolean b) {
+        _defaultMergeable = b;
+        return this;
+    }
+
+    public ConfigOverrides setDefaultLeniency(Boolean b) {
+        _defaultLeniency = b;
         return this;
     }
 
@@ -175,6 +216,7 @@ public class ConfigOverrides
                 .append("incl=").append(_defaultInclusion)
                 .append(", nulls=").append(_defaultNullHandling)
                 .append(", merge=").append(_defaultMergeable)
+                .append(", leniency=").append(_defaultLeniency)
                 .append(", visibility=").append(_visibilityChecker)
                 .append(", typed=")
                 ;
