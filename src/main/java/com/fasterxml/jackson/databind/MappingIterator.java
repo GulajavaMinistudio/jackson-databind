@@ -163,11 +163,17 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
         }
     }
 
+    /**
+     * Method for getting an "empty" iterator instance: one that never
+     * has more values; may be freely shared.
+     *
+     * @since 2.10 Existed earlier but {@code public} since 2.10
+     */
     @SuppressWarnings("unchecked")
-    protected static <T> MappingIterator<T> emptyIterator() {
+    public static <T> MappingIterator<T> emptyIterator() {
         return (MappingIterator<T>) EMPTY_ITERATOR;
     }
-    
+
     /*
     /**********************************************************************
     /* Basic iterator impl
@@ -185,7 +191,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
             return (Boolean) _handleIOException(e);
         }
     }
-    
+
     @Override
     public T next()
     {

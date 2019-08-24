@@ -18,15 +18,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
  */
 public class TestContextualSerialization extends BaseMapTest
 {
-    /*
-    /**********************************************************
-    /* Helper classes
-    /**********************************************************
-     */
-
-    /* NOTE: important; MUST be considered a 'Jackson' annotation to be seen
-     * (or recognized otherwise via AnnotationIntrospect.isHandled())
-     */
+    // NOTE: important; MUST be considered a 'Jackson' annotation to be seen
+    // (or recognized otherwise via AnnotationIntrospect.isHandled())
     @Target({ElementType.FIELD, ElementType.TYPE, ElementType.METHOD})
     @Retention(RetentionPolicy.RUNTIME)
     @JacksonAnnotation
@@ -162,13 +155,13 @@ public class TestContextualSerialization extends BaseMapTest
         protected int isResolved;
 
         public ContextualAndResolvable() { this(0, 0); }
-        
+
         public ContextualAndResolvable(int resolved, int contextual)
         {
             isContextual = contextual;
             isResolved = resolved;
         }
-        
+
         @Override
         public void serialize(String value, JsonGenerator jgen, SerializerProvider provider) throws IOException
         {
@@ -187,7 +180,35 @@ public class TestContextualSerialization extends BaseMapTest
             ++isResolved;
         }
     }
-    
+
+    static class AccumulatingContextual
+        extends JsonSerializer<String>
+    {
+        protected String desc;
+
+        public AccumulatingContextual() { this(""); }
+
+        public AccumulatingContextual(String newDesc) {
+            desc = newDesc;
+        }
+
+        @Override
+        public void serialize(String value, JsonGenerator g, SerializerProvider provider) throws IOException
+        {
+            g.writeString(desc+"/"+value);
+        }
+
+        @Override
+        public JsonSerializer<?> createContextual(SerializerProvider prov, BeanProperty property)
+                throws JsonMappingException
+        {
+            if (property == null) {
+                return new AccumulatingContextual(desc+"/ROOT");
+            }
+            return new AccumulatingContextual(desc+"/"+property.getName());
+        }
+    }
+
     /*
     /**********************************************************
     /* Unit tests
@@ -267,27 +288,40 @@ public class TestContextualSerialization extends BaseMapTest
 
     public void testContextualViaAnnotation() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = newJsonMapper();
         AnnotatedContextualBean bean = new AnnotatedContextualBean("abc");
         assertEquals("{\"value\":\"prefix->abc\"}", mapper.writeValueAsString(bean));
     }
 
-    /*
-    // [JACKSON-647]: is resolve() called for contextual instances?
     public void testResolveOnContextual() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         SimpleModule module = new SimpleModule("test", Version.unknownVersion());
         module.addSerializer(String.class, new ContextualAndResolvable());
-        mapper.registerModule(module);
+        ObjectMapper mapper = jsonMapperBuilder()
+                .addModule(module)
+                .build();
         assertEquals(quote("contextual=1,resolved=1"), mapper.writeValueAsString("abc"));
+
+        // also: should NOT be called again
+        assertEquals(quote("contextual=1,resolved=1"), mapper.writeValueAsString("foo"));
     }
 
     public void testContextualArrayElement() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = newJsonMapper();
         ContextualArrayElementBean beans = new ContextualArrayElementBean("456");
         assertEquals("{\"beans\":[\"elem->456\"]}", mapper.writeValueAsString(beans));
     }
-    */
+
+    // Test to verify aspects of [databind#2429]
+    public void testRootContextualization2429() throws Exception
+    {
+        ObjectMapper mapper = jsonMapperBuilder()
+                .addModule(new SimpleModule("test", Version.unknownVersion())
+                        .addSerializer(String.class, new AccumulatingContextual()))
+                .build();
+        assertEquals(quote("/ROOT/foo"), mapper.writeValueAsString("foo"));
+        assertEquals(quote("/ROOT/bar"), mapper.writeValueAsString("bar"));
+        assertEquals(quote("/ROOT/3"), mapper.writeValueAsString("3"));
+    }
 }
