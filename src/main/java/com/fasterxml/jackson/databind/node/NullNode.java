@@ -3,6 +3,7 @@ package com.fasterxml.jackson.databind.node;
 import java.io.IOException;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
 
@@ -10,7 +11,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
  * This singleton value class is used to contain explicit JSON null
  * value.
  */
-public final class NullNode
+public class NullNode
     extends ValueNode
 {
     private static final long serialVersionUID = 3L;
@@ -38,6 +39,12 @@ public final class NullNode
     @Override public String asText(String defaultValue) { return defaultValue; }
     @Override public String asText() { return "null"; }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public JsonNode requireNonNull() {
+        return _reportRequiredViolation("requireNonNull() called on `NullNode`");
+    }
+
     // as with MissingNode, not considered number node; hence defaults are returned if provided
     
     /*
@@ -56,7 +63,11 @@ public final class NullNode
 
     @Override
     public boolean equals(Object o) {
-        return (o == this);
+        // 29-Aug-2019, tatu: [databind#2433] Since custom sub-classes are allowed (bad idea probably),
+        //     need to do better comparison
+        if (o == this) return true;
+        if (!(o instanceof NullNode)) return false;
+        return ((NullNode) o).isNull();
     }
 
     @Override

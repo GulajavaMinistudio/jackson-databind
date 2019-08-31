@@ -2,7 +2,6 @@ package com.fasterxml.jackson.databind.jsontype.deftyping;
 
 import java.util.*;
 
-
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
@@ -19,6 +18,11 @@ public class TestDefaultForObject
 
         public StringBean() { this(null); }
         protected StringBean(String n)  { name = n; }
+    }
+
+    final static class FinalStringBean extends StringBean {
+        protected FinalStringBean() { this(null); }
+        public FinalStringBean(String n)  { super(n); }
     }
 
     enum Choice { YES, NO; }
@@ -371,7 +375,26 @@ public class TestDefaultForObject
             verifyException(e, "Cannot use includeAs of EXTERNAL_PROPERTY");
         }
     }
-    
+
+    // [databind#2349]
+    public void testWithFinalClass() throws Exception
+    {
+        // First: type info NOT included
+        ObjectMapper mapper = jsonMapperBuilder()
+                .activateDefaultTyping(NoCheckSubTypeValidator.instance,
+                        DefaultTyping.NON_FINAL)
+                .build();
+        assertEquals(aposToQuotes("{'name':'abc'}"),
+                mapper.writeValueAsString(new FinalStringBean("abc")));
+
+        mapper = jsonMapperBuilder()
+                .activateDefaultTyping(NoCheckSubTypeValidator.instance,
+                        DefaultTyping.EVERYTHING)
+                .build();
+        assertEquals(aposToQuotes("['"+FinalStringBean.class.getName()+"',{'name':'abc'}]"),
+                mapper.writeValueAsString(new FinalStringBean("abc")));
+    }
+
     /*
     /**********************************************************
     /* Helper methods

@@ -6,10 +6,13 @@ Project: jackson-databind
 
 2.10.0.pr2 (not yet released)
 
+#2237: Add "required" methods in `JsonNode`: `required(String | int)`,
+  `requiredAt(JsonPointer)`
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
  (reported by sunchezz89@github)
 #2336: `MapDeserializer` can not merge `Map`s with polymorphic values
  (reported by Robert G)
+#2349: Add option `DefaultTyping.EVERYTHING` to support Kotlin data classes
 #2390: `Iterable` serialization breaks when adding `@JsonFilter` annotation
  (reported by Chris M)
 #2392: `BeanDeserializerModifier.modifyDeserializer()` not applied to custom bean deserializers
@@ -26,6 +29,8 @@ Project: jackson-databind
 #2425: Add global config override setting for `@JsonFormat.lenient()`
 #2428: Use "activateDefaultTyping" over "enableDefaultTyping" in 2.10 with new methods
 #2430: Change `ObjectMapper.valueToTree()` to convert `null` to `NullNode`
+#2433: Improve `NullNode.equals()`
+ (suggested by David B)
 
 2.10.0.pr1 (19-Jul-2019)
 
