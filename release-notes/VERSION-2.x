@@ -4,10 +4,25 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+2.10.0-final (not yet released)
+
+#2149: Add `MapperFeature.ACCEPT_CASE_INSENSITIVE_VALUES`
+ (suggested by Craig P)
+#2309: READ_ENUMS_USING_TO_STRING doesn't support null values
+ (reported, fix suggested by Ben A)
+#2442: `ArrayNode.addAll()` adds raw `null` values which cause NPE on `deepCopy()`
+  and `toString()`
+ (reported, fix contributed by Hesham M)
+#2446: Java 11: Unable to load JDK7 types (annotations, java.nio.file.Path): no Java7 support added
+ (reported by David C)
+#2451: Add new `JsonValueFormat` value, `UUID`
+
 2.10.0.pr2 (31-Aug-2019)
 
 #2237: Add "required" methods in `JsonNode`: `required(String | int)`,
   `requiredAt(JsonPointer)`
+#2309: READ_ENUMS_USING_TO_STRING doesn't support null values
+ (reported, fix suggested by Ben A)
 #2331: `JsonMappingException` through nested getter with generic wildcard return type
  (reported by sunchezz89@github)
 #2336: `MapDeserializer` can not merge `Map`s with polymorphic values
@@ -34,9 +49,6 @@ Project: jackson-databind
 #2430: Change `ObjectMapper.valueToTree()` to convert `null` to `NullNode`
 #2433: Improve `NullNode.equals()`
  (suggested by David B)
-#2442: `ArrayNode.addAll()` adds raw `null` values which cause NPE on `deepCopy()`
-  and `toString()`
- (reported, fix contributed by Hesham M)
 
 2.10.0.pr1 (19-Jul-2019)
 
