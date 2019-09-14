@@ -661,6 +661,10 @@ svarzee@github
   * Reported #2109, suggested fix: Canonical string for reference type is built incorrectly
    (2.8.11.3 / 2.9.7)
 
+Kaki King (kingkk9279@g)
+  * Reported #2449: Block one more gadget type (cve CVE-2019-14540)
+   (2.9.10)
+  
 Connor Kuhn (ckuhn@github)
   * Contributed #1341: FAIL_ON_MISSING_EXTERNAL_TYPE_ID_PROPERTY
    (2.9.0)
@@ -880,12 +884,17 @@ Joe Barnett (josephlbarnett@github)
     ignored when creator properties are buffered
    (2.9.10)
 
-Christoph Breitkopf (bokesan@github)
-  * Reported #2217: Suboptimal memory allocation in `TextNode.getBinaryValue()`
+Yiqiu Huang (huangyq23@github
+  * Reported #2164: `FactoryBasedEnumDeserializer` does not respect
+   `DeserializationFeature.WRAP_EXCEPTIONS`
    (2.10.0)
-
+   
 Alexander Saites (saites@github)
   * Reported #2189: `TreeTraversingParser` does not check int bounds
+   (2.10.0)
+
+Christoph Breitkopf (bokesan@github)
+  * Reported #2217: Suboptimal memory allocation in `TextNode.getBinaryValue()`
    (2.10.0)
 
 Pavel Chervakov (pacher@github)
@@ -924,6 +933,10 @@ Sam Smith (Oracle Security Researcher)
 Vladimir Tsanev (tsachev@github)
   * Contributed #2415: Builder-based POJO deserializer should pass builder instance, not type,
     to `handleUnknownVanilla()` to fix earlier #822
+   (2.10.0)
+
+Marcos Passos (marcospassos@github(
+  * Contributed #2432: Add support for module bundles
    (2.10.0)
 
 David Becker (dsbecker@github)

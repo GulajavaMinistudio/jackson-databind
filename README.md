@@ -11,7 +11,7 @@ Naming of classes uses word 'JSON' in many places even though there is no actual
 
 [![Build Status](https://travis-ci.org/FasterXML/jackson-databind.svg?branch=master)](https://travis-ci.org/FasterXML/jackson-databind) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind)
 [![Javadoc](https://javadoc.io/badge/com.fasterxml.jackson.core/jackson-databind.svg)](http://www.javadoc.io/doc/com.fasterxml.jackson.core/jackson-databind)
-[![Coverage Status](https://coveralls.io/repos/github/FasterXML/jackson-databind/badge.svg?branch=master)](https://coveralls.io/github/FasterXML/jackson-databind?branch=master)
+[![Tidelift](https://tidelift.com/badges/package/maven/com.fasterxml.jackson.core:jackson-databind)](https://tidelift.com/subscription/pkg/maven-com-fasterxml-jackson-core-jackson-databind?utm_source=maven-com-fasterxml-jackson-core-jackson-databind&utm_medium=referral&utm_campaign=readme)
 
 -----
 
@@ -404,7 +404,10 @@ There is really just one main rule, which is that to accept any code contributio
 One additional limitation exists for so-called core components (streaming api, jackson-annotations and jackson-databind): no additional dependencies are allowed beyond:
 
 * Core components may rely on any methods included in the supported JDK
-    * Minimum JDK version is 1.6 as of Jackson 2.4 and above (1.5 was baseline with 2.3 and earlier)
+    * Minimum JDK version was 1.5 until (and including) version 2.3
+    * Minimum JDK version was 1.6 for Jackson 2.4 - 2.7 (inclusive) for all core components
+        * Minimum is still 1.6 for `jackson-annotations` and `jackson-core`, for all remaining Jackson 2.x versions
+    * Minimum JDK version is 1.7 for Jackson 2.7 - 2.10 of `jackson-databind` and most non-core components
 * Jackson-databind (this package) depends on the other two (annotations, streaming).
 
 This means that anything that has to rely on additional APIs or libraries needs to be built as an extension,
@@ -449,3 +452,4 @@ Related:
 * [Core parser/generator](https://github.com/FasterXML/jackson-core) package defines low-level incremental/streaming parsers, generators
 * [Jackson Project Home](../../../jackson) has links to all modules
 * [Jackson Docs](../../../jackson-docs) is project's documentation hub
+

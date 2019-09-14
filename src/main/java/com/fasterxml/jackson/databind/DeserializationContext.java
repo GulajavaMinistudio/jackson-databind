@@ -150,7 +150,7 @@ public abstract class DeserializationContext
             InjectableValues injectableValues)
     {
         _streamFactory = streamFactory;
-        _factory = df;
+        _factory = Objects.requireNonNull(df, "Cannot pass null DeserializerFactory");
         _cache = cache;
 
         _config = config;
@@ -304,7 +304,7 @@ public abstract class DeserializationContext
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends TreeNode> T readTree(JsonParser p) throws IOException {
+    public JsonNode readTree(JsonParser p) throws IOException {
         // NOTE: inlined version of `_bindAsTree()` from `ObjectReader`
         JsonToken t = p.currentToken();
         if (t == null) {
@@ -314,10 +314,10 @@ public abstract class DeserializationContext
             }
         }
         if (t == JsonToken.VALUE_NULL) {
-            return (T) getNodeFactory().nullNode();
+            return getNodeFactory().nullNode();
         }
         JsonDeserializer<Object> deser = findRootValueDeserializer(ObjectReader.JSON_NODE_TYPE);
-        return (T) deser.deserialize(p, this);
+        return (JsonNode) deser.deserialize(p, this);
     }
 
     /**
@@ -1148,6 +1148,10 @@ targetType, goodValue.getClass()));
         }
         // 18-May-2016, tatu: Only wrap if not already a valid type to throw
         ClassUtil.throwIfIOE(t);
+        // [databind#2164]: but see if wrapping is desired
+        if (!isEnabled(DeserializationFeature.WRAP_EXCEPTIONS)) {
+            ClassUtil.throwIfRTE(t);
+        }
         throw instantiationException(instClass, t);
     }
 
@@ -1382,18 +1386,6 @@ targetType, goodValue.getClass()));
      * Helper method used to indicate a problem with input in cases where more
      * specific <code>reportXxx()</code> method was not available.
      */
-    public <T> T reportInputMismatch(BeanProperty prop,
-            String msg, Object... msgArgs) throws JsonMappingException
-    {
-        msg = _format(msg, msgArgs);
-        JavaType type = (prop == null) ? null : prop.getType();
-        throw MismatchedInputException.from(getParser(), type, msg);
-    }
-
-    /**
-     * Helper method used to indicate a problem with input in cases where more
-     * specific <code>reportXxx()</code> method was not available.
-     */
     public <T> T reportInputMismatch(JsonDeserializer<?> src,
             String msg, Object... msgArgs) throws JsonMappingException
     {
@@ -1422,6 +1414,55 @@ targetType, goodValue.getClass()));
         msg = _format(msg, msgArgs);
         throw MismatchedInputException.from(getParser(), targetType, msg);
     }
+
+    /**
+     * Helper method used to indicate a problem with input in cases where more
+     * specific <code>reportXxx()</code> method was not available.
+     */
+    public <T> T reportInputMismatch(BeanProperty prop,
+            String msg, Object... msgArgs) throws JsonMappingException
+    {
+        msg = _format(msg, msgArgs);
+        JavaType type = (prop == null) ? null : prop.getType();
+        final MismatchedInputException e = MismatchedInputException.from(getParser(), type, msg);
+        // [databind#2357]: Include property name, if we have it
+        if (prop != null) {
+            AnnotatedMember member = prop.getMember();
+            if (member != null) {
+                e.prependPath(member.getDeclaringClass(), prop.getName());
+            }
+        }
+        throw e;
+    }
+
+    /**
+     * Helper method used to indicate a problem with input in cases where more
+     * specific <code>reportXxx()</code> method was not available.
+     *
+     * @since 2.10
+     */
+    public <T> T reportPropertyInputMismatch(Class<?> targetType, String propertyName,
+            String msg, Object... msgArgs) throws JsonMappingException
+    {
+        msg = _format(msg, msgArgs);
+        MismatchedInputException e = MismatchedInputException.from(getParser(), targetType, msg);
+        if (propertyName != null) {
+            e.prependPath(targetType, propertyName);
+        }
+        throw e;
+    }
+
+    /**
+     * Helper method used to indicate a problem with input in cases where more
+     * specific <code>reportXxx()</code> method was not available.
+     *
+     * @since 2.10
+     */
+    public <T> T reportPropertyInputMismatch(JavaType targetType, String propertyName,
+            String msg, Object... msgArgs) throws JsonMappingException
+    {
+        return reportPropertyInputMismatch(targetType.getRawClass(), propertyName, msg, msgArgs);
+    }    
 
     public <T> T reportTrailingTokens(Class<?> targetType,
             JsonParser p, JsonToken trailingToken) throws JsonMappingException

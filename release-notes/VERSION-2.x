@@ -8,14 +8,22 @@ Project: jackson-databind
 
 #2149: Add `MapperFeature.ACCEPT_CASE_INSENSITIVE_VALUES`
  (suggested by Craig P)
+#2164: `FactoryBasedEnumDeserializer` does not respect
+  `DeserializationFeature.WRAP_EXCEPTIONS`
+ (reported by Yiqiu H)
 #2309: READ_ENUMS_USING_TO_STRING doesn't support null values
  (reported, fix suggested by Ben A)
+#2357: Lack of path on MismatchedInputException
+ (suggested by TheEin@github)
+#2432: Add support for module bundles
+ (contributed by Marcos P)
 #2442: `ArrayNode.addAll()` adds raw `null` values which cause NPE on `deepCopy()`
   and `toString()`
  (reported, fix contributed by Hesham M)
 #2446: Java 11: Unable to load JDK7 types (annotations, java.nio.file.Path): no Java7 support added
  (reported by David C)
 #2451: Add new `JsonValueFormat` value, `UUID`
+#2453: Add `DeserializationContext.readTree(JsonParser)` convenience method
 
 2.10.0.pr2 (31-Aug-2019)
 
@@ -109,13 +117,15 @@ Project: jackson-databind
 #2387: Block yet another deserialization gadget (CVE-2019-14379)
 #2389: Block yet another deserialization gadget (CVE-2019-14439)
  (reported by xiexq)
+#2404: FAIL_ON_MISSING_EXTERNAL_TYPE_ID_PROPERTY setting ignored when
+  creator properties are buffered
+ (contributed by Joe B)
 #2410: Block one more gadget type (CVE-2019-14540)
   (reported by iSafeBlue@github / blue@ixsec.org)
 #2420: Block one more gadget type (no CVE allocated yet)
   (reported by crazylirui@gmail.com)
-#2404: FAIL_ON_MISSING_EXTERNAL_TYPE_ID_PROPERTY setting ignored when
-  creator properties are buffered
- (contributed by Joe B)
+#2449: Block one more gadget type (no CVE allocated yet)
+  (reported by Kaki K)
 
 2.9.9 (16-May-2019)
 
