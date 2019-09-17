@@ -4,10 +4,15 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.10.0-final (not yet released)
+2.10.0.pr3 (17-Sep-2019)
 
+#1093: Default typing does not work with `writerFor(Object.class)`
+ (reported by hoomanv@github)
 #2129: Add `SerializationFeature.WRITE_ENUM_KEYS_USING_INDEX`, separate from value setting
  (suggested by renzihui@github)
+#2133: Improve `DeserializationProblemHandler.handleUnexpectedToken()` to allow handling of
+  Collection problems
+ (contributed by Semyon L)
 #2149: Add `MapperFeature.ACCEPT_CASE_INSENSITIVE_VALUES`
  (suggested by Craig P)
 #2164: `FactoryBasedEnumDeserializer` does not respect
@@ -126,8 +131,8 @@ Project: jackson-databind
   (reported by iSafeBlue@github / blue@ixsec.org)
 #2420: Block one more gadget type (no CVE allocated yet)
   (reported by crazylirui@gmail.com)
-#2449: Block one more gadget type (no CVE allocated yet)
-  (reported by Kaki K)
+#2449: Block one more gadget type (CVE-2019-14540)
+  (reported by kingkk)
 
 2.9.9 (16-May-2019)
 
