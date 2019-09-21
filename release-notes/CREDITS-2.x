@@ -341,6 +341,9 @@ Sadayuki Furuhashi (frsyuki@github)
   * Reported #941: Deserialization from "{}" to ObjectNode field causes
     "out of END_OBJECT token" error
    (2.6.3)
+  * Reported #2077: `JsonTypeInfo` with a subtype having `JsonFormat.Shape.ARRAY`
+    and no fields generates `{}` not `[]`
+   (2.10.0)
 
 David Haraburda (dharaburda@github)
   * Contributed #918: Add `MapperFeature.ALLOW_EXPLICIT_PROPERTY_RENAMING`
@@ -956,6 +959,15 @@ Hesham Massoud (heshamMassoud@github)
    (2.10.0)
 
 David Connelly (dconnelly@github)
-  * Reported#2446: Java 11: Unable to load JDK7 types (annotations, java.nio.file.Path):
+  * Reported #2446: Java 11: Unable to load JDK7 types (annotations, java.nio.file.Path):
     no Java7 support added
    (2.10.0)
+
+Wahey (KevynBct@github)
+  * Reported #2466: Didn't find class "java.nio.file.Path" below Android api 26
+  (2.10.0)
+
+Martín Coll (colltoaction@github)
+  * Contributed #2467: Accept `JsonTypeInfo.As.WRAPPER_ARRAY` with no second argument to
+   deserialize as "null value"
+  (2.10.0)

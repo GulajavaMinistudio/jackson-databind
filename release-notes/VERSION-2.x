@@ -4,6 +4,17 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+2.10.0 (not yet released)
+
+#2077: `JsonTypeInfo` with a subtype having `JsonFormat.Shape.ARRAY` and
+  no fields generates `{}` not `[]`
+ (reported by Sadayuki F)
+#2466: Didn't find class "java.nio.file.Path" below Android api 26
+ (reported by KevynBct@github)
+#2467: Accept `JsonTypeInfo.As.WRAPPER_ARRAY` with no second argument to
+  deserialize as "null value"
+ (contributed by Martin C)
+
 2.10.0.pr3 (17-Sep-2019)
 
 #1093: Default typing does not work with `writerFor(Object.class)`
@@ -133,6 +144,10 @@ Project: jackson-databind
   (reported by crazylirui@gmail.com)
 #2449: Block one more gadget type (CVE-2019-14540)
   (reported by kingkk)
+#2460: Block one mode gadget type (ehcache, no CVE allocated yet)
+  (reported by Fei Lu)
+#2462: Block two more gadget types (commons-configuration)
+#2469: Block one more gadget type (xalan2)
 
 2.9.9 (16-May-2019)
 

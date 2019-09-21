@@ -90,8 +90,9 @@ public class SubTypeValidator
         s.add("org.jdom.transform.XSLTransformer");
         s.add("org.jdom2.transform.XSLTransformer");
 
-        // [databind#2387]: EHCache
+        // [databind#2387], [databind#2460]: EHCache
         s.add("net.sf.ehcache.transaction.manager.DefaultTransactionManagerLookup");
+        s.add("net.sf.ehcache.hibernate.EhcacheJtaTransactionManagerLookup");
 
         // [databind#2389]: logback/jndi
         s.add("ch.qos.logback.core.db.JNDIConnectionSource");
@@ -103,7 +104,14 @@ public class SubTypeValidator
 
         // [databind#2420]: CXF/JAX-RS provider/XSLT
         s.add("org.apache.cxf.jaxrs.provider.XSLTJaxbProvider");
-        
+
+        // [databind#2462]: commons-configuration / -2
+        s.add("org.apache.commons.configuration.JNDIConfiguration");
+        s.add("org.apache.commons.configuration2.JNDIConfiguration");
+
+        // [databind#2469]: xalan2
+        s.add("org.apache.xalan.lib.sql.JNDIConnectionPool");
+
         DEFAULT_NO_DESER_CLASS_NAMES = Collections.unmodifiableSet(s);
     }
 
