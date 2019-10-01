@@ -89,8 +89,13 @@ public class ClassNameIdResolver
     protected String _idFrom(Object value, Class<?> cls, TypeFactory typeFactory)
     {
         // Need to ensure that "enum subtypes" work too
-        if (Enum.class.isAssignableFrom(cls)) {
-            if (!cls.isEnum()) { // means that it's sub-class of base enum, so:
+        if (ClassUtil.isEnumType(cls)) {
+            // 29-Sep-2019, tatu: `Class.isEnum()` only returns true for main declaration,
+            //   but NOT from sub-class thereof (extending individual values). This
+            //   is why additional resolution is needed: we want class that contains
+            //   enumeration instances.
+            if (!cls.isEnum()) {
+                // and this parent would then have `Enum.class` as its parent:
                 cls = cls.getSuperclass();
             }
         }

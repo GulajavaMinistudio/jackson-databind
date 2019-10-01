@@ -971,3 +971,17 @@ Martín Coll (colltoaction@github)
   * Contributed #2467: Accept `JsonTypeInfo.As.WRAPPER_ARRAY` with no second argument to
    deserialize as "null value"
   (2.10.0)
+
+Andrey Kulikov (ankulikov@github)
+  * Reported #2457: Extended enum values are not handled as enums when used as Map keys
+  (2.10.1)
+
+João Guerra (joca-bt@github)
+  * Reported #2473: Array index missing in path of `JsonMappingException` for `Collection<String>`,
+   with custom deserializer
+  (2.10.1)
+
+Ryan Bohn (bohnman@github)
+  * Reported #2475: `StringCollectionSerializer` calls `JsonGenerator.setCurrentValue(value)`,
+   which messes up current value for sibling properties
+  (2.10.1)
