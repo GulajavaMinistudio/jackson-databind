@@ -4,6 +4,11 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+2.11.0 (not yet released)
+
+#2487: BeanDeserializerBuilder Protected Factory Method for Extension
+ (contributed by Ville K)
+
 2.10.1 (not yet released)
 
 #2457: Extended enum values are not handled as enums when used as Map keys
