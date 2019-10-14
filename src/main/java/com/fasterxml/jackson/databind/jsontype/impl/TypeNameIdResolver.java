@@ -3,7 +3,7 @@ package com.fasterxml.jackson.databind.jsontype.impl;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.BeanDescription;
+
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
@@ -11,8 +11,6 @@ import com.fasterxml.jackson.databind.jsontype.NamedType;
 
 public class TypeNameIdResolver extends TypeIdResolverBase
 {
-    protected final MapperConfig<?> _config;
-
     /**
      * Mappings from class name to type id, used for serialization
      */
@@ -23,11 +21,10 @@ public class TypeNameIdResolver extends TypeIdResolverBase
      */
     protected final Map<String, JavaType> _idToType;
 
-    protected TypeNameIdResolver(MapperConfig<?> config, JavaType baseType,
+    protected TypeNameIdResolver(JavaType baseType,
             Map<String, String> typeToId, Map<String, JavaType> idToType)
     {
-        super(baseType, config.getTypeFactory());
-        _config = config;
+        super(baseType);
         _typeToId = typeToId;
         _idToType = idToType;
     }
@@ -72,23 +69,30 @@ public class TypeNameIdResolver extends TypeIdResolverBase
                 }
             }
         }
-        return new TypeNameIdResolver(config, baseType, typeToId, idToType);
+        return new TypeNameIdResolver(baseType, typeToId, idToType);
     }
 
     @Override
     public JsonTypeInfo.Id getMechanism() { return JsonTypeInfo.Id.NAME; }
 
     @Override
-    public String idFromValue(Object value) {
-        return idFromClass(value.getClass());
+    public String idFromValue(DatabindContext ctxt, Object value) {
+        return idFromClass(ctxt, value.getClass());
     }
 
-    protected String idFromClass(Class<?> clazz)
+    protected String idFromClass(DatabindContext ctxt, Class<?> cls)
     {
-        if (clazz == null) {
+        if (cls == null) {
             return null;
         }
-        Class<?> cls = _typeFactory.constructType(clazz).getRawClass();
+        // 12-Oct-2019, tatu: This looked weird; was done in 2.x to force application
+        //   of `TypeModifier`. But that just... does not seem right, at least not in
+        //   the sense that raw class would be changed (intent for modifier is to change
+        //   `JavaType` being resolved, not underlying class. Hence commented out in
+        //   3.x. There should be better way to support whatever the use case is.
+
+//        cls = _typeFactory.constructType(cls).getRawClass();
+
         final String key = cls.getName();
         String name;
 
@@ -97,9 +101,9 @@ public class TypeNameIdResolver extends TypeIdResolverBase
             if (name == null) {
                 // 24-Feb-2011, tatu: As per [JACKSON-498], may need to dynamically look up name
                 // can either throw an exception, or use default name...
-                if (_config.isAnnotationProcessingEnabled()) {
-                    BeanDescription beanDesc = _config.introspectClassAnnotations(cls);
-                    name = _config.getAnnotationIntrospector().findTypeName(_config, beanDesc.getClassInfo());
+                if (ctxt.isAnnotationProcessingEnabled()) {
+                    name = ctxt.getAnnotationIntrospector().findTypeName(ctxt.getConfig(),
+                            ctxt.introspectClassAnnotations(cls));
                 }
                 if (name == null) {
                     // And if still not found, let's choose default?
@@ -112,13 +116,13 @@ public class TypeNameIdResolver extends TypeIdResolverBase
     }
 
     @Override
-    public String idFromValueAndType(Object value, Class<?> type) {
+    public String idFromValueAndType(DatabindContext ctxt, Object value, Class<?> type) {
         // 18-Jan-2013, tatu: We may be called with null value occasionally
         //   it seems; nothing much we can figure out that way.
         if (value == null) {
-            return idFromClass(type);
+            return idFromClass(ctxt, type);
         }
-        return idFromValue(value);
+        return idFromValue(ctxt, value);
     }
 
     @Override

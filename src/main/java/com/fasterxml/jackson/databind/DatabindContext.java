@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.cfg.HandlerInstantiator;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.introspect.Annotated;
+import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
 import com.fasterxml.jackson.databind.introspect.ObjectIdInfo;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator.Validity;
@@ -33,9 +34,9 @@ public abstract class DatabindContext
     private final static int MAX_ERROR_STR_LEN = 500;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Generic config access
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -53,9 +54,9 @@ public abstract class DatabindContext
     public abstract AnnotationIntrospector getAnnotationIntrospector();
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Access to specific config settings
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -67,6 +68,10 @@ public abstract class DatabindContext
      *</pre>
      */
     public abstract boolean isEnabled(MapperFeature feature);
+
+    public final boolean isAnnotationProcessingEnabled() {
+        return isEnabled(MapperFeature.USE_ANNOTATIONS);
+    }
 
     /**
      * Convenience method for accessing serialization view in use (if any); equivalent to:
@@ -89,9 +94,9 @@ public abstract class DatabindContext
     public abstract JsonFormat.Value getDefaultPropertyFormat(Class<?> baseType);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Generic attributes
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -118,9 +123,9 @@ public abstract class DatabindContext
     public abstract DatabindContext setAttribute(Object key, Object value);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Type instantiation/resolution
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -285,9 +290,29 @@ public abstract class DatabindContext
     public abstract TypeFactory getTypeFactory();
 
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* Annotation, BeanDescription introspection
+    /**********************************************************************
+     */
+
+    /**
+     * NOTE: sub-class implementations vary in kind of description produced
+     * (between serialization, deserialization)
+     */
+    public abstract BeanDescription introspectBeanDescription(JavaType type);
+
+    public AnnotatedClass introspectClassAnnotations(Class<?> rawType) {
+        return introspectClassAnnotations(constructType(rawType));
+    }
+
+    public abstract AnnotatedClass introspectClassAnnotations(JavaType type);
+
+    public abstract AnnotatedClass introspectDirectClassAnnotations(JavaType type);
+
+    /*
+    /**********************************************************************
     /* Helper object construction
-    /**********************************************************
+    /**********************************************************************
      */
 
     public ObjectIdGenerator<?> objectIdGeneratorInstance(Annotated annotated,
@@ -321,8 +346,6 @@ public abstract class DatabindContext
     /**
      * Helper method to use to construct a {@link Converter}, given a definition
      * that may be either actual converter instance, or Class for instantiating one.
-     * 
-     * @since 2.2
      */
     @SuppressWarnings("unchecked")
     public Converter<Object,Object> converterInstance(Annotated annotated,
@@ -359,9 +382,19 @@ public abstract class DatabindContext
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* Misc config access
+    /**********************************************************************
+     */
+
+    public abstract PropertyName findRootName(JavaType rootType);
+
+    public abstract PropertyName findRootName(Class<?> rawRootType);
+
+    /*
+    /**********************************************************************
     /* Error reporting
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -376,9 +409,9 @@ public abstract class DatabindContext
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected final String _format(String msg, Object... msgArgs) {

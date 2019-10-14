@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import com.fasterxml.jackson.databind.introspect.Annotated;
+import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -451,7 +452,7 @@ public abstract class DeserializationContext
 
     /*
     /**********************************************************************
-    /* Introspection support
+    /* Annotation, BeanDescription introspection
     /**********************************************************************
      */
 
@@ -459,20 +460,45 @@ public abstract class DeserializationContext
      * Convenience method for doing full "for serialization" introspection of specified
      * type; results may be cached during lifespan of this context as well.
      */
-    public BeanDescription introspect(JavaType type) throws JsonMappingException {
+    @Override
+    public BeanDescription introspectBeanDescription(JavaType type) {
         return _config.introspect(type);
     }
 
-    public BeanDescription introspectClassAnnotations(JavaType type) throws JsonMappingException {
-        return _config.introspectClassAnnotations(type);
+    @Override
+    public AnnotatedClass introspectClassAnnotations(JavaType type) {
+        return _config.getClassIntrospector().introspectClassAnnotations(_config,
+                type, _config);
     }
 
-    public BeanDescription introspectForCreation(JavaType type) throws JsonMappingException{
+    @Override
+    public AnnotatedClass introspectDirectClassAnnotations(JavaType type) {
+        return _config.getClassIntrospector().introspectDirectClassAnnotations(_config,
+                type, _config);
+    }
+
+    public BeanDescription introspectBeanDescriptionForCreation(JavaType type) {
         return _config.introspectForCreation(type);
     }
 
-    public BeanDescription introspectForBuilder(JavaType type) throws JsonMappingException {
+    public BeanDescription introspectBeanDescriptionForBuilder(JavaType type) {
         return _config.introspectForBuilder(type);
+    }
+
+    /*
+    /**********************************************************************
+    /* Misc config access
+    /**********************************************************************
+     */
+
+    @Override
+    public PropertyName findRootName(JavaType rootType) {
+        return _config.findRootName(this, rootType);
+    }
+
+    @Override
+    public PropertyName findRootName(Class<?> rawRootType) {
+        return _config.findRootName(this, rawRootType);
     }
 
     /*
@@ -561,11 +587,11 @@ public abstract class DeserializationContext
     }
 
     public TypeDeserializer findTypeDeserializer(JavaType baseType,
-            BeanDescription beanDesc)
+            AnnotatedClass classAnnotations)
         throws JsonMappingException
     {
         return _config.getTypeResolverProvider().findTypeDeserializer(this,
-                baseType, beanDesc.getClassInfo());
+                baseType, classAnnotations);
     }
 
     /**

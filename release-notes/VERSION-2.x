@@ -140,6 +140,7 @@ Project: jackson-databind
 #2478: Block two more gadget types (commons-dbcp, p6spy,
   CVE-2019-16942 / CVE-2019-16943)
  (reported by b5mali4 / root@codersec.net)
+#2498: Block one more gadget type (log4j-extras/1.2, CVE-2019-17531)
 
 2.9.10 (21-Sep-2019)
 

@@ -145,7 +145,7 @@ public class BeanSerializerFactory
         } else { // changes; assume static typing; plus, need to re-introspect if class differs
             staticTyping = true;
             if (!type.hasRawClass(origType.getRawClass())) {
-                beanDesc = ctxt.introspect(type);
+                beanDesc = ctxt.introspectBeanDescription(type);
             }
         }
         // Slight detour: do we have a Converter to consider?
@@ -155,7 +155,7 @@ public class BeanSerializerFactory
             
             // One more twist, as per [databind#288]; probably need to get new BeanDesc
             if (!delegateType.hasRawClass(type.getRawClass())) {
-                beanDesc = ctxt.introspect(delegateType);
+                beanDesc = ctxt.introspectBeanDescription(delegateType);
                 // [#359]: explicitly check (again) for @JsonSerializer...
                 ser = findSerializerFromAnnotation(ctxt, beanDesc.getClassInfo());
             }
@@ -472,13 +472,13 @@ public class BeanSerializerFactory
         final SerializationConfig config = ctxt.getConfig();
 
         // ignore specified types
-        removeIgnorableTypes(config, beanDesc, properties);
-        
+        removeIgnorableTypes(ctxt, beanDesc, properties);
+
         // and possibly remove ones without matching mutator...
         if (config.isEnabled(MapperFeature.REQUIRE_SETTERS_FOR_GETTERS)) {
             removeSetterlessGetters(config, beanDesc, properties);
         }
-        
+
         // nothing? can't proceed (caller may or may not throw an exception)
         if (properties.isEmpty()) {
             return null;
@@ -584,10 +584,10 @@ public class BeanSerializerFactory
      * annotation but can be supplied by module-provided introspectors too.
      * Starting with 2.8 there are also "Config overrides" to consider.
      */
-    protected void removeIgnorableTypes(SerializationConfig config, BeanDescription beanDesc,
+    protected void removeIgnorableTypes(SerializerProvider ctxt, BeanDescription beanDesc,
             List<BeanPropertyDefinition> properties)
     {
-        AnnotationIntrospector intr = config.getAnnotationIntrospector();
+        AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
         HashMap<Class<?>,Boolean> ignores = new HashMap<Class<?>,Boolean>();
         Iterator<BeanPropertyDefinition> it = properties.iterator();
         while (it.hasNext()) {
@@ -603,10 +603,9 @@ public class BeanSerializerFactory
             Class<?> type = property.getRawPrimaryType();
             Boolean result = ignores.get(type);
             if (result == null) {
-                result = config.getConfigOverride(type).getIsIgnoredType();
+                result = ctxt.getConfig().getConfigOverride(type).getIsIgnoredType();
                 if (result == null) {
-                    BeanDescription desc = config.introspectClassAnnotations(type);
-                    AnnotatedClass ac = desc.getClassInfo();
+                    AnnotatedClass ac = ctxt.introspectClassAnnotations(type);
                     result = intr.isIgnorableType(ac);
                     // default to false, non-ignorable
                     if (result == null) {

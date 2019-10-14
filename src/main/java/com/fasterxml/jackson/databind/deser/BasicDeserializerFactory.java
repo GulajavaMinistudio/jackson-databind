@@ -1183,7 +1183,7 @@ nonAnnotatedParamIndex, ctor);
                 } else {
                     type = implType;
                     // But if so, also need to re-check creators...
-                    beanDesc = ctxt.introspectForCreation(type);
+                    beanDesc = ctxt.introspectBeanDescriptionForCreation(type);
                 }
             }
             if (deser == null) {
@@ -1333,7 +1333,7 @@ nonAnnotatedParamIndex, ctor);
                         type = (MapType) fallback;
                         mapClass = type.getRawClass();
                         // But if so, also need to re-check creators...
-                        beanDesc = ctxt.introspectForCreation(type);
+                        beanDesc = ctxt.introspectBeanDescriptionForCreation(type);
                     } else {
                         // [databind#292]: Actually, may be fine, but only if polymorphic deser enabled
                         if (type.getTypeHandler() == null) {
@@ -1577,7 +1577,7 @@ nonAnnotatedParamIndex, ctor);
         final DeserializationConfig config = ctxt.getConfig();
         KeyDeserializer deser = null;
         if (_factoryConfig.hasKeyDeserializers()) {
-            BeanDescription beanDesc = config.introspectClassAnnotations(type.getRawClass());
+            BeanDescription beanDesc = config.introspect(type);
             for (KeyDeserializers d  : _factoryConfig.keyDeserializers()) {
                 deser = d.findKeyDeserializer(type, config, beanDesc);
                 if (deser != null) {
@@ -1611,7 +1611,7 @@ nonAnnotatedParamIndex, ctor);
         final DeserializationConfig config = ctxt.getConfig();
         Class<?> enumClass = type.getRawClass();
 
-        BeanDescription beanDesc = ctxt.introspect(type);
+        BeanDescription beanDesc = ctxt.introspectBeanDescription(type);
         // 24-Sep-2015, bim: a key deserializer is the preferred thing.
         KeyDeserializer des = findKeyDeserializerFromAnnotation(ctxt, beanDesc.getClassInfo());
         if (des != null) {

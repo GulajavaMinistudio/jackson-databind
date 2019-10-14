@@ -61,7 +61,37 @@ public class BasicClassIntrospector
 
     /*
     /**********************************************************************
-    /* Factory method impls
+    /* Factory method impls: annotation resolution
+    /**********************************************************************
+     */
+
+    @Override
+    public AnnotatedClass introspectClassAnnotations(MapperConfig<?> config,
+            JavaType type, MixInResolver r)
+    {
+        BasicBeanDescription desc = _findStdTypeDesc(type);
+        if (desc == null) {
+            desc = BasicBeanDescription.forOtherUse(config, type,
+                    _resolveAnnotatedClass(config, type, r));
+        }
+        return desc.getClassInfo();
+    }
+
+    @Override
+    public AnnotatedClass introspectDirectClassAnnotations(MapperConfig<?> config,
+            JavaType type, MixInResolver r)
+    {
+        BasicBeanDescription desc = _findStdTypeDesc(type);
+        if (desc == null) {
+            desc = BasicBeanDescription.forOtherUse(config, type,
+                    _resolveAnnotatedWithoutSuperTypes(config, type, r));
+        }
+        return desc.getClassInfo();
+    }
+
+    /*
+    /**********************************************************************
+    /* Factory method impls: bean introspection
     /**********************************************************************
      */
 
@@ -123,30 +153,6 @@ public class BasicClassIntrospector
                 desc = BasicBeanDescription.forDeserialization(
             		collectProperties(cfg, type, r, false, "set"));
             }
-        }
-        return desc;
-    }
-
-    @Override
-    public BasicBeanDescription forClassAnnotations(MapperConfig<?> config,
-            JavaType type, MixInResolver r)
-    {
-        BasicBeanDescription desc = _findStdTypeDesc(type);
-        if (desc == null) {
-            desc = BasicBeanDescription.forOtherUse(config, type,
-                    _resolveAnnotatedClass(config, type, r));
-        }
-        return desc;
-    }
-
-    @Override
-    public BasicBeanDescription forDirectClassAnnotations(MapperConfig<?> config,
-            JavaType type, MixInResolver r)
-    {
-        BasicBeanDescription desc = _findStdTypeDesc(type);
-        if (desc == null) {
-            desc = BasicBeanDescription.forOtherUse(config, type,
-                    _resolveAnnotatedWithoutSuperTypes(config, type, r));
         }
         return desc;
     }
@@ -223,16 +229,12 @@ public class BasicClassIntrospector
             return false;
         }
         Class<?> raw = type.getRawClass();
-        String pkgName = ClassUtil.getPackageName(raw);
-        if (pkgName != null) {
-            if (pkgName.startsWith("java.lang")
-                    || pkgName.startsWith("java.util")) {
-                // 23-Sep-2014, tatu: Should we be conservative here (minimal number
-                //    of matches), or ambitious? Let's do latter for now.
-                if (Collection.class.isAssignableFrom(raw)
-                        || Map.class.isAssignableFrom(raw)) {
-                    return true;
-                }
+        if (ClassUtil.isJDKClass(raw)) {
+            // 23-Sep-2014, tatu: Should we be conservative here (minimal number
+            //    of matches), or ambitious? Let's do latter for now.
+            if (Collection.class.isAssignableFrom(raw)
+                    || Map.class.isAssignableFrom(raw)) {
+                return true;
             }
         }
         return false;
