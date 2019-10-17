@@ -3,9 +3,7 @@ package com.fasterxml.jackson.databind.introspect;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import com.fasterxml.jackson.databind.AnnotationIntrospector;
 import com.fasterxml.jackson.databind.JavaType;
@@ -20,7 +18,14 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  */
 public class AnnotatedClassResolver
 {
-    private final static Annotations NO_ANNOTATIONS = AnnotationCollector.emptyAnnotations();
+    private final static Annotation[] NO_ANNOTATIONS = new Annotation[0];
+    private final static Annotations EMPTY_ANNOTATIONS = AnnotationCollector.emptyAnnotations();
+
+    private final static Class<?> CLS_OBJECT = Object.class;
+    private final static Class<?> CLS_ENUM = Enum.class;
+
+    private final static Class<?> CLS_LIST = List.class;
+    private final static Class<?> CLS_MAP = Map.class;
 
     private final MapperConfig<?> _config;
     private final AnnotationIntrospector _intr;
@@ -32,6 +37,12 @@ public class AnnotatedClassResolver
     private final Class<?> _primaryMixin;
 
     private final boolean _collectAnnotations;
+
+    /*
+    /**********************************************************************
+    /* Life-cycle
+    /**********************************************************************
+     */
 
     AnnotatedClassResolver(MapperConfig<?> config, JavaType type, MixInResolver r) {
         _config = Objects.requireNonNull(config, "Can not pass null `config`");
@@ -60,6 +71,12 @@ public class AnnotatedClassResolver
         _collectAnnotations = (_intr != null) && !ClassUtil.isJDKClass(_class);
     }
 
+    /*
+    /**********************************************************************
+    /* Public static API
+    /**********************************************************************
+     */
+    
     public static AnnotatedClass resolve(MapperConfig<?> config, JavaType forType,
             MixInResolver r)
     {
@@ -93,15 +110,6 @@ public class AnnotatedClassResolver
 
     private static boolean skippableArray(MapperConfig<?> config, Class<?> type) {
         return (config == null) || (config.findMixInClassFor(type) == null);
-                
-    }
-
-    /**
-     * Internal helper method used for resolving a small set of "primordial" types for which
-     * we do not accept any annotation information or overrides. 
-     */
-    static AnnotatedClass createPrimordial(Class<?> raw) {
-        return new AnnotatedClass(raw);
     }
 
     /**
@@ -112,8 +120,25 @@ public class AnnotatedClassResolver
         return new AnnotatedClass(raw);
     }
 
+    /*
+    /**********************************************************************
+    /* Main resolution methods
+    /**********************************************************************
+     */
+    
     AnnotatedClass resolveFully() {
-        List<JavaType> superTypes = ClassUtil.findSuperTypes(_type, null, false);
+        final List<JavaType> superTypes;
+
+        // 15-Oct-2019, tatu: Can avoid hierarchy traversal in some cases; but best
+        //    caught considering starting point and not the middle
+        if (!_collectAnnotations && // that is, JDK types
+            ((_class == CLS_LIST) || (_class == CLS_MAP))) {
+            superTypes = Collections.emptyList();
+        } else {
+            superTypes = new ArrayList<>(8);
+            _addSuperTypes(_type, superTypes, false);
+        }
+//System.err.println(" resolveFully("+_type.getRawClass().getSimpleName()+") -> "+superTypes);        
         return new AnnotatedClass(_type, _class, superTypes, _primaryMixin,
                 resolveClassAnnotations(superTypes),
                 _bindings, _intr, _mixInResolver, _config.getTypeFactory(),
@@ -122,11 +147,46 @@ public class AnnotatedClassResolver
     }
 
     AnnotatedClass resolveWithoutSuperTypes() {
-        List<JavaType> superTypes = Collections.<JavaType>emptyList();
+        List<JavaType> superTypes = Collections.emptyList();
         return new AnnotatedClass(null, _class, superTypes, _primaryMixin,
                 resolveClassAnnotations(superTypes),
                 _bindings, _intr, _mixInResolver, _config.getTypeFactory(),
                 _collectAnnotations);
+    }
+
+    private static void _addSuperTypes(JavaType type, List<JavaType> result,
+            boolean addClassItself)
+    {
+        if (type == null) {
+            return;
+        }
+        final Class<?> cls = type.getRawClass();
+
+        // 15-Oct-2019, tatu: certain paths do not lead to useful information, so prune
+        //    as optimization
+        if ((cls == CLS_OBJECT) || (cls == CLS_ENUM)) {
+            return;
+        }
+        
+        if (addClassItself) {
+            if (_contains(result, cls)) { // already added, no need to check supers
+                return;
+            }
+            result.add(type);
+        }
+        for (JavaType intCls : type.getInterfaces()) {
+            _addSuperTypes(intCls, result, true);
+        }
+        _addSuperTypes(type.getSuperClass(), result, true);
+    }
+
+    private static boolean _contains(List<JavaType> found, Class<?> raw) {
+        for (int i = 0, end = found.size(); i < end; ++i) {
+            if (found.get(i).getRawClass() == raw) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /*
@@ -144,14 +204,14 @@ public class AnnotatedClassResolver
     {
         // Should skip processing if annotation processing disabled
         if (_intr == null) {
-            return NO_ANNOTATIONS;
+            return EMPTY_ANNOTATIONS;
         }
         // Plus we may or may not have mix-ins to consider
         final boolean checkMixIns = (_mixInResolver != null) && _mixInResolver.hasMixIns();
 
         // also skip if there's nothing to do
         if (!checkMixIns && !_collectAnnotations) {
-            return NO_ANNOTATIONS;
+            return EMPTY_ANNOTATIONS;
         }
 
         AnnotationCollector resolvedCA = AnnotationCollector.emptyCollector();
@@ -162,8 +222,7 @@ public class AnnotatedClassResolver
         // then annotations from the class itself:
         // 06-Oct-2019, tatu: [databind#2464] Skip class annotations for JDK classes
         if (_collectAnnotations) {
-            resolvedCA = _addAnnotationsIfNotPresent(resolvedCA,
-                    ClassUtil.findClassAnnotations(_class));
+            resolvedCA = _addAnnotationsIfNotPresent(resolvedCA, _findClassAnnotations(_class));
         }
 
         // and then from super types
@@ -176,7 +235,7 @@ public class AnnotatedClassResolver
             }
             if (_collectAnnotations) {
                 resolvedCA = _addAnnotationsIfNotPresent(resolvedCA,
-                        ClassUtil.findClassAnnotations(type.getRawClass()));
+                        _findClassAnnotations(type.getRawClass()));
             }
         }
 
@@ -197,7 +256,7 @@ public class AnnotatedClassResolver
     {
         if (mixin != null) {
             // Ok, first: annotations from mix-in class itself:
-            annotations = _addAnnotationsIfNotPresent(annotations, ClassUtil.findClassAnnotations(mixin));
+            annotations = _addAnnotationsIfNotPresent(annotations, _findClassAnnotations(mixin));
     
             // And then from its supertypes, if any. But note that we will only consider
             // super-types up until reaching the masked class (if found); this because
@@ -205,7 +264,7 @@ public class AnnotatedClassResolver
             // And if so, we absolutely must NOT include super types of masked class,
             // as that would inverse precedence of annotations.
             for (Class<?> parent : ClassUtil.findSuperClasses(mixin, target, false)) {
-                annotations = _addAnnotationsIfNotPresent(annotations, ClassUtil.findClassAnnotations(parent));
+                annotations = _addAnnotationsIfNotPresent(annotations, _findClassAnnotations(parent));
             }
         }
         return annotations;
@@ -231,7 +290,7 @@ public class AnnotatedClassResolver
     private AnnotationCollector _addFromBundleIfNotPresent(AnnotationCollector c,
             Annotation bundle)
     {
-        for (Annotation ann : ClassUtil.findClassAnnotations(bundle.annotationType())) {
+        for (Annotation ann : _findClassAnnotations(bundle.annotationType())) {
             // minor optimization: by-pass 2 common JDK meta-annotations
             if ((ann instanceof Target) || (ann instanceof Retention)) {
                 continue;
@@ -244,5 +303,18 @@ public class AnnotatedClassResolver
             }
         }
         return c;
+    }
+
+    /*
+    /**********************************************************************
+    /* Methods copied from `ClassUtil`
+    /**********************************************************************
+     */
+
+    private static Annotation[] _findClassAnnotations(Class<?> cls) {
+        if (cls == CLS_OBJECT) { // never called with primitive types but might get Object.class
+            return NO_ANNOTATIONS;
+        }
+        return cls.getDeclaredAnnotations();
     }
 }

@@ -16,34 +16,25 @@ public class BasicClassIntrospector
 {
     private static final long serialVersionUID = 3L;
 
+    private final static Class<?> CLS_OBJECT = Object.class;
+    private final static Class<?> CLS_STRING = String.class;
+    private final static Class<?> CLS_NUMBER = Number.class;
+
     /* We keep a small set of pre-constructed descriptions to use for
      * common non-structured values, such as Numbers and Strings.
      * This is strictly performance optimization to reduce what is
      * usually one-time cost, but seems useful for some cases considering
      * simplicity.
      */
-    protected final static HashMap<Class<?>, AnnotatedClass> PRE_RESOLVED_AC;
-    static {
-        final HashMap<Class<?>, AnnotatedClass> preresolved = new HashMap<>();
+    private final static AnnotatedClass OBJECT_AC = new AnnotatedClass(CLS_OBJECT);
+    private final static AnnotatedClass STRING_AC = new AnnotatedClass(CLS_STRING);
 
-        preresolved.put(String.class, AnnotatedClassResolver.createPrimordial(String.class));
+    private final static AnnotatedClass BOOLEAN_AC = new AnnotatedClass(Boolean.TYPE);
+    private final static AnnotatedClass INT_AC = new AnnotatedClass(Integer.TYPE);
+    private final static AnnotatedClass LONG_AC = new AnnotatedClass(Long.TYPE);
 
-        final AnnotatedClass BOOLEAN_AC = AnnotatedClassResolver.createPrimordial(Boolean.TYPE);
-        preresolved.put(Boolean.TYPE, BOOLEAN_AC);
-        // NOTE: should be ok to pass non-primitive type for descriptions
-        preresolved.put(Boolean.class, BOOLEAN_AC);
+    private final static AnnotatedClass NUMBER_AC = new AnnotatedClass(CLS_NUMBER);
 
-        final AnnotatedClass INT_AC = AnnotatedClassResolver.createPrimordial(Integer.TYPE);
-        preresolved.put(Integer.TYPE, INT_AC);
-        preresolved.put(Integer.class, INT_AC);
-
-        final AnnotatedClass LONG_AC = AnnotatedClassResolver.createPrimordial(Long.TYPE);
-        preresolved.put(Long.TYPE, LONG_AC);
-        preresolved.put(Long.class, LONG_AC);
-
-        PRE_RESOLVED_AC = preresolved;
-    }
-    
     /*
     /**********************************************************************
     /* Configuration
@@ -60,12 +51,23 @@ public class BasicClassIntrospector
     /**********************************************************************
      */
 
+    /**
+     * Reuse fully-resolved annotations during a single operation
+     */
     protected HashMap<JavaType, AnnotatedClass> _resolvedFullAnnotations;
 
-    protected HashMap<JavaType, AnnotatedClass> _resolvedDirectAnnotations;
+    // 15-Oct-2019, tatu: No measurable benefit from trying to reuse direct
+    //    annotation access.
+//    protected HashMap<JavaType, AnnotatedClass> _resolvedDirectAnnotations;
 
+    /**
+     * Reuse full bean descriptions for serialization during a single operation
+     */
     protected HashMap<JavaType, BasicBeanDescription> _resolvedSerBeanDescs;
 
+    /**
+     * Reuse full bean descriptions for serialization during a single operation
+     */
     protected HashMap<JavaType, BasicBeanDescription> _resolvedDeserBeanDescs;
 
     /*
@@ -104,18 +106,22 @@ public class BasicClassIntrospector
     public AnnotatedClass introspectClassAnnotations(JavaType type)
     {
         AnnotatedClass ac = _findStdTypeDef(type.getRawClass());
-        if (ac == null) {
-            if (_resolvedFullAnnotations == null) {
-                _resolvedFullAnnotations = new HashMap<>();
-            } else {
-                ac = _resolvedFullAnnotations.get(type);
-                if (ac != null) {
-                    return ac;
-                }
-            }
-            ac = _resolveAnnotatedClass(type);
-            _resolvedFullAnnotations.put(type, ac);
+        if (ac != null) {
+//System.err.println(" AC.introspectClassAnnotations "+type.getRawClass().getSimpleName()+" -> std-def");
+            return ac;
         }
+        if (_resolvedFullAnnotations == null) {
+            _resolvedFullAnnotations = new HashMap<>();
+        } else {
+            ac = _resolvedFullAnnotations.get(type);
+            if (ac != null) {
+//System.err.println(" AC.introspectClassAnnotations "+type.getRawClass().getSimpleName()+" -> CACHED");
+                return ac;
+            }
+        }
+//System.err.println(" AC.introspectClassAnnotations "+type.getRawClass().getSimpleName()+" -> resolve");
+        ac = _resolveAnnotatedClass(type);
+        _resolvedFullAnnotations.put(type, ac);
         return ac;
     }
 
@@ -123,19 +129,7 @@ public class BasicClassIntrospector
     public AnnotatedClass introspectDirectClassAnnotations(JavaType type)
     {
         AnnotatedClass ac = _findStdTypeDef(type.getRawClass());
-        if (ac == null) {
-            if (_resolvedDirectAnnotations == null) {
-                _resolvedDirectAnnotations = new HashMap<>();
-            } else {
-                ac = _resolvedDirectAnnotations.get(type);
-                if (ac != null) {
-                    return ac;
-                }
-            }
-            ac = _resolveAnnotatedWithoutSuperTypes(type);
-            _resolvedDirectAnnotations.put(type, ac);
-        }
-        return ac;
+        return (ac != null) ? ac : _resolveAnnotatedWithoutSuperTypes(type);
     }
 
     protected AnnotatedClass _resolveAnnotatedClass(JavaType type) {
@@ -266,7 +260,7 @@ public class BasicClassIntrospector
 
     protected BasicBeanDescription _findStdTypeDesc(JavaType type) {
         AnnotatedClass ac = _findStdTypeDef(type.getRawClass());
-        return (ac == null) ? null : BasicBeanDescription.forOtherUse(null, type, ac);
+        return (ac == null) ? null : BasicBeanDescription.forOtherUse(_config, type, ac);
     }
 
     /**
@@ -275,10 +269,37 @@ public class BasicClassIntrospector
      */
     protected AnnotatedClass _findStdTypeDef(Class<?> rawType)
     {
-        if (rawType.isPrimitive() || ClassUtil.isJDKClass(rawType)) {
-            AnnotatedClass ac = PRE_RESOLVED_AC.get(rawType);
-            if (ac != null) {
-                return ac;
+        if (rawType.isPrimitive()) {
+            if (rawType == Integer.TYPE) {
+                return INT_AC;
+            }
+            if (rawType == Long.TYPE) {
+                return LONG_AC;
+            }
+            if (rawType == Boolean.TYPE) {
+                return BOOLEAN_AC;
+            }
+        } else if (ClassUtil.isJDKClass(rawType)) {
+            if (rawType == String.class) {
+                return STRING_AC;
+            }
+            // Should be ok to just pass "primitive" info
+            if (rawType == Integer.class) {
+                return INT_AC;
+            }
+            if (rawType == Long.class) {
+                return LONG_AC;
+            }
+            if (rawType == Boolean.class) {
+                return BOOLEAN_AC;
+            }
+
+            if (rawType == Object.class) {
+                return OBJECT_AC;
+            }
+            // This mostly matters for "untyped" deserialization
+            if (rawType == CLS_NUMBER) {
+                return NUMBER_AC;
             }
         }
         return null;
