@@ -6,11 +6,17 @@ Project: jackson-databind
 
 2.11.0 (not yet released)
 
+#2049: TreeTraversingParser and UTF8StreamJsonParser create contexts differently
+ (reported by Antonio P)
 #2487: BeanDeserializerBuilder Protected Factory Method for Extension
  (contributed by Ville K)
 #2503: Support `@JsonSerialize(keyUsing)` and `@JsonDeserialize(keyUsing)` on Key class
 #2511: Add `SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL`
  (contributed by Joongsoo P)
+#2522: `DeserializationContext.handleMissingInstantiator()` throws `MismatchedInputException`
+  for non-static inner classes
+#2525: Incorrect `JsonStreamContext` for `TokenBuffer` and `TreeTraversingParser`
+- Add `SerializerProvider.findContentValueSerializer()` methods
 
 2.10.1 (not yet released)
 
@@ -26,6 +32,10 @@ Project: jackson-databind
  (contributed by Marc M)
 #2513: BigDecimalAsStringSerializer in NumberSerializer throws IllegalStateException in 2.10
  (reported by Johan H)
+#2519: Serializing `BigDecimal` values inside containers ignores shape override
+ (reported by Richard W)
+#2520: Sub-optimal exception message when failing to deserialize non-static inner classes
+ (reported by Mark S)
 
 2.10.0 (26-Sep-2019)
 

@@ -991,10 +991,22 @@ Johan Haleby (johanhaleby@github)
     in 2.10
   (2.10.1)
 
+Richard Wise (Woodz@github)
+  * Reported #2519: Serializing `BigDecimal` values inside containers ignores shape override	
+  (2.10.1)
+
+Mark Schäfer (mark--@github)
+  * Reported #2520: Sub-optimal exception message when failing to deserialize non-static inner classes
+  (2.10.1)
+
 Ville Koskela (vjkoskela@github)
   * Contributed #2487: BeanDeserializerBuilder Protected Factory Method for Extension
   (2.11.0)
 
 Fitz (Joongsoo.Park) (joongsoo@github)
   * Contributed #2511: Add `SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL`
+  (2.11.0)
+
+Antonio Petrelli (apetrelli@github)
+  * Reported #2049: TreeTraversingParser and UTF8StreamJsonParser create contexts differently
   (2.11.0)

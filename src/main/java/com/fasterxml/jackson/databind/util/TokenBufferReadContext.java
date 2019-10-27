@@ -8,8 +8,6 @@ import com.fasterxml.jackson.core.json.JsonReadContext;
  * to link back to the original context to try to keep location information
  * consistent between source location and buffered content when it's re-read
  * from the buffer.
- *
- * @since 2.9
  */
 public class TokenBufferReadContext extends TokenStreamContext
 {
@@ -92,10 +90,14 @@ public class TokenBufferReadContext extends TokenStreamContext
     }
 
     public TokenBufferReadContext createChildArrayContext() {
+        // For current context there will be one next Array value, first:
+        ++_index;
         return new TokenBufferReadContext(this, TYPE_ARRAY, -1);
     }
 
     public TokenBufferReadContext createChildObjectContext() {
+        // For current context there will be one next Object value, first:
+        ++_index;
         return new TokenBufferReadContext(this, TYPE_OBJECT, -1);
     }
 
@@ -130,5 +132,15 @@ public class TokenBufferReadContext extends TokenStreamContext
 
     public void setCurrentName(String name) throws JsonProcessingException {
         _currentName = name;
+    }
+
+    /*
+    /**********************************************************
+    /* Extended support for context updates
+    /**********************************************************
+     */
+
+    public void updateForValue() {
+        ++_index;
     }
 }

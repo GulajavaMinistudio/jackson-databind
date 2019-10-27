@@ -2,7 +2,9 @@ package com.fasterxml.jackson.databind.deser.creators;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 
 // For [databind#1501], [databind#1502], [databind#1503]; mostly to
 // test that for non-static inner classes constructors are ignored
@@ -62,10 +64,10 @@ public class InnerClassCreatorTest extends BaseMapTest
         try {
             MAPPER.readValue(ser, Something1501.class);
             fail("Should not pass");
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "Cannot construct instance");
             verifyException(e, "InnerSomething1501");
-            verifyException(e, "can only instantiate non-static inner class by using default");
+            verifyException(e, "non-static inner classes like this can only by instantiated using default");
         }
     }    
 
@@ -79,10 +81,10 @@ public class InnerClassCreatorTest extends BaseMapTest
         try {
             MAPPER.readValue(ser, Something1502.class);
             fail("Should not pass");
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "Cannot construct instance");
             verifyException(e, "InnerSomething1502");
-            verifyException(e, "can only instantiate non-static inner class by using default");
+            verifyException(e, "non-static inner classes like this can only by instantiated using default");
         }
         */
         Something1502 result = MAPPER.readValue(ser, Something1502.class);

@@ -208,7 +208,7 @@ public abstract class AnnotationIntrospector
      * is defined. Returns null if no declaration found; can return
      * explicit empty String, which is usually ignored as well as null.
      */
-    public PropertyName findRootName(AnnotatedClass ac) {
+    public PropertyName findRootName(MapperConfig<?> config, AnnotatedClass ac) {
         return null;
     }
 
@@ -216,7 +216,7 @@ public abstract class AnnotationIntrospector
      * Method for finding information about properties to ignore either by
      * name, or by more general specification ("ignore all unknown").
      */
-    public JsonIgnoreProperties.Value findPropertyIgnorals(Annotated ac)
+    public JsonIgnoreProperties.Value findPropertyIgnorals(MapperConfig<?> config, Annotated ac)
     {
         return JsonIgnoreProperties.Value.empty();
     }
@@ -232,7 +232,7 @@ public abstract class AnnotationIntrospector
      *   Boolean.FALSE if they are not to be ignored, null for default
      *   handling (which is 'do not ignore')
      */
-    public Boolean isIgnorableType(AnnotatedClass ac) { return null; }
+    public Boolean isIgnorableType(MapperConfig<?> config, AnnotatedClass ac) { return null; }
 
     /**
      * Method for finding if annotated class has associated filter; and if so,
@@ -241,7 +241,7 @@ public abstract class AnnotationIntrospector
      * @return Id of the filter to use for filtering properties of annotated
      *    class, if any; or null if none found.
      */
-    public Object findFilterId(Annotated ann) { return null; }
+    public Object findFilterId(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method for finding {@link PropertyNamingStrategy} for given
@@ -252,7 +252,7 @@ public abstract class AnnotationIntrospector
      * @return Sub-class or instance of {@link PropertyNamingStrategy}, if one
      *   is specified for given class; null if not.
      */
-    public Object findNamingStrategy(AnnotatedClass ac) { return null; }
+    public Object findNamingStrategy(MapperConfig<?> config, AnnotatedClass ac) { return null; }
 
     /**
      * Method used to check whether specified class defines a human-readable
@@ -263,7 +263,7 @@ public abstract class AnnotationIntrospector
      * 
      * @return Human-readable description, if any.
      */
-    public String findClassDescription(AnnotatedClass ac) { return null; }
+    public String findClassDescription(MapperConfig<?> config, AnnotatedClass ac) { return null; }
 
     /*
     /**********************************************************************
@@ -340,16 +340,16 @@ public abstract class AnnotationIntrospector
     public Boolean isTypeId(MapperConfig<?> config, AnnotatedMember member) { return null; }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* General member (field, method/constructor) annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Method for checking if given member indicates that it is part
      * of a reference (parent/child).
      */
-    public ReferenceProperty findReferenceType(AnnotatedMember member) { return null; }
+    public ReferenceProperty findReferenceType(MapperConfig<?> config, AnnotatedMember member) { return null; }
 
     /**
      * Method called to check whether given property is marked to be "unwrapped"
@@ -359,7 +359,7 @@ public abstract class AnnotationIntrospector
      * should  be done, or null if not -- note that transformation may simply
      * be identity transformation (no changes).
      */
-    public NameTransformer findUnwrappingNameTransformer(AnnotatedMember member) { return null; }
+    public NameTransformer findUnwrappingNameTransformer(MapperConfig<?> config, AnnotatedMember member) { return null; }
 
     /**
      * Method called to check whether given property is marked to
@@ -368,7 +368,7 @@ public abstract class AnnotationIntrospector
      * annotations from multiple accessors (getters, setters, fields,
      * constructor parameters).
      */
-    public boolean hasIgnoreMarker(AnnotatedMember m) { return false; }
+    public boolean hasIgnoreMarker(MapperConfig<?> config, AnnotatedMember m) { return false; }
 
     /**
      * Method called to find out whether given member expectes a value
@@ -383,7 +383,7 @@ public abstract class AnnotationIntrospector
      * @return Identifier of value to inject, if any; null if no injection
      *   indicator is found
      */
-    public JacksonInject.Value findInjectableValue(AnnotatedMember m) {
+    public JacksonInject.Value findInjectableValue(MapperConfig<?> config, AnnotatedMember m) {
         return null;
     }
 
@@ -392,7 +392,7 @@ public abstract class AnnotationIntrospector
      * an annotation that suggests whether value for matching property
      * is required or not.
      */
-    public Boolean hasRequiredMarker(AnnotatedMember m) { return null; }
+    public Boolean hasRequiredMarker(MapperConfig<?> config, AnnotatedMember m) { return null; }
 
     /**
      * Method for checking if annotated property (represented by a field or
@@ -410,7 +410,7 @@ public abstract class AnnotationIntrospector
      * @return Array of views (represented by classes) that the property is included in;
      *    if null, always included (same as returning array containing <code>Object.class</code>)
      */
-    public Class<?>[] findViews(Annotated a) { return null; }
+    public Class<?>[] findViews(MapperConfig<?> config, Annotated a) { return null; }
 
     /**
      * Method for finding format annotations for property or class.
@@ -418,7 +418,7 @@ public abstract class AnnotationIntrospector
      * deserializers to customize presentation aspects of the
      * serialized value.
      */
-    public JsonFormat.Value findFormat(Annotated memberOrClass) {
+    public JsonFormat.Value findFormat(MapperConfig<?> config, Annotated memberOrClass) {
         return JsonFormat.Value.empty();
     }
 
@@ -431,7 +431,7 @@ public abstract class AnnotationIntrospector
      * @return Wrapper name to use, if any, or {@link PropertyName#USE_DEFAULT}
      *   to indicate that no wrapper element should be used.
      */
-    public PropertyName findWrapperName(Annotated ann) { return null; }
+    public PropertyName findWrapperName(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method for finding suggested default value (as simple textual serialization)
@@ -439,7 +439,7 @@ public abstract class AnnotationIntrospector
      * for extension modules to use: an expected use is generation of schema representations
      * and documentation.
      */
-    public String findPropertyDefaultValue(Annotated ann) { return null; }
+    public String findPropertyDefaultValue(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method used to check whether specified property member (accessor
@@ -449,7 +449,7 @@ public abstract class AnnotationIntrospector
      * 
      * @return Human-readable description, if any.
      */
-    public String findPropertyDescription(Annotated ann) { return null; }
+    public String findPropertyDescription(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method used to check whether specified property member (accessor
@@ -460,7 +460,7 @@ public abstract class AnnotationIntrospector
      * 
      * @return Explicitly specified index for the property, if any
      */
-    public Integer findPropertyIndex(Annotated ann) { return null; }
+    public Integer findPropertyIndex(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method for finding implicit name for a property that given annotated
@@ -473,7 +473,7 @@ public abstract class AnnotationIntrospector
      * by standard databind); or to provide alternate name mangling for
      * fields, getters and/or setters.
      */
-    public String findImplicitPropertyName(AnnotatedMember member) { return null; }
+    public String findImplicitPropertyName(MapperConfig<?> config, AnnotatedMember member) { return null; }
 
     /**
      * Method called to find if given property has alias(es) defined.
@@ -481,7 +481,7 @@ public abstract class AnnotationIntrospector
      * @return `null` if member has no information; otherwise a `List` (possibly
      *   empty) of aliases to use.
      */
-    public List<PropertyName> findPropertyAliases(Annotated ann) { return null; }
+    public List<PropertyName> findPropertyAliases(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method for finding optional access definition for a property, annotated
@@ -490,7 +490,7 @@ public abstract class AnnotationIntrospector
      * that even more specific annotations (like one for ignoring specific accessor)
      * may further override behavior of the access definition.
      */
-    public JsonProperty.Access findPropertyAccess(Annotated ann) { return null; }
+    public JsonProperty.Access findPropertyAccess(MapperConfig<?> config, Annotated ann) { return null; }
 
     /**
      * Method called in cases where a class has two methods eligible to be used
@@ -504,9 +504,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: general annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -614,9 +614,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: type refinements
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -631,16 +631,16 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: class annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Method for accessing defined property serialization order (which may be
      * partial). May return null if no ordering is defined.
      */
-    public String[] findSerializationPropertyOrder(AnnotatedClass ac) {
+    public String[] findSerializationPropertyOrder(MapperConfig<?> config, AnnotatedClass ac) {
         return null;
     }
 
@@ -649,7 +649,7 @@ public abstract class AnnotationIntrospector
      * for which no explicit is defined should be alphabetically (lexicograpically)
      * ordered
      */
-    public Boolean findSerializationSortAlphabetically(Annotated ann) {
+    public Boolean findSerializationSortAlphabetically(MapperConfig<?> config, Annotated ann) {
         return null;
     }
 
@@ -661,9 +661,9 @@ public abstract class AnnotationIntrospector
             List<BeanPropertyWriter> properties) { }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: property annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -678,7 +678,7 @@ public abstract class AnnotationIntrospector
      * 
      * @return Name to use if found; null if not.
      */
-    public PropertyName findNameForSerialization(Annotated a) {
+    public PropertyName findNameForSerialization(MapperConfig<?> config, Annotated a) {
         return null;
     }
 
@@ -693,7 +693,7 @@ public abstract class AnnotationIntrospector
      *   accessor is definitely NOT to be used "as value"); or `null` if no
      *   information found.
      */
-    public Boolean hasAsValue(Annotated a) {
+    public Boolean hasAsValue(MapperConfig<?> config, Annotated a) {
         return null;
     }
 
@@ -706,7 +706,7 @@ public abstract class AnnotationIntrospector
      * @return True if such annotation is found (and is not disabled),
      *   false otherwise
      */
-    public Boolean hasAnyGetter(Annotated a) {
+    public Boolean hasAnyGetter(MapperConfig<?> config, Annotated a) {
         return null;
     }
 
@@ -715,7 +715,8 @@ public abstract class AnnotationIntrospector
      * have explicitly defined name. Method will overwrite entries in incoming <code>names</code>
      * array with explicit names found, if any, leaving other entries unmodified.
      */
-    public String[] findEnumValues(Class<?> enumType, Enum<?>[] enumValues, String[] names) {
+    public String[] findEnumValues(MapperConfig<?> config, 
+            Class<?> enumType, Enum<?>[] enumValues, String[] names) {
         return names;
     }
 
@@ -725,14 +726,15 @@ public abstract class AnnotationIntrospector
      * @param enumCls The Enum class to scan for the default value.
      * @return null if none found or it's not possible to determine one.
      */
-    public Enum<?> findDefaultEnumValue(Class<Enum<?>> enumCls) {
+    public Enum<?> findDefaultEnumValue(MapperConfig<?> config, 
+            Class<Enum<?>> enumCls) {
         return null;
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: general annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -815,9 +817,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: type refinements
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -831,9 +833,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: class annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -865,9 +867,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: property annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -882,7 +884,7 @@ public abstract class AnnotationIntrospector
      * 
      * @return Name to use if found; null if not.
      */
-    public PropertyName findNameForDeserialization(Annotated a) {
+    public PropertyName findNameForDeserialization(MapperConfig<?> config, Annotated a) {
         return null;
     }
     
@@ -895,7 +897,7 @@ public abstract class AnnotationIntrospector
      * @return True if such annotation is found (and is not disabled),
      *   false otherwise
      */
-    public Boolean hasAnySetter(Annotated a) {
+    public Boolean hasAnySetter(MapperConfig<?> config, Annotated a) {
         return null;
     }
 
@@ -903,14 +905,14 @@ public abstract class AnnotationIntrospector
      * Method for finding possible settings for property, given annotations
      * on an accessor.
      */
-    public JsonSetter.Value findSetterInfo(Annotated a) {
+    public JsonSetter.Value findSetterInfo(MapperConfig<?> config, Annotated a) {
         return JsonSetter.Value.empty();
     }
 
     /**
      * Method for finding merge settings for property, if any.
      */
-    public Boolean findMergeInfo(Annotated a) {
+    public Boolean findMergeInfo(MapperConfig<?> config, Annotated a) {
         return null;
     }
 
@@ -932,10 +934,9 @@ public abstract class AnnotationIntrospector
     }
 
     /*
-    /**********************************************************
-    /* Overridable methods: may be used as low-level extension
-    /* points.
-    /**********************************************************
+    /**********************************************************************
+    /* Overridable methods: may be used as low-level extension points.
+    /**********************************************************************
      */
 
     /**
