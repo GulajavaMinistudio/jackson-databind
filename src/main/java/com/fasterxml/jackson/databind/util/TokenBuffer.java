@@ -1596,9 +1596,10 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
         /******************************************************************
          */
 
-        @Override
-        public TokenStreamContext getParsingContext() { return _parsingContext; }
-
+        @Override public TokenStreamContext getParsingContext() { return _parsingContext; }
+        @Override public void setCurrentValue(Object v) { _parsingContext.setCurrentValue(v); }
+        @Override public Object getCurrentValue() { return _parsingContext.getCurrentValue(); }
+        
         @Override
         public JsonLocation getTokenLocation() { return getCurrentLocation(); }
 
@@ -1615,23 +1616,6 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
                 return parent.currentName();
             }
             return _parsingContext.currentName();
-        }
-
-        @Override
-        public void overrideCurrentName(String name)
-        {
-            // Simple, but need to look for START_OBJECT/ARRAY's "off-by-one" thing:
-            TokenStreamContext ctxt = _parsingContext;
-            if (_currToken == JsonToken.START_OBJECT || _currToken == JsonToken.START_ARRAY) {
-                ctxt = ctxt.getParent();
-            }
-            if (ctxt instanceof TokenBufferReadContext) {
-                try {
-                    ((TokenBufferReadContext) ctxt).setCurrentName(name);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
         }
 
         /*
