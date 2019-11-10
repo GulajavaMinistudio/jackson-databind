@@ -48,6 +48,13 @@ public class CoreXMLDeserializers
         return null;
     }
 
+    public static boolean hasDeserializerFor(Class<?> valueType) {
+        return (valueType == QName.class)
+                || (valueType == XMLGregorianCalendar.class)
+                || (valueType == Duration.class)
+                ;
+    }
+
     /*
     /**********************************************************************
     /* Concrete deserializers

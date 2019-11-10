@@ -115,6 +115,12 @@ public class EnumCreatorTest extends BaseMapTest
             }
             return null;
         }
+
+        @Override
+        public boolean hasDeserializerFor(DeserializationConfig config,
+                Class<?> valueType) {
+            return false;
+        }
     }
 
     // [databind#745]
