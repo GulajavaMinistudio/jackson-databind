@@ -44,9 +44,9 @@ public final class PropertyBasedCreator
     protected final SettableBeanProperty[] _propertiesInOrder;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Construction, initialization
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected PropertyBasedCreator(DeserializationContext ctxt,
@@ -57,7 +57,7 @@ public final class PropertyBasedCreator
     {
         _valueInstantiator = valueInstantiator;
         if (caseInsensitive) {
-            _propertyLookup = new CaseInsensitiveMap();
+            _propertyLookup = CaseInsensitiveMap.construct(ctxt.getConfig().getLocale());
         } else {
             _propertyLookup = new HashMap<String, SettableBeanProperty>();
         }
@@ -141,9 +141,9 @@ public final class PropertyBasedCreator
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     public Collection<SettableBeanProperty> properties() {
@@ -164,9 +164,9 @@ public final class PropertyBasedCreator
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Building process
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -195,29 +195,41 @@ public final class PropertyBasedCreator
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper classes
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Simple override of standard {@link java.util.HashMap} to support
      * case-insensitive access to creator properties
-     *
-     * @since 2.8.5
      */
     static class CaseInsensitiveMap extends HashMap<String, SettableBeanProperty>
     {
-        private static final long serialVersionUID = 1L;
+        // doesn't really need to be Serializable with 3.x but... whatever
+        private static final long serialVersionUID = 3L;
 
+        /**
+         * Lower-casing can have Locale-specific minor variations.
+         */
+        protected final Locale _locale;
+
+        public CaseInsensitiveMap(Locale l) {
+            _locale = l;
+        }
+
+        public static CaseInsensitiveMap construct(Locale l) {
+            return new CaseInsensitiveMap(l);
+        }
+        
         @Override
         public SettableBeanProperty get(Object key0) {
-            return super.get(((String) key0).toLowerCase());
+            return super.get(((String) key0).toLowerCase(_locale));
         }
 
         @Override
         public SettableBeanProperty put(String key, SettableBeanProperty value) {
-            key = key.toLowerCase();
+            key = key.toLowerCase(_locale);
             return super.put(key, value);
         }
     }
