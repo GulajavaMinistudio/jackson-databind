@@ -25,6 +25,8 @@ Project: jackson-databind
   for non-static inner classes
 #2525: Incorrect `JsonStreamContext` for `TokenBuffer` and `TreeTraversingParser`
 #2555: Use `@JsonProperty(index)` for sorting properties on serialization
+#2565: Java 8 `Optional` not working with `@JsonUnwrapped` on unwrappable type
+ (reported by Haowei W)
 - Add `SerializerProvider.findContentValueSerializer()` methods
 
 2.10.2 (not yet released)
@@ -37,6 +39,12 @@ Project: jackson-databind
  (reported by Fabian L)
 #2560: Check `WRAP_EXCEPTIONS` in `CollectionDeserializer.handleNonArray()`
  (reported by Stefan W)
+#2564: Fix `IllegalArgumentException` on empty input collection for `ArrayBlockingQueue`
+ (reported, fix suggested by yamert89@github)
+#2566: `MissingNode.toString()` returns `null` (4 character token) instead of empty string
+ (reported by Greg A)
+#2567: Incorrect target type for arrays when providing nulls and nulls are disabled
+ (reported by João G)
 
 2.10.1 (09-Nov-2019)
 

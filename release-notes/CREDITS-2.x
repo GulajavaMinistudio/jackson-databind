@@ -984,6 +984,8 @@ João Guerra (joca-bt@github)
   * Reported #2473: Array index missing in path of `JsonMappingException` for `Collection<String>`,
     with custom deserializer
   (2.10.1)
+  * Reported #2567: Incorrect target type for arrays when providing nulls and nulls are disabled
+  (2.10.2)
 
 Ryan Bohn (bohnman@github)
   * Reported #2475: `StringCollectionSerializer` calls `JsonGenerator.setCurrentValue(value)`,
@@ -1011,6 +1013,15 @@ Stefan Wendt (stewe@github)
   * Reported #2560: Check `WRAP_EXCEPTIONS` in `CollectionDeserializer.handleNonArray()`
   (2.10.2)
 
+Greg Arakelian (arakelian@github)
+  * Reported #2566: `MissingNode.toString()` returns `null` (4 character token) instead
+    of empty string
+  (2.10.2)
+
+Máté Rédecsi (rmatesz@github)
+  * Reported #953: i-I case convertion problem in Turkish locale with case-insensitive deserialization
+ (2.11.0)
+
 Ville Koskela (vjkoskela@github)
   * Contributed #2487: BeanDeserializerBuilder Protected Factory Method for Extension
   (2.11.0)
@@ -1032,6 +1043,6 @@ Joseph Koshakow (jkosh44@github)
     the same POJO for two different type ids
  (2.11.0)
 
-Máté Rédecsi (rmatesz@github)
-  * Reported #953: i-I case convertion problem in Turkish locale with case-insensitive deserialization
+Haowei Wen (yushijinhun@github)
+  * Reported #2565: Java 8 `Optional` not working with `@JsonUnwrapped` on unwrappable type
  (2.11.0)
