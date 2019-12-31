@@ -1,7 +1,6 @@
 package com.fasterxml.jackson.databind.deser.builder;
 
 import com.fasterxml.jackson.annotation.*;
-
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -47,7 +46,7 @@ public class BuilderAdvancedTest extends BaseMapTest
     /* Unit tests
     /**********************************************************
      */
-    
+
     public void testWithInjectable() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -60,4 +59,6 @@ public class BuilderAdvancedTest extends BaseMapTest
         assertEquals(4, bean._y);
         assertEquals("stuffValue", bean._stuff);
     }
+
+    // NOTE: failing test from [databind#2580] moved in 3.x (included here for 2.11)
 }

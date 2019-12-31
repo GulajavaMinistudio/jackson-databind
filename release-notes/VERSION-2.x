@@ -24,6 +24,8 @@ Project: jackson-databind
 #2522: `DeserializationContext.handleMissingInstantiator()` throws `MismatchedInputException`
   for non-static inner classes
 #2525: Incorrect `JsonStreamContext` for `TokenBuffer` and `TreeTraversingParser`
+#2527: Add `AnnotationIntrospector.findRenameByField()` to support Kotlin's "is-getter"
+  naming convention
 #2555: Use `@JsonProperty(index)` for sorting properties on serialization
 #2565: Java 8 `Optional` not working with `@JsonUnwrapped` on unwrappable type
  (reported by Haowei W)
@@ -31,6 +33,8 @@ Project: jackson-databind
 
 2.10.2 (not yet released)
 
+#2101: `FAIL_ON_NULL_FOR_PRIMITIVES` failure does not indicate field name in exception message
+ (reported by raderio@github)
 #2544: java.lang.NoClassDefFoundError Thrown for compact profile1
   (reported by Jon A)
 #2553: JsonDeserialize(contentAs=...) broken with raw collections
@@ -45,9 +49,12 @@ Project: jackson-databind
  (reported by Greg A)
 #2567: Incorrect target type for arrays when providing nulls and nulls are disabled
  (reported by João G)
+#2573: Problem with `JsonInclude` config overrides for `java.util.Map`
+ (reported by SukruthKS@github)
 #2576: Fail to serialize `Enum` instance which includes a method override
   as POJO (shape = Shape.OBJECT)
  (reported by ylhuang-veeva@github)
+- Fix an issue with `ObjectReader.with(JsonParser.Feature)` (and related) not working
 
 2.10.1 (09-Nov-2019)
 

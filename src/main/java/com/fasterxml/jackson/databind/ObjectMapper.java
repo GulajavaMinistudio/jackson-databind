@@ -43,7 +43,7 @@ import com.fasterxml.jackson.databind.util.TokenBuffer;
  * (producing instance with default configuration); or through one of two build
  * methods.
  * First build method is the static <code>builder()</code> on exact type
- * and second {@link #rebuild()} method method on an existing mapper.
+ * and second {@link #rebuild()} method on an existing mapper.
  * Former starts with default configuration (same as one that no-arguments constructor
  * created mapper has), and latter starts with configuration of the mapper it is called
  * on.
@@ -2304,7 +2304,8 @@ public class ObjectMapper
                 GeneratorSettings.empty());
     }
 
-    protected DefaultSerializerProvider _serializerProvider() {
+    // NOTE: only public to allow for testing
+    public DefaultSerializerProvider _serializerProvider() {
         // 03-Oct-2017, tatu: Should be ok to pass "empty" generator settings...
         return _serializationContexts.createContext(serializationConfig(),
                 GeneratorSettings.empty());
@@ -2474,7 +2475,8 @@ public class ObjectMapper
                 .assignParser(p);
     }
 
-    protected DefaultDeserializationContext _deserializationContext() {
+    // NOTE: only public to allow for testing
+    public DefaultDeserializationContext _deserializationContext() {
         return _deserializationContexts.createContext(deserializationConfig(),
                 /* FormatSchema */ null, _injectableValues);
     }

@@ -21,9 +21,9 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
 public class POJOPropertiesCollector
 {
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -58,11 +58,11 @@ public class POJOPropertiesCollector
      * but differs for builder objects ("with" by default).
      */
     protected final String _mutatorPrefix;
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Collected property information
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -81,6 +81,22 @@ public class POJOPropertiesCollector
     protected LinkedHashMap<String, POJOPropertyBuilder> _properties;
 
     protected LinkedList<POJOPropertyBuilder> _creatorProperties;
+
+    /**
+     * A set of "field renamings" that have been discovered, indicating
+     * intended renaming of other accesors: key is the implicit original
+     * name and value intended name to use instead.
+     *<p>
+     * Note that these renamings are applied earlier than "regular" (explicit)
+     * renamings and affect implicit name: their effect may be changed by
+     * further renaming based on explicit indicators.
+     * The main use case is to effectively relink accessors based on fields
+     * discovered, and used to sort of correct otherwise missing linkage between
+     * fields and other accessors.
+     *
+     * @since 2.11
+     */
+    protected Map<PropertyName, PropertyName> _fieldRenameMappings;
     
     protected LinkedList<AnnotatedMember> _anyGetters;
 
@@ -106,11 +122,11 @@ public class POJOPropertiesCollector
      * value injection.
      */
     protected LinkedHashMap<Object, AnnotatedMember> _injectables;
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected POJOPropertiesCollector(MapperConfig<?> config, boolean forSerialization,
@@ -133,9 +149,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API
-    /**********************************************************
+    /**********************************************************************
      */
 
     public MapperConfig<?> getConfig() {
@@ -267,9 +283,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API: main-level collection
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -280,7 +296,7 @@ public class POJOPropertiesCollector
         LinkedHashMap<String, POJOPropertyBuilder> props = new LinkedHashMap<String, POJOPropertyBuilder>();
 
         // First: gather basic data
-        _addFields(props);
+        _addFields(props); // note: populates _fieldRenameMappings
         _addMethods(props);
         // 25-Jan-2016, tatu: Avoid introspecting (constructor-)creators for non-static
         //    inner classes, see [databind#1502]
@@ -326,9 +342,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Overridable internal methods, adding members
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -343,7 +359,7 @@ public class POJOPropertiesCollector
          */
         final boolean pruneFinalFields = !_forSerialization && !_config.isEnabled(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS);
         final boolean transientAsIgnoral = _config.isEnabled(MapperFeature.PROPAGATE_TRANSIENT_MARKER);
-        
+
         for (AnnotatedField f : _classDef.fields()) {
             // @JsonValue?
             if (Boolean.TRUE.equals(ai.hasAsValue(_config, f))) {
@@ -356,7 +372,7 @@ public class POJOPropertiesCollector
             // @JsonAnySetter?
             if (Boolean.TRUE.equals(ai.hasAnySetter(_config, f))) {
                 if (_anySetterField == null) {
-                    _anySetterField = new LinkedList<AnnotatedMember>();
+                    _anySetterField = new LinkedList<>();
                 }
                 _anySetterField.add(f);
                 continue;
@@ -365,14 +381,27 @@ public class POJOPropertiesCollector
             if (implName == null) {
                 implName = f.getName();
             }
+            final PropertyName implNameP = _propNameFromSimple(implName);
+
+            // [databind#2527: Field-based renaming can be applied early (here),
+            // or at a later point, but probably must be done before pruning
+            // final fields. So let's do it early here
+            final PropertyName rename = ai.findRenameByField(_config, f, implNameP);
+            if ((rename != null) && !rename.equals(implNameP)) {
+                if (_fieldRenameMappings == null) {
+                    _fieldRenameMappings = new HashMap<>();
+                }
+                _fieldRenameMappings.put(rename, implNameP);
+                // todo
+            }
+
             PropertyName pn;
 
             if (_forSerialization) {
-                /* 18-Aug-2011, tatu: As per existing unit tests, we should only
-                 *   use serialization annotation (@JsonSerialize) when serializing
-                 *   fields, and similarly for deserialize-only annotations... so
-                 *   no fallbacks in this particular case.
-                 */
+                // 18-Aug-2011, tatu: As per existing unit tests, we should only
+                //   use serialization annotation (@JsonSerialize) when serializing
+                //   fields, and similarly for deserialize-only annotations... so
+                //   no fallbacks in this particular case.
                 pn = ai.findNameForSerialization(_config, f);
             } else {
                 pn = ai.findNameForDeserialization(_config, f);
@@ -405,7 +434,7 @@ public class POJOPropertiesCollector
             }
             /* [databind#190]: this is the place to prune final fields, if they are not
              *  to be used as mutators. Must verify they are not explicitly included.
-             *  Also: if 'ignored' is set, need to included until a later point, to
+             *  Also: if 'ignored' is set, need to include until a later point, to
              *  avoid losing ignoral information.
              */
             if (pruneFinalFields && (pn == null) && !ignored
@@ -427,7 +456,7 @@ public class POJOPropertiesCollector
         }
         for (AnnotatedConstructor ctor : _classDef.getConstructors()) {
             if (_creatorProperties == null) {
-                _creatorProperties = new LinkedList<POJOPropertyBuilder>();
+                _creatorProperties = new LinkedList<>();
             }
             for (int i = 0, len = ctor.getParameterCount(); i < len; ++i) {
                 _addCreatorParam(props, ctor.getParameter(i));
@@ -435,7 +464,7 @@ public class POJOPropertiesCollector
         }
         for (AnnotatedMethod factory : _classDef.getFactoryMethods()) {
             if (_creatorProperties == null) {
-                _creatorProperties = new LinkedList<POJOPropertyBuilder>();
+                _creatorProperties = new LinkedList<>();
             }
             for (int i = 0, len = factory.getParameterCount(); i < len; ++i) {
                 _addCreatorParam(props, factory.getParameter(i));
@@ -468,9 +497,12 @@ public class POJOPropertiesCollector
             pn = PropertyName.construct(impl);
         }
 
+        // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
+        impl = _checkRenameByField(impl);
+
         // shouldn't need to worry about @JsonIgnore, since creators only added
         // if so annotated
-
+        
         /* 13-May-2015, tatu: We should try to start with implicit name, similar to how
          *   fields and methods work; but unlike those, we don't necessarily have
          *   implicit name to use (pre-Java8 at least). So:
@@ -488,11 +520,11 @@ public class POJOPropertiesCollector
     {
         final AnnotationIntrospector ai = _annotationIntrospector;
         for (AnnotatedMethod m : _classDef.memberMethods()) {
-            /* For methods, handling differs between getters and setters; and
-             * we will also only consider entries that either follow the bean
-             * naming convention or are explicitly marked: just being visible
-             * is not enough (unlike with fields)
-             */
+            // For methods, handling differs between getters and setters; and
+            // we will also only consider entries that either follow the bean
+            // naming convention or are explicitly marked: just being visible
+            // is not enough (unlike with fields)
+
             int argCount = m.getParameterCount();
             if (argCount == 0) { // getters (including 'any getter')
             	_addGetterMethod(props, m, ai);
@@ -573,6 +605,8 @@ public class POJOPropertiesCollector
             }
             visible = true;
         }
+        // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
+        implName = _checkRenameByField(implName);
         boolean ignore = ai.hasIgnoreMarker(_config, m);
         _property(props, implName).addGetter(m, pn, nameExplicit, visible, ignore);
     }
@@ -610,6 +644,8 @@ public class POJOPropertiesCollector
             }
             visible = true;
         }
+        // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
+        implName = _checkRenameByField(implName);
         boolean ignore = (ai == null) ? false : ai.hasIgnoreMarker(_config, m);
         _property(props, implName).addSetter(m, pn, nameExplicit, visible, ignore);
     }
@@ -654,11 +690,23 @@ public class POJOPropertiesCollector
     private PropertyName _propNameFromSimple(String simpleName) {
         return PropertyName.construct(simpleName, null);
     }
-    
+
+    private String _checkRenameByField(String implName) {
+        if (_fieldRenameMappings != null) {
+            PropertyName p = _fieldRenameMappings.get(_propNameFromSimple(implName));
+            if (p != null) {
+                implName = p.getSimpleName();
+                return implName;
+
+            }
+        }
+        return implName;
+    }
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods; removing ignored properties
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -729,9 +777,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods; renaming properties
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected void _renameProperties(Map<String, POJOPropertyBuilder> props)
@@ -893,9 +941,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Overridable internal methods, sorting, other stuff
-    /**********************************************************
+    /**********************************************************************
      */
 
     // First, order by(explicit ordering and/or alphabetic),
@@ -1014,9 +1062,9 @@ public class POJOPropertiesCollector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods; helpers
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected void reportProblem(String msg, Object... args) {

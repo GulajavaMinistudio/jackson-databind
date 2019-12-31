@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -286,10 +287,9 @@ public class UntypedObjectDeserializer
 
         case JsonTokenId.ID_EMBEDDED_OBJECT:
             return p.getEmbeddedObject();
-            
-        /* Otherwise we probably got a "native" type (ones that map
-         * naturally and thus do not need or use type ids)
-         */
+
+        // Otherwise we probably got a "native" type (ones that map
+        // naturally and thus do not need or use type ids)
         case JsonTokenId.ID_STRING:
             if (_stringDeserializer != null) {
                 return _stringDeserializer.deserialize(p, ctxt);
@@ -339,8 +339,8 @@ public class UntypedObjectDeserializer
         switch (p.currentTokenId()) {
         case JsonTokenId.ID_START_OBJECT:
         case JsonTokenId.ID_FIELD_NAME:
-            // 28-Oct-2015, tatu: [databind#989] We may also be given END_OBJECT (similar to FIELD_NAME),
-            //    if caller has advanced to the first token of Object, but for empty Object
+            // We may also be given END_OBJECT (similar to FIELD_NAME),
+            // if caller has advanced to the first token of Object, but for empty Object
         case JsonTokenId.ID_END_OBJECT:
             if (_mapDeserializer != null) {
                 return _mapDeserializer.deserialize(p, ctxt, intoValue);
@@ -578,6 +578,10 @@ public class UntypedObjectDeserializer
     /**********************************************************
      */
 
+    /**
+     * Streamlined version of {@UntypedObjectDeserializer} that has fewer checks and
+     * is only used when no custom deserializer overrides are applied.
+     */
     @JacksonStdImpl
     public static class Vanilla
         extends StdDeserializer<Object>
