@@ -6,7 +6,7 @@ Project: jackson-databind
 
 2.11.0 (not yet released)
 
-#953: i-I case convertion problem in Turkish locale with case-insensitive deserialization
+#953: i-I case conversion problem in Turkish locale with case-insensitive deserialization
  (reported by Máté R)
 #2049: TreeTraversingParser and UTF8StreamJsonParser create contexts differently
  (reported by Antonio P)
@@ -193,7 +193,7 @@ Project: jackson-databind
   deserialize as "null value"
  (contributed by Martin C)
 
-2.9.10.2 (not yet released)
+2.9.10.2 (03-Jan-2020)
 
 #2526: Block two more gadget types (ehcache/JNDI - CVEs to be allocated)
   (repoerted by UltramanGaia)
