@@ -1,7 +1,7 @@
 package com.fasterxml.jackson.databind.jsontype;
 
-import javax.naming.Referenceable;
-import javax.sql.DataSource;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
@@ -89,16 +89,7 @@ ClassUtil.classNameOf(getClass()), ClassUtil.classNameOf(baseType.getRawClass())
      */
     protected boolean isUnsafeBaseType(DatabindContext ctxt, JavaType baseType)
     {
-        final Class<?> rawBase = baseType.getRawClass();
-        return (rawBase == Object.class)
-                || (rawBase == java.io.Closeable.class)
-                || (rawBase == java.io.Serializable.class)
-                || (rawBase == AutoCloseable.class)
-                || (rawBase == Cloneable.class)
-                || (rawBase == java.util.logging.Handler.class)
-                || (rawBase == Referenceable.class)
-                || (rawBase == DataSource.class) 
-            ;
+        return UnsafeBaseTypes.instance.isUnsafeBaseType(baseType.getRawClass());
     }
 
     /**
@@ -116,5 +107,30 @@ ClassUtil.classNameOf(getClass()), ClassUtil.classNameOf(baseType.getRawClass())
             JavaType baseType, JavaType subType)
     {
         return true;
+    }
+
+    private final static class UnsafeBaseTypes {
+        public final static UnsafeBaseTypes instance = new UnsafeBaseTypes();
+
+        private final Set<String> UNSAFE = new HashSet<>();
+        {
+            // first add names of types in `java.base`
+            UNSAFE.add(Object.class.getName());
+            UNSAFE.add(java.io.Closeable.class.getName());
+            UNSAFE.add(java.io.Serializable.class.getName());
+            UNSAFE.add(AutoCloseable.class.getName());
+            UNSAFE.add(Cloneable.class.getName());
+
+            // and then couple others typically included in JDK, but that we
+            // prefer not adding direct reference to
+            UNSAFE.add("java.util.logging.Handler");
+            UNSAFE.add("javax.naming.Referenceable");
+            UNSAFE.add("javax.sql.DataSource");
+        }
+        
+        public boolean isUnsafeBaseType(Class<?> rawBaseType)
+        {
+            return UNSAFE.contains(rawBaseType.getName());
+        }
     }
 }
