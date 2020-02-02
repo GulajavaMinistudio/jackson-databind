@@ -41,12 +41,17 @@ Project: jackson-databind
 
 2.10.3 (not yet released)
 
+#2482: `JSONMappingException` `Location` column number is one line Behind the actual
+  location
+ (reported by Kamal A, fixed by Ivo S)
 #2599: NoClassDefFoundError at DeserializationContext.<init> on Android 4.1.2
   and Jackson 2.10.0
  (reported by Tobias P)
 #2602: ByteBufferSerializer produces unexpected results with a duplicated ByteBuffer
   and a position > 0
  (reported by Eduard T)
+#2610: `EXTERNAL_PROPERTY` doesn't work with `@JsonIgnoreProperties`
+ (reported, fix suggested by Alexander S)
 
 2.10.2 (05-Jan-2020)
 
