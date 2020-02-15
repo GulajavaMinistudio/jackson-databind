@@ -52,6 +52,8 @@ Project: jackson-databind
 #2602: ByteBufferSerializer produces unexpected results with a duplicated ByteBuffer
   and a position > 0
  (reported by Eduard T)
+#2605: Failure to deserializer polymorphic subtypes of base type `Enum`
+ (reported by uewle@github)
 #2610: `EXTERNAL_PROPERTY` doesn't work with `@JsonIgnoreProperties`
  (reported, fix suggested by Alexander S)
 
@@ -216,6 +218,11 @@ Project: jackson-databind
 #2467: Accept `JsonTypeInfo.As.WRAPPER_ARRAY` with no second argument to
   deserialize as "null value"
  (contributed by Martin C)
+
+2.9.10.3 (not released yet)
+
+#2620: Block one more gadget type (xbean-reflect/JNDI - CVE-2020-8840)
+ (reported by threedr3am@github)
 
 2.9.10.2 (03-Jan-2020)
 
