@@ -119,6 +119,14 @@ public class ObjectReaderTest extends BaseMapTest
 
         // and another one
         assertSame(r, r.with(r.getConfig()));
+
+        // and with StreamReadFeatures
+        r = MAPPER.reader();
+        assertFalse(r.isEnabled(StreamReadFeature.IGNORE_UNDEFINED));
+        ObjectReader r2 = r.with(StreamReadFeature.IGNORE_UNDEFINED);
+        assertTrue(r2.isEnabled(StreamReadFeature.IGNORE_UNDEFINED));
+        ObjectReader r3 = r2.without(StreamReadFeature.IGNORE_UNDEFINED);
+        assertFalse(r3.isEnabled(StreamReadFeature.IGNORE_UNDEFINED));
     }
 
     public void testMiscSettings() throws Exception
@@ -269,6 +277,24 @@ public class ObjectReaderTest extends BaseMapTest
         public Set<String> set2;
     }    
 
+    // [databind#2636]
+    public void testCanPassResultToOverloadedMethod() throws Exception {
+        final String source = "{\"foo\":{\"bar\":{\"caller\":{\"name\":{\"value\":1234}}}}}";
+
+        ObjectReader reader = MAPPER.readerFor(POJO.class).at("/foo/bar/caller");
+
+        process(reader.readValue(source, POJO.class));
+    }
+
+    void process(POJO pojo) {
+        // do nothing - just used to show that the compiler can choose the correct method overloading to invoke
+    }
+
+    void process(String pojo) {
+        // do nothing - just used to show that the compiler can choose the correct method overloading to invoke
+        throw new Error();
+    }
+    
     /*
     /**********************************************************************
     /* Test methods, ObjectCodec

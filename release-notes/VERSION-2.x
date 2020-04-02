@@ -8,6 +8,9 @@ Project: jackson-databind
 
 #953: i-I case conversion problem in Turkish locale with case-insensitive deserialization
  (reported by Máté R)
+#1983: Polymorphic deserialization should handle case-insensitive Type Id property name
+  if `MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES` is enabled
+ (reported by soundvibe@github, fix contributed by Oleksandr P)
 #2049: TreeTraversingParser and UTF8StreamJsonParser create contexts differently
  (reported by Antonio P)
 #2352: Support use of `@JsonAlias` for enum values
@@ -39,9 +42,27 @@ Project: jackson-databind
  (reported by Bartosz B)
 #2592: `ObjectMapper.setSerializationInclusion()` is ignored for `JsonAnyGetter`
  (reported by Oleksii K)
+#2627: JsonIgnoreProperties(ignoreUnknown = true) does not work on field and method level
+ (reported by robotmrv@github)
+#2632: Failure to resolve generic type parameters on serialization
+ (reported by Simone D)
+#2636: ObjectReader readValue lacks Class<T> argument
+ (contributed by Robin R)
+#2643: Change default textual serialization of `java.util.Date`/`Calendar`
+  to include colon in timezone offset
+#2647: Add `ObjectMapper.createParser()` and `createGenerator()` methods
+#2657: Allow serialization of `Properties` with non-String values
+#2663: Add new factory method for creating custom `EnumValues` to pass to `EnumDeserializer
+ (requested by Rafal K)
+#2668: `IllegalArgumentException` thrown for mismatched subclass deserialization
+ (reported by nbruno@github)
 - Add `SerializerProvider.findContentValueSerializer()` methods
 
-2.10.3 (not yet released)
+2.10.4 (not yet released)
+
+-
+
+2.10.3 (03-Mar-2020)
 
 #2482: `JSONMappingException` `Location` column number is one line Behind the actual
   location
@@ -219,7 +240,32 @@ Project: jackson-databind
   deserialize as "null value"
  (contributed by Martin C)
 
-2.9.10.3 (not released yet)
+2.9.10.4 (not yet released)
+
+#2631: Block one more gadget type (shaded-hikari-config, CVE-2020-9546)
+ (reported by threedr3am & LFY)
+#2634: Block two more gadget types (ibatis-sqlmap, anteros-core; CVE-2020-9547 / CVE-2020-9548)
+ (reported by threedr3am & V1ZkRA)
+#2642: Block one more gadget type (javax.swing, CVE-2020-10969)
+ (reported by threedr3am)
+#2648: Block one more gadget type (shiro-core)
+#2653: Block one more gadget type (shiro-core)
+#2658: Block one more gadget type (ignite-jta, CVE-2020-10650)
+ (reported by Srikanth Ramu, threedr3am'follower)
+#2659: Block one more gadget type (aries.transaction.jms, CVE-2020-10672)
+ (reported by Srikanth Ramu)
+#2660: Block one more gadget type (caucho-quercus, CVE-2020-10673)
+ (reported by threedr3am'follower)
+#2662: Block one more gadget type (bus-proxy, CVE-2020-10968)
+ (reported by XuYuanzhen)
+#2664: Block one more gadget type (activemq-pool[-jms], CVE-2020-11111)
+ (reported by Srikanth Ramu)
+#2666: Block one more gadget type (apache/commons-proxy, CVE-2020-11112)
+ (reported by Yiting Fan)
+#2670: Block one more gadget type (openjpa, CVE-2020-11113)
+ (reported by XuYuanzhen)
+
+2.9.10.3 (23-Feb-2020)
 
 #2620: Block one more gadget type (xbean-reflect/JNDI - CVE-2020-8840)
  (reported by threedr3am@github)

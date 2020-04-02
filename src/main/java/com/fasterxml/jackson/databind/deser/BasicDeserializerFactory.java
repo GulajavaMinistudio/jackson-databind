@@ -719,7 +719,7 @@ nonAnnotatedParamIndex, ctor);
     }
 
     /**
-     * Helper method called when there is the explicit "is-creator", but no mode declaration.
+     * Helper method called when there is explicit "is-creator" marker, but no mode declaration.
      */
     protected void _addExplicitAnyCreator(DeserializationContext ctxt,
             BeanDescription beanDesc, CreatorCollector creators,
@@ -1227,7 +1227,8 @@ nonAnnotatedParamIndex, ctor);
     {
         final Class<?> collectionClass = ContainerDefaultMappings.findCollectionFallback(type);
         if (collectionClass != null) {
-            return (CollectionType) config.constructSpecializedType(type, collectionClass);
+            return (CollectionType) config.getTypeFactory()
+                    .constructSpecializedType(type, collectionClass, true);
         }
         return null;
     }
@@ -1381,7 +1382,8 @@ nonAnnotatedParamIndex, ctor);
     {
         final Class<?> mapClass = ContainerDefaultMappings.findMapFallback(type);
         if (mapClass != null) {
-            return (MapType) config.constructSpecializedType(type, mapClass);
+            return (MapType) config.getTypeFactory()
+                    .constructSpecializedType(type, mapClass, true);
         }
         return null;
     }
@@ -1467,10 +1469,13 @@ nonAnnotatedParamIndex, ctor);
                     }
                     Class<?> returnType = factory.getRawReturnType();
                     // usually should be class, but may be just plain Enum<?> (for Enum.valueOf()?)
-                    if (returnType.isAssignableFrom(enumClass)) {
-                        deser = EnumDeserializer.deserializerForCreator(config, enumClass, factory, valueInstantiator, creatorProps);
-                        break;
+                    if (!returnType.isAssignableFrom(enumClass)) {
+                        ctxt.reportBadDefinition(type, String.format(
+"Invalid `@JsonCreator` annotated Enum factory method [%s]: needs to return compatible type",
+factory.toString()));
                     }
+                    deser = EnumDeserializer.deserializerForCreator(config, enumClass, factory, valueInstantiator, creatorProps);
+                    break;
                 }
             }
            
@@ -2119,8 +2124,6 @@ nonAnnotatedParamIndex, ctor);
      * Helper class to contain default mappings for abstract JDK {@link java.util.Collection}
      * and {@link java.util.Map} types. Separated out here to defer cost of creating lookups
      * until mappings are actually needed.
-     *
-     * @since 2.10
      */
     @SuppressWarnings("rawtypes")
     protected static class ContainerDefaultMappings {

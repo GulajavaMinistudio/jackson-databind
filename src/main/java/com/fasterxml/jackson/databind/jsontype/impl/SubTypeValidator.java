@@ -74,10 +74,11 @@ public class SubTypeValidator
         s.add("com.sun.deploy.security.ruleset.DRSHelper");
         s.add("org.apache.axis2.jaxws.spi.handler.HandlerResolverImpl");
 
-        // [databind#2186]: yet more 3rd party gadgets
+        // [databind#2186], [databind#2670]: yet more 3rd party gadgets
         s.add("org.jboss.util.propertyeditor.DocumentEditor");
         s.add("org.apache.openjpa.ee.RegistryManagedRuntime");
         s.add("org.apache.openjpa.ee.JNDIManagedRuntime");
+        s.add("org.apache.openjpa.ee.WASRegistryManagedRuntime"); // [#2670] addition
         s.add("org.apache.axis2.transport.jms.JMSOutTransportInfo");
 
         // [databind#2326] (2.9.9)
@@ -127,6 +128,51 @@ public class SubTypeValidator
 
         // [databind#2620]: xbean-reflect
         s.add("org.apache.xbean.propertyeditor.JndiConverter");
+
+        // [databind#2631]: shaded hikari-config
+        s.add("org.apache.hadoop.shaded.com.zaxxer.hikari.HikariConfig");
+
+        // [databind#2634]: ibatis-sqlmap, anteros-core
+        s.add("com.ibatis.sqlmap.engine.transaction.jta.JtaTransactionConfig");
+        s.add("br.com.anteros.dbcp.AnterosDBCPConfig");
+
+        // [databind#2642]: javax.swing (jdk)
+        s.add("javax.swing.JEditorPane");
+
+        // [databind#2648], [databind#2653]: shiro-core
+        s.add("org.apache.shiro.realm.jndi.JndiRealmFactory");
+        s.add("org.apache.shiro.jndi.JndiObjectFactory");
+
+        // [databind#2658]: ignite-jta (, quartz-core)
+        s.add("org.apache.ignite.cache.jta.jndi.CacheJndiTmLookup");
+        s.add("org.apache.ignite.cache.jta.jndi.CacheJndiTmFactory");
+        s.add("org.quartz.utils.JNDIConnectionProvider");
+
+        // [databind#2659]: aries.transaction.jms
+        s.add("org.apache.aries.transaction.jms.internal.XaPooledConnectionFactory");
+        s.add("org.apache.aries.transaction.jms.RecoverablePooledConnectionFactory");
+
+        // [databind#2660]: caucho-quercus
+        s.add("com.caucho.config.types.ResourceRef");
+
+        // [databind#2662]: aoju/bus-proxy
+        s.add("org.aoju.bus.proxy.provider.RmiProvider");
+        s.add("org.aoju.bus.proxy.provider.remoting.RmiProvider");
+
+        // [databind#2664]: activemq-core, activemq-pool, activemq-pool-jms
+
+        s.add("org.apache.activemq.ActiveMQConnectionFactory"); // core
+        s.add("org.apache.activemq.ActiveMQXAConnectionFactory");
+        s.add("org.apache.activemq.spring.ActiveMQConnectionFactory");
+        s.add("org.apache.activemq.spring.ActiveMQXAConnectionFactory");
+        s.add("org.apache.activemq.pool.JcaPooledConnectionFactory"); // pool
+        s.add("org.apache.activemq.pool.PooledConnectionFactory");
+        s.add("org.apache.activemq.pool.XaPooledConnectionFactory");
+        s.add("org.apache.activemq.jms.pool.XaPooledConnectionFactory"); // pool-jms
+        s.add("org.apache.activemq.jms.pool.JcaPooledConnectionFactory");
+        
+        // [databind#2666]: apache/commons-jms
+        s.add("org.apache.commons.proxy.provider.remoting.RmiProvider");
 
         DEFAULT_NO_DESER_CLASS_NAMES = Collections.unmodifiableSet(s);
     }
