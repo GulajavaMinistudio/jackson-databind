@@ -6,6 +6,7 @@ import java.util.Set;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.WritableTypeId;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
@@ -61,8 +62,8 @@ public class BeanAsArraySerializer
         _defaultSerializer = src;
     }
 
-    protected BeanAsArraySerializer(BeanSerializerBase src, Set<String> toIgnore) {
-        super(src, toIgnore);
+    protected BeanAsArraySerializer(BeanSerializerBase src, Set<String> toIgnore, Set<String> toInclude) {
+        super(src, toIgnore, toInclude);
         _defaultSerializer = src;
     }
 
@@ -114,8 +115,16 @@ public class BeanAsArraySerializer
     }
 
     @Override
-    protected BeanAsArraySerializer withIgnorals(Set<String> toIgnore) {
-        return new BeanAsArraySerializer(this, toIgnore);
+    protected BeanAsArraySerializer withByNameInclusion(Set<String> toIgnore, Set<String> toInclude) {
+        return new BeanAsArraySerializer(this, toIgnore, toInclude);
+    }
+
+    @Override // @since 2.11.1
+    protected BeanSerializerBase withProperties(BeanPropertyWriter[] properties,
+            BeanPropertyWriter[] filteredProperties) {
+        // 16-Jun-2020, tatu: Added for [databind#2759] but with as-array we
+        //    probably do not want to reorder anything; so actually leave unchanged
+        return this;
     }
 
     @Override
@@ -123,7 +132,7 @@ public class BeanAsArraySerializer
         // already is one, so:
         return this;
     }
-    
+
     /*
     /**********************************************************
     /* JsonSerializer implementation that differs between impls

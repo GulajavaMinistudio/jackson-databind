@@ -10,27 +10,20 @@ import java.util.function.UnaryOperator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.core.util.Snapshottable;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
-import com.fasterxml.jackson.databind.introspect.BasicClassIntrospector;
-import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
-import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
-import com.fasterxml.jackson.databind.introspect.MixInResolver;
-import com.fasterxml.jackson.databind.introspect.MixInHandler;
-import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
-import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.fasterxml.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
-import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
-import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
-import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
-import com.fasterxml.jackson.databind.jsontype.TypeResolverProvider;
+import com.fasterxml.jackson.databind.introspect.*;
+import com.fasterxml.jackson.databind.jsontype.*;
 import com.fasterxml.jackson.databind.jsontype.impl.DefaultTypeResolverBuilder;
 import com.fasterxml.jackson.databind.jsontype.impl.StdSubtypeResolver;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.ser.*;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.type.TypeModifier;
 import com.fasterxml.jackson.databind.util.ArrayBuilders;
@@ -57,9 +50,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     protected final static PolymorphicTypeValidator DEFAULT_TYPE_VALIDATOR = new DefaultBaseTypeLimitingValidator();
 
+    protected final static AccessorNamingStrategy.Provider DEFAULT_ACCESSOR_NAMING = new DefaultAccessorNamingStrategy.Provider();
+    
     protected final static BaseSettings DEFAULT_BASE_SETTINGS = new BaseSettings(
             DEFAULT_ANNOTATION_INTROSPECTOR,
-             null,
+            null, DEFAULT_ACCESSOR_NAMING,
             null, // no default typing, by default
             DEFAULT_TYPE_VALIDATOR, // and polymorphic type by class won't pass either
             StdDateFormat.instance, null,
@@ -91,6 +86,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * and per-class overrides.
      */
     protected final ConfigOverrides _configOverrides;
+
+    /**
+     * Coercion settings (global, per-type overrides)
+     */
+    protected final CoercionConfigs _coercionConfigs;
 
     /*
     /**********************************************************************
@@ -252,6 +252,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _streamFactory = streamFactory;
         _baseSettings = DEFAULT_BASE_SETTINGS;
         _configOverrides = new ConfigOverrides();
+        _coercionConfigs = new CoercionConfigs();
         _modules = null;
 
         _streamReadFeatures = streamFactory.getStreamReadFeatures();
@@ -295,6 +296,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _streamFactory = state._streamFactory;
         _baseSettings = state._baseSettings;
         _configOverrides = Snapshottable.takeSnapshot(state._configOverrides);
+        _coercionConfigs = Snapshottable.takeSnapshot(state._coercionConfigs);
 
         _streamReadFeatures = state._streamReadFeatures;
         _streamWriteFeatures = state._streamWriteFeatures;
@@ -342,6 +344,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _streamFactory = base._streamFactory;
         _baseSettings = base._baseSettings;
         _configOverrides = base._configOverrides;
+        _coercionConfigs = base._coercionConfigs;
 
         _mapperFeatures = base._mapperFeatures;
         _serFeatures = base._serFeatures;
@@ -430,11 +433,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     public DeserializationConfig buildDeserializationConfig(ConfigOverrides configOverrides,
             MixInHandler mixins, TypeFactory tf, ClassIntrospector classIntr, SubtypeResolver str,
-            RootNameLookup rootNames)
+            RootNameLookup rootNames,
+            CoercionConfigs coercionConfigs)
     {
         return new DeserializationConfig(this,
                 _mapperFeatures, _deserFeatures, _streamReadFeatures, _formatReadFeatures,
-                configOverrides,
+                configOverrides, coercionConfigs,
                 tf, classIntr, mixins, str, rootNames,
                 _abstractTypeResolvers);
     }
@@ -873,6 +877,49 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************************
+    /* Changing settings, coercion config
+    /**********************************************************************
+     */
+
+    /**
+     * Method for changing coercion config for specific logical types, through
+     * callback to specific handler.
+     */
+    public B withCoercionConfig(LogicalType forType,
+            Consumer<MutableCoercionConfig> handler) {
+        handler.accept(_coercionConfigs.findOrCreateCoercion(forType));
+        return _this();
+    }
+
+    /**
+     * Method for changing coercion config for specific physical type, through
+     * callback to specific handler.
+     */
+    public B withCoercionConfig(Class<?> forType,
+            Consumer<MutableCoercionConfig> handler) {
+        handler.accept(_coercionConfigs.findOrCreateCoercion(forType));
+        return _this();
+    }
+
+    /**
+     * Method for changing target-type-independent coercion configuration defaults.
+     */
+    public B withCoercionConfigDefaults(Consumer<MutableCoercionConfig> handler) {
+        handler.accept(_coercionConfigs.defaultCoercions());
+        return _this();
+    }
+
+    // 03-Jun-2020, tatu: Needed at least for snapshotting, if not for other usage...
+    /**
+     * Method for changing various aspects of configuration overrides.
+     */
+    public B withAllCoercionConfigs(Consumer<CoercionConfigs> handler) {
+        handler.accept(_coercionConfigs);
+        return _this();
+    }
+
+    /*
+    /**********************************************************************
     /* Module registration, discovery, access
     /**********************************************************************
      */
@@ -1085,13 +1132,41 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * id resolvers), given a class.
      *
      * @param hi Instantiator to use; if null, use the default implementation
+     *
+     * @return Builder instance itself to allow chaining
      */
     public B handlerInstantiator(HandlerInstantiator hi) {
         _baseSettings = _baseSettings.with(hi);
         return _this();
     }
 
+    /**
+     * Method for configuring {@link PropertyNamingStrategy} to use for adapting
+     * POJO property names (internal) into content property names (external)
+     *
+     * @param s Strategy instance to use; if null, use the default implementation
+     *
+     * @return Builder instance itself to allow chaining
+     */
     public B propertyNamingStrategy(PropertyNamingStrategy s) {
+        _baseSettings = _baseSettings.with(s);
+        return _this();
+    }
+
+    /**
+     * Method for configuring {@link AccessorNamingStrategy} to use for auto-detecting
+     * accessor ("getter") and mutator ("setter") methods based on naming of methods.
+     *
+     * @param s Strategy instance to use; if null, use the default implementation
+     *
+     * @return Builder instance itself to allow chaining
+     *
+     * @since 2.12
+     */
+    public B accessorNaming(AccessorNamingStrategy.Provider s) {
+        if (s == null) {
+            s = new DefaultAccessorNamingStrategy.Provider();
+        }
         _baseSettings = _baseSettings.with(s);
         return _this();
     }
@@ -1141,7 +1216,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
-    public B deserializationContext(DeserializationContexts ctxt) {
+    public B deserializationContexts(DeserializationContexts ctxt) {
         _deserializationContexts = ctxt;
         return _this();
     }

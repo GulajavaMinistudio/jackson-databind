@@ -2,15 +2,11 @@ package com.fasterxml.jackson.databind.jsontype;
 
 import java.util.*;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
-import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.testutil.NoCheckSubTypeValidator;
 
@@ -54,7 +50,9 @@ public class TestSubtypes extends BaseMapTest
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=As.PROPERTY, property="type")
     @JsonSubTypes({ @JsonSubTypes.Type(ImplX.class),
-          @JsonSubTypes.Type(ImplY.class) })
+        @JsonSubTypes.Type(ImplY.class),
+        @JsonSubTypes.Type(ImplAbs.class)
+    })
     static abstract class BaseX { }
 
     @JsonTypeName("x")
@@ -68,6 +66,11 @@ public class TestSubtypes extends BaseMapTest
     @JsonTypeName("y")
     static class ImplY extends BaseX {
         public int y;
+    }
+
+    // for [databind#919] testing
+    @JsonTypeName("abs")
+    abstract static class ImplAbs extends BaseX {
     }
 
     // [databind#663]
@@ -289,8 +292,9 @@ public class TestSubtypes extends BaseMapTest
         try {
             mapper.readValue("{ \"type\": \"z\"}", BaseX.class);
             fail("Should have failed");
-        } catch (JsonMappingException e) {
-            verifyException(e, "known type ids =");
+        } catch (InvalidTypeIdException e) {
+            verifyException(e, "Could not resolve type id 'z' as a subtype of");
+            verifyException(e, "known type ids = [x, y]");
         }
     }
 

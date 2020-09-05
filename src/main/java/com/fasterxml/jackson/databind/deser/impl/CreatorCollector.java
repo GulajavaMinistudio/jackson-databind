@@ -21,17 +21,20 @@ public class CreatorCollector
     protected final static int C_STRING = 1;
     protected final static int C_INT = 2;
     protected final static int C_LONG = 3;
-    protected final static int C_DOUBLE = 4;
-    protected final static int C_BOOLEAN = 5;
-    protected final static int C_DELEGATE = 6;
-    protected final static int C_PROPS = 7;
-    protected final static int C_ARRAY_DELEGATE = 8;
+    protected final static int C_BIG_INTEGER = 4;
+    protected final static int C_DOUBLE = 5;
+    protected final static int C_BIG_DECIMAL = 6;
+    protected final static int C_BOOLEAN = 7;
+    protected final static int C_DELEGATE = 8;
+    protected final static int C_PROPS = 9;
+    protected final static int C_ARRAY_DELEGATE = 10;
 
     protected final static String[] TYPE_DESCS = new String[] { "default",
-            "from-String", "from-int", "from-long", "from-double",
-            "from-boolean", "delegate", "property-based" };
+            "from-String", "from-int", "from-long", "from-big-integer", "from-double",
+            "from-big-decimal", "from-boolean", "delegate", "property-based", "array-delegate"
+    };
 
-    /// Type of bean being created
+    // Type of bean being created
     final protected BeanDescription _beanDesc;
 
     final protected boolean _canFixAccess;
@@ -41,7 +44,7 @@ public class CreatorCollector
     /**
      * Set of creators we have collected so far
      */
-    protected final AnnotatedWithParams[] _creators = new AnnotatedWithParams[9];
+    final protected AnnotatedWithParams[] _creators = new AnnotatedWithParams[11];
 
     /**
      * Bitmask of creators that were explicitly marked as creators; false for
@@ -91,7 +94,9 @@ public class CreatorCollector
         inst.configureFromStringCreator(_creators[C_STRING]);
         inst.configureFromIntCreator(_creators[C_INT]);
         inst.configureFromLongCreator(_creators[C_LONG]);
+        inst.configureFromBigIntegerCreator(_creators[C_BIG_INTEGER]);
         inst.configureFromDoubleCreator(_creators[C_DOUBLE]);
+        inst.configureFromBigDecimalCreator(_creators[C_BIG_DECIMAL]);
         inst.configureFromBooleanCreator(_creators[C_BOOLEAN]);
         return inst;
     }
@@ -128,8 +133,16 @@ public class CreatorCollector
         verifyNonDup(creator, C_LONG, explicit);
     }
 
+    public void addBigIntegerCreator(AnnotatedWithParams creator, boolean explicit) {
+        verifyNonDup(creator, C_BIG_INTEGER, explicit);
+    }
+
     public void addDoubleCreator(AnnotatedWithParams creator, boolean explicit) {
         verifyNonDup(creator, C_DOUBLE, explicit);
+    }
+
+    public void addBigDecimalCreator(AnnotatedWithParams creator, boolean explicit) {
+        verifyNonDup(creator, C_BIG_DECIMAL, explicit);
     }
 
     public void addBooleanCreator(AnnotatedWithParams creator, boolean explicit) {
@@ -289,31 +302,31 @@ public class CreatorCollector
                 Class<?> newType = newOne.getRawParameterType(0);
 
                 if (oldType == newType) {
-                    // 13-Jul-2016, tatu: One more thing to check; since Enum
-                    // classes always have
-                    // implicitly created `valueOf()`, let's resolve in favor of
-                    // other implicit
-                    // creator (`fromString()`)
+                    // 13-Jul-2016, tatu: One more thing to check; since Enum classes
+                    //   always have implicitly created `valueOf()`, let's resolve in
+                    //   favor of other implicit creator (`fromString()`)
                     if (_isEnumValueOf(newOne)) {
                         return false; // ignore
                     }
                     if (_isEnumValueOf(oldOne)) {
                         ;
                     } else {
-                        throw new IllegalArgumentException(String.format(
-                                "Conflicting %s creators: already had %s creator %s, encountered another: %s",
-                                TYPE_DESCS[typeIndex],
-                                explicit ? "explicitly marked"
-                                        : "implicitly discovered",
-                                oldOne, newOne));
+                        _reportDuplicateCreator(typeIndex, explicit, oldOne, newOne);
                     }
                 }
                 // otherwise, which one to choose?
                 else if (newType.isAssignableFrom(oldType)) {
                     // new type more generic, use old
                     return false;
+                } else if (oldType.isAssignableFrom(newType)) {
+                    // new type more specific, use it
+                    ;
+                } else {
+                    // 02-May-2020, tatu: Should this only result in exception if both
+                    //   explicit? Doing so could lead to arbitrary choice between
+                    //   multiple implicit creators tho?
+                    _reportDuplicateCreator(typeIndex, explicit, oldOne, newOne);
                 }
-                // new type more specific, use it
             }
         }
         if (explicit) {
@@ -323,6 +336,17 @@ public class CreatorCollector
         return true;
     }
 
+    // @since 2.12
+    protected void _reportDuplicateCreator(int typeIndex, boolean explicit,
+            AnnotatedWithParams oldOne, AnnotatedWithParams newOne) {
+        throw new IllegalArgumentException(String.format(
+                "Conflicting %s creators: already had %s creator %s, encountered another: %s",
+                TYPE_DESCS[typeIndex],
+                explicit ? "explicitly marked"
+                        : "implicitly discovered",
+                oldOne, newOne));
+    }
+    
     /**
      * Helper method for recognizing `Enum.valueOf()` factory method
      */

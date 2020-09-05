@@ -161,6 +161,14 @@ public final class AnnotatedMethod
 
     @Override
     public String getFullName() {
+        final String methodName = super.getFullName();
+        switch (getParameterCount()) {
+        case 0:
+            return methodName+"()";
+        case 1:
+            return methodName+"("+getRawParameterType(0).getName()+")";
+        default:
+        }
         return String.format("%s(%d params)", super.getFullName(), getParameterCount());
     }
 
@@ -174,16 +182,6 @@ public final class AnnotatedMethod
 
     public Class<?> getRawReturnType() {
         return _method.getReturnType();
-    }
-
-    /**
-     * Helper method that can be used to check whether method returns
-     * a value or not; if return type declared as <code>void</code>, returns
-     * false, otherwise true
-     */
-    public boolean hasReturnType() {
-        Class<?> rt = getRawReturnType();
-        return (rt != Void.TYPE && rt != Void.class);
     }
 
     /*

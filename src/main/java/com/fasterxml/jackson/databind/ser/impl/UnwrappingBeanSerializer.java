@@ -1,6 +1,7 @@
 package com.fasterxml.jackson.databind.ser.impl;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
@@ -47,7 +48,18 @@ public class UnwrappingBeanSerializer
     }
 
     protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src, Set<String> toIgnore) {
-        super(src, toIgnore);
+        this(src, toIgnore, null);
+    }
+
+    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src, Set<String> toIgnore, Set<String> toInclude) {
+        super(src, toIgnore, toInclude);
+        _nameTransformer = src._nameTransformer;
+    }
+
+    // @since 2.11.1
+    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src,
+            BeanPropertyWriter[] properties, BeanPropertyWriter[] filteredProperties) {
+        super(src, properties, filteredProperties);
         _nameTransformer = src._nameTransformer;
     }
 
@@ -79,8 +91,14 @@ public class UnwrappingBeanSerializer
     }
 
     @Override
-    protected BeanSerializerBase withIgnorals(Set<String> toIgnore) {
-        return new UnwrappingBeanSerializer(this, toIgnore);
+    protected BeanSerializerBase withByNameInclusion(Set<String> toIgnore, Set<String> toInclude) {
+        return new UnwrappingBeanSerializer(this, toIgnore, toInclude);
+    }
+
+    @Override
+    protected BeanSerializerBase withProperties(BeanPropertyWriter[] properties,
+            BeanPropertyWriter[] filteredProperties) {
+        return new UnwrappingBeanSerializer(this, properties, filteredProperties);
     }
 
     /**

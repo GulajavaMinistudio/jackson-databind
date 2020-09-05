@@ -2,6 +2,8 @@ package com.fasterxml.jackson.databind.deser.std;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
@@ -39,7 +41,7 @@ public class StdValueInstantiator
     protected SettableBeanProperty[] _constructorArguments;
 
     // // // Delegate construction
-    
+
     protected JavaType _delegateType;
     protected AnnotatedWithParams _delegateCreator;
     protected SettableBeanProperty[] _delegateArguments;
@@ -49,13 +51,15 @@ public class StdValueInstantiator
     protected JavaType _arrayDelegateType;
     protected AnnotatedWithParams _arrayDelegateCreator;
     protected SettableBeanProperty[] _arrayDelegateArguments;
-    
+
     // // // Scalar construction
 
     protected AnnotatedWithParams _fromStringCreator;
     protected AnnotatedWithParams _fromIntCreator;
     protected AnnotatedWithParams _fromLongCreator;
+    protected AnnotatedWithParams _fromBigIntegerCreator;
     protected AnnotatedWithParams _fromDoubleCreator;
+    protected AnnotatedWithParams _fromBigDecimalCreator;
     protected AnnotatedWithParams _fromBooleanCreator;
 
     /*
@@ -95,12 +99,22 @@ public class StdValueInstantiator
         _arrayDelegateType = src._arrayDelegateType;
         _arrayDelegateCreator = src._arrayDelegateCreator;
         _arrayDelegateArguments = src._arrayDelegateArguments;
-        
+
         _fromStringCreator = src._fromStringCreator;
         _fromIntCreator = src._fromIntCreator;
         _fromLongCreator = src._fromLongCreator;
+        _fromBigIntegerCreator = src._fromBigIntegerCreator;
         _fromDoubleCreator = src._fromDoubleCreator;
+        _fromBigDecimalCreator = src._fromBigDecimalCreator;
         _fromBooleanCreator = src._fromBooleanCreator;
+    }
+
+    @Override
+    public ValueInstantiator createContextual(DeserializationContext ctxt,
+            BeanDescription beanDesc)
+        throws JsonMappingException
+    {
+        return this;
     }
 
     /**
@@ -142,9 +156,13 @@ public class StdValueInstantiator
         _fromLongCreator = creator;
     }
 
+    public void configureFromBigIntegerCreator(AnnotatedWithParams creator) { _fromBigIntegerCreator = creator; }
+
     public void configureFromDoubleCreator(AnnotatedWithParams creator) {
         _fromDoubleCreator = creator;
     }
+
+    public void configureFromBigDecimalCreator(AnnotatedWithParams creator) { _fromBigDecimalCreator = creator; }
 
     public void configureFromBooleanCreator(AnnotatedWithParams creator) {
         _fromBooleanCreator = creator;
@@ -182,9 +200,15 @@ public class StdValueInstantiator
     }
 
     @Override
+    public boolean canCreateFromBigInteger() { return _fromBigIntegerCreator != null; }
+
+    @Override
     public boolean canCreateFromDouble() {
         return (_fromDoubleCreator != null);
     }
+
+    @Override
+    public boolean canCreateFromBigDecimal() { return _fromBigDecimalCreator != null; }
 
     @Override
     public boolean canCreateFromBoolean() {
@@ -231,7 +255,7 @@ public class StdValueInstantiator
     }
 
     @Override
-    public SettableBeanProperty[] getFromObjectArguments(DeserializationContext ctxt) {
+    public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
         return _constructorArguments;
     }
 
@@ -240,7 +264,7 @@ public class StdValueInstantiator
     /* Public API implementation; instantiation from JSON Object
     /**********************************************************************
      */
-    
+
     @Override
     public Object createUsingDefault(DeserializationContext ctxt) throws IOException
     {
@@ -300,17 +324,17 @@ public class StdValueInstantiator
     @Override
     public Object createFromString(DeserializationContext ctxt, String value) throws IOException
     {
-        if (_fromStringCreator == null) {
-            return _createFromStringFallbacks(ctxt, value);
+        if (_fromStringCreator != null) {
+            try {
+                return _fromStringCreator.call1(value);
+            } catch (Throwable t) {
+                return ctxt.handleInstantiationProblem(_fromStringCreator.getDeclaringClass(),
+                        value, rewrapCtorProblem(ctxt, t));
+            }
         }
-        try {
-            return _fromStringCreator.call1(value);
-        } catch (Throwable t) {
-            return ctxt.handleInstantiationProblem(_fromStringCreator.getDeclaringClass(),
-                    value, rewrapCtorProblem(ctxt, t));
-        }
+        return super.createFromString(ctxt, value);
     }
-    
+
     @Override
     public Object createFromInt(DeserializationContext ctxt, int value) throws IOException
     {
@@ -334,37 +358,106 @@ public class StdValueInstantiator
                         arg, rewrapCtorProblem(ctxt, t0));
             }
         }
+
+        if (_fromBigIntegerCreator != null) {
+            Object arg = BigInteger.valueOf(value);
+            try {
+                return _fromBigIntegerCreator.call1(arg);
+            } catch (Throwable t0) {
+                return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
+                                                       arg, rewrapCtorProblem(ctxt, t0)
+                );
+            }
+        }
+
         return super.createFromInt(ctxt, value);
     }
 
     @Override
     public Object createFromLong(DeserializationContext ctxt, long value) throws IOException
     {
-        if (_fromLongCreator == null) {
-            return super.createFromLong(ctxt, value);
+        if (_fromLongCreator != null) {
+            Object arg = Long.valueOf(value);
+            try {
+                return _fromLongCreator.call1(arg);
+            } catch (Throwable t0) {
+                return ctxt.handleInstantiationProblem(_fromLongCreator.getDeclaringClass(),
+                                                       arg,
+                                                       rewrapCtorProblem(ctxt, t0)
+                );
+            }
         }
-        Object arg = Long.valueOf(value);
-        try {
-            return _fromLongCreator.call1(arg);
-        } catch (Throwable t0) {
-            return ctxt.handleInstantiationProblem(_fromLongCreator.getDeclaringClass(),
-                    arg, rewrapCtorProblem(ctxt, t0));
+
+        if (_fromBigIntegerCreator != null) {
+            Object arg = BigInteger.valueOf(value);
+            try {
+                return _fromBigIntegerCreator.call1(arg);
+            } catch (Throwable t0) {
+                return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
+                                                       arg, rewrapCtorProblem(ctxt, t0)
+                );
+            }
         }
+
+        return super.createFromLong(ctxt, value);
+    }
+
+    @Override
+    public Object createFromBigInteger(DeserializationContext ctxt, BigInteger value) throws IOException
+    {
+        if (_fromBigDecimalCreator != null) {
+            try {
+                return _fromBigIntegerCreator.call1(value);
+            } catch (Throwable t) {
+                return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
+                                                       value, rewrapCtorProblem(ctxt, t)
+                );
+            }
+        }
+
+        return super.createFromBigInteger(ctxt, value);
     }
 
     @Override
     public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException
     {
-        if (_fromDoubleCreator == null) {
-            return super.createFromDouble(ctxt, value);
+        if(_fromDoubleCreator != null) {
+            Object arg = Double.valueOf(value);
+            try {
+                return _fromDoubleCreator.call1(arg);
+            } catch (Throwable t0) {
+                return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
+                                                       arg, rewrapCtorProblem(ctxt, t0));
+            }
         }
-        Object arg = Double.valueOf(value);
-        try {
-            return _fromDoubleCreator.call1(arg);
-        } catch (Throwable t0) {
-            return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
-                    arg, rewrapCtorProblem(ctxt, t0));
+
+        if (_fromBigDecimalCreator != null) {
+            Object arg = BigDecimal.valueOf(value);
+            try {
+                return _fromBigDecimalCreator.call1(arg);
+            } catch (Throwable t0) {
+                return ctxt.handleInstantiationProblem(_fromBigDecimalCreator.getDeclaringClass(),
+                                                       arg, rewrapCtorProblem(ctxt, t0));
+            }
         }
+
+        return super.createFromDouble(ctxt, value);
+    }
+
+    @Override
+    public Object createFromBigDecimal(DeserializationContext ctxt, BigDecimal value) throws IOException
+    {
+        if (_fromBigDecimalCreator != null) {
+            try {
+                return _fromBigDecimalCreator.call1(value);
+            } catch (Throwable t) {
+                return ctxt.handleInstantiationProblem(_fromBigDecimalCreator.getDeclaringClass(),
+                                                       value, rewrapCtorProblem(ctxt, t)
+                );
+            }
+        }
+
+        return super.createFromBigDecimal(ctxt, value);
     }
 
     @Override
@@ -381,7 +474,7 @@ public class StdValueInstantiator
                     arg, rewrapCtorProblem(ctxt, t0));
         }
     }
-    
+
     /*
     /**********************************************************************
     /* Extended API: configuration mutators, accessors

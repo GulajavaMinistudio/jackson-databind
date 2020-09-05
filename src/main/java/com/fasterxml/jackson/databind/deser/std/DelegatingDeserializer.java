@@ -8,12 +8,13 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.ObjectIdReader;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 
 /**
  * Base class that simplifies implementations of {@link JsonDeserializer}s
  * that mostly delegate functionality to another deserializer implementation
- * (possibly forming a chaing of deserializers delegating functionality
+ * (possibly forming a chain of deserializers delegating functionality
  * in some cases)
  */
 public abstract class DelegatingDeserializer
@@ -137,6 +138,11 @@ public abstract class DelegatingDeserializer
     @Override
     public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
         return _delegatee.getEmptyValue(ctxt);
+    }
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return _delegatee.logicalType();
     }
 
     @Override

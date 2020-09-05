@@ -4,6 +4,7 @@ import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIncludeProperties;
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
@@ -15,11 +16,14 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.impl.FilteredBeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
 import com.fasterxml.jackson.databind.ser.impl.PropertyBasedObjectIdGenerator;
+import com.fasterxml.jackson.databind.ser.impl.UnsupportedTypeSerializer;
 import com.fasterxml.jackson.databind.ser.std.MapSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdDelegatingSerializer;
 import com.fasterxml.jackson.databind.type.ReferenceType;
+import com.fasterxml.jackson.databind.util.BeanUtil;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.Converter;
+import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 
 /**
  * Factory class that can provide serializers for any regular Java beans
@@ -269,7 +273,6 @@ public class BeanSerializerFactory
             return ctxt.getUnknownTypeSerializer(Object.class);
 //            throw new IllegalArgumentException("Cannot create bean serializer for Object.class");
         }
-
         // We also know some types are not beans...
         if (!isPotentialBeanType(type.getRawClass())) {
             // Except we do need to allow serializers for Enums, if shape dictates (which it does
@@ -278,7 +281,11 @@ public class BeanSerializerFactory
                 return null;
             }
         }
-        
+        JsonSerializer<?> ser = _findUnsupportedTypeSerializer(ctxt, type, beanDesc);
+        if (ser != null) {
+            return (JsonSerializer<Object>) ser;
+        }
+
         final SerializationConfig config = ctxt.getConfig();
         BeanSerializerBuilder builder = constructBeanSerializerBuilder(beanDesc);
         builder.setConfig(config);
@@ -330,9 +337,11 @@ public class BeanSerializerFactory
             JsonSerializer<?> anySer = findSerializerFromAnnotation(ctxt, anyGetter);
             if (anySer == null) {
                 // TODO: support '@JsonIgnoreProperties' with any setter?
-                anySer = MapSerializer.construct(/* ignored props*/ (Set<String>) null,
+                anySer = MapSerializer.construct(
                         anyType, config.isEnabled(MapperFeature.USE_STATIC_TYPING),
-                        typeSer, null, null, /*filterId*/ null);
+                        typeSer, null, null, /*filterId*/ null,
+                        /* ignored props*/ (Set<String>) null,
+                        /* included props*/ (Set<String>) null);
             }
             // TODO: can we find full PropertyName?
             PropertyName name = PropertyName.construct(anyGetter.getName());
@@ -350,14 +359,17 @@ public class BeanSerializerFactory
             }
         }
 
-        JsonSerializer<Object> ser = null;
         try {
-            ser = (JsonSerializer<Object>) builder.build();
+            ser = builder.build();
         } catch (RuntimeException e) {
             ctxt.reportBadTypeDefinition(beanDesc, "Failed to construct BeanSerializer for %s: (%s) %s",
                     beanDesc.getType(), e.getClass().getName(), e.getMessage());
         }
         if (ser == null) {
+            // 21-Aug-2020, tatu: Empty Records should be fine tho
+            if (type.isRecordType()) {
+                return builder.createDummy();
+            }
             // [databind#2390]: Need to consider add-ons before fallback "empty" serializer
             ser = (JsonSerializer<Object>) findSerializerByAddonType(ctxt, type, beanDesc, format, staticTyping);
             if (ser == null) {
@@ -369,7 +381,7 @@ public class BeanSerializerFactory
                 }
             }
         }
-        return ser;
+        return (JsonSerializer<Object>) ser;
     }
 
     protected ObjectIdWriter constructObjectIdHandler(SerializerProvider ctxt,
@@ -390,8 +402,9 @@ public class BeanSerializerFactory
 
             for (int i = 0, len = props.size() ;; ++i) {
                 if (i == len) {
-                    throw new IllegalArgumentException("Invalid Object Id definition for "+beanDesc.getBeanClass().getName()
-                            +": cannot find property with name '"+propName+"'");
+                    throw new IllegalArgumentException(String.format(
+"Invalid Object Id definition for %s: cannot find property with name %s",
+ClassUtil.getTypeDescription(beanDesc.getType()), ClassUtil.name(propName)));
                 }
                 BeanPropertyWriter prop = props.get(i);
                 if (propName.equals(prop.getName())) {
@@ -430,7 +443,7 @@ public class BeanSerializerFactory
     {
         return FilteredBeanPropertyWriter.constructViewBased(writer, inViews);
     }
-    
+
     protected PropertyBuilder constructPropertyBuilder(SerializationConfig config,
             BeanDescription beanDesc)
     {
@@ -440,7 +453,7 @@ public class BeanSerializerFactory
     protected BeanSerializerBuilder constructBeanSerializerBuilder(BeanDescription beanDesc) {
         return new BeanSerializerBuilder(beanDesc);
     }
-    
+
     /*
     /**********************************************************************
     /* Overridable non-public introspection methods
@@ -530,10 +543,22 @@ public class BeanSerializerFactory
         //   just use it as is.
         JsonIgnoreProperties.Value ignorals = config.getDefaultPropertyIgnorals(beanDesc.getBeanClass(),
                 beanDesc.getClassInfo());
+        Set<String> ignored = null;
         if (ignorals != null) {
-            Set<String> ignored = ignorals.findIgnoredForSerialization();
-            if (!ignored.isEmpty()) {
-                props.removeIf(beanPropertyWriter -> ignored.contains(beanPropertyWriter.getName()));
+            ignored = ignorals.findIgnoredForSerialization();
+        }
+        JsonIncludeProperties.Value inclusions = config.getDefaultPropertyInclusions(beanDesc.getBeanClass(),
+                beanDesc.getClassInfo());
+        Set<String> included = null;
+        if (inclusions != null) {
+            included = inclusions.getIncluded();
+        }
+        if (included != null || (ignored != null && !ignored.isEmpty())) {
+            Iterator<BeanPropertyWriter> it = props.iterator();
+            while (it.hasNext()) {
+                if (IgnorePropertiesUtil.shouldIgnore(it.next().getName(), ignored, included)) {
+                    it.remove();
+                }
             }
         }
         return props;
@@ -700,5 +725,16 @@ public class BeanSerializerFactory
         TypeSerializer typeSer = ctxt.findPropertyTypeSerializer(type, accessor);
         return pb.buildWriter(ctxt, propDef, type, annotatedSerializer,
                         typeSer, contentTypeSer, accessor, staticTyping);
+    }
+
+    protected JsonSerializer<?> _findUnsupportedTypeSerializer(SerializerProvider ctxt,
+            JavaType type, BeanDescription beanDesc)
+        throws JsonMappingException
+    {
+        // 05-May-2020, tatu: Should we check for possible Shape override to "POJO"?
+        //   (to let users force 'serialize-as-POJO'?
+        final String errorMsg = BeanUtil.checkUnsupportedType(type);
+        return (errorMsg == null) ? null
+                : new UnsupportedTypeSerializer(type, errorMsg);
     }
 }

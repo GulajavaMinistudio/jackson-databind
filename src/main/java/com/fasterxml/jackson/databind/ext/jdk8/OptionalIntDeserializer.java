@@ -8,6 +8,8 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.JsonTokenId;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.type.LogicalType;
 
 public class OptionalIntDeserializer extends BaseScalarOptionalDeserializer<OptionalInt>
 {
@@ -18,26 +20,37 @@ public class OptionalIntDeserializer extends BaseScalarOptionalDeserializer<Opti
     }
 
     @Override
+    public LogicalType logicalType() { return LogicalType.Integer; }
+
+    @Override
     public OptionalInt deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         // minor optimization, first, for common case
         if (p.hasToken(JsonToken.VALUE_NUMBER_INT)) {
             return OptionalInt.of(p.getIntValue());
         }
+        CoercionAction act;
         switch (p.currentTokenId()) {
         case JsonTokenId.ID_STRING:
-            String text = p.getText().trim();
-            if ((text.length() == 0)) {
-                _coerceEmptyString(ctxt, false);
-                return _empty;
+            String text = p.getText();
+            act = _checkFromStringCoercion(ctxt, text);
+            if (act == CoercionAction.AsNull) {
+                return (OptionalInt) getNullValue(ctxt);
             }
-            if (_hasTextualNull(text)) {
-                _coerceTextualNull(ctxt, false);
-                return _empty;
+            if (act == CoercionAction.AsEmpty) {
+                return (OptionalInt) getEmptyValue(ctxt);
+            }
+            text = text.trim();
+            if (_checkTextualNull(ctxt, text)) {
+                return (OptionalInt) getNullValue(ctxt);
             }
             return OptionalInt.of(_parseIntPrimitive(ctxt, text));
         case JsonTokenId.ID_NUMBER_FLOAT:
-            if (!ctxt.isEnabled(DeserializationFeature.ACCEPT_FLOAT_AS_INT)) {
-                _failDoubleToIntCoercion(p, ctxt, "int");
+            act = _checkFloatToIntCoercion(p, ctxt, _valueClass);
+            if (act == CoercionAction.AsNull) {
+                return (OptionalInt) getNullValue(ctxt);
+            }
+            if (act == CoercionAction.AsEmpty) {
+                return (OptionalInt) getEmptyValue(ctxt);
             }
             return OptionalInt.of(p.getValueAsInt());
         case JsonTokenId.ID_NULL:

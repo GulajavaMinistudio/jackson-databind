@@ -378,10 +378,12 @@ Jayson Minard (apatrida@github)
    (2.8.5)
 
 David Bakin (david-bakin@github)
-  * Reported #1013: `@JsonUnwrapped` is not treated as assuming `@JsonProperty("")`
+* Reported #1013: `@JsonUnwrapped` is not treated as assuming `@JsonProperty("")`
    (2.6.4)
   * Suggested #1011: Change ObjectWriter::withAttributes() to take a Map with some kind of wildcard types
    (2.7.0)
+  * Reported #962: `@JsonInject` fails on trying to find deserializer even if inject-only
+   (2.11.0)
 
 Dmitry Romantsov (DmRomantsov@github)
   * Reported #1036: Problem with case-insensitive deserialization
@@ -989,6 +991,11 @@ João Guerra (joca-bt@github)
   (2.10.1)
   * Reported #2567: Incorrect target type for arrays when providing nulls and nulls are disabled
   (2.10.2)
+  * Reported #2635: JsonParser cannot getText() for input stream on MismatchedInputException
+  (2.11.0)
+  * Reported #2770: JsonParser from MismatchedInputException cannot getText() for
+    floating-point value
+  (2.11.1)
 
 Ryan Bohn (bohnman@github)
   * Reported #2475: `StringCollectionSerializer` calls `JsonGenerator.setCurrentValue(value)`,
@@ -1045,13 +1052,25 @@ Alexander Shilov (ashlanderr@github)
   * Reported, suggested fix for #2610: `EXTERNAL_PROPERTY` doesn't work with `@JsonIgnoreProperties`
   (2.10.3)
 
+Endre Stølsvik (stolsvik@github)
+  * Reported #2679: `ObjectMapper.readValue("123", Void.TYPE)` throws "should never occur"
+  (2.10.4)
+
+Denis Kostousov (kostousov-ds@github)
+  * Reported #2787 (partial fix): NPE after add mixin for enum
+  (2.10.5)
+
 Máté Rédecsi (rmatesz@github)
   * Reported #953: i-I case convertion problem in Turkish locale with case-insensitive deserialization
- (2.11.0)
+  (2.11.0)
 
 Ville Koskela (vjkoskela@github)
   * Contributed #2487: BeanDeserializerBuilder Protected Factory Method for Extension
   (2.11.0)
+  * Reported #2486: Builder Deserialization with JsonCreator Value vs Array
+  (2.11.1)
+  * Contributed fix for #792: Deserialization Not Working Right with Generic Types and Builders
+  (2.12.0)
 
 Fitz (Joongsoo.Park) (joongsoo@github)
   * Contributed #2511: Add `SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL`
@@ -1068,32 +1087,124 @@ Robert Diebels (RobertDiebels@github)
 Joseph Koshakow (jkosh44@github)
   * Contributed fix for #2515: `ObjectMapper.registerSubtypes(NamedType...)` doesn't allow registering
     the same POJO for two different type ids
- (2.11.0)
+  (2.11.0)
 
 Haowei Wen (yushijinhun@github)
   * Reported #2565: Java 8 `Optional` not working with `@JsonUnwrapped` on unwrappable type
- (2.11.0)
+  (2.11.0)
 
 Bartosz Baranowski (baranowb@github)
   * Reported #2589: `DOMDeserializer`: setExpandEntityReferences(false) may not prevent
    external entity expansion in all cases
- (2.11.0)
+  (2.11.0)
 
 Oleksii Khomchenko (gagoman@github)
   * Reported, contributed fix for #2592: `ObjectMapper.setSerializationInclusion()` is
    ignored for `JsonAnyGetter`
- (2.11.0)
+  (2.11.0)
 
 Oleksandr Poslavskyi (alevskyi@github)
   * Contributed fix for #1983: Polymorphic deserialization should handle case-insensitive Type Id
     property name if `MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES` is enabled
- (2.11.0)
+  (2.11.0)
 
 Simone D'Avico (simonedavico@github)
   * Reported #2632: Failure to resolve generic type parameters on serialization
- (2.11.0)
+  (2.11.0)
  
 Robin Roos (robinroos@github)
   * Contributed #2636: ObjectReader readValue lacks Class<T> argument
- (2.11.0)
+  (2.11.0)
 
+Michael Cramer (BigMichi1@github)
+  * Reported #2725: JsonCreator on static method in Enum and Enum used as key in map
+   fails randomly
+  (2.11.1)
+ 
+Frank Schmager (fschmager@github)
+  * Reported #2757: "Conflicting setter definitions for property" exception for `Map`
+   subtype during deserialization
+  (2.11.1)
+
+Johannes Kuhn (DasBrain@github)
+  * Reported #2758: Fail to deserialize local Records
+  (2.11.1)
+  * Reported #2760: Jackson doesn't respect `CAN_OVERRIDE_ACCESS_MODIFIERS=false` for
+    deserializer properties
+  (2.11.1)
+
+Oleg Chtchoukine (oshatrk@github)
+  * Reported #2759: Rearranging of props when property-based generator is in use leads
+    to incorrect output
+  (2.11.1)
+
+Joshua Shannon (retrodaredevil@github)
+  * Reported, contributed fix for #2785: Polymorphic subtypes not registering on copied
+    ObjectMapper (2.11.1)
+  (2.11.2)
+
+Daniel Hrabovcak (TheSpiritXIII@github)
+  * Reported #2796: `TypeFactory.constructType()` does not take `TypeBindings` correctly
+  (2.11.2)
+
+Daniel Wu (DanielYWoo@github)
+  * Reported #2840: `ObjectMapper.activateDefaultTypingAsProperty()` is not using
+  (2.11.3)
+
+Marc Carter (drekbour@github)
+  * Contributed #43 implementation: Add option to resolve type from multiple existing properties,
+   `@JsonTypeInfo(use=DEDUCTION)`
+  (2.12.0)
+ 
+Mike Gilbode (gilbode@github)
+  * Reported #792: Deserialization Not Working Right with Generic Types and Builders
+  (2.12.0)
+
+Baptiste Pernet (sp4ce@github)
+  * Contributed #1296 implementation: Add `@JsonIncludeProperties(propertyNames)` (reverse
+    of `@JsonIgnoreProperties`)
+  (2.12.0)
+
+Patrick Jungermann (pjungermann@github)
+  * Requested #1852: Allow case insensitive deserialization of String value into
+  `boolean`/`Boolean` (esp for Excel)
+  (2.12.0)
+ 
+Nate Bauernfeind (nbauernfeind@github)
+  * Reported #2091: `ReferenceType` does not expose valid containedType
+  (2.12.0)
+
+Xiang Zhang (zhangyangyu@github)
+  * Reported #2118: `JsonProperty.Access.READ_ONLY` does not work with "getter-as-setter"
+    Collections
+  (2.12.0)
+
+David Nelson (eatdrinksleepcode@github)
+  * Requested #2215: Support `BigInteger` and `BigDecimal` creators in `StdValueInstantiator`
+  (2.12.0)
+
+Tiago Martins (upsidedownsmile@github)
+  * Contributed #2215: Support `BigInteger` and `BigDecimal` creators in `StdValueInstantiator`
+  (2.12.0)
+
+Yona Appletree (Yona-Appletree@github)
+  * Reported #2283: `JsonProperty.Access.READ_ONLY` fails with collections when a
+    property name is specified
+  (2.12.0)
+
+Youri Bonnaffé (youribonnaffe@github)
+  * Contributed #2709: Support for JDK 14 record types
+  (2.12.0)
+
+David Bidorff (bidorffOL@github)
+  * Reported, contributed fix for #2719: `FAIL_ON_IGNORED_PROPERTIES` does not throw
+    on `READONLY` properties with an explicit name
+  (2.12.0)
+
+Jendrik Johannes (jjohannes@github)
+  * Contributed #2726: Add Gradle Module Metadata for version alignment with Gradle 6
+  (2.12.0)
+
+Swayam Raina (swayamraina@github)
+  * Contributed #2761: Support multiple names in `JsonSubType.Type`
+  (2.12.0)

@@ -5,6 +5,8 @@ import java.lang.reflect.Type;
 import java.net.URL;
 import java.text.DateFormat;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -308,12 +310,19 @@ public class ObjectMapper
         
         // General framework factories
         _streamFactory = builder.streamFactory();
+
         final ConfigOverrides configOverrides;
         {
             // bit tricky as we do NOT want to expose simple accessors (to a mutable thing)
             final AtomicReference<ConfigOverrides> ref = new AtomicReference<>();
             builder.withAllConfigOverrides(overrides -> ref.set(overrides));
             configOverrides = Snapshottable.takeSnapshot(ref.get());
+        }
+        final CoercionConfigs coercionConfigs;
+        {
+            final AtomicReference<CoercionConfigs> ref = new AtomicReference<>();
+            builder.withAllCoercionConfigs(overrides -> ref.set(overrides));
+            coercionConfigs = Snapshottable.takeSnapshot(ref.get());
         }
 
         // Handlers, introspection
@@ -340,7 +349,7 @@ public class ObjectMapper
         FilterProvider filterProvider = Snapshottable.takeSnapshot(builder.filterProvider());
         _deserializationConfig = builder.buildDeserializationConfig(configOverrides,
                 mixIns, _typeFactory, classIntr, subtypeResolver,
-                rootNames);
+                rootNames, coercionConfigs);
         _serializationConfig = builder.buildSerializationConfig(configOverrides,
                 mixIns, _typeFactory, classIntr, subtypeResolver,
                 rootNames, filterProvider);
@@ -873,9 +882,8 @@ public class ObjectMapper
                 return null;
             }
         }
-        DeserializationContext ctxt = _deserializationContext(p);
         // NOTE! _readValue() will check for trailing tokens
-        JsonNode n = (JsonNode) _readValue(ctxt, p, JSON_NODE_TYPE);
+        JsonNode n = (JsonNode) _readValue(_deserializationContext(p), p, JSON_NODE_TYPE);
         if (n == null) {
             n = getNodeFactory().nullNode();
         }
@@ -922,8 +930,7 @@ public class ObjectMapper
     public <T> T readValue(JsonParser p, Class<T> valueType) throws IOException
     {
         _assertNotNull("p", p);
-        DeserializationContext ctxt = _deserializationContext(p);
-        return (T) _readValue(ctxt, p, _typeFactory.constructType(valueType));
+        return (T) _readValue(_deserializationContext(p), p, _typeFactory.constructType(valueType));
     } 
 
     /**
@@ -946,8 +953,7 @@ public class ObjectMapper
     public <T> T readValue(JsonParser p, TypeReference<T> valueTypeRef) throws IOException
     {
         _assertNotNull("p", p);
-        DeserializationContext ctxt = _deserializationContext(p);
-        return (T) _readValue(ctxt, p, _typeFactory.constructType(valueTypeRef));
+        return (T) _readValue(_deserializationContext(p), p, _typeFactory.constructType(valueTypeRef));
     }
 
     /**
@@ -969,8 +975,7 @@ public class ObjectMapper
     public final <T> T readValue(JsonParser p, ResolvedType valueType) throws IOException
     {
         _assertNotNull("p", p);
-        DeserializationContext ctxt = _deserializationContext(p);
-        return (T) _readValue(ctxt, p, (JavaType) valueType);
+        return (T) _readValue(_deserializationContext(p), p, (JavaType) valueType);
     }
 
     /**
@@ -989,8 +994,7 @@ public class ObjectMapper
     public <T> T readValue(JsonParser p, JavaType valueType) throws IOException
     {
         _assertNotNull("p", p);
-        DeserializationContext ctxt = _deserializationContext(p);
-        return (T) _readValue(ctxt, p, valueType);
+        return (T) _readValue(_deserializationContext(p), p, valueType);
     }
 
     /**
@@ -1078,7 +1082,7 @@ public class ObjectMapper
     public JsonNode readTree(InputStream in) throws IOException
     {
         _assertNotNull("in", in);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, in));
     }
 
@@ -1088,7 +1092,7 @@ public class ObjectMapper
      */
     public JsonNode readTree(Reader r) throws IOException {
         _assertNotNull("r", r);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, r));
     }
 
@@ -1098,7 +1102,7 @@ public class ObjectMapper
      */
     public JsonNode readTree(String content) throws IOException {
         _assertNotNull("content", content);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, content));
     }
 
@@ -1108,7 +1112,7 @@ public class ObjectMapper
      */
     public JsonNode readTree(byte[] content) throws IOException {
         _assertNotNull("content", content);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, content));
     }
 
@@ -1118,7 +1122,7 @@ public class ObjectMapper
      */
     public JsonNode readTree(byte[] content, int offset, int len) throws IOException {
         _assertNotNull("content", content);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, content, offset, len));
     }
 
@@ -1129,7 +1133,7 @@ public class ObjectMapper
     public JsonNode readTree(File file) throws IOException
     {
         _assertNotNull("file", file);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, file));
     }
 
@@ -1145,7 +1149,7 @@ public class ObjectMapper
      */
     public JsonNode readTree(URL src) throws IOException {
         _assertNotNull("src", src);
-        DeserializationContext ctxt = _deserializationContext();
+        DefaultDeserializationContext ctxt = _deserializationContext();
         return _readTreeAndClose(ctxt, _streamFactory.createParser(ctxt, src));
     }
 
@@ -1200,7 +1204,7 @@ public class ObjectMapper
      */
     @SuppressWarnings("unchecked")
     public <T> T treeToValue(TreeNode n, Class<T> valueType)
-        throws JsonProcessingException
+        throws IllegalArgumentException
     {
         if (n == null) {
             return null;
@@ -1228,8 +1232,6 @@ public class ObjectMapper
                 }
             }
             return readValue(treeAsTokens(n), valueType);
-        } catch (JsonProcessingException e) {
-            throw e;
         } catch (IOException e) { // should not occur, no real i/o...
             throw new IllegalArgumentException(e.getMessage(), e);
         }
@@ -2006,6 +2008,54 @@ public class ObjectMapper
 
     /**
      * Factory method for constructing {@link ObjectReader} that will
+     * read values of a type {@code List<type>}.
+     * Functionally same as:
+     *<pre>
+     *    readerFor(type[].class);
+     *</pre>
+     *
+     * @since 2.11
+     */
+    public ObjectReader readerForArrayOf(Class<?> type) {
+        return _newReader(deserializationConfig(),
+                _typeFactory.constructArrayType(type), null,
+                null, _injectableValues);
+    }
+
+    /**
+     * Factory method for constructing {@link ObjectReader} that will
+     * read or update instances of a type {@code List<type>}.
+     * Functionally same as:
+     *<pre>
+     *    readerFor(new TypeReference&lt;List&lt;type&gt;&gt;() { });
+     *</pre>
+     *
+     * @since 2.11
+     */
+    public ObjectReader readerForListOf(Class<?> type) {
+        return _newReader(deserializationConfig(),
+                _typeFactory.constructCollectionType(List.class, type), null,
+                null, _injectableValues);
+    }
+
+    /**
+     * Factory method for constructing {@link ObjectReader} that will
+     * read or update instances of a type {@code Map<String, type>}
+     * Functionally same as:
+     *<pre>
+     *    readerFor(new TypeReference&lt;Map&lt;String, type&gt;&gt;() { });
+     *</pre>
+     *
+     * @since 2.11
+     */
+    public ObjectReader readerForMapOf(Class<?> type) {
+        return _newReader(deserializationConfig(),
+                _typeFactory.constructMapType(Map.class, String.class, type), null,
+                null, _injectableValues);
+    }
+
+    /**
+     * Factory method for constructing {@link ObjectReader} that will
      * use specified {@link JsonNodeFactory} for constructing JSON trees.
      */
     public ObjectReader reader(JsonNodeFactory f) {
@@ -2327,34 +2377,27 @@ public class ObjectMapper
     /**
      * Actual implementation of value reading+binding operation.
      */
-    protected Object _readValue(DeserializationContext ctxt, JsonParser p,
+    protected Object _readValue(DefaultDeserializationContext ctxt, JsonParser p,
             JavaType valueType)
         throws IOException
     {
-        /* First: may need to read the next token, to initialize
-         * state (either before first read from parser, or after
-         * previous token has been cleared)
-         */
-        Object result;
+        // First: may need to read the next token, to initialize
+        // state (either before first read from parser, or after
+        // previous token has been cleared)
+        final Object result;
         JsonToken t = _initForReading(p, valueType);
-        final DeserializationConfig config = ctxt.getConfig();
+
         if (t == JsonToken.VALUE_NULL) {
             // Ask JsonDeserializer what 'null value' to use:
             result = _findRootDeserializer(ctxt, valueType).getNullValue(ctxt);
         } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
             result = null;
         } else { // pointing to event other than null
-            JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
-            // ok, let's get the value
-            if (config.useRootWrapping()) {
-                result = _unwrapAndDeserialize(p, ctxt, config, valueType, deser);
-            } else {
-                result = deser.deserialize(p, ctxt);
-            }
+            result = ctxt.readRootValue(p, valueType, _findRootDeserializer(ctxt, valueType), null);
         }
         // Need to consume the token too
         p.clearCurrentToken();
-        if (config.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
+        if (ctxt.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
             _verifyNoTrailingTokens(p, ctxt, valueType);
         }
         return result;
@@ -2374,13 +2417,8 @@ public class ObjectMapper
             } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
                 result = null;
             } else {
-                final DeserializationConfig config = ctxt.getConfig();
-                JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
-                if (config.useRootWrapping()) {
-                    result = _unwrapAndDeserialize(p, ctxt, config, valueType, deser);
-                } else {
-                    result = deser.deserialize(p, ctxt);
-                }
+                result = ctxt.readRootValue(p, valueType,
+                        _findRootDeserializer(ctxt, valueType), null);
                 ctxt.checkUnresolvedObjectId();
             }
             if (ctxt.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
@@ -2393,10 +2431,11 @@ public class ObjectMapper
     /**
      * Similar to {@link #_readMapAndClose} but specialized for <code>JsonNode</code> reading.
      */
-    protected JsonNode _readTreeAndClose(DeserializationContext ctxt,
+    protected JsonNode _readTreeAndClose(DefaultDeserializationContext ctxt,
             JsonParser p0) throws IOException
     {
-        try (JsonParser p = p0) {
+        try (JsonParser p = ctxt.assignAndReturnParser(p0)) {
+            
             final JavaType valueType = JSON_NODE_TYPE;
             DeserializationConfig cfg = deserializationConfig();
 
@@ -2411,64 +2450,20 @@ public class ObjectMapper
                     return cfg.getNodeFactory().missingNode();
                 }
             }
-            JsonNode resultNode;
-
+            final JsonNode resultNode;
             if (t == JsonToken.VALUE_NULL) {
                 resultNode = cfg.getNodeFactory().nullNode();
             } else {
-                JsonDeserializer<Object> deser = _findRootDeserializer(ctxt, valueType);
-                if (cfg.useRootWrapping()) {
-                    resultNode = (JsonNode) _unwrapAndDeserialize(p, ctxt, cfg, valueType, deser);
-                } else {
-                    resultNode = (JsonNode) deser.deserialize(p, ctxt);
-                }
+                resultNode = (JsonNode) ctxt.readRootValue(p, valueType,
+                        _findRootDeserializer(ctxt, valueType), null);
+                // No ObjectIds so can ignore
+//              ctxt.checkUnresolvedObjectId();
             }
             if (cfg.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
                 _verifyNoTrailingTokens(p, ctxt, valueType);
             }
-            // No ObjectIds so can ignore
-//            ctxt.checkUnresolvedObjectId();
             return resultNode;
         }
-    }
-
-    protected Object _unwrapAndDeserialize(JsonParser p, DeserializationContext ctxt, 
-            DeserializationConfig config,
-            JavaType rootType, JsonDeserializer<Object> deser)
-        throws IOException
-    {
-        PropertyName expRootName = ctxt.findRootName(rootType);
-        // 12-Jun-2015, tatu: Should try to support namespaces etc but...
-        String expSimpleName = expRootName.getSimpleName();
-        if (p.currentToken() != JsonToken.START_OBJECT) {
-            ctxt.reportWrongTokenException(rootType, JsonToken.START_OBJECT,
-                    "Current token not START_OBJECT (needed to unwrap root name '%s'), but %s",
-                    expSimpleName, p.currentToken());
-        }
-        if (p.nextToken() != JsonToken.FIELD_NAME) {
-            ctxt.reportWrongTokenException(rootType, JsonToken.FIELD_NAME,
-                    "Current token not FIELD_NAME (to contain expected root name '%s'), but %s",
-                    expSimpleName, p.currentToken());
-        }
-        String actualName = p.currentName();
-        if (!expSimpleName.equals(actualName)) {
-            ctxt.reportPropertyInputMismatch(rootType, actualName,
-                    "Root name '%s' does not match expected ('%s') for type %s",
-                    actualName, expSimpleName, rootType);
-        }
-        // ok, then move to value itself....
-        p.nextToken();
-        Object result = deser.deserialize(p, ctxt);
-        // and last, verify that we now get matching END_OBJECT
-        if (p.nextToken() != JsonToken.END_OBJECT) {
-            ctxt.reportWrongTokenException(rootType, JsonToken.END_OBJECT,
-                    "Current token not END_OBJECT (to match wrapper object with root name '%s'), but %s",
-                    expSimpleName, p.currentToken());
-        }
-        if (config.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)) {
-            _verifyNoTrailingTokens(p, ctxt, rootType);
-        }
-        return result;
     }
 
     /**

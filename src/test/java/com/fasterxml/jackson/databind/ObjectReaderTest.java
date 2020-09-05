@@ -1,15 +1,15 @@
 package com.fasterxml.jackson.databind;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.StringWriter;
+import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
+
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -26,14 +26,20 @@ public class ObjectReaderTest extends BaseMapTest
     }
 
     static class A2297 {
-        private String knownField;
+        String knownField;
 
         @JsonCreator
         private A2297(@JsonProperty("knownField") String knownField) {
             this.knownField = knownField;
         }
     }
-    
+
+    /*
+    /**********************************************************
+    /* Test methods, simple read/write with defaults
+    /**********************************************************
+     */
+
     public void testSimpleViaParser() throws Exception
     {
         final String JSON = "[1]";
@@ -67,7 +73,53 @@ public class ObjectReaderTest extends BaseMapTest
         }
     }
 
-    public void testJsonReadFeatures() throws Exception
+    // [databind#2693]: convenience read methods:
+    public void testReaderForArrayOf() throws Exception
+    {
+        Object value = MAPPER.readerForArrayOf(ABC.class)
+                .readValue("[ \"A\", \"C\" ]");
+        assertEquals(ABC[].class, value.getClass());
+        ABC[] abcs = (ABC[]) value;
+        assertEquals(2, abcs.length);
+        assertEquals(ABC.A, abcs[0]);
+        assertEquals(ABC.C, abcs[1]);
+    }
+
+    // [databind#2693]: convenience read methods:
+    public void testReaderForListOf() throws Exception
+    {
+        Object value = MAPPER.readerForListOf(ABC.class)
+                .readValue("[ \"B\", \"C\" ]");
+        assertEquals(ArrayList.class, value.getClass());
+        assertEquals(Arrays.asList(ABC.B, ABC.C), value);
+    }
+
+    // [databind#2693]: convenience read methods:
+    public void testReaderForMapOf() throws Exception
+    {
+        Object value = MAPPER.readerForMapOf(ABC.class)
+                .readValue("{\"key\" : \"B\" }");
+        assertEquals(LinkedHashMap.class, value.getClass());
+        assertEquals(Collections.singletonMap("key", ABC.B), value);
+    }
+
+    public void testNodeHandling() throws Exception
+    {
+        JsonNodeFactory nodes = new JsonNodeFactory(true);
+        ObjectReader r = MAPPER.reader().with(nodes);
+        // but also no further changes if attempting again
+        assertSame(r, r.with(nodes));
+        assertTrue(r.createArrayNode().isArray());
+        assertTrue(r.createObjectNode().isObject());
+    }
+
+    /*
+    /**********************************************************
+    /* Test methods, some alternative JSON settings
+    /**********************************************************
+     */
+
+    public void testJsonReadFeaturesComments() throws Exception
     {
         final String JSON = "[ /* foo */ 7 ]";
         // default won't accept comments, let's change that:
@@ -88,15 +140,41 @@ public class ObjectReaderTest extends BaseMapTest
         }
     }
 
-    public void testNodeHandling() throws Exception
+    public void testJsonReadFeaturesCtrlChars() throws Exception
     {
-        JsonNodeFactory nodes = new JsonNodeFactory(true);
-        ObjectReader r = MAPPER.reader().with(nodes);
-        // but also no further changes if attempting again
-        assertSame(r, r.with(nodes));
-        assertTrue(r.createArrayNode().isArray());
-        assertTrue(r.createObjectNode().isObject());
+        String FIELD = "a\tb";
+        String VALUE = "\t";
+        String JSON = "{ "+quote(FIELD)+" : "+quote(VALUE)+"}";
+        Map<?, ?> result;
+
+        // First: by default, unescaped control characters should not work
+        try {
+            result = MAPPER.readValue(JSON, Map.class);
+            fail("Should not pass with defaylt settings");
+        } catch (JsonParseException e) {
+            verifyException(e, "Illegal unquoted character");
+        }
+
+        // But both ObjectReader:
+        result = MAPPER.readerFor(Map.class)
+                .with(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+                .readValue(JSON);
+        assertEquals(1, result.size());
+
+        // and new mapper should work
+        ObjectMapper mapper2 = JsonMapper.builder()
+                .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+                .build();
+        result = mapper2.readerFor(Map.class)
+                .readValue(JSON);
+        assertEquals(1, result.size());
     }
+
+    /*
+    /**********************************************************
+    /* Test methods, config setting verification
+    /**********************************************************
+     */
 
     public void testFeatureSettings() throws Exception
     {
@@ -170,6 +248,33 @@ public class ObjectReaderTest extends BaseMapTest
 
         r = r.forType(String.class);
         assertEquals(MAPPER.constructType(String.class), r.getValueType());
+    }
+
+    public void testParserConfigViaReader() throws Exception
+    {
+        try (JsonParser p = MAPPER.reader()
+                .with(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .createParser("[ ]")) {
+            assertTrue(p.isEnabled(StreamReadFeature.STRICT_DUPLICATE_DETECTION));
+        }
+
+        /*
+        try (JsonParser p = MAPPER.reader()
+                .with(JsonReadFeature.ALLOW_JAVA_COMMENTS)
+                .createParser("[ ]")) {
+            assertTrue(p.isEnabled(JsonReadFeature.ALLOW_JAVA_COMMENTS));
+        }
+        */
+    }
+
+    public void testGeneratorConfigViaReader() throws Exception
+    {
+        StringWriter sw = new StringWriter();
+        try (JsonGenerator g = MAPPER.writer()
+                .with(StreamWriteFeature.IGNORE_UNKNOWN)
+                .createGenerator(sw)) {
+            assertTrue(g.isEnabled(StreamWriteFeature.IGNORE_UNKNOWN));
+        }
     }
 
     /*

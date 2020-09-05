@@ -258,8 +258,14 @@ public class JacksonAnnotationIntrospector
         return PropertyName.construct(ann.value(), ns);
     }
 
-    @Override // since 2.8
-    public JsonIgnoreProperties.Value findPropertyIgnorals(MapperConfig<?> config, Annotated a)
+    @Override
+    public Boolean isIgnorableType(MapperConfig<?> config, AnnotatedClass ac) {
+        JsonIgnoreType ignore = _findAnnotation(ac, JsonIgnoreType.class);
+        return (ignore == null) ? null : ignore.value();
+    }
+
+    @Override
+    public JsonIgnoreProperties.Value findPropertyIgnoralByName(MapperConfig<?> config, Annotated a)
     {
         JsonIgnoreProperties v = _findAnnotation(a, JsonIgnoreProperties.class);
         if (v == null) {
@@ -269,9 +275,13 @@ public class JacksonAnnotationIntrospector
     }
 
     @Override
-    public Boolean isIgnorableType(MapperConfig<?> config, AnnotatedClass ac) {
-        JsonIgnoreType ignore = _findAnnotation(ac, JsonIgnoreType.class);
-        return (ignore == null) ? null : ignore.value();
+    public JsonIncludeProperties.Value findPropertyInclusionByName(MapperConfig<?> config, Annotated a)
+    {
+        JsonIncludeProperties v = _findAnnotation(a, JsonIncludeProperties.class);
+        if (v == null) {
+            return JsonIncludeProperties.Value.all();
+        }
+        return JsonIncludeProperties.Value.from(v);
     }
  
     @Override
@@ -444,7 +454,9 @@ public class JacksonAnnotationIntrospector
     @Override
     public JsonFormat.Value findFormat(MapperConfig<?> config, Annotated ann) {
         JsonFormat f = _findAnnotation(ann, JsonFormat.class);
-        return (f == null)  ? null : new JsonFormat.Value(f);
+        // NOTE: could also just call `JsonFormat.Value.from()` with `null`
+        // too, but that returns "empty" instance
+        return (f == null)  ? null : JsonFormat.Value.from(f);
     }
 
     @Override        
@@ -608,6 +620,10 @@ public class JacksonAnnotationIntrospector
         ArrayList<NamedType> result = new ArrayList<NamedType>(types.length);
         for (JsonSubTypes.Type type : types) {
             result.add(new NamedType(type.value(), type.name()));
+            // [databind#2761]: alternative set of names to use
+            for (String name : type.names()) {
+                result.add(new NamedType(type.value(), name));
+            }
         }
         return result;
     }

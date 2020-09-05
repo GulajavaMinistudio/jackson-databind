@@ -41,25 +41,13 @@ public abstract class ContainerSerializer<T>
      */
 
     protected ContainerSerializer(Class<?> t) {
-        super(t);
-        _property = null;
-        _dynamicValueSerializers = PropertySerializerMap.emptyForProperties();
+        this(t, null);
     }
 
-    /**
-     * Alternate constructor that is (alas!) needed to work
-     * around kinks of generic type handling
-     */
-    @Deprecated
-    protected ContainerSerializer(Class<?> t, boolean dummy) {
+    protected ContainerSerializer(Class<?> t, BeanProperty prop) {
         super(t);
-        _property = null;
+        _property = prop;
         _dynamicValueSerializers = PropertySerializerMap.emptyForProperties();
-    }
-
-    @Deprecated // since 3.0
-    protected ContainerSerializer(JavaType fullType) {
-        this(fullType, null);
     }
 
     protected ContainerSerializer(JavaType fullType, BeanProperty prop) {

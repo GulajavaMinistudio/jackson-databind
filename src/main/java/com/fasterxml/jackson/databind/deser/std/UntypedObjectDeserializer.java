@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.ObjectBuffer;
@@ -176,9 +177,11 @@ public class UntypedObjectDeserializer
                 &&  getClass() == UntypedObjectDeserializer.class) {
             return Vanilla.instance(preventMerge);
         }
+
         if (preventMerge != _nonMerging) {
             return new UntypedObjectDeserializer(this, preventMerge);
         }
+
         return this;
     }
 
@@ -199,6 +202,11 @@ public class UntypedObjectDeserializer
          *   are problems with false sharing, this may need to be revisited.
          */
         return true;
+    }
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Untyped;
     }
 
     @Override // since 2.9
@@ -480,18 +488,17 @@ public class UntypedObjectDeserializer
         }
         if (key1 == null) {
             // empty map might work; but caller may want to modify... so better just give small modifiable
-            return new LinkedHashMap<String,Object>(2);
+            return new LinkedHashMap<>(2);
         }
         // minor optimization; let's handle 1 and 2 entry cases separately
         // 24-Mar-2015, tatu: Ideally, could use one of 'nextXxx()' methods, but for
         //   that we'd need new method(s) in JsonDeserializer. So not quite yet.
         p.nextToken();
         Object value1 = deserialize(p, ctxt);
-
         String key2 = p.nextFieldName();
         if (key2 == null) { // has to be END_OBJECT, then
             // single entry; but we want modifiable
-            LinkedHashMap<String, Object> result = new LinkedHashMap<String, Object>(2);
+            LinkedHashMap<String, Object> result = new LinkedHashMap<>(2);
             result.put(key1, value1);
             return result;
         }
@@ -499,23 +506,72 @@ public class UntypedObjectDeserializer
         Object value2 = deserialize(p, ctxt);
 
         String key = p.nextFieldName();
-
         if (key == null) {
-            LinkedHashMap<String, Object> result = new LinkedHashMap<String, Object>(4);
+            LinkedHashMap<String, Object> result = new LinkedHashMap<>(4);
             result.put(key1, value1);
-            result.put(key2, value2);
+            if (result.put(key2, value2) != null) {
+                // 22-May-2020, tatu: [databind#2733] may need extra handling
+                return _mapObjectWithDups(p, ctxt, result, key1, value1, value2, key);
+            }
             return result;
         }
         // And then the general case; default map size is 16
-        LinkedHashMap<String, Object> result = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
         result.put(key1, value1);
-        result.put(key2, value2);
+        if (result.put(key2, value2) != null) {
+            // 22-May-2020, tatu: [databind#2733] may need extra handling
+            return _mapObjectWithDups(p, ctxt, result, key1, value1, value2, key);
+        }
 
         do {
             p.nextToken();
-            result.put(key, deserialize(p, ctxt));
+            final Object newValue = deserialize(p, ctxt);
+            final Object oldValue = result.put(key, newValue);
+            if (oldValue != null) {
+                return _mapObjectWithDups(p, ctxt, result, key, oldValue, newValue,
+                        p.nextFieldName());
+            }
         } while ((key = p.nextFieldName()) != null);
         return result;
+    }
+
+    // @since 2.12 (wrt [databind#2733]
+    protected Object _mapObjectWithDups(JsonParser p, DeserializationContext ctxt,
+            final Map<String, Object> result, String key,
+            Object oldValue, Object newValue, String nextKey) throws IOException
+    {
+        final boolean squashDups = ctxt.isEnabled(StreamReadCapability.DUPLICATE_PROPERTIES);
+
+        if (squashDups) {
+            _squashDups(result, key, oldValue, newValue);
+        }
+
+        while (nextKey != null) {
+            p.nextToken();
+            newValue = deserialize(p, ctxt);
+            oldValue = result.put(nextKey, newValue);
+            if ((oldValue != null) && squashDups) {
+                _squashDups(result, key, oldValue, newValue);
+            }
+            nextKey = p.nextFieldName();
+        }
+
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void _squashDups(final Map<String, Object> result, String key,
+            Object oldValue, Object newValue)
+    {
+        if (oldValue instanceof List<?>) {
+            ((List<Object>) oldValue).add(newValue);
+            result.put(key, oldValue);
+        } else {
+            ArrayList<Object> l = new ArrayList<>();
+            l.add(oldValue);
+            l.add(newValue);
+            result.put(key, l);
+        }
     }
 
     /**
@@ -606,7 +662,12 @@ public class UntypedObjectDeserializer
             }
             return std;
         }
-        
+
+        @Override // since 2.12
+        public LogicalType logicalType() {
+            return LogicalType.Untyped;
+        }
+
         @Override // since 2.9
         public Boolean supportsUpdate(DeserializationConfig config) {
             // 21-Apr-2017, tatu: Bit tricky... some values, yes. So let's say "dunno"
@@ -858,18 +919,72 @@ public class UntypedObjectDeserializer
             if (key == null) {
                 LinkedHashMap<String, Object> result = new LinkedHashMap<String, Object>(4);
                 result.put(key1, value1);
-                result.put(key2, value2);
+                if (result.put(key2, value2) != null) {
+                    // 22-May-2020, tatu: [databind#2733] may need extra handling
+                    return _mapObjectWithDups(p, ctxt, result, key1, value1, value2, key);
+                }
                 return result;
             }
             // And then the general case; default map size is 16
             LinkedHashMap<String, Object> result = new LinkedHashMap<String, Object>();
             result.put(key1, value1);
-            result.put(key2, value2);
+            if (result.put(key2, value2) != null) {
+                // 22-May-2020, tatu: [databind#2733] may need extra handling
+                return _mapObjectWithDups(p, ctxt, result, key1, value1, value2, key);
+            }
+
             do {
                 p.nextToken();
-                result.put(key, deserialize(p, ctxt));
+                final Object newValue = deserialize(p, ctxt);
+                final Object oldValue = result.put(key, newValue);
+                if (oldValue != null) {
+                    return _mapObjectWithDups(p, ctxt, result, key, oldValue, newValue,
+                            p.nextFieldName());
+                }
             } while ((key = p.nextFieldName()) != null);
             return result;
         }
+
+        // NOTE: copied from above (alas, no easy way to share/reuse)
+        // @since 2.12 (wrt [databind#2733]
+        protected Object _mapObjectWithDups(JsonParser p, DeserializationContext ctxt,
+                final Map<String, Object> result, String key,
+                Object oldValue, Object newValue, String nextKey) throws IOException
+        {
+            final boolean squashDups = ctxt.isEnabled(StreamReadCapability.DUPLICATE_PROPERTIES);
+
+            if (squashDups) {
+                _squashDups(result, key, oldValue, newValue);
+            }
+
+            while (nextKey != null) {
+                p.nextToken();
+                newValue = deserialize(p, ctxt);
+                oldValue = result.put(nextKey, newValue);
+                if ((oldValue != null) && squashDups) {
+                    _squashDups(result, key, oldValue, newValue);
+                }
+                nextKey = p.nextFieldName();
+            }
+
+            return result;
+        }
+
+        // NOTE: copied from above (alas, no easy way to share/reuse)
+        @SuppressWarnings("unchecked")
+        private void _squashDups(final Map<String, Object> result, String key,
+                Object oldValue, Object newValue)
+        {
+            if (oldValue instanceof List<?>) {
+                ((List<Object>) oldValue).add(newValue);
+                result.put(key, oldValue);
+            } else {
+                ArrayList<Object> l = new ArrayList<>();
+                l.add(oldValue);
+                l.add(newValue);
+                result.put(key, l);
+            }
+        }
+
     }
 }

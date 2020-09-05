@@ -5,12 +5,11 @@ import java.lang.reflect.Type;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.*;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.module.SimpleDeserializers;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.Serializers;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.databind.type.*;
@@ -187,7 +186,7 @@ public class TestTypeModifiers extends BaseMapTest
         }        
     }
 
-    private static class MyTypeModifier extends TypeModifier
+    static class MyTypeModifier extends TypeModifier
     {
         @Override
         public JavaType modifyType(JavaType type, Type jdkType, TypeBindings bindings, TypeFactory typeFactory)
@@ -204,7 +203,7 @@ public class TestTypeModifiers extends BaseMapTest
             return type;
         }
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests
@@ -234,6 +233,21 @@ public class TestTypeModifiers extends BaseMapTest
         param = ((MapLikeType) type).getContentType();
         assertNotNull(param);
         assertSame(Integer.class, param.getRawClass());
+    }
+
+    public void testMapLikeTypeViaParametric() throws Exception
+    {
+        // [databind#2796]: should refine with another call too
+        JavaType type = MAPPER_WITH_MODIFIER.getTypeFactory().constructParametricType(MapMarker.class,
+                new Class<?>[] { String.class, Double.class });
+        assertTrue(type.isMapLikeType());
+        JavaType param = ((MapLikeType) type).getKeyType();
+        assertNotNull(param);
+        assertSame(String.class, param.getRawClass());
+
+        param = ((MapLikeType) type).getContentType();
+        assertNotNull(param);
+        assertSame(Double.class, param.getRawClass());
     }
 
     // [databind#2395] Can trigger problem this way too

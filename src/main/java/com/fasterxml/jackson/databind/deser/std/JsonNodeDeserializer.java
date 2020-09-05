@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.node.*;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.RawValue;
 
 /**
@@ -174,10 +175,14 @@ abstract class BaseNodeDeserializer<T extends JsonNode>
         return typeDeserializer.deserializeTypedFromAny(p, ctxt);
     }
 
-    /* 07-Nov-2014, tatu: When investigating [databind#604], realized that it makes
-     *   sense to also mark this is cachable, since lookup not exactly free, and
-     *   since it's not uncommon to "read anything"
-     */
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Untyped;
+    }
+
+    // 07-Nov-2014, tatu: When investigating [databind#604], realized that it makes
+    //   sense to also mark this is cachable, since lookup not exactly free, and
+    //   since it's not uncommon to "read anything"
     @Override
     public boolean isCachable() { return true; }
 
@@ -219,6 +224,20 @@ abstract class BaseNodeDeserializer<T extends JsonNode>
             ctxt.reportInputMismatch(JsonNode.class,
 "Duplicate field '%s' for `ObjectNode`: not allowed when `DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY` enabled",
                     fieldName);
+        }
+        // [databind#2732]: Special case for XML; automatically coerce into `ArrayNode`
+        if (ctxt.isEnabled(StreamReadCapability.DUPLICATE_PROPERTIES)) {
+            // Note that ideally we wouldn't have to shuffle things but... Map.putIfAbsent()
+            // only added in JDK 8, to efficiently check for add. So...
+            if (oldValue.isArray()) { // already was array, to append
+                ((ArrayNode) oldValue).add(newValue);
+                objectNode.replace(fieldName, oldValue);
+            } else { // was not array, convert
+                ArrayNode arr = nodeFactory.arrayNode();
+                arr.add(oldValue);
+                arr.add(newValue);
+                objectNode.replace(fieldName, arr);
+            }
         }
     }
 

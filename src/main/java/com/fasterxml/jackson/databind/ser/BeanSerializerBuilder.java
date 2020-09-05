@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
 /**
  * Builder class used for aggregating deserialization information about
  * a POJO, in order to build a {@link JsonSerializer} for serializing
- * intances.
+ * instances.
  * Main reason for using separate builder class is that this makes it easier
  * to make actual serializer class fully immutable.
  */
@@ -179,11 +179,23 @@ public class BeanSerializerBuilder
      */
     public JsonSerializer<?> build()
     {
+        // [databind#2789]: There can be a case wherein `_typeId` is used, but
+        // nothing else. Rare but has happened; so force access early.
+        if (_anyGetter != null) {
+            _anyGetter.fixAccess(_config);
+        }
+        if (_typeId != null) {
+            if (_config.isEnabled(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS)) {
+                _typeId.fixAccess(_config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
+            }
+        }
+
         BeanPropertyWriter[] properties;
         // No properties, any getter or object id writer?
         // No real serializer; caller gets to handle
         if (_properties == null || _properties.isEmpty()) {
             if (_anyGetter == null && _objectIdWriter == null) {
+                // NOTE! Caller may still call `createDummy()` later on
                 return null;
             }
             properties = NO_PROPERTIES;
@@ -201,14 +213,6 @@ public class BeanSerializerBuilder
                 throw new IllegalStateException(String.format(
 "Mismatch between `properties` size (%d), `filteredProperties` (%s): should have as many (or `null` for latter)",
 _properties.size(), _filteredProperties.length));
-            }
-        }
-        if (_anyGetter != null) {
-            _anyGetter.fixAccess(_config);
-        }
-        if (_typeId != null) {
-            if (_config.isEnabled(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS)) {
-                _typeId.fixAccess(_config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
             }
         }
         JsonSerializer<?> ser = UnrolledBeanSerializer.tryConstruct(

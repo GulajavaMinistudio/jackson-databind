@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.NullValueProvider;
 import com.fasterxml.jackson.databind.deser.impl.NullsConstantProvider;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 
 /**
@@ -103,7 +104,7 @@ public class EnumSetDeserializer
     /* Basic metadata
     /**********************************************************************
      */
-    
+
     /**
      * Because of costs associated with constructing Enum resolvers,
      * let's cache instances by default.
@@ -115,6 +116,11 @@ public class EnumSetDeserializer
             return false;
         }
         return true;
+    }
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Collection;
     }
 
     @Override // since 2.9
@@ -142,6 +148,9 @@ public class EnumSetDeserializer
     public JsonDeserializer<?> createContextual(DeserializationContext ctxt,
             BeanProperty property) throws JsonMappingException
     {
+        // 07-May-2020, tatu: Is the argument `EnumSet.class` correct here?
+        //    In a way seems like it should rather refer to value class... ?
+        //    (as it's individual value of element type, not Container)...
         final Boolean unwrapSingle = findFormatFeature(ctxt, property, EnumSet.class,
                 JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
         JsonDeserializer<?> deser = _enumDeserializer;

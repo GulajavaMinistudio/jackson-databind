@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.*;
-import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator.Validity;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
@@ -115,10 +114,19 @@ public class StdTypeResolverBuilder
         // 03-Oct-2016, tatu: As per [databind#1395] better prevent use for primitives,
         //    regardless of setting
         if (baseType.isPrimitive()) {
-            return null;
+            // 19-Jun-2020, tatu: But for [databind#2753], allow overriding
+            if (!allowPrimitiveTypes(ctxt, baseType)) {
+                return null;
+            }
         }
         TypeIdResolver idRes = idResolver(ctxt, baseType, subTypeValidator(ctxt),
                 subtypes, true, false);
+
+        if (_idType == JsonTypeInfo.Id.DEDUCTION) {
+            // Deduction doesn't require a type property. We use EXISTING_PROPERTY with a name of <null> to drive this.
+            return new AsExistingPropertyTypeSerializer(idRes, null, _typeProperty);
+        }
+
         switch (_includeAs) {
         case WRAPPER_ARRAY:
             return new AsArrayTypeSerializer(idRes, null);
@@ -143,7 +151,10 @@ public class StdTypeResolverBuilder
         // 03-Oct-2016, tatu: As per [databind#1395] better prevent use for primitives,
         //    regardless of setting
         if (baseType.isPrimitive()) {
-            return null;
+            // 19-Jun-2020, tatu: But for [databind#2753], allow overriding
+            if (!allowPrimitiveTypes(ctxt, baseType)) {
+                return null;
+            }
         }
 
         // 27-Apr-2019, tatu: Part of [databind#2195]; must first check whether any subtypes
@@ -152,6 +163,11 @@ public class StdTypeResolverBuilder
 
         TypeIdResolver idRes = idResolver(ctxt, baseType, subTypeValidator, subtypes, false, true);
         JavaType defaultImpl = defineDefaultImpl(ctxt, baseType);
+
+        if(_idType == JsonTypeInfo.Id.DEDUCTION) {
+            // Deduction doesn't require an includeAs property
+            return new AsDeductionTypeDeserializer(ctxt, baseType, idRes, defaultImpl, subtypes);
+        }
 
         // First, method for converting type info to type id:
         switch (_includeAs) {
@@ -175,7 +191,6 @@ public class StdTypeResolverBuilder
     protected JavaType defineDefaultImpl(DatabindContext ctxt, JavaType baseType) {
         JavaType defaultImpl;
         if (_defaultImpl == null) {
-            //Fis of issue #955
             if (ctxt.isEnabled(MapperFeature.USE_BASE_TYPE_AS_DEFAULT_IMPL) && !baseType.isAbstract()) {
                 defaultImpl = baseType;
             } else {
@@ -256,6 +271,7 @@ public class StdTypeResolverBuilder
         if (_customIdResolver != null) { return _customIdResolver; }
         if (_idType == null) throw new IllegalStateException("Cannot build, 'init()' not yet called");
         switch (_idType) {
+        case DEDUCTION: // Deduction produces class names to be resolved
         case CLASS:
             return ClassNameIdResolver.construct(baseType, subtypeValidator);
         case MINIMAL_CLASS:
@@ -296,13 +312,13 @@ public class StdTypeResolverBuilder
     {
         final PolymorphicTypeValidator ptv = subTypeValidator(ctxt);
         if (_idType == JsonTypeInfo.Id.CLASS || _idType == JsonTypeInfo.Id.MINIMAL_CLASS) {
-            final Validity validity = ptv.validateBaseType(ctxt, baseType);
+            final PolymorphicTypeValidator.Validity validity = ptv.validateBaseType(ctxt, baseType);
             // If no subtypes are legal (that is, base type itself is invalid), indicate problem
-            if (validity == Validity.DENIED) {
+            if (validity == PolymorphicTypeValidator.Validity.DENIED) {
                 return reportInvalidBaseType(ctxt, baseType, ptv);
             }
             // If there's indication that any and all subtypes are fine, replace validator itself:
-            if (validity == Validity.ALLOWED) {
+            if (validity == PolymorphicTypeValidator.Validity.ALLOWED) {
                 return LaissezFaireSubTypeValidator.instance;
             }
             // otherwise just return validator, is to be called for each distinct type
@@ -317,5 +333,30 @@ public class StdTypeResolverBuilder
 "Configured `PolymorphicTypeValidator` (of type %s) denied resolution of all subtypes of base type %s",
                         ClassUtil.classNameOf(ptv), ClassUtil.classNameOf(baseType.getRawClass()))
                 );
+    }
+
+    /*
+    /**********************************************************
+    /* Overridable helper methods
+    /**********************************************************
+     */
+
+    /**
+     * Overridable helper method that is called to determine whether type serializers
+     * and type deserializers may be created even if base type is Java {@code primitive}
+     * type.
+     * Default implementation simply returns {@code false} (since primitive types can not
+     * be sub-classed, are never polymorphic) but custom implementations
+     * may change the logic for some special cases.
+     *
+     * @param config Currently active configuration
+     * @param baseType Primitive base type for property being handled
+     *
+     * @return True if type (de)serializer may be created even if base type is Java
+     *    {@code primitive} type; false if not
+     */
+    protected boolean allowPrimitiveTypes(DatabindContext ctxt,
+            JavaType baseType) {
+        return false;
     }
 }

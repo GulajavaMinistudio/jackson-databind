@@ -1,6 +1,7 @@
 package com.fasterxml.jackson.databind.deser.std;
 
 import com.fasterxml.jackson.core.JsonLocation;
+import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.PropertyMetadata;
@@ -25,7 +26,7 @@ public class JsonLocationInstantiator
     public boolean canCreateFromObjectWith() { return true; }
     
     @Override
-    public SettableBeanProperty[] getFromObjectArguments(DeserializationContext config) {
+    public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
         JavaType intType = config.constructType(Integer.TYPE);
         JavaType longType = config.constructType(Long.TYPE);
         return new SettableBeanProperty[] {
@@ -38,10 +39,10 @@ public class JsonLocationInstantiator
     }
 
     private static CreatorProperty creatorProp(String name, JavaType type, int index) {
-        return new CreatorProperty(PropertyName.construct(name), type, null,
+        return CreatorProperty.construct(PropertyName.construct(name), type, null,
                 null, null, null, index, null, PropertyMetadata.STD_REQUIRED);
     }
-    
+
     @Override
     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) {
         return new JsonLocation(args[0], _long(args[1]), _long(args[2]),

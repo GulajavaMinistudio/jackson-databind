@@ -221,7 +221,7 @@ public class AnySetterTest
         public String type;
         public int x, y;
     
-        private Map<String, Object> props = new HashMap<>();
+        Map<String, Object> props = new HashMap<>();
     
         @JsonAnySetter
         public void addProperty(String key, Object value) {
@@ -240,14 +240,14 @@ public class AnySetterTest
     static class IdentityDTO349 {
         public int x, y;
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
     
     public void testSimpleMapImitation() throws Exception
     {
@@ -271,7 +271,7 @@ public class AnySetterTest
                     MapImitatorDisabled.class);
             fail("Should not pass");
         } catch (JsonMappingException e) {
-            verifyException(e, "Unrecognized field \"value\"");
+            verifyException(e, "Unrecognized property \"value\"");
         }
 
     }

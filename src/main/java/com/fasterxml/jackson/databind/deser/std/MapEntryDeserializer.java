@@ -8,14 +8,15 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 
 /**
  * Basic serializer that can take JSON "Object" structure and
- * construct a {@link java.util.Map} instance, with typed contents.
+ * construct a {@link java.util.Map.Entry} instance, with typed contents.
  *<p>
  * Note: for untyped content (one indicated by passing Object.class
  * as the type), {@link UntypedObjectDeserializer} is used instead.
- * It can also construct {@link java.util.Map}s, but not with specific
+ * It can also construct {@link java.util.Map.Entry}s, but not with specific
  * POJO types, only other containers and primitives/wrappers.
  */
 @JacksonStdImpl
@@ -100,6 +101,12 @@ public class MapEntryDeserializer
                 keyDeser, (JsonDeserializer<Object>) valueDeser, valueTypeDeser);
     }
 
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        // Slightly tricky, could consider POJO too?
+        return LogicalType.Map;
+    }
+
     /*
     /**********************************************************
     /* Validation, post-processing (ResolvableDeserializer)
@@ -152,7 +159,10 @@ public class MapEntryDeserializer
     public JsonDeserializer<Object> getContentDeserializer() {
         return _valueDeserializer;
     }
-    
+
+    // 31-May-2020, tatu: Should probably define but we don't have it yet
+//    public ValueInstantiator getValueInstantiator() { }
+
     /*
     /**********************************************************
     /* JsonDeserializer API
@@ -165,13 +175,14 @@ public class MapEntryDeserializer
     {
         // Ok: must point to START_OBJECT, FIELD_NAME or END_OBJECT
         JsonToken t = p.currentToken();
-        if (t != JsonToken.START_OBJECT && t != JsonToken.FIELD_NAME && t != JsonToken.END_OBJECT) {
-            // String may be ok however:
-            // slightly redundant (since String was passed above), but
-            return _deserializeFromEmpty(p, ctxt);
-        }
         if (t == JsonToken.START_OBJECT) {
             t = p.nextToken();
+        } else if (t != JsonToken.FIELD_NAME && t != JsonToken.END_OBJECT) {
+            // Empty array, or single-value wrapped in array?
+            if (t == JsonToken.START_ARRAY) {
+                return _deserializeFromArray(p, ctxt);
+            }
+            return (Map.Entry<Object,Object>) ctxt.handleUnexpectedToken(getValueType(ctxt), p);
         }
         if (t != JsonToken.FIELD_NAME) {
             if (t == JsonToken.END_OBJECT) {

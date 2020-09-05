@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.deser.NullValueProvider;
 import com.fasterxml.jackson.databind.deser.impl.NullsConstantProvider;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 import com.fasterxml.jackson.databind.util.ObjectBuffer;
 
@@ -70,6 +71,11 @@ public final class StringArrayDeserializer
         _nullProvider = nuller;
         _unwrapSingle = unwrapSingle;
         _skipNullValues = NullsConstantProvider.isSkipper(nuller);
+    }
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Array;
     }
 
     @Override // since 2.9
@@ -300,12 +306,8 @@ public final class StringArrayDeserializer
                     : _parseString(p, ctxt);
             return new String[] { value };
         }
-        if (p.hasToken(JsonToken.VALUE_STRING)
-                    && ctxt.isEnabled(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)) {
-            String str = p.getText();
-            if (str.length() == 0) {
-                return null;
-            }
+        if (p.hasToken(JsonToken.VALUE_STRING)) {
+            return _deserializeFromString(p, ctxt);
         }
         return (String[]) ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }

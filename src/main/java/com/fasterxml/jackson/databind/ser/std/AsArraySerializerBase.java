@@ -51,23 +51,50 @@ public abstract class AsArraySerializerBase<T>
      * Non-contextual, "blueprint" constructor typically called when the first
      * instance is created, without knowledge of property it was used via.
      */
-    @SuppressWarnings("unchecked")
-    protected AsArraySerializerBase(Class<?> cls, JavaType et, boolean staticTyping,
+    protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
             TypeSerializer vts, JsonSerializer<?> elementSerializer)
     {
+        this(cls, elementType, staticTyping, vts, elementSerializer, null);
+    }
+
+    /**
+     * General purpose constructor. Use contextual constructors, if possible.
+     */
+    @SuppressWarnings("unchecked")
+    protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
+            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            Boolean unwrapSingle)
+    {
         super(cls);
-        _elementType = et;
+        _elementType = elementType;
         // static if explicitly requested, or if element type is final
-        _staticTyping = staticTyping || (et != null && et.isFinal());
+        _staticTyping = staticTyping || (elementType != null && elementType.isFinal());
         _valueTypeSerializer = vts;
         _elementSerializer = (JsonSerializer<Object>) elementSerializer;
-        _unwrapSingle = null;
+        _unwrapSingle = unwrapSingle;
+    }
+
+    /**
+     * General purpose constructor. Use contextual constructors, if possible.
+     */
+    @SuppressWarnings("unchecked")
+    protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
+            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            Boolean unwrapSingle, BeanProperty property)
+    {
+        super(cls, property);
+        _elementType = elementType;
+        // static if explicitly requested, or if element type is final
+        _staticTyping = staticTyping || (elementType != null && elementType.isFinal());
+        _valueTypeSerializer = vts;
+        _elementSerializer = (JsonSerializer<Object>) elementSerializer;
+        _unwrapSingle = unwrapSingle;
     }
 
     @SuppressWarnings("unchecked")
     protected AsArraySerializerBase(AsArraySerializerBase<?> src,
-            BeanProperty property, TypeSerializer vts, JsonSerializer<?> elementSerializer,
-            Boolean unwrapSingle)
+            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            Boolean unwrapSingle, BeanProperty property)
     {
         super(src, property);
         _elementType = src._elementType;

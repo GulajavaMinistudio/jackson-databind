@@ -4,8 +4,10 @@ import java.text.DateFormat;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
+
 import com.fasterxml.jackson.core.Base64Variant;
 import com.fasterxml.jackson.core.type.TypeReference;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
@@ -277,7 +279,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
 
     /**
      * Fluent factory method that will construct a new instance with
-     * specified {@link JsonNodeFactory}
+     * specified {@link JsonNodeFactory}.
      */
     public final T with(JsonNodeFactory f) {
         return _withBase(_base.with(f));
@@ -476,9 +478,17 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     {
         AnnotationIntrospector intr = getAnnotationIntrospector();
         JsonIgnoreProperties.Value base = (intr == null) ? null
-                : intr.findPropertyIgnorals(this, actualClass);
+                : intr.findPropertyIgnoralByName(this, actualClass);
         JsonIgnoreProperties.Value overrides = getDefaultPropertyIgnorals(baseType);
         return JsonIgnoreProperties.Value.merge(base, overrides);
+    }
+
+    @Override
+    public final JsonIncludeProperties.Value getDefaultPropertyInclusions(Class<?> baseType,
+            AnnotatedClass actualClass)
+    {
+        AnnotationIntrospector intr = getAnnotationIntrospector();
+        return (intr == null) ? null : intr.findPropertyInclusionByName(this, actualClass);
     }
 
     @Override

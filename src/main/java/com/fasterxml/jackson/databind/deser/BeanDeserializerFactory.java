@@ -3,6 +3,7 @@ package com.fasterxml.jackson.databind.deser;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.databind.cfg.DeserializerFactoryConfig;
@@ -12,7 +13,9 @@ import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.jsontype.impl.SubTypeValidator;
+import com.fasterxml.jackson.databind.util.BeanUtil;
 import com.fasterxml.jackson.databind.util.ClassUtil;
+import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 
 /**
@@ -92,7 +95,7 @@ public class BeanDeserializerFactory
         throws JsonMappingException
     {
         final DeserializationConfig config = ctxt.getConfig();
-        // We may also have custom overrides:
+        // First: we may also have custom overrides:
         JsonDeserializer<?> deser = _findCustomBeanDeserializer(type, config, beanDesc);
         if (deser != null) {
             // [databind#2392]
@@ -103,10 +106,8 @@ public class BeanDeserializerFactory
             }
             return (JsonDeserializer<Object>) deser;
         }
-        /* One more thing to check: do we have an exception type
-         * (Throwable or its sub-classes)? If so, need slightly
-         * different handling.
-         */
+        // One more thing to check: do we have an exception type (Throwable or its
+        // sub-classes)? If so, need slightly different handling.
         if (type.isThrowable()) {
             return buildThrowableDeserializer(ctxt, type, beanDesc);
         }
@@ -137,13 +138,21 @@ public class BeanDeserializerFactory
         }
         // For checks like [databind#1599]
         _validateSubType(ctxt, type, beanDesc);
+
+        // 05-May-2020, tatu: [databind#2683] Let's actually pre-emptively catch
+        //   certain types (for now, java.time.*) to give better error messages
+        deser = _findUnsupportedTypeDeserializer(ctxt, type, beanDesc);
+        if (deser != null) {
+            return (JsonDeserializer<Object>)deser;
+        }
+
         // Use generic bean introspection to build deserializer
         return buildBeanDeserializer(ctxt, type, beanDesc);
     }
 
     @Override
     public JsonDeserializer<Object> createBuilderBasedDeserializer(
-            DeserializationContext ctxt, JavaType valueType, BeanDescription beanDesc,
+            DeserializationContext ctxt, JavaType valueType, BeanDescription valueBeanDesc,
             Class<?> builderClass)
         throws JsonMappingException
     {
@@ -154,7 +163,9 @@ public class BeanDeserializerFactory
         } else {
             builderType = ctxt.constructType(builderClass);
         }
-        BeanDescription builderDesc = ctxt.introspectBeanDescriptionForBuilder(builderType);
+        BeanDescription builderDesc = ctxt.introspectBeanDescriptionForBuilder(builderType, valueBeanDesc);
+        // 20-Aug-2020, tatu: May want to change at some point (after 2.12) to pass "valueBeanDesc"
+        //    too; no urgent need at this point
         return buildBuilderBasedDeserializer(ctxt, valueType, builderDesc);
     }
 
@@ -178,6 +189,24 @@ public class BeanDeserializerFactory
             }
         }
         return deser;
+    }
+
+    /**
+     * Helper method called to see if given type, otherwise to be taken as POJO type,
+     * is "known but not supported" JDK type, and if so, return alternate handler
+     * (deserializer).
+     * Initially added to support more meaningful error messages when "Java 8 date/time"
+     * support module not registered.
+     */
+    protected JsonDeserializer<Object> _findUnsupportedTypeDeserializer(DeserializationContext ctxt,
+            JavaType type, BeanDescription beanDesc)
+        throws JsonMappingException
+    {
+        // 05-May-2020, tatu: Should we check for possible Shape override to "POJO"?
+        //   (to let users force 'serialize-as-POJO'? Or not?
+        final String errorMsg = BeanUtil.checkUnsupportedType(type);
+        return (errorMsg == null) ? null
+                : new UnsupportedTypeDeserializer(type, errorMsg);
     }
 
     protected JavaType materializeAbstractType(DeserializationContext ctxt,
@@ -353,8 +382,10 @@ public class BeanDeserializerFactory
             PropertyName propName = objectIdInfo.getPropertyName();
             idProp = builder.findProperty(propName);
             if (idProp == null) {
-                throw new IllegalArgumentException("Invalid Object Id definition for "
-                        +beanDesc.getBeanClass().getName()+": cannot find property with name '"+propName+"'");
+                throw new IllegalArgumentException(String.format(
+"Invalid Object Id definition for %s: cannot find property with name %s",
+ClassUtil.getTypeDescription(beanDesc.getType()),
+ClassUtil.name(propName)));
             }
             idType = idProp.getType();
             gen = new PropertyBasedObjectIdGenerator(objectIdInfo.getScope());
@@ -433,8 +464,7 @@ public class BeanDeserializerFactory
 
     /*
     /**********************************************************
-    /* Helper methods for Bean deserializer construction,
-    /* overridable by sub-classes
+    /* Helper methods for Bean deserializer construction
     /**********************************************************
      */
 
@@ -461,7 +491,7 @@ public class BeanDeserializerFactory
     {
         final boolean isConcrete = !beanDesc.getType().isAbstract();
         final SettableBeanProperty[] creatorProps = isConcrete
-                ? builder.getValueInstantiator().getFromObjectArguments(ctxt)
+                ? builder.getValueInstantiator().getFromObjectArguments(ctxt.getConfig())
                 : null;
         final boolean hasCreatorProps = (creatorProps != null);
 
@@ -483,6 +513,18 @@ public class BeanDeserializerFactory
             }
         } else {
             ignored = Collections.emptySet();
+        }
+        JsonIncludeProperties.Value inclusions = ctxt.getConfig()
+                .getDefaultPropertyInclusions(beanDesc.getBeanClass(),
+                        beanDesc.getClassInfo());
+        Set<String> included = null;
+        if (inclusions != null) {
+            included = inclusions.getIncluded();
+            if (included != null) {
+                for(String propName : included) {
+                    builder.addIncludable(propName);
+                }
+            }
         }
 
         // Also, do we have a fallback "any" setter?
@@ -508,7 +550,7 @@ public class BeanDeserializerFactory
 
         // Ok: let's then filter out property definitions
         List<BeanPropertyDefinition> propDefs = filterBeanProps(ctxt,
-                beanDesc, builder, beanDesc.findProperties(), ignored);
+                beanDesc, builder, beanDesc.findProperties(), ignored, included);
         // After which we can let custom code change the set
         if (_factoryConfig.hasDeserializerModifiers()) {
             for (BeanDeserializerModifier mod : _factoryConfig.deserializerModifiers()) {
@@ -580,8 +622,8 @@ public class BeanDeserializerFactory
                         n.add(cp.getName());
                     }
                     ctxt.reportBadPropertyDefinition(beanDesc, propDef,
-                            "Could not find creator property with name '%s' (known Creator properties: %s)",
-                            name, n);
+"Could not find creator property with name %s (known Creator properties: %s)",
+                            ClassUtil.name(name), n);
                     continue;
                 }
                 if (prop != null) {
@@ -620,12 +662,32 @@ public class BeanDeserializerFactory
      * as well as properties that have "ignorable types".
      * Note that this will not remove properties that have no
      * setters.
+     *
+     * @deprecated in 2.12, remove from 3.0
      */
+    @Deprecated
     protected List<BeanPropertyDefinition> filterBeanProps(DeserializationContext ctxt,
             BeanDescription beanDesc, BeanDeserializerBuilder builder,
             List<BeanPropertyDefinition> propDefsIn,
             Set<String> ignored)
         throws JsonMappingException
+    {
+        return filterBeanProps(ctxt, beanDesc, builder, propDefsIn, ignored, null);
+    }
+
+    /**
+     * Helper method called to filter out explicit ignored properties,
+     * as well as properties that have "ignorable types".
+     * Note that this will not remove properties that have no
+     * setters.
+     *
+     * @since 2.12
+     */
+    protected List<BeanPropertyDefinition> filterBeanProps(DeserializationContext ctxt,
+                                                           BeanDescription beanDesc, BeanDeserializerBuilder builder,
+                                                           List<BeanPropertyDefinition> propDefsIn,
+                                                           Set<String> ignored,
+                                                           Set<String> included)
     {
         ArrayList<BeanPropertyDefinition> result = new ArrayList<BeanPropertyDefinition>(
                 Math.max(4, propDefsIn.size()));
@@ -633,7 +695,8 @@ public class BeanDeserializerFactory
         // These are all valid setters, but we do need to introspect bit more
         for (BeanPropertyDefinition property : propDefsIn) {
             String name = property.getName();
-            if (ignored.contains(name)) { // explicit ignoral using @JsonIgnoreProperties needs to block entries
+            // explicit ignoral using @JsonIgnoreProperties of @JsonIncludeProperties needs to block entries
+            if (IgnorePropertiesUtil.shouldIgnore(name, ignored, included)) {
                 continue;
             }
             if (!property.hasConstructorParameter()) { // never skip constructor params
@@ -676,8 +739,8 @@ public class BeanDeserializerFactory
                     //    work through constructors; but let's at least indicate the issue for now
                     if (m instanceof AnnotatedParameter) {
                         ctxt.reportBadTypeDefinition(beanDesc,
-"Cannot bind back reference using Creator parameter (reference '%s', parameter index #%d)",
-name, ((AnnotatedParameter) m).getIndex());
+"Cannot bind back reference using Creator parameter (reference %s, parameter index #%d)",
+ClassUtil.name(name), ((AnnotatedParameter) m).getIndex());
                     }
                 }
                 */
@@ -874,9 +937,8 @@ name, ((AnnotatedParameter) m).getIndex());
         if (ClassUtil.isProxyType(type)) {
             throw new IllegalArgumentException("Cannot deserialize Proxy class "+type.getName()+" as a Bean");
         }
-        /* also: can't deserialize some local classes: static are ok; in-method not;
-         * other non-static inner classes are ok
-         */
+        // also: can't deserialize some local classes: static are ok; in-method not;
+        // other non-static inner classes are ok
         typeStr = ClassUtil.isLocalType(type, true);
         if (typeStr != null) {
             throw new IllegalArgumentException("Cannot deserialize Class "+type.getName()+" (of type "+typeStr+") as a Bean");

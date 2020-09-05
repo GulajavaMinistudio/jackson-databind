@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <!-- This module was also published with a richer model, Gradle metadata,  -->
+  <!-- which should be used instead. Do not delete the following line which  -->
+  <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
+  <!-- that they should prefer consuming it instead. -->
+  <!-- do_not_remove: published-with-gradle-metadata -->
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -34,10 +40,10 @@
   <properties>
     <!-- Can not use default, since group id != Java package name here -->
     <osgi.export>com.fasterxml.jackson.databind.*;version=${project.version}</osgi.export>
-    <!-- fix for databind#2299: using jackson-databind in an OSGi environment under Android --> 
+    <!-- fix for databind#2299: using jackson-databind in an OSGi environment under Android -->
     <osgi.import>
-        org.w3c.dom.bootstrap;resolution:=optional,
-        *
+      org.w3c.dom.bootstrap;resolution:=optional,
+      *
     </osgi.import>
 
     <!-- Generate PackageVersion.java into this directory. -->
@@ -109,8 +115,12 @@
       <id>sonatype-nexus-snapshots</id>
       <name>Sonatype Nexus Snapshots</name>
       <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      <releases><enabled>false</enabled></releases>
-      <snapshots><enabled>true</enabled></snapshots>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
 
@@ -118,23 +128,22 @@
     <plugins>
 
       <plugin>
-	<groupId>org.jacoco</groupId>
-	<artifactId>jacoco-maven-plugin</artifactId>
-	<version>0.8.4</version>
-	<executions>
-	  <execution>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
           </execution>
-	  <execution>
+          <execution>
             <id>report</id>
             <phase>test</phase>
             <goals>
               <goal>report</goal>
             </goals>
           </execution>
-	</executions>
+        </executions>
       </plugin>
 
       <plugin>
@@ -171,6 +180,15 @@
         <!-- Inherited from oss-base. Generate PackageVersion.java.-->
         <groupId>com.google.code.maven-replacer-plugin</groupId>
         <artifactId>replacer</artifactId>
+        <executions>
+          <execution>
+            <id>generate-package-version-java</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>replace</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
 
       <!-- 17-Sep-2017, tatu: With 3.0 need to ensure parameter names compiled in
@@ -191,6 +209,11 @@
         <groupId>org.moditect</groupId>
         <artifactId>moditect-maven-plugin</artifactId>
       </plugin>
+
+      <plugin>
+        <groupId>de.jjohannes</groupId>
+        <artifactId>gradle-module-metadata-maven-plugin</artifactId>
+      </plugin>
     </plugins>
   </build>
 
@@ -201,6 +224,57 @@
         <maven.test.skip>true</maven.test.skip>
         <skipTests>true</skipTests>
       </properties>
+    </profile>
+    <profile>
+      <!-- Build Record tests using Java 14 if JDK is available -->
+      <id>java14+</id>
+      <activation>
+        <jdk>[14,</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>add-test-source</id>
+                <phase>generate-test-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/test-jdk14/java</source>
+                  </sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <inherited>true</inherited>
+            <configuration>
+              <optimize>true</optimize>
+              <!-- Enable Java 14+ for all sources so that Intellij picks the right language level -->
+              <source>14</source>
+              <release>14</release>
+              <compilerArgs>
+                <arg>-parameters</arg>
+                <arg>--enable-preview</arg>
+              </compilerArgs>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <argLine>--enable-preview</argLine>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 

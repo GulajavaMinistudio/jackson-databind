@@ -690,10 +690,24 @@ public final class TypeFactory
         return _fromAny(null, type, EMPTY_BINDINGS);
     }
 
+    /**
+     * Method that you very likely should NOT be using -- you need to know a lot
+     * about internal details of {@link TypeBindings} and even then it will probably
+     * not do what you want.
+     * Usually you would instead want to call one of {@code constructXxxType()}
+     * methods (where {@code Xxx} would be "Array", "Collection[Like]", "Map[Like]"
+     * or "Parametric").
+     */
     public JavaType constructType(Type type, TypeBindings bindings) {
+        // 15-Jun-2020, tatu: To resolve (parts of) [databind#2796], need to
+        //    call _fromClass() directly if we get `Class` argument
+        if (type instanceof Class<?>) {
+            JavaType resultType = _fromClass(null, (Class<?>) type, bindings);
+            return _applyModifiers(type, resultType);
+        }
         return _fromAny(null, type, bindings);
     }
-    
+
     public JavaType constructType(TypeReference<?> typeRef)
     {
         // 19-Oct-2015, tatu: Simpler variant like so should work
@@ -847,8 +861,7 @@ public final class TypeFactory
     /**
      * Method for constructing a {@link MapType} instance
      *<p>
-     * NOTE: type modifiers are NOT called on constructed type itself; but are called
-     * for contained types.
+     * NOTE: type modifiers are NOT called on constructed type itself.
      */
     public MapType constructMapType(Class<? extends Map> mapClass, JavaType keyType, JavaType valueType) {
         TypeBindings bindings = TypeBindings.createIfNeeded(mapClass, new JavaType[] { keyType, valueType });
@@ -888,8 +901,7 @@ public final class TypeFactory
     /**
      * Method for constructing a {@link MapLikeType} instance
      *<p>
-     * NOTE: type modifiers are NOT called on constructed type itself; but are called
-     * for contained types.
+     * NOTE: type modifiers are NOT called on constructed type itself.
      */
     public MapLikeType constructMapLikeType(Class<?> mapClass, JavaType keyType, JavaType valueType) {
         // 19-Oct-2015, tatu: Allow case of no-type-variables, since it seems likely to be
@@ -904,14 +916,23 @@ public final class TypeFactory
 
     /**
      * Method for constructing a type instance with specified parameterization.
-s     */
+     *<p>
+     * NOTE: type modifiers are NOT called on constructed type itself.
+     */
     public JavaType constructSimpleType(Class<?> rawType, JavaType[] parameterTypes) {
         return _fromClass(null, rawType, TypeBindings.create(rawType, parameterTypes));
     }
 
+    /**
+     * Method for constructing a {@link ReferenceType} instance with given type parameter
+     * (type MUST take one and only one type parameter)
+     *<p>
+     * NOTE: type modifiers are NOT called on constructed type itself.
+     */
     public JavaType constructReferenceType(Class<?> rawType, JavaType referredType)
     {
-        return ReferenceType.construct(rawType, null, // no bindings
+        return ReferenceType.construct(rawType,
+                TypeBindings.create(rawType, referredType), // [databind#2091]
                 null, null, // or super-class, interfaces?
                 referredType);
     }
@@ -969,10 +990,12 @@ s     */
      * In most cases distinction does not matter, but there are types where it does;
      * one such example is parameterization of types that implement {@link java.util.Iterator}.
      *<p>
-     * NOTE: type modifiers are NOT called on constructed type.
+     * NOTE: since 2.11.2 {@link TypeModifier}s ARE called on result (fix for [databind#2796])
      *
      * @param rawType Actual type-erased type
      * @param parameterTypes Type parameters to apply
+     *
+     * @return Fully resolved type for given base type and type parameters
      */
     public JavaType constructParametricType(Class<?> rawType, JavaType... parameterTypes)
     {
@@ -998,7 +1021,10 @@ s     */
      */
     public JavaType constructParametricType(Class<?> rawType, TypeBindings parameterTypes)
     {
-        return _fromClass(null, rawType, parameterTypes);
+        // 16-Jul-2020, tatu: Since we do not call `_fromAny()`, need to make
+        //   sure `TypeModifier`s are applied:
+        JavaType resultType =  _fromClass(null, rawType, parameterTypes);
+        return _applyModifiers(rawType, resultType);
     }
 
     /*
@@ -1195,51 +1221,58 @@ s     */
      * as Java typing returned from <code>getGenericXxx</code> methods
      * (usually for a return or argument type).
      */
-    protected JavaType _fromAny(ClassStack context, Type type, TypeBindings bindings)
+    protected JavaType _fromAny(ClassStack context, Type srcType, TypeBindings bindings)
     {
         JavaType resultType;
 
         // simple class?
-        if (type instanceof Class<?>) {
+        if (srcType instanceof Class<?>) {
             // Important: remove possible bindings since this is type-erased thingy
-            resultType = _fromClass(context, (Class<?>) type, EMPTY_BINDINGS);
+            resultType = _fromClass(context, (Class<?>) srcType, EMPTY_BINDINGS);
         }
         // But if not, need to start resolving.
-        else if (type instanceof ParameterizedType) {
-            resultType = _fromParamType(context, (ParameterizedType) type, bindings);
+        else if (srcType instanceof ParameterizedType) {
+            resultType = _fromParamType(context, (ParameterizedType) srcType, bindings);
         }
-        else if (type instanceof JavaType) { // [databind#116]
+        else if (srcType instanceof JavaType) { // [databind#116]
             // no need to modify further if we already had JavaType
-            return (JavaType) type;
+            return (JavaType) srcType;
         }
-        else if (type instanceof GenericArrayType) {
-            resultType = _fromArrayType(context, (GenericArrayType) type, bindings);
+        else if (srcType instanceof GenericArrayType) {
+            resultType = _fromArrayType(context, (GenericArrayType) srcType, bindings);
         }
-        else if (type instanceof TypeVariable<?>) {
-            resultType = _fromVariable(context, (TypeVariable<?>) type, bindings);
+        else if (srcType instanceof TypeVariable<?>) {
+            resultType = _fromVariable(context, (TypeVariable<?>) srcType, bindings);
         }
-        else if (type instanceof WildcardType) {
-            resultType = _fromWildcard(context, (WildcardType) type, bindings);
+        else if (srcType instanceof WildcardType) {
+            resultType = _fromWildcard(context, (WildcardType) srcType, bindings);
         } else {
             // sanity check
-            throw new IllegalArgumentException("Unrecognized Type: "+((type == null) ? "[null]" : type.toString()));
+            throw new IllegalArgumentException("Unrecognized Type: "+((srcType == null) ? "[null]" : srcType.toString()));
         }
         // 21-Feb-2016, nateB/tatu: as per [databind#1129] (applied for 2.7.2),
         //   we do need to let all kinds of types to be refined, esp. for Scala module.
-        if (_modifiers != null) {
-            TypeBindings b = resultType.getBindings();
-            if (b == null) {
-                b = EMPTY_BINDINGS;
+        return _applyModifiers(srcType, resultType);
+    }
+
+    protected JavaType _applyModifiers(Type srcType, JavaType resolvedType)
+    {
+        if (_modifiers == null) {
+            return resolvedType;
+        }
+        JavaType resultType = resolvedType;
+        TypeBindings b = resultType.getBindings();
+        if (b == null) {
+            b = EMPTY_BINDINGS;
+        }
+        for (TypeModifier mod : _modifiers) {
+            JavaType t = mod.modifyType(resultType, srcType, b, this);
+            if (t == null) {
+                throw new IllegalStateException(String.format(
+                        "TypeModifier %s (of type %s) return null for type %s",
+                        mod, mod.getClass().getName(), resultType));
             }
-            for (TypeModifier mod : _modifiers) {
-                JavaType t = mod.modifyType(resultType, type, b, this);
-                if (t == null) {
-                    throw new IllegalStateException(String.format(
-                            "TypeModifier %s (of type %s) return null for type %s",
-                            mod, mod.getClass().getName(), resultType));
-                }
-                resultType = t;
-            }
+            resultType = t;
         }
         return resultType;
     }

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.NumberOutput;
 import com.fasterxml.jackson.core.sym.FieldNameMatcher;
 import com.fasterxml.jackson.core.util.ByteArrayBuilder;
+import com.fasterxml.jackson.core.util.JacksonFeatureSet;
 import com.fasterxml.jackson.core.util.SimpleTokenWriteContext;
 import com.fasterxml.jackson.databind.*;
 
@@ -27,6 +28,10 @@ public class TokenBuffer
     extends JsonGenerator
 {
     protected final static int DEFAULT_STREAM_WRITE_FEATURES = StreamWriteFeature.collectDefaults();
+
+    // Should work for now
+    protected final static JacksonFeatureSet<StreamWriteCapability> BOGUS_WRITE_CAPABILITIES
+        = JacksonFeatureSet.fromDefaults(StreamWriteCapability.values());
 
     /*
     /**********************************************************************
@@ -627,14 +632,12 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
      */
 
     @Override
-    public JsonGenerator enable(StreamWriteFeature f) {
-        _streamWriteFeatures |= f.getMask();
-        return this;
-    }
-
-    @Override
-    public JsonGenerator disable(StreamWriteFeature f) {
-        _streamWriteFeatures &= ~f.getMask();
+    public JsonGenerator configure(StreamWriteFeature f, boolean state) {
+        if (state) {
+            _streamWriteFeatures |= f.getMask();
+        } else {
+            _streamWriteFeatures &= ~f.getMask();
+        }
         return this;
     }
 
@@ -650,13 +653,6 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
         return _streamWriteFeatures;
     }
 
-    @Override // since 3.0
-    public int formatWriteFeatures() {
-        // 26-Oct-2018, tatu: Should not have anything format-specific... however,
-        // not all features  default to "false" so this may not be right choice?
-        return 0;
-    }
-
     /*
     /**********************************************************************
     /* JsonGenerator implementation: capability introspection
@@ -670,7 +666,16 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
     public boolean canWriteBinaryNatively() {
         return true;
     }
-    
+
+    // 20-May-2020, tatu: This may or may not be enough -- ideally access is
+    //    via `DeserializationContext`, not parser, but if latter is needed
+    //    then we'll need to pass this from parser contents if which were
+    //    buffered.
+    @Override
+    public JacksonFeatureSet<StreamWriteCapability> getWriteCapabilities() {
+        return BOGUS_WRITE_CAPABILITIES;
+    }
+
     /*
     /**********************************************************************
     /* JsonGenerator implementation: low-level output handling
@@ -687,6 +692,12 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
 
     @Override
     public boolean isClosed() { return _closed; }
+
+    @Override
+    public Object getOutputTarget() { return null; }
+
+    @Override
+    public int getOutputBuffered() { return -1; }
 
     /*
     /**********************************************************************
@@ -1231,16 +1242,10 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
             if (_forceBigDecimal) {
                 writeNumber(p.getDecimalValue());
             } else {
-                switch (p.getNumberType()) {
-                case BIG_DECIMAL:
-                    writeNumber(p.getDecimalValue());
-                    break;
-                case FLOAT:
-                    writeNumber(p.getFloatValue());
-                    break;
-                default:
-                    writeNumber(p.getDoubleValue());
-                }
+                // 09-Jul-2020, tatu: Used to just copy using most optimal method, but
+                //  issues like [databind#2644] force to use exact, not optimal type
+                final Number n = p.getNumberValueExact();
+                _appendValue(JsonToken.VALUE_NUMBER_FLOAT, n);
             }
             break;
         case VALUE_TRUE:
@@ -1467,9 +1472,24 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
             _location = l;
         }
 
+        /*
+        /**********************************************************
+        /* Public API, config access, capability introspection
+        /**********************************************************
+         */
+
         @Override
         public Version version() {
             return com.fasterxml.jackson.databind.cfg.PackageVersion.VERSION;
+        }
+
+        // 20-May-2020, tatu: This may or may not be enough -- ideally access is
+        //    via `DeserializationContext`, not parser, but if latter is needed
+        //    then we'll need to pass this from parser contents if which were
+        //    buffered.
+        @Override
+        public JacksonFeatureSet<StreamReadCapability> getReadCapabilities() {
+            return DEFAULT_READ_CAPABILITIES;
         }
 
         @Override
@@ -2159,11 +2179,11 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
             }
         }
 
-        private Object findObjectId(int index) {
+        public Object findObjectId(int index) {
             return (_nativeIds == null) ? null : _nativeIds.get(_objectIdIndex(index));
         }
 
-        private Object findTypeId(int index) {
+        public Object findTypeId(int index) {
             return (_nativeIds == null) ? null : _nativeIds.get(_typeIdIndex(index));
         }
 

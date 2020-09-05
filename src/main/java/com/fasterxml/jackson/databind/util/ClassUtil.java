@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.util.Named;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.PropertyName;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 
 public final class ClassUtil
@@ -123,11 +124,15 @@ public final class ClassUtil
     {
         /* As per [JACKSON-187], GAE seems to throw SecurityExceptions
          * here and there... and GAE itself has a bug, too
-         * (see []). Bah. So we need to catch some wayward exceptions on GAE
+         * Bah. So we need to catch some wayward exceptions on GAE
          */
         try {
+            final boolean isStatic = Modifier.isStatic(type.getModifiers());
+
             // one more: method locals, anonymous, are not good:
-            if (hasEnclosingMethod(type)) {
+            // 23-Jun-2020, tatu: [databind#2758] With JDK14+ should allow
+            //    local Record types, however
+            if (!isStatic && hasEnclosingMethod(type)) {
                 return "local/anonymous";
             }
             /* But how about non-static inner classes? Can't construct
@@ -135,7 +140,7 @@ public final class ClassUtil
              * happens to be enclosing... but that gets convoluted)
              */
             if (!allowNonStatic) {
-                if (isNonStaticInnerClass(type)) {
+                if (!isStatic && getEnclosingClass(type) != null) {
                     return "non-static member class";
                 }
             }
@@ -213,6 +218,14 @@ public final class ClassUtil
 
     public static boolean isBogusClass(Class<?> cls) {
         return (cls == Void.class || cls == Void.TYPE);
+    }
+
+    /**
+     * Helper method for detecting Java14-added new {@code Record} types
+     */
+    public static boolean isRecordType(Class<?> cls) {
+        Class<?> parent = cls.getSuperclass();
+        return (parent != null) && "java.lang.Record".equals(parent.getName());
     }
 
     public static boolean isObjectOrPrimitive(Class<?> cls) {
@@ -362,7 +375,7 @@ public final class ClassUtil
     {
         // 04-Mar-2014, tatu: Let's try to prevent auto-closing of
         //    structures, which typically causes more damage.
-        g.disable(StreamWriteFeature.AUTO_CLOSE_CONTENT);
+        g.configure(StreamWriteFeature.AUTO_CLOSE_CONTENT, false);
         try {
             g.close();
         } catch (Exception e) {
@@ -385,7 +398,7 @@ public final class ClassUtil
         throws IOException
     {
         if (g != null) {
-            g.disable(StreamWriteFeature.AUTO_CLOSE_CONTENT);
+            g.configure(StreamWriteFeature.AUTO_CLOSE_CONTENT, false);
             try {
                 g.close();
             } catch (Exception e) {
@@ -585,14 +598,37 @@ public final class ClassUtil
     }
 
     /**
-     * Returns either backtick-quoted `named.getName()` (if `named` not null),
-     * or "[null]" if `named` is null.
+     * Returns either single-quoted (apostrophe) {@code 'named.getName()'} (if {@code named} not null),
+     * or "[null]" if {@code named} is null.
      */
     public static String nameOf(Named named) {
         if (named == null) {
             return "[null]";
         }
-        return backticked(named.getName());
+        return apostrophed(named.getName());
+    }
+
+    /**
+     * Returns either single-quoted (apostrophe) {@code 'name'} (if {@code name} not null),
+     * or "[null]" if {@code name} is null.
+     */
+    public static String name(String name) {
+        if (name == null) {
+            return "[null]";
+        }
+        return apostrophed(name);
+    }
+    
+    /**
+     * Returns either single-quoted (apostrophe) {@code 'name'} (if {@code name} not null),
+     * or "[null]" if {@code name} is null.
+     */
+    public static String name(PropertyName name) {
+        if (name == null) {
+            return "[null]";
+        }
+        // 26-Aug-2020, tatu: Should we consider namespace somehow?
+        return apostrophed(name.getSimpleName());
     }
 
     /*
@@ -600,15 +636,25 @@ public final class ClassUtil
     /* Other escaping, description access
     /**********************************************************************
      */
-    
+
     /**
-     * Returns either `text` or [null].
+     * Returns either {@code `text`} (backtick-quoted) or {@code [null]}.
      */
     public static String backticked(String text) {
         if (text == null) {
             return "[null]";
         }
         return new StringBuilder(text.length()+2).append('`').append(text).append('`').toString();
+    }
+
+    /**
+     * Returns either {@code 'text'} (single-quoted) or {@code [null]}.
+     */
+    public static String apostrophed(String text) {
+        if (text == null) {
+            return "[null]";
+        }
+        return new StringBuilder(text.length()+2).append('\'').append(text).append('\'').toString();
     }
 
     /**

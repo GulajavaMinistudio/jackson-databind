@@ -23,7 +23,10 @@ import java.util.regex.Pattern;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.util.VersionUtil;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
@@ -75,16 +78,18 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
             TimeZone.class,
             InetAddress.class,
             InetSocketAddress.class,
+
+            // Special impl:
             StringBuilder.class,
         };
     }
 
     /*
     /**********************************************************************
-    /* Deserializer implementations
+    /* Life-cycle
     /**********************************************************************
      */
-    
+
     protected FromStringDeserializer(Class<?> vc) {
         super(vc);
     }
@@ -93,7 +98,7 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
      * Factory method for trying to find a deserializer for one of supported
      * types that have simple from-String serialization.
      */
-    public static Std findDeserializer(Class<?> rawType)
+    public static FromStringDeserializer<?> findDeserializer(Class<?> rawType)
     {
         int kind = 0;
         if (rawType == File.class) {
@@ -123,11 +128,16 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
         } else if (rawType == InetSocketAddress.class) {
             kind = Std.STD_INET_SOCKET_ADDRESS;
         } else if (rawType == StringBuilder.class) {
-            kind = Std.STD_STRING_BUILDER;
+            return new StringBuilderDeserializer();
         } else {
             return null;
         }
         return new Std(rawType, kind);
+    }
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.OtherScalar;
     }
     
     /*
@@ -142,33 +152,49 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
     {
         // Let's get textual value, possibly via coercion from other scalar types
         String text = p.getValueAsString();
-        if (text != null) { // has String representation
-            if (text.length() == 0 || (text = text.trim()).length() == 0) {
-                // Usually should become null; but not always
-                return _deserializeFromEmptyString(ctxt);
+        if (text == null) {
+            JsonToken t = p.currentToken();
+            if (t != JsonToken.START_OBJECT) {
+                return (T) _deserializeFromOther(p, ctxt, t);
             }
-            Exception cause = null;
-            try {
-                // 19-May-2017, tatu: Used to require non-null result (assuming `null`
-                //    indicated error; but that seems wrong. Should be able to return
-                //    `null` as value.
-                return _deserialize(text, ctxt);
-            } catch (IllegalArgumentException | MalformedURLException e) {
-                cause = e;
-            }
-            // note: `cause` can't be null
-            String msg = "not a valid textual representation";
-            String m2 = cause.getMessage();
-            if (m2 != null) {
-                msg = msg + ", problem: "+m2;
-            }
-            // 05-May-2016, tatu: Unlike most usage, this seems legit, so...
-            JsonMappingException e = ctxt.weirdStringException(text, _valueClass, msg);
-            e.initCause(cause);
-            throw e;
-            // nothing to do here, yet? We'll fail anyway
+            // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
+            text = ctxt.extractScalarFromObject(p, this, _valueClass);
         }
-        JsonToken t = p.currentToken();
+        if (text.length() == 0 || (text = text.trim()).length() == 0) {
+            // 09-Jun-2020, tatu: Commonly `null` but may coerce to "empty" as well
+            return (T) _deserializeFromEmptyString(ctxt);
+        }
+        Exception cause = null;
+        try {
+            // 19-May-2017, tatu: Used to require non-null result (assuming `null`
+            //    indicated error; but that seems wrong. Should be able to return
+            //    `null` as value.
+            return _deserialize(text, ctxt);
+        } catch (IllegalArgumentException | MalformedURLException e) {
+            cause = e;
+        }
+        // note: `cause` can't be null
+        String msg = "not a valid textual representation";
+        String m2 = cause.getMessage();
+        if (m2 != null) {
+            msg = msg + ", problem: "+m2;
+        }
+        // 05-May-2016, tatu: Unlike most usage, this seems legit, so...
+        JsonMappingException e = ctxt.weirdStringException(text, _valueClass, msg);
+        e.initCause(cause);
+        throw e;
+    }
+
+    /**
+     * Main method from trying to deserialize actual value from non-empty
+     * String.
+     */
+    protected abstract T _deserialize(String value, DeserializationContext ctxt) throws IOException;
+
+    // @since 2.12
+    protected Object _deserializeFromOther(JsonParser p, DeserializationContext ctxt,
+            JsonToken t) throws IOException
+    {
         // [databind#381]
         if (t == JsonToken.START_ARRAY) {
             return _deserializeFromArray(p, ctxt);
@@ -180,15 +206,18 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
                 return null;
             }
             if (_valueClass.isAssignableFrom(ob.getClass())) {
-                return (T) ob;
+                return ob;
             }
             return _deserializeEmbedded(ob, ctxt);
         }
-        return (T) ctxt.handleUnexpectedToken(getValueType(ctxt), p);
+        return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }
-        
-    protected abstract T _deserialize(String value, DeserializationContext ctxt) throws IOException;
 
+    /**
+     * Overridable method to allow coercion from embedded value that is neither
+     * {@code null} nor directly assignable to target type.
+     * Used, for example, by {@link UUIDDeserializer} to coerce from {@code byte[]}.
+     */
     protected T _deserializeEmbedded(Object ob, DeserializationContext ctxt) throws IOException {
         // default impl: error out
         ctxt.reportInputMismatch(this,
@@ -197,9 +226,31 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    protected T _deserializeFromEmptyString(DeserializationContext ctxt) throws IOException {
-        return (T) _coerceEmptyString(ctxt, false);
+    protected Object _deserializeFromEmptyString(DeserializationContext ctxt) throws IOException {
+        CoercionAction act = ctxt.findCoercionAction(logicalType(), _valueClass,
+                CoercionInputShape.EmptyString);
+        if (act == CoercionAction.Fail) {
+            ctxt.reportInputMismatch(this,
+"Cannot coerce empty String (\"\") to %s (but could if enabling coercion using `CoercionConfig`)",
+_coercedTypeDesc());
+        }
+        if (act == CoercionAction.AsNull) {
+            return getNullValue(ctxt);
+        }
+        if (act == CoercionAction.AsEmpty) {
+            return getEmptyValue(ctxt);
+        }
+        // 09-Jun-2020, tatu: semantics for `TryConvert` are bit interesting due to
+        //    historical reasons
+        return _deserializeFromEmptyStringDefault(ctxt);
+    }
+
+    /**
+     * @since 2.12
+     */
+    protected Object _deserializeFromEmptyStringDefault(DeserializationContext ctxt) throws IOException {
+        // by default, "as-null", but overridable by sub-classes
+        return getNullValue(ctxt);
     }
 
     /*
@@ -227,10 +278,11 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
         public final static int STD_TIME_ZONE = 11;
         public final static int STD_INET_ADDRESS = 12;
         public final static int STD_INET_SOCKET_ADDRESS = 13;
-        public final static int STD_STRING_BUILDER = 14;
+// No longer implemented here since 2.12
+//        public final static int STD_STRING_BUILDER = 14;
 
         protected final int _kind;
-        
+
         protected Std(Class<?> valueType, int kind) {
             super(valueType);
             _kind = kind;
@@ -308,27 +360,32 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
                 }
                 // host or unbracketed IPv6, without port number
                 return new InetSocketAddress(value, 0);
-            case STD_STRING_BUILDER:
-                return new StringBuilder(value);
             }
             VersionUtil.throwInternal();
             return null;
         }
 
-        @Override
-        protected Object _deserializeFromEmptyString(DeserializationContext ctxt) throws IOException {
-            // As per [databind#398], URI requires special handling
-            if (_kind == STD_URI) {
+        @Override // since 2.12
+        public Object getEmptyValue(DeserializationContext ctxt)
+            throws JsonMappingException
+        {
+            switch (_kind) {
+            case STD_URI:
+                // As per [databind#398], URI requires special handling
                 return URI.create("");
-            }
-            // As per [databind#1123], Locale too
-            if (_kind == STD_LOCALE) {
+            case STD_LOCALE:
+                // As per [databind#1123], Locale too
                 return Locale.ROOT;
             }
-            if (_kind == STD_STRING_BUILDER) {
-                return new StringBuilder();
-            }
-            return super._deserializeFromEmptyString(ctxt);
+            return super.getEmptyValue(ctxt);
+        }
+
+        @Override
+        protected Object _deserializeFromEmptyStringDefault(DeserializationContext ctxt) throws IOException {
+            // 09-Jun-2020, tatu: For backwards compatibility deserialize "as-empty"
+            //    as URI and Locale did that in 2.11 (and StringBuilder probably ought to).
+            //   But doing this here instead of super-class lets UUID return "as-null" instead
+            return getEmptyValue(ctxt);
         }
 
         protected int _firstHyphenOrUnderscore(String str)
@@ -340,6 +397,44 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
                 }
             }
             return -1;
+        }
+    }
+
+    // @since 2.12 to simplify logic a bit: should not use coercions when reading
+    //   String Values
+    static class StringBuilderDeserializer extends FromStringDeserializer<Object>
+    {
+        public StringBuilderDeserializer() {
+            super(StringBuilder.class);
+        }
+
+        @Override
+        public LogicalType logicalType() {
+            return LogicalType.Textual;
+        }
+
+        @Override
+        public Object getEmptyValue(DeserializationContext ctxt)
+            throws JsonMappingException
+        {
+            return new StringBuilder();
+        }
+
+        @Override
+        public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
+        {
+            String text = p.getValueAsString();
+            if (text != null) {
+                return _deserialize(text, ctxt);
+            }
+            return super.deserialize(p, ctxt);
+        }
+
+        @Override
+        protected Object _deserialize(String value, DeserializationContext ctxt)
+            throws IOException
+        {
+            return new StringBuilder(value);
         }
     }
 
@@ -395,6 +490,6 @@ public abstract class FromStringDeserializer<T> extends StdScalarDeserializer<T>
             } catch (Throwable e) {
                 return (Path) ctxt.handleInstantiationProblem(Path.class, value, e);
             }
-        }        
+        }
     }
 }

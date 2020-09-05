@@ -375,12 +375,7 @@ public class ObjectWriter
      * pretty printer for serialization.
      */
     public ObjectWriter withDefaultPrettyPrinter() {
-//        return with(_config.getDefaultPrettyPrinter());
-
-System.err.println(" withDefaultPrettyPrinter: default == "+_config.getDefaultPrettyPrinter());
-ObjectWriter w = with(_config.getDefaultPrettyPrinter());
-System.err.println(" PP now: "+_config.getDefaultPrettyPrinter());
-return w;
+        return with(_config.getDefaultPrettyPrinter());
     }
 
     /**
@@ -923,7 +918,6 @@ return w;
      * {@link #writeValue(Writer,Object)} with {@link java.io.StringWriter}
      * and constructing String, but more efficient.
      */
-    @SuppressWarnings("resource")
     public String writeValueAsString(Object value)
         throws JsonProcessingException
     {        
@@ -948,7 +942,6 @@ return w;
      * and getting bytes, but more efficient.
      * Encoding used will be UTF-8.
      */
-    @SuppressWarnings("resource")
     public byte[] writeValueAsBytes(Object value)
         throws JsonProcessingException
     {

@@ -11,8 +11,8 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.ReadableObjectId.Referring;
-import com.fasterxml.jackson.databind.deser.std.ContainerDeserializerBase;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
@@ -122,6 +122,11 @@ public class CollectionDeserializer
                 ;
     }
 
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Collection;
+    }
+
     /*
     /**********************************************************
     /* Validation, post-processing (ResolvableDeserializer)
@@ -182,7 +187,7 @@ _containerType,
             valueTypeDeser = valueTypeDeser.forProperty(property);
         }
         NullValueProvider nuller = findContentNullProvider(ctxt, property, valueDeser);
-        if ( (unwrapSingle != _unwrapSingle)
+        if ((unwrapSingle != _unwrapSingle)
                 || (nuller != _nullProvider)
                 || (delegateDeser != _delegateDeserializer)
                 || (valueDeser != _valueDeserializer)
@@ -225,16 +230,18 @@ _containerType,
             return (Collection<Object>) _valueInstantiator.createUsingDelegate(ctxt,
                     _delegateDeserializer.deserialize(p, ctxt));
         }
+        // 16-May-2020, tatu: As per [dataformats-text#199] need to first check for
+        //   possible Array-coercion and only after that String coercion
+        if (p.isExpectedStartArrayToken()) {
+            return _deserializeFromArray(p, ctxt, createDefaultInstance(ctxt));
+        }
         // Empty String may be ok; bit tricky to check, however, since
         // there is also possibility of "auto-wrapping" of single-element arrays.
         // Hence we only accept empty String here.
         if (p.hasToken(JsonToken.VALUE_STRING)) {
-            String str = p.getText();
-            if (str.length() == 0) {
-                return (Collection<Object>) _valueInstantiator.createFromString(ctxt, str);
-            }
+            return _deserializeFromString(p, ctxt);
         }
-        return deserialize(p, ctxt, createDefaultInstance(ctxt));
+        return handleNonArray(p, ctxt, createDefaultInstance(ctxt));
     }
 
     /**
@@ -246,16 +253,35 @@ _containerType,
     {
         return (Collection<Object>) _valueInstantiator.createUsingDefault(ctxt);
     }
-    
+
     @Override
     public Collection<Object> deserialize(JsonParser p, DeserializationContext ctxt,
             Collection<Object> result)
         throws IOException
     {
         // Ok: must point to START_ARRAY (or equivalent)
-        if (!p.isExpectedStartArrayToken()) {
-            return handleNonArray(p, ctxt, result);
+        if (p.isExpectedStartArrayToken()) {
+            return _deserializeFromArray(p, ctxt, result);
         }
+        return handleNonArray(p, ctxt, result);
+    }
+
+    @Override
+    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
+            TypeDeserializer typeDeserializer)
+        throws IOException
+    {
+        // In future could check current token... for now this should be enough:
+        return typeDeserializer.deserializeTypedFromArray(p, ctxt);
+    }
+
+    /**
+     * @since 2.12
+     */
+    protected Collection<Object> _deserializeFromArray(JsonParser p, DeserializationContext ctxt,
+            Collection<Object> result)
+        throws IOException
+    {
         // [databind#631]: Assign current value, to be accessible by custom serializers
         p.setCurrentValue(result);
 
@@ -295,15 +321,6 @@ _containerType,
             }
         }
         return result;
-    }
-
-    @Override
-    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
-            TypeDeserializer typeDeserializer)
-        throws IOException
-    {
-        // In future could check current token... for now this should be enough:
-        return typeDeserializer.deserializeTypedFromArray(p, ctxt);
     }
 
     /**

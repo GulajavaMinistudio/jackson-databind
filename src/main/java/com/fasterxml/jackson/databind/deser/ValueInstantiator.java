@@ -1,6 +1,8 @@
 package com.fasterxml.jackson.databind.deser;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
@@ -42,7 +44,31 @@ public abstract class ValueInstantiator
     public interface Gettable {
         public ValueInstantiator getValueInstantiator();
     }
-    
+
+    /*
+    /**********************************************************************
+    /* Life-cycle
+    /**********************************************************************
+     */
+
+    /**
+     * "Contextualization" method that is called after construction but before first
+     * use, to allow instantiator access to context needed to possible resolve its
+     * dependencies.
+     *
+     * @param ctxt Currently active deserialization context: needed to (for example)
+     *    resolving {@link com.fasterxml.jackson.databind.jsontype.TypeDeserializer}s.
+     *
+     * @return This instance, if no change, or newly constructed instance
+     *
+     * @throws JsonMappingException If there are issues with contextualization
+     *
+     * @since 3.0
+     */
+    public abstract ValueInstantiator createContextual(DeserializationContext ctxt,
+            BeanDescription beanDesc)
+        throws JsonMappingException;
+
     /*
     /**********************************************************************
     /* Metadata accessors
@@ -61,7 +87,7 @@ public abstract class ValueInstantiator
     public abstract String getValueTypeDesc();
 
     /**
-     * Method that will return true if any of <code>canCreateXxx</code> method
+     * Method that will return true if any of {@code canCreateXxx} method
      * returns true: that is, if there is any way that an instance could
      * be created.
      */
@@ -75,7 +101,10 @@ public abstract class ValueInstantiator
 
     /**
      * Method that can be called to check whether a String-based creator
-     * is available for this instantiator
+     * is available for this instantiator.
+     *<p>
+     * NOTE: does NOT include possible case of fallbacks, or coercion; only
+     * considers explicit creator.
      */
     public boolean canCreateFromString() { return false; }
 
@@ -92,16 +121,29 @@ public abstract class ValueInstantiator
     public boolean canCreateFromLong() { return false; }
 
     /**
+     * Method that can be called to check whether a BigInteger based creator is available
+     * to use (to call {@link #createFromBigInteger}). +
+     */
+    public boolean canCreateFromBigInteger() { return false; }
+
+    /**
      * Method that can be called to check whether a double (double / Double) based
      * creator is available to use (to call {@link #createFromDouble}).
      */
     public boolean canCreateFromDouble() { return false; }
 
     /**
+     * Method that can be called to check whether a BigDecimal based creator is available
+     * to use (to call {@link #createFromBigDecimal}).
+     */
+    public boolean canCreateFromBigDecimal() { return false; }
+
+    /**
      * Method that can be called to check whether a double (boolean / Boolean) based
      * creator is available to use (to call {@link #createFromDouble}).
      */
     public boolean canCreateFromBoolean() { return false; }
+
 
     /**
      * Method that can be called to check whether a default creator (constructor,
@@ -140,11 +182,8 @@ public abstract class ValueInstantiator
      *<p>
      * NOTE: all properties will be of type
      * {@link com.fasterxml.jackson.databind.deser.CreatorProperty}.
-     *<p>
-     * NOTE: since 3.0, gets passed full {@link DeserializationContext},
-     * not just <code>DeserializationConfig</code>
      */
-    public SettableBeanProperty[] getFromObjectArguments(DeserializationContext ctxt) {
+    public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
         return null;
     }
 
@@ -247,9 +286,12 @@ public abstract class ValueInstantiator
     /* Instantiation methods for JSON scalar types (String, Number, Boolean)
     /**********************************************************************
      */
-    
+
     public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
-        return _createFromStringFallbacks(ctxt, value);
+        return ctxt.handleMissingInstantiator(getValueClass(), this, ctxt.getParser(),
+                "no String-argument constructor/factory method to deserialize from String value ('%s')",
+                value);
+
     }
 
     public Object createFromInt(DeserializationContext ctxt, int value) throws IOException {
@@ -264,10 +306,26 @@ public abstract class ValueInstantiator
                 value);
     }
 
+    public Object createFromBigInteger(DeserializationContext ctxt, BigInteger value) throws IOException
+    {
+        return ctxt.handleMissingInstantiator(getValueClass(),this,null,
+                                              "no BigInteger-argument constructor/factory method to deserialize from Number value (%s)",
+                                              value
+        );
+    }
+
     public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException {
         return ctxt.handleMissingInstantiator(getValueClass(), this, null,
                 "no double/Double-argument constructor/factory method to deserialize from Number value (%s)",
                 value);
+    }
+
+    public Object createFromBigDecimal(DeserializationContext ctxt, BigDecimal value) throws IOException
+    {
+        return ctxt.handleMissingInstantiator(getValueClass(),this,null,
+                                              "no BigDecimal/double/Double-argument constructor/factory method to deserialize from Number value (%s)",
+                                              value
+        );
     }
 
     public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
@@ -327,58 +385,6 @@ public abstract class ValueInstantiator
 
     /*
     /**********************************************************************
-    /* Helper methods
-    /**********************************************************************
-     */
-
-    protected Object _createFromStringFallbacks(DeserializationContext ctxt, String value)
-            throws IOException
-    {
-        /* 28-Sep-2011, tatu: Ok this is not clean at all; but since there are legacy
-         *   systems that expect conversions in some cases, let's just add a minimal
-         *   patch (note: same could conceivably be used for numbers too).
-         */
-        if (canCreateFromBoolean()) {
-            String str = value.trim();
-            if ("true".equals(str)) {
-                return createFromBoolean(ctxt, true);
-            }
-            if ("false".equals(str)) {
-                return createFromBoolean(ctxt, false);
-            }
-        }
-        // also, empty Strings might be accepted as null Object...
-        if (value.length() == 0) {
-            if (ctxt.isEnabled(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)) {
-                return null;
-            }
-        }
-        return ctxt.handleMissingInstantiator(getValueClass(), this, ctxt.getParser(),
-                "no String-argument constructor/factory method to deserialize from String value ('%s')",
-                value);
-    }
-
-    /*
-    /**********************************************************************
-    /* Std method overrides for testing
-    /**********************************************************************
-     */
-
-    /*
-    @Override
-    public String toString() {
-        return String.format(
-"(StdValueInstantiator: default=%s, delegate=%s, props=%s; str/int/long/double/boolean =  %s/%s/%s/%s/%s)",
-            canCreateUsingDefault(), canCreateUsingDelegate()
-            , canCreateFromObjectWith(), canCreateFromString()
-            , canCreateFromInt(), canCreateFromLong()
-            , canCreateFromDouble(), canCreateFromBoolean()
-            );
-    }
-*/
-
-    /*
-    /**********************************************************************
     /* Standard Base implementation
     /**********************************************************************
      */
@@ -400,6 +406,14 @@ public abstract class ValueInstantiator
         }
 
         @Override
+        public ValueInstantiator createContextual(DeserializationContext ctxt,
+                BeanDescription beanDesc)
+            throws JsonMappingException
+        {
+            return this;
+        }
+
+        @Override
         public String getValueTypeDesc() {
             return _valueType.getName();
         }
@@ -408,5 +422,162 @@ public abstract class ValueInstantiator
         public Class<?> getValueClass() {
             return _valueType;
         }
+    }
+
+    /**
+     * Delegating {@link ValueInstantiator} implementation meant as a base type
+     * that by default delegates methods to specified fallback instantiator.
+     *
+     * @since 2.12
+     */
+    public static class Delegating extends ValueInstantiator
+        implements java.io.Serializable
+    {
+        private static final long serialVersionUID = 1L;
+
+        protected final ValueInstantiator _delegate;
+
+        protected Delegating(ValueInstantiator delegate) {
+            _delegate = delegate;
+        }
+
+        @Override
+        public ValueInstantiator createContextual(DeserializationContext ctxt,  BeanDescription beanDesc)
+                throws JsonMappingException
+        {
+            ValueInstantiator d = _delegate.createContextual(ctxt, beanDesc);
+            return (d == _delegate) ? this : new Delegating(d);
+        }
+
+        protected ValueInstantiator delegate() { return _delegate; }
+
+        @Override
+        public Class<?> getValueClass() { return delegate().getValueClass(); }
+
+        @Override
+        public String getValueTypeDesc() { return delegate().getValueTypeDesc(); }
+
+        @Override
+        public boolean canInstantiate() { return delegate().canInstantiate(); }
+
+        @Override
+        public boolean canCreateFromString() { return delegate().canCreateFromString(); }
+        @Override
+        public boolean canCreateFromInt() { return delegate().canCreateFromInt(); }
+        @Override
+        public boolean canCreateFromLong() { return delegate().canCreateFromLong(); }
+        @Override
+        public boolean canCreateFromDouble() { return delegate().canCreateFromDouble(); }
+        @Override
+        public boolean canCreateFromBoolean() { return delegate().canCreateFromBoolean(); }
+        @Override
+        public boolean canCreateUsingDefault() { return delegate().canCreateUsingDefault(); }
+        @Override
+        public boolean canCreateUsingDelegate() { return delegate().canCreateUsingDelegate(); }
+        @Override
+        public boolean canCreateUsingArrayDelegate() { return delegate().canCreateUsingArrayDelegate(); }
+        @Override
+        public boolean canCreateFromObjectWith() { return delegate().canCreateFromObjectWith(); }
+
+        @Override
+        public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
+            return delegate().getFromObjectArguments(config);
+        }
+
+        @Override
+        public JavaType getDelegateType(DeserializationConfig config) {
+            return delegate().getDelegateType(config);
+        }
+
+        @Override
+        public JavaType getArrayDelegateType(DeserializationConfig config) {
+            return delegate().getArrayDelegateType(config);
+        }
+
+        /*
+        /**********************************************************
+        /* Creation methods
+        /**********************************************************
+         */
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
+            return delegate().createUsingDefault(ctxt);
+        }
+
+        @Override
+        public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
+            return delegate().createFromObjectWith(ctxt, args);
+        }
+
+        @Override
+        public Object createFromObjectWith(DeserializationContext ctxt,
+                SettableBeanProperty[] props, PropertyValueBuffer buffer)
+            throws IOException {
+            return delegate().createFromObjectWith(ctxt, props, buffer);
+        }
+
+        @Override
+        public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+            return delegate().createUsingDelegate(ctxt, delegate);
+        }
+
+        @Override
+        public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+            return delegate().createUsingArrayDelegate(ctxt, delegate);
+        }
+
+        @Override
+        public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
+            return delegate().createFromString(ctxt, value);
+        }
+
+        @Override
+        public Object createFromInt(DeserializationContext ctxt, int value) throws IOException {
+            return delegate().createFromInt(ctxt, value);
+        }
+
+        @Override
+        public Object createFromLong(DeserializationContext ctxt, long value) throws IOException {
+            return delegate().createFromLong(ctxt, value);
+        }
+
+        @Override
+        public Object createFromBigInteger(DeserializationContext ctxt, BigInteger value) throws IOException {
+            return delegate().createFromBigInteger(ctxt, value);
+        }
+
+        @Override
+        public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException {
+            return delegate().createFromDouble(ctxt, value);
+        }
+
+        @Override
+        public Object createFromBigDecimal(DeserializationContext ctxt, BigDecimal value) throws IOException {
+            return delegate().createFromBigDecimal(ctxt, value);
+        }
+
+        @Override
+        public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
+            return delegate().createFromBoolean(ctxt, value);
+        }
+
+        /*
+        /**********************************************************
+        /* Accessors for underlying creator objects (optional)
+        /**********************************************************
+         */
+
+        @Override
+        public AnnotatedWithParams getDefaultCreator() { return delegate().getDefaultCreator(); }
+
+        @Override
+        public AnnotatedWithParams getDelegateCreator() { return delegate().getDelegateCreator(); }
+
+        @Override
+        public AnnotatedWithParams getArrayDelegateCreator() { return delegate().getArrayDelegateCreator(); }
+
+        @Override
+        public AnnotatedWithParams getWithArgsCreator() { return delegate().getWithArgsCreator(); }
     }
 }

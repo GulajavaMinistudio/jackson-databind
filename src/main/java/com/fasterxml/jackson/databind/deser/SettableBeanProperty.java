@@ -246,6 +246,28 @@ public abstract class SettableBeanProperty
     }
 
     /**
+     * Copy-with-type-deserializer-change constructor for sub-classes to use.
+     */
+    protected SettableBeanProperty(SettableBeanProperty src, TypeDeserializer typeDeser)
+    {
+        super(src);
+        _propName = src._propName;
+        _type = src._type;
+        _wrapperName = src._wrapperName;
+        _contextAnnotations = src._contextAnnotations;
+        _valueDeserializer = src._valueDeserializer;
+        if (typeDeser != null) {
+            typeDeser = typeDeser.forProperty(this);
+        }
+
+        _valueTypeDeserializer = typeDeser;
+        _managedReferenceName = src._managedReferenceName;
+        _propertyIndex = src._propertyIndex;
+        _viewMatcher = src._viewMatcher;
+        _nullProvider = src._nullProvider;
+    }
+
+    /**
      * Fluent factory method for constructing and returning a new instance
      * with specified value deserializer.
      * Note that this method should NOT change configuration of this instance.
@@ -450,7 +472,19 @@ public abstract class SettableBeanProperty
      * value injection.
      */
     public Object getInjectableValueId() { return null; }
-    
+
+    /**
+     * Accessor for checking whether this property is injectable, and if so,
+     * ONLY injectable (will not bind from input).
+     * Currently (2.11) can only return {@code true} for Creator-backed properties.
+     *
+     * @return True if (and only if) property has injector that is also defined NOT
+     *    to bind from input.
+     *
+     * @since 2.11
+     */
+    public boolean isInjectionOnly() { return false; } // overridden by CreatorProperty
+
     /*
     /**********************************************************
     /* Public API
@@ -713,6 +747,9 @@ public abstract class SettableBeanProperty
 
         @Override
         public Object getInjectableValueId() { return delegate.getInjectableValueId(); }
+
+        @Override
+        public boolean isInjectionOnly() { return delegate.isInjectionOnly(); }
 
         @Override
         public AnnotatedMember getMember() {

@@ -1,13 +1,14 @@
 package com.fasterxml.jackson.databind;
 
 import java.io.*;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 import com.fasterxml.jackson.core.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
 import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -55,11 +56,27 @@ public abstract class BaseMapTest
         public LongWrapper(long value) { l = value; }
     }
 
+    protected static class BigIntegerWrapper {
+        public BigInteger i;
+
+        public BigIntegerWrapper() { }
+
+        public BigIntegerWrapper(final BigInteger value) { i = value; }
+    }
+
     protected static class DoubleWrapper {
         public double d;
 
         public DoubleWrapper() { }
         public DoubleWrapper(double value) { d = value; }
+    }
+
+    protected static class BigDecimalWrapper {
+        public BigDecimal d;
+
+        public BigDecimalWrapper() { }
+
+        public BigDecimalWrapper(final BigDecimal value) { d = value; }
     }
     
     /**
@@ -293,6 +310,10 @@ public abstract class BaseMapTest
         return json.replace("'", "\"");
     }
 
+    protected static String a2q(String json) {
+        return json.replace("'", "\"");
+    }
+    
     protected static String quotesToApos(String json) {
         return json.replace("\"", "'");
     }

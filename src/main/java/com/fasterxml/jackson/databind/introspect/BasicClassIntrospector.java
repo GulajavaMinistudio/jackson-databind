@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
@@ -88,13 +87,13 @@ public class BasicClassIntrospector
     }
 
     @Override
-    public ClassIntrospector forMapper() {
+    public BasicClassIntrospector forMapper() {
         // 14-Oct-2019, tatu: no per-mapper caching used, so just return as-is
         return this;
     }
 
     @Override
-    public ClassIntrospector forOperation(MapperConfig<?> config) {
+    public BasicClassIntrospector forOperation(MapperConfig<?> config) {
         return new BasicClassIntrospector(config);
     }
     /*
@@ -202,11 +201,12 @@ public class BasicClassIntrospector
     }
 
     @Override
-    public BasicBeanDescription introspectForDeserializationWithBuilder(JavaType type)
+    public BasicBeanDescription introspectForDeserializationWithBuilder(JavaType type,
+            BeanDescription valueTypeDesc)
     {
         // no std JDK types with Builders, so:
         return BasicBeanDescription.forDeserialization(collectPropertiesWithBuilder(type,
-                introspectClassAnnotations(type),
+                introspectClassAnnotations(type), valueTypeDesc,
                 false));
     }
 
@@ -233,30 +233,32 @@ public class BasicClassIntrospector
     /**********************************************************************
      */
 
-    protected POJOPropertiesCollector collectProperties(JavaType type, AnnotatedClass ac,
+    protected POJOPropertiesCollector collectProperties(JavaType type, AnnotatedClass classDef,
             boolean forSerialization, String mutatorPrefix)
     {
-        return constructPropertyCollector(type, ac, forSerialization, mutatorPrefix);
+        final AccessorNamingStrategy accNaming = type.isRecordType()
+                ? _config.getAccessorNaming().forRecord(_config, classDef)
+                : _config.getAccessorNaming().forPOJO(_config, classDef);
+        return constructPropertyCollector(type, classDef, forSerialization, accNaming);
     }
 
-    protected POJOPropertiesCollector collectPropertiesWithBuilder(JavaType type, AnnotatedClass ac,
+    protected POJOPropertiesCollector collectPropertiesWithBuilder(JavaType type,
+            AnnotatedClass builderClassDef, BeanDescription valueTypeDesc,
             boolean forSerialization)
     {
-        AnnotationIntrospector ai = _config.isAnnotationProcessingEnabled() ? _config.getAnnotationIntrospector() : null;
-        JsonPOJOBuilder.Value builderConfig = (ai == null) ? null
-                : ai.findPOJOBuilderConfig(_config, ac);
-        String mutatorPrefix = (builderConfig == null) ? JsonPOJOBuilder.DEFAULT_WITH_PREFIX : builderConfig.withPrefix;
-        return constructPropertyCollector(type, ac, forSerialization, mutatorPrefix);
+        final AccessorNamingStrategy accNaming = _config.getAccessorNaming().forBuilder(_config,
+                builderClassDef, valueTypeDesc);
+        return constructPropertyCollector(type, builderClassDef, forSerialization, accNaming);
     }
 
     /**
      * Overridable method called for creating {@link POJOPropertiesCollector} instance
      * to use; override is needed if a custom sub-class is to be used.
      */
-    protected POJOPropertiesCollector constructPropertyCollector(JavaType type, AnnotatedClass ac,
-            boolean forSerialization, String mutatorPrefix)
+    protected POJOPropertiesCollector constructPropertyCollector(JavaType type, AnnotatedClass classDef,
+            boolean forSerialization, AccessorNamingStrategy accNaming)
     {
-        return new POJOPropertiesCollector(_config, forSerialization, type, ac, mutatorPrefix);
+        return new POJOPropertiesCollector(_config, forSerialization, type, classDef, accNaming);
     }
 
     protected BasicBeanDescription _findStdTypeDesc(JavaType type) {

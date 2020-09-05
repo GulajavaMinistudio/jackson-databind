@@ -6,8 +6,10 @@ import java.util.*;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.sym.FieldNameMatcher;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.deser.impl.*;
 import com.fasterxml.jackson.databind.deser.impl.ReadableObjectId.Referring;
+import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 
@@ -44,14 +46,31 @@ public class BeanDeserializer
 
     /**
      * Constructor used by {@link BeanDeserializerBuilder}.
+     *
+     * @deprecated in 2.12, remove from 3.0
      */
+    @Deprecated
     public BeanDeserializer(BeanDeserializerBuilder builder, BeanDescription beanDesc,
             BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
             HashSet<String> ignorableProps, boolean ignoreAllUnknown,
             boolean hasViews)
     {
         super(builder, beanDesc, properties, backRefs,
-                ignorableProps, ignoreAllUnknown, hasViews);
+                ignorableProps, ignoreAllUnknown, null, hasViews);
+    }
+
+    /**
+     * Constructor used by {@link BeanDeserializerBuilder}.
+     *
+     * @since 2.12
+     */
+    public BeanDeserializer(BeanDeserializerBuilder builder, BeanDescription beanDesc,
+                            BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
+                            HashSet<String> ignorableProps, boolean ignoreAllUnknown, Set<String> includableProps,
+                            boolean hasViews)
+    {
+        super(builder, beanDesc, properties, backRefs,
+                ignorableProps, ignoreAllUnknown, includableProps, hasViews);
     }
 
     /**
@@ -78,19 +97,20 @@ public class BeanDeserializer
         _fieldsByIndex = _beanProperties.getFieldMatcherProperties();
     }
 
-    public BeanDeserializer(BeanDeserializer src, ObjectIdReader oir) {
+    protected BeanDeserializer(BeanDeserializer src, ObjectIdReader oir) {
         super(src, oir);
         _fieldMatcher = src._fieldMatcher;
         _fieldsByIndex = src._fieldsByIndex;
     }
 
-    public BeanDeserializer(BeanDeserializer src, Set<String> ignorableProps) {
-        super(src, ignorableProps);
+    protected BeanDeserializer(BeanDeserializer src,
+            Set<String> ignorableProps, Set<String> includableProps) {
+        super(src, ignorableProps, includableProps);
         _fieldMatcher = src._fieldMatcher;
         _fieldsByIndex = src._fieldsByIndex;
     }
 
-    public BeanDeserializer(BeanDeserializer src, BeanPropertyMap props) {
+    protected BeanDeserializer(BeanDeserializer src, BeanPropertyMap props) {
         super(src, props);
         _fieldMatcher = _beanProperties.getFieldMatcher();
         _fieldsByIndex = _beanProperties.getFieldMatcherProperties();
@@ -134,8 +154,9 @@ public class BeanDeserializer
     }
 
     @Override
-    public BeanDeserializer withIgnorableProperties(Set<String> ignorableProps) {
-        return new BeanDeserializer(this, ignorableProps);
+    public BeanDeserializer withByNameInclusion(Set<String> ignorableProps,
+            Set<String> includableProps) {
+        return new BeanDeserializer(this, ignorableProps, includableProps);
     }
 
     @Override
@@ -214,8 +235,8 @@ public class BeanDeserializer
             case VALUE_NULL:
                 return deserializeFromNull(p, ctxt);
             case START_ARRAY:
-                // these only work if there's a (delegating) creator...
-                return deserializeFromArray(p, ctxt);
+                // these only work if there's a (delegating) creator, or UNWRAP_SINGLE_ARRAY
+                return _deserializeFromArray(p, ctxt);
             case FIELD_NAME:
             case END_OBJECT: // added to resolve [JACKSON-319], possible related issues
                 if (_vanillaProcessing) {
@@ -470,9 +491,6 @@ public class BeanDeserializer
                 return deserializeWithExternalTypeId(p, ctxt);
             }
             Object bean = deserializeFromObjectUsingNonDefault(p, ctxt);
-            if (_injectables != null) {
-                injectValues(ctxt, bean);
-            }
             // 27-May-2014, tatu: I don't think view processing would work
             //   at this point, so commenting it out; but leaving in place
             //   just in case I forgot something fundamental...
@@ -538,7 +556,6 @@ public class BeanDeserializer
      * as well.
      */
     @Override
-    @SuppressWarnings("resource")
     protected Object _deserializeUsingPropertyBased(final JsonParser p, final DeserializationContext ctxt)
         throws IOException
     {
@@ -620,7 +637,7 @@ public class BeanDeserializer
                 continue;
             }
             // Things marked as ignorable should not be passed to any setter
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, handledType(), propName);
                 continue;
             }
@@ -644,11 +661,16 @@ public class BeanDeserializer
         // We hit END_OBJECT, so:
         Object bean;
         try {
-            bean =  creator.build(ctxt, buffer);
+            bean = creator.build(ctxt, buffer);
         } catch (Exception e) {
             wrapInstantiationProblem(e, ctxt);
             bean = null; // never gets here
         }
+        // 13-Apr-2020, tatu: [databind#2678] need to handle injection here
+        if (_injectables != null) {
+            injectValues(ctxt, bean);
+        }
+
         if (referrings != null) {
             for (BeanReferring referring : referrings) {
                referring.setBean(bean);
@@ -665,9 +687,6 @@ public class BeanDeserializer
         return bean;
     }
 
-    /**
-     * @since 2.8
-     */
     private BeanReferring handleUnresolvedReference(DeserializationContext ctxt,
             SettableBeanProperty prop, PropertyValueBuffer buffer,
             UnresolvedForwardReference reference)
@@ -702,6 +721,7 @@ public class BeanDeserializer
         // 17-Dec-2015, tatu: Highly specialized case, mainly to support polymorphic
         //   "empty" POJOs deserialized from XML, where empty XML tag synthesizes a
         //   `VALUE_NULL` tokens
+        /*
         if (p.canSynthesizeNulls()) {
             TokenBuffer tb = TokenBuffer.forGeneration();
             tb.writeEndObject();
@@ -713,6 +733,48 @@ public class BeanDeserializer
             p2.close();
             tb.close();
             return ob;
+        }
+        */
+        return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
+    }
+
+    @Override
+    protected Object _deserializeFromArray(JsonParser p, DeserializationContext ctxt) throws IOException
+    {
+        // note: cannot call `_delegateDeserializer()` since order reversed here:
+        JsonDeserializer<Object> delegateDeser = _arrayDelegateDeserializer;
+        // fallback to non-array delegate
+        if ((delegateDeser != null) || ((delegateDeser = _delegateDeserializer) != null)) {
+            Object bean = _valueInstantiator.createUsingArrayDelegate(ctxt,
+                    delegateDeser.deserialize(p, ctxt));
+            if (_injectables != null) {
+                injectValues(ctxt, bean);
+            }
+            return bean;
+        }
+        final CoercionAction act = _findCoercionFromEmptyArray(ctxt);
+        final boolean unwrap = ctxt.isEnabled(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS);
+
+        if (unwrap || (act != CoercionAction.Fail)) {
+            JsonToken t = p.nextToken();
+            if (t == JsonToken.END_ARRAY) {
+                switch (act) {
+                case AsEmpty:
+                    return getEmptyValue(ctxt);
+                case AsNull:
+                case TryConvert:
+                    return getNullValue(ctxt);
+                default:
+                }
+                return ctxt.handleUnexpectedToken(getValueType(ctxt), JsonToken.START_ARRAY, p, null);
+            }
+            if (unwrap) {
+                final Object value = deserialize(p, ctxt);
+                if (p.nextToken() != JsonToken.END_ARRAY) {
+                    handleMissingEndArrayForSingle(p, ctxt);
+                }
+                return value;
+            }
         }
         return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }
@@ -810,7 +872,7 @@ public class BeanDeserializer
             final String propName = p.currentName();
             p.nextToken();
             // Things marked as ignorable should not be passed to any setter
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, bean, propName);
                 continue;
             }
@@ -874,7 +936,7 @@ public class BeanDeserializer
             }
             final String propName = p.currentName();
             p.nextToken();
-            if ((_ignorableProps != null) && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, bean, propName);
                 continue;
             }
@@ -973,7 +1035,7 @@ public class BeanDeserializer
                 continue;
             }
             // Things marked as ignorable should not be passed to any setter
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, handledType(), propName);
                 continue;
             }
@@ -1071,7 +1133,7 @@ public class BeanDeserializer
             // ignorable things should be ignored
             final String propName = p.currentName();
             p.nextToken();
-            if ((_ignorableProps != null) && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, bean, propName);
                 continue;
             }
@@ -1161,7 +1223,7 @@ public class BeanDeserializer
                 continue;
             }
             // Things marked as ignorable should not be passed to any setter
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
                 handleIgnoredProperty(p, ctxt, handledType(), propName);
                 continue;
             }

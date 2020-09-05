@@ -54,7 +54,7 @@ public class BuilderErrorHandling extends BaseMapTest
             MAPPER.readValue(json, ValueClassXY.class);
             fail("Should not pass");
         } catch (MismatchedInputException e) {
-            verifyException(e, "unrecognized field");
+            verifyException(e, "Unrecognized property ");
         }
         // but pass if ok to ignore
         ValueClassXY result = MAPPER.readerFor(ValueClassXY.class)
@@ -62,5 +62,17 @@ public class BuilderErrorHandling extends BaseMapTest
                 .readValue(json);
         assertEquals(2, result._x);
         assertEquals(5, result._y);
+    }
+
+    public void testWrongShape() throws Exception
+    {
+        try {
+            MAPPER.readValue("123", ValueClassXY.class);
+            fail("Should not pass");
+        } catch (MismatchedInputException e) {
+            verifyException(e, "Cannot construct instance of ");
+            // should report Builder class, not value here, right?
+            verifyException(e, "$SimpleBuilderXY");
+        }
     }
 }

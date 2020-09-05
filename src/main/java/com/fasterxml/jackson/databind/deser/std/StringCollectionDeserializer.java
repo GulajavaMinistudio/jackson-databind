@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.deser.NullValueProvider;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedWithParams;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 
 /**
  * Specifically optimized version for {@link java.util.Collection}s
@@ -86,7 +87,12 @@ public final class StringCollectionDeserializer
         //    are involved
         return (_valueDeserializer == null) && (_delegateDeserializer == null);
     }
-    
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Collection;
+    }
+
     /*
     /**********************************************************
     /* Validation, post-processing
@@ -267,7 +273,10 @@ public final class StringCollectionDeserializer
                 ((_unwrapSingle == null) &&
                         ctxt.isEnabled(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY));
         if (!canWrap) {
-            return (Collection<String>) ctxt.handleUnexpectedToken(getValueType(ctxt), p);
+            if (p.hasToken(JsonToken.VALUE_STRING)) {
+                return _deserializeFromString(p, ctxt);
+            }
+            return (Collection<String>) ctxt.handleUnexpectedToken(_containerType, p);
         }
         // Strings are one of "native" (intrinsic) types, so there's never type deserializer involved
         JsonDeserializer<String> valueDes = _valueDeserializer;

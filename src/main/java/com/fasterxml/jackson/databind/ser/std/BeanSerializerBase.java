@@ -19,7 +19,9 @@ import com.fasterxml.jackson.databind.ser.impl.MapEntrySerializer;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
 import com.fasterxml.jackson.databind.ser.impl.PropertyBasedObjectIdGenerator;
 import com.fasterxml.jackson.databind.ser.impl.WritableObjectId;
+import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.Converter;
+import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 
 /**
@@ -129,7 +131,7 @@ public abstract class BeanSerializerBase
         this(src, src._props, src._filteredProps);
     }
 
-    public BeanSerializerBase(BeanSerializerBase src,
+    protected BeanSerializerBase(BeanSerializerBase src,
             BeanPropertyWriter[] properties, BeanPropertyWriter[] filteredProperties)
     {
         super(src._handledType);
@@ -165,7 +167,7 @@ public abstract class BeanSerializerBase
         _serializationShape = src._serializationShape;
     }
 
-    protected BeanSerializerBase(BeanSerializerBase src, Set<String> toIgnore)
+    protected BeanSerializerBase(BeanSerializerBase src, Set<String> toIgnore, Set<String> toInclude)
     {
         super(src._handledType);
 
@@ -180,7 +182,7 @@ public abstract class BeanSerializerBase
         for (int i = 0; i < len; ++i) {
             BeanPropertyWriter bpw = propsIn[i];
             // should be ignored?
-            if ((toIgnore != null) && toIgnore.contains(bpw.getName())) {
+            if (IgnorePropertiesUtil.shouldIgnore(bpw.getName(), toIgnore, toInclude)) {
                 continue;
             }
             propsOut.add(bpw);
@@ -206,9 +208,10 @@ public abstract class BeanSerializerBase
 
     /**
      * Mutant factory used for creating a new instance with additional
-     * set of properties to ignore (from properties this instance otherwise has)
+     * set of properties to ignore or include (from properties this instance otherwise has)
      */
-    protected abstract BeanSerializerBase withIgnorals(Set<String> toIgnore);
+    protected abstract BeanSerializerBase withByNameInclusion(Set<String> toIgnore,
+            Set<String> toInclude);
 
     /**
      * Mutant factory for creating a variant that output POJO as a
@@ -223,6 +226,13 @@ public abstract class BeanSerializerBase
      */
     @Override
     public abstract BeanSerializerBase withFilterId(Object filterId);
+
+    /**
+     * Mutant factory used for creating a new instance with modified set
+     * of properties
+     */
+    protected abstract BeanSerializerBase withProperties(BeanPropertyWriter[] properties,
+            BeanPropertyWriter[] filteredProperties);
 
     /**
      * Lets force sub-classes to implement this, to avoid accidental missing
@@ -423,15 +433,18 @@ public abstract class BeanSerializerBase
         }
 
         ObjectIdWriter oiw = _objectIdWriter;
+
+        // 16-Jun-2020, tatu: [databind#2759] means we need to handle reordering
+        //    at a later point
+        int idPropOrigIndex = 0;
         Set<String> ignoredProps = null;
+        Set<String> includedProps = null;
         Object newFilterId = null;
 
         // Then we may have an override for Object Id
         if (accessor != null) {
-            JsonIgnoreProperties.Value ignorals = intr.findPropertyIgnorals(config, accessor);
-            if (ignorals != null) {
-                ignoredProps = ignorals.findIgnoredForSerialization();
-            }
+            ignoredProps = intr.findPropertyIgnoralByName(config, accessor).findIgnoredForSerialization();
+            includedProps = intr.findPropertyInclusionByName(config, accessor).getIncluded();
             ObjectIdInfo objectIdInfo = intr.findObjectIdInfo(config, accessor);
             if (objectIdInfo == null) {
                 // no ObjectId override, but maybe ObjectIdRef?
@@ -447,7 +460,7 @@ public abstract class BeanSerializerBase
                 
                 // 2.1: allow modifications by "id ref" annotations as well:
                 objectIdInfo = intr.findObjectReferenceInfo(config, accessor, objectIdInfo);
-                ObjectIdGenerator<?> gen;
+
                 Class<?> implClass = objectIdInfo.getGeneratorType();
                 JavaType type = ctxt.constructType(implClass);
                 JavaType idType = ctxt.getTypeFactory().findTypeParameters(type, ObjectIdGenerator.class)[0];
@@ -455,35 +468,27 @@ public abstract class BeanSerializerBase
                 if (implClass == ObjectIdGenerators.PropertyGenerator.class) { // most special one, needs extra work
                     String propName = objectIdInfo.getPropertyName().getSimpleName();
                     BeanPropertyWriter idProp = null;
-
+                    
                     for (int i = 0, len = _props.length; ; ++i) {
                         if (i == len) {
                             ctxt.reportBadDefinition(_beanType, String.format(
-                                    "Invalid Object Id definition for %s: cannot find property with name '%s'",
-                                    handledType().getName(), propName));
+                                    "Invalid Object Id definition for %s: cannot find property with name %s",
+                                    ClassUtil.getTypeDescription(_beanType), ClassUtil.name(propName)));
                         }
                         BeanPropertyWriter prop = _props[i];
                         if (propName.equals(prop.getName())) {
                             idProp = prop;
-                            // Let's force it to be the first property to output
+                            // Let's mark id prop to be moved as the first (may still get rearranged)
                             // (although it may still get rearranged etc)
-                            if (i > 0) { // note: must shuffle both regular properties and filtered
-                                System.arraycopy(_props, 0, _props, 1, i);
-                                _props[0] = idProp;
-                                if (_filteredProps != null) {
-                                    BeanPropertyWriter fp = _filteredProps[i];
-                                    System.arraycopy(_filteredProps, 0, _filteredProps, 1, i);
-                                    _filteredProps[0] = fp;
-                                }
-                            }
+                            idPropOrigIndex = i;
                             break;
                         }
                     }
                     idType = idProp.getType();
-                    gen = new PropertyBasedObjectIdGenerator(objectIdInfo, idProp);
+                    ObjectIdGenerator<?> gen = new PropertyBasedObjectIdGenerator(objectIdInfo, idProp);
                     oiw = ObjectIdWriter.construct(idType, (PropertyName) null, gen, objectIdInfo.getAlwaysAsId());
                 } else { // other types need to be simpler
-                    gen = ctxt.objectIdGeneratorInstance(accessor, objectIdInfo);
+                    ObjectIdGenerator<?>gen = ctxt.objectIdGeneratorInstance(accessor, objectIdInfo);
                     oiw = ObjectIdWriter.construct(idType, objectIdInfo.getPropertyName(), gen,
                             objectIdInfo.getAlwaysAsId());
                 }
@@ -499,6 +504,25 @@ public abstract class BeanSerializerBase
         }
         // either way, need to resolve serializer:
         BeanSerializerBase contextual = this;
+
+        // 16-Jun-2020, tatu: [databind#2759] must make copies, then reorder
+        if (idPropOrigIndex > 0) { // note: must shuffle both regular properties and filtered
+            final BeanPropertyWriter[] newProps = Arrays.copyOf(_props, _props.length);
+            BeanPropertyWriter bpw = newProps[idPropOrigIndex];
+            System.arraycopy(newProps, 0, newProps, 1, idPropOrigIndex);
+            newProps[0] = bpw;
+            final BeanPropertyWriter[] newFiltered;
+            if (_filteredProps == null) {
+                newFiltered = null;
+            } else {
+                newFiltered = Arrays.copyOf(_filteredProps, _filteredProps.length);
+                bpw = newFiltered[idPropOrigIndex];
+                System.arraycopy(newFiltered, 0, newFiltered, 1, idPropOrigIndex);
+                newFiltered[0] = bpw;
+            }
+            contextual = contextual.withProperties(newProps, newFiltered);
+        }
+
         if (oiw != null) {
             // not really associated with the property so let's not pass it?
             JsonSerializer<?> ser = ctxt.findRootValueSerializer(oiw.idType);
@@ -507,13 +531,16 @@ public abstract class BeanSerializerBase
                 contextual = contextual.withObjectIdWriter(oiw);
             }
         }
-        // And possibly add more properties to ignore
-        if ((ignoredProps != null) && !ignoredProps.isEmpty()) {
-            contextual = contextual.withIgnorals(ignoredProps);
+        // Possibly change inclusions: for ignored, only non-empty set matters;
+        // for inclusion `null` means "not defined" but empty "include nothing":
+        if (((ignoredProps != null) && !ignoredProps.isEmpty())
+                || (includedProps != null)) {
+            contextual = contextual.withByNameInclusion(ignoredProps, includedProps);
         }
         if (newFilterId != null) {
             contextual = contextual.withFilterId(newFilterId);
         }
+
         if (shape == null) {
             shape = _serializationShape;
         }

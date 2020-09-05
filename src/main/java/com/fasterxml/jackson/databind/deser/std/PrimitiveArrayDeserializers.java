@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.deser.impl.NullsConstantProvider;
 import com.fasterxml.jackson.databind.deser.impl.NullsFailProvider;
 import com.fasterxml.jackson.databind.exc.InvalidNullException;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 import com.fasterxml.jackson.databind.util.ArrayBuilders;
 
@@ -143,6 +144,11 @@ public abstract class PrimitiveArrayDeserializers<T>
     /* Default implementations
     /********************************************************
      */
+
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Array;
+    }
     
     @Override // since 2.9
     public Boolean supportsUpdate(DeserializationConfig config) {
@@ -197,11 +203,8 @@ public abstract class PrimitiveArrayDeserializers<T>
     protected T handleNonArray(JsonParser p, DeserializationContext ctxt) throws IOException
     {
         // Empty String can become null...
-        if (p.hasToken(JsonToken.VALUE_STRING)
-                && ctxt.isEnabled(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)) {
-            if (p.getText().length() == 0) {
-                return null;
-            }
+        if (p.hasToken(JsonToken.VALUE_STRING)) {
+            return _deserializeFromString(p, ctxt);
         }
         boolean canWrap = (_unwrapSingle == Boolean.TRUE) ||
                 ((_unwrapSingle == null) &&
@@ -429,6 +432,13 @@ public abstract class PrimitiveArrayDeserializers<T>
             return new byte[0];
         }
 
+        @Override // since 2.12
+        public LogicalType logicalType() {
+            // 30-May-2020, tatu: while technically an array, logically contains
+            //    binary data so...
+            return LogicalType.Binary;
+        }
+        
         @Override
         public byte[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
         {
@@ -469,9 +479,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                 while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
                     // whether we should allow truncating conversions?
                     byte value;
-                    if (t == JsonToken.VALUE_NUMBER_INT || t == JsonToken.VALUE_NUMBER_FLOAT) {
-                        // should we catch overflow exceptions?
-                        value = p.getByteValue();
+                    if (t == JsonToken.VALUE_NUMBER_INT) {
+                        value = p.getByteValue(); // note: may throw due to overflow
                     } else {
                         // should probably accept nulls as 0
                         if (t == JsonToken.VALUE_NULL) {
@@ -503,9 +512,8 @@ public abstract class PrimitiveArrayDeserializers<T>
         {
             byte value;
             JsonToken t = p.currentToken();
-            if (t == JsonToken.VALUE_NUMBER_INT || t == JsonToken.VALUE_NUMBER_FLOAT) {
-                // should we catch overflow exceptions?
-                value = p.getByteValue();
+            if (t == JsonToken.VALUE_NUMBER_INT) {
+                value = p.getByteValue(); // note: may throw due to overflow
             } else {
                 // should probably accept nulls as 'false'
                 if (t == JsonToken.VALUE_NULL) {

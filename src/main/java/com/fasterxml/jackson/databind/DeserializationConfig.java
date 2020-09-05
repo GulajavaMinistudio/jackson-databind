@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.cfg.*;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.jsontype.*;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.ArrayIterator;
 import com.fasterxml.jackson.databind.util.LinkedNode;
@@ -65,10 +66,14 @@ public final class DeserializationConfig
      * concrete types. Used by functionality like "mr Bean" to materialize
      * types as needed, although may be used for other kinds of defaulting
      * as well.
-     *
-     * @since 3.0
      */
     protected final AbstractTypeResolver[] _abstractTypeResolvers;
+
+    /**
+     * Configured coercion rules for coercions from secondary input
+     * shapes.
+     */
+    protected final CoercionConfigs _coercionConfigs;
 
     /*
     /**********************************************************************
@@ -81,7 +86,7 @@ public final class DeserializationConfig
      */
     public DeserializationConfig(MapperBuilder<?,?> b, int mapperFeatures,
             int deserFeatures, int streamReadFeatures, int formatReadFeatures,
-            ConfigOverrides configOverrides,
+            ConfigOverrides configOverrides, CoercionConfigs coercionConfigs,
             TypeFactory tf, ClassIntrospector classIntr, MixInHandler mixins, SubtypeResolver str,
             RootNameLookup rootNames,
             AbstractTypeResolver[] atrs)
@@ -91,6 +96,7 @@ public final class DeserializationConfig
         _streamReadFeatures = streamReadFeatures;
         _formatReadFeatures = formatReadFeatures;
         _problemHandlers = b.deserializationProblemHandlers();
+        _coercionConfigs = coercionConfigs;
         _abstractTypeResolvers = atrs;
     }
 
@@ -108,6 +114,7 @@ public final class DeserializationConfig
         _deserFeatures = deserFeatures;
         _streamReadFeatures = streamReadFeatures;
         _formatReadFeatures = formatReadFeatures;
+        _coercionConfigs = src._coercionConfigs;
         _problemHandlers = src._problemHandlers;
         _abstractTypeResolvers = src._abstractTypeResolvers;
     }
@@ -118,6 +125,7 @@ public final class DeserializationConfig
         _deserFeatures = src._deserFeatures;
         _streamReadFeatures = src._streamReadFeatures;
         _formatReadFeatures = src._formatReadFeatures;
+        _coercionConfigs = src._coercionConfigs;
         _problemHandlers = src._problemHandlers;
         _abstractTypeResolvers = src._abstractTypeResolvers;
     }
@@ -130,6 +138,7 @@ public final class DeserializationConfig
         _deserFeatures = src._deserFeatures;
         _streamReadFeatures = src._streamReadFeatures;
         _formatReadFeatures = src._formatReadFeatures;
+        _coercionConfigs = src._coercionConfigs;
         _problemHandlers = problemHandlers;
         _abstractTypeResolvers = atr;
     }
@@ -140,6 +149,7 @@ public final class DeserializationConfig
         _deserFeatures = src._deserFeatures;
         _problemHandlers = src._problemHandlers;
         _streamReadFeatures = src._streamReadFeatures;
+        _coercionConfigs = src._coercionConfigs;
         _formatReadFeatures = src._formatReadFeatures;
         _abstractTypeResolvers = src._abstractTypeResolvers;
     }
@@ -150,6 +160,7 @@ public final class DeserializationConfig
         _deserFeatures = src._deserFeatures;
         _problemHandlers = src._problemHandlers;
         _streamReadFeatures = src._streamReadFeatures;
+        _coercionConfigs = src._coercionConfigs;
         _formatReadFeatures = src._formatReadFeatures;
         _abstractTypeResolvers = src._abstractTypeResolvers;
     }
@@ -159,6 +170,7 @@ public final class DeserializationConfig
         super(src, attrs);
         _deserFeatures = src._deserFeatures;
         _problemHandlers = src._problemHandlers;
+        _coercionConfigs = src._coercionConfigs;
         _streamReadFeatures = src._streamReadFeatures;
         _formatReadFeatures = src._formatReadFeatures;
         _abstractTypeResolvers = src._abstractTypeResolvers;
@@ -598,5 +610,54 @@ public final class DeserializationConfig
      */
     public LinkedNode<DeserializationProblemHandler> getProblemHandlers() {
         return _problemHandlers;
+    }
+
+    /*
+    /**********************************************************************
+    /* CoercionConfig access
+    /**********************************************************************
+     */
+
+    /**
+     * General-purpose accessor for finding what to do when specified coercion
+     * from shape that is now always allowed to be coerced from is requested.
+     *
+     * @param targetType Logical target type of coercion
+     * @param targetClass Physical target type of coercion
+     * @param inputShape Input shape to coerce from
+     *
+     * @return CoercionAction configured for specific coercion
+     *
+     * @since 2.12
+     */
+    public CoercionAction findCoercionAction(LogicalType targetType,
+            Class<?> targetClass, CoercionInputShape inputShape)
+    {
+        return _coercionConfigs.findCoercion(this,
+                targetType, targetClass, inputShape);
+    }
+
+    /**
+     * More specialized accessor called in case of input being a blank
+     * String (one consisting of only white space characters with length of at least one).
+     * Will basically first determine if "blank as empty" is allowed: if not,
+     * returns {@code actionIfBlankNotAllowed}, otherwise returns action for
+     * {@link CoercionInputShape#EmptyString}.
+     *
+     * @param targetType Logical target type of coercion
+     * @param targetClass Physical target type of coercion
+     * @param actionIfBlankNotAllowed Return value to use in case "blanks as empty"
+     *    is not allowed
+     *
+     * @return CoercionAction configured for specified coercion from blank string
+     *
+     * @since 2.12
+     */
+    public CoercionAction findCoercionFromBlankString(LogicalType targetType,
+            Class<?> targetClass,
+            CoercionAction actionIfBlankNotAllowed)
+    {
+        return _coercionConfigs.findCoercionFromBlankString(this,
+                targetType, targetClass, actionIfBlankNotAllowed);
     }
 }

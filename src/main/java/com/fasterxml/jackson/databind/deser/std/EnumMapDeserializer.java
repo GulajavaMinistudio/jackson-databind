@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.deser.impl.PropertyBasedCreator;
 import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
@@ -107,7 +108,7 @@ public class EnumMapDeserializer
     /* Validation, post-processing (ResolvableDeserializer)
     /**********************************************************
      */
-    
+
     @Override
     public void resolve(DeserializationContext ctxt) throws JsonMappingException
     {
@@ -136,7 +137,7 @@ public class EnumMapDeserializer
                 }
                 _delegateDeserializer = findDeserializer(ctxt, delegateType, null);
             } else if (_valueInstantiator.canCreateFromObjectWith()) {
-                SettableBeanProperty[] creatorProps = _valueInstantiator.getFromObjectArguments(ctxt);
+                SettableBeanProperty[] creatorProps = _valueInstantiator.getFromObjectArguments(ctxt.getConfig());
                 _propertyBasedCreator = PropertyBasedCreator.construct(ctxt, _valueInstantiator, creatorProps,
                         ctxt.isEnabled(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES));
             }
@@ -183,6 +184,11 @@ public class EnumMapDeserializer
                 && (_valueTypeDeserializer == null);
     }
 
+    @Override // since 2.12
+    public LogicalType logicalType() {
+        return LogicalType.Map;
+    }
+
     /*
     /**********************************************************
     /* ContainerDeserializerBase API
@@ -194,7 +200,11 @@ public class EnumMapDeserializer
         return _valueDeserializer;
     }
 
-    // Must override since we do not expose ValueInstantiator
+    @Override
+    public ValueInstantiator getValueInstantiator() {
+        return _valueInstantiator;
+    }
+
     @Override // since 2.9
     public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
         return constructMap(ctxt);
@@ -217,18 +227,21 @@ public class EnumMapDeserializer
             return (EnumMap<?,?>) _valueInstantiator.createUsingDelegate(ctxt,
                     _delegateDeserializer.deserialize(p, ctxt));
         }
-        // Ok: must point to START_OBJECT
-        JsonToken t = p.currentToken();
-        if ((t != JsonToken.START_OBJECT) && (t != JsonToken.FIELD_NAME) && (t != JsonToken.END_OBJECT)) {
+
+        switch (p.currentTokenId()) {
+        case JsonTokenId.ID_START_OBJECT:
+        case JsonTokenId.ID_END_OBJECT:
+        case JsonTokenId.ID_FIELD_NAME:
+            return deserialize(p, ctxt, constructMap(ctxt));
+        case JsonTokenId.ID_STRING:
             // (empty) String may be ok however; or single-String-arg ctor
-            if (t == JsonToken.VALUE_STRING) {
-                return (EnumMap<?,?>) _valueInstantiator.createFromString(ctxt, p.getText());
-            }
-            // slightly redundant (since String was passed above), but also handles empty array case:
-            return _deserializeFromEmpty(p, ctxt);
+            return _deserializeFromString(p, ctxt);
+        case JsonTokenId.ID_START_ARRAY:
+            // Empty array, or single-value wrapped in array?
+            return _deserializeFromArray(p, ctxt);
+        default:
         }
-        EnumMap result = constructMap(ctxt);
-        return deserialize(p, ctxt, result);
+        return (EnumMap<?,?>) ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }
 
     @Override
