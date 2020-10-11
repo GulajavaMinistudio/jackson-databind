@@ -309,19 +309,6 @@ public class TestTypeFactory
         assertSame(String.class, ((CollectionType) t).getContentType().getRawClass());
     }
 
-    // [databind#2796]
-    public void testCollectionsWithBindings()
-    {
-        final TypeFactory tf = TypeFactory.defaultInstance();
-        TypeBindings tb = TypeBindings.create(Set.class, new JavaType[] {
-                tf.constructType(String.class) });
-        JavaType t = tf.constructType(ArrayList.class, tb);
-        assertEquals(CollectionType.class, t.getClass());
-        assertSame(ArrayList.class, t.getRawClass());
-        assertSame(String.class, ((CollectionType) t).getContentType().getRawClass());
-    }
-
-    // since 2.7
     public void testCollectionTypesRefined()
     {
         TypeFactory tf = newTypeFactory();
@@ -389,6 +376,7 @@ public class TestTypeFactory
     {
         TypeFactory tf = newTypeFactory();
         JavaType type = tf.constructType(new TypeReference<Map<String,List<Integer>>>() { });
+        assertEquals(MapType.class, type.getClass());
         MapType mapType = (MapType) type;
         assertEquals(Map.class, mapType.getRawClass());
         assertEquals(String.class, mapType.getKeyType().getRawClass());
@@ -438,6 +426,7 @@ public class TestTypeFactory
     {
         TypeFactory tf = TypeFactory.defaultInstance();
         JavaType type = tf.constructType(HashMap.class);
+        assertEquals(MapType.class, type.getClass());
         MapType mapType = (MapType) type;
         assertEquals(tf.constructType(Object.class), mapType.getKeyType());
         assertEquals(tf.constructType(Object.class), mapType.getContentType());        
@@ -447,6 +436,7 @@ public class TestTypeFactory
     {
         TypeFactory tf = TypeFactory.defaultInstance();
         JavaType type = tf.constructType(MyMap.class);
+        assertEquals(MapType.class, type.getClass());
         MapType mapType = (MapType) type;
         assertEquals(tf.constructType(String.class), mapType.getKeyType());
         assertEquals(tf.constructType(Long.class), mapType.getContentType());
@@ -471,6 +461,7 @@ public class TestTypeFactory
     {
         TypeFactory tf = TypeFactory.defaultInstance();
         JavaType type = tf.constructType(IntLongMap.class);
+        assertEquals(MapType.class, type.getClass());
         MapType mapType = (MapType) type;
         assertEquals(tf.constructType(Integer.class), mapType.getKeyType());
         assertEquals(tf.constructType(Long.class), mapType.getContentType());
@@ -484,7 +475,7 @@ public class TestTypeFactory
         TypeFactory tf = TypeFactory.defaultInstance();
         Field field = SneakyBean.class.getDeclaredField("intMap");
         JavaType type = tf.constructType(field.getGenericType());
-        assertTrue(type instanceof MapType);
+        assertEquals(MapType.class, type.getClass());
         MapType mapType = (MapType) type;
         assertEquals(tf.constructType(Integer.class), mapType.getKeyType());
         assertEquals(tf.constructType(Long.class), mapType.getContentType());

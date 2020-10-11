@@ -6,7 +6,8 @@ It builds on [Streaming API](../../../jackson-core) (stream parser/generator) pa
 and uses [Jackson Annotations](../../../jackson-annotations) for configuration.
 Project is licensed under [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
-While the original use case for Jackson was JSON data-binding, it can now be used for other data formats as well, as long as parser and generator implementations exist.
+While the original use case for Jackson was JSON data-binding, it can now be used to read content
+encoded in other data formats as well, as long as parser and generator implementations exist.
 Naming of classes uses word 'JSON' in many places even though there is no actual hard dependency to JSON format.
 
 [![Build Status](https://travis-ci.org/FasterXML/jackson-databind.svg?branch=master)](https://travis-ci.org/FasterXML/jackson-databind) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind)
@@ -405,8 +406,10 @@ usually a Jackson module.
 `master` branch is for developing the next major Jackson version -- 3.0 -- but there
 are active maintenance branches in which much of development happens:
 
+* `2.12` is the branch for "next" minor version to release (as of October 2020)
 * `2.11` is the current stable minor 2.x version
-* `2.10` is for selected backported fixes 
+* `2.10` is for selected backported fixes
+* `2.9` may still get security fixes (until December 31, 2020)
 
 Older branches are usually not maintained after being declared as closed
 on [Jackson Releases](https://github.com/FasterXML/jackson/wiki/Jackson-Releases) page,

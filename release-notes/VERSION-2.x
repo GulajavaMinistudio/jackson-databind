@@ -16,6 +16,8 @@ Project: jackson-databind
  (reported by Mike G; fix contributed by Ville K)
 #1296: Add `@JsonIncludeProperties(propertyNames)` (reverse of `@JsonIgnoreProperties`)
  (contributed Baptiste P)
+#1498: Allow handling of single-arg constructor as property based by default
+ (requested by Lovro P)
 #1852: Allow case insensitive deserialization of String value into
   `boolean`/`Boolean` (esp for Excel)
  (requested by Patrick J)
@@ -67,11 +69,20 @@ Project: jackson-databind
 - Add `BeanDeserializerBase.isCaseInsensitive()`
 - Some refactoring of `CollectionDeserializer` to solve CSV array handling issues
 
-2.11.3 (not yet released)
+2.11.3 (02-Oct-2020)
 
+#2795: Cannot detect creator arguments of mixins for JDK types
+ (reported by Marcos P)
+#2815: Add `JsonFormat.Shape` awareness for UUID serialization (`UUIDSerializer`)
+#2821: Json serialization fails or a specific case that contains generics and
+  static methods with generic parameters (2.11.1 -> 2.11.2 regression)
+ (reported by Lari H)
+#2822: Using JsonValue and JsonFormat on one field does not work as expected
+ (reported by Nils-Christian E)
 #2840: `ObjectMapper.activateDefaultTypingAsProperty()` is not using
   parameter `PolymorphicTypeValidator`
  (reported by Daniel W)
+#2846: Problem deserialization "raw generic" fields (like `Map`) in 2.11.2
 - Fix issues with `MapLikeType.isTrueMapType()`,
   `CollectionLikeType.isTrueCollectionType()`
 
@@ -85,7 +96,6 @@ Project: jackson-databind
  (reported by isaki@github)
 #2796: `TypeFactory.constructType()` does not take `TypeBindings` correctly
  (reported by Daniel H)
-#2815: Add `JsonFormat.Shape` awareness for UUID serialization (`UUIDSerializer`)
 
 2.11.1 (25-Jun-2020)
 
@@ -360,15 +370,15 @@ Project: jackson-databind
 #2404: FAIL_ON_MISSING_EXTERNAL_TYPE_ID_PROPERTY setting ignored when
   creator properties are buffered
  (contributed by Joe B)
-#2410: Block one more gadget type (CVE-2019-14540)
+#2410: Block one more gadget type (HikariCP, CVE-2019-14540)
   (reported by iSafeBlue@github / blue@ixsec.org)
-#2420: Block one more gadget type (no CVE allocated yet)
+#2420: Block one more gadget type (cxf-jax-rs, no CVE allocated yet)
   (reported by crazylirui@gmail.com)
-#2449: Block one more gadget type (CVE-2019-14540)
+#2449: Block one more gadget type (HikariCP, CVE-2019-14439 / CVE-2019-16335)
   (reported by kingkk)
 #2460: Block one more gadget type (ehcache, CVE-2019-17267)
   (reported by Fei Lu)
-#2462: Block two more gadget types (commons-configuration)
+#2462: Block two more gadget types (commons-configuration/-2)
 #2469: Block one more gadget type (xalan2)
 
 2.9.9 (16-May-2019)

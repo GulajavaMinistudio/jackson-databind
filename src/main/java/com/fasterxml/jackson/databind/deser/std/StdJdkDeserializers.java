@@ -3,6 +3,8 @@ package com.fasterxml.jackson.databind.deser.std;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.databind.*;
 
@@ -17,6 +19,8 @@ public class StdJdkDeserializers
         // note: can skip primitive types; other ways to check them:
         _classNames.add(UUID.class.getName());
         _classNames.add(AtomicBoolean.class.getName());
+        _classNames.add(AtomicInteger.class.getName());
+        _classNames.add(AtomicLong.class.getName());
         _classNames.add(StackTraceElement.class.getName());
         _classNames.add(ByteBuffer.class.getName());
         _classNames.add(Void.class.getName());
@@ -39,8 +43,13 @@ public class StdJdkDeserializers
                 return new StackTraceElementDeserializer();
             }
             if (rawType == AtomicBoolean.class) {
-                // (note: AtomicInteger/Long work due to single-arg constructor. For now?
                 return new AtomicBooleanDeserializer();
+            }
+            if (rawType == AtomicInteger.class) {
+                return new AtomicIntegerDeserializer();
+            }
+            if (rawType == AtomicLong.class) {
+                return new AtomicLongDeserializer();
             }
             if (rawType == ByteBuffer.class) {
                 return new ByteBufferDeserializer();

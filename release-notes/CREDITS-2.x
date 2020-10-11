@@ -175,6 +175,8 @@ Fernando Otero (zeitos@github)
 Lovro Pandžić (lpandzic@github)
   * Reported #421: @JsonCreator not used in case of multiple creators with parameter names
    (2.5.0)
+  * Requested #1498: Allow handling of single-arg constructor as property based by default
+   (2.12.0)
 
 Adam Stroud (adstro@github)
   * Contributed	#576: Add fluent API for adding mixins
@@ -957,6 +959,8 @@ Vladimir Tsanev (tsachev@github)
 Marcos Passos (marcospassos@github(
   * Contributed #2432: Add support for module bundles
    (2.10.0)
+  * Reported #2795: Cannot detect creator arguments of mixins for JDK types
+   (2.11.3)
 
 David Becker (dsbecker@github)
   * Suggested #2433: Improve `NullNode.equals()`
@@ -1146,6 +1150,15 @@ Joshua Shannon (retrodaredevil@github)
 Daniel Hrabovcak (TheSpiritXIII@github)
   * Reported #2796: `TypeFactory.constructType()` does not take `TypeBindings` correctly
   (2.11.2)
+
+Lari Hotari (lhotari@github)
+  * Reported #2821: Json serialization fails or a specific case that contains generics and
+   static methods with generic parameters (2.11.1 -> 2.11.2 regression)
+  (2.11.3)
+
+Nils Christian Ehmke (nils-christian@github)
+  * Reported #2822: Using JsonValue and JsonFormat on one field does not work as expected
+  (2.11.3)
 
 Daniel Wu (DanielYWoo@github)
   * Reported #2840: `ObjectMapper.activateDefaultTypingAsProperty()` is not using
