@@ -213,8 +213,9 @@ public class PropertyBuilder
         case ALWAYS: // default
         default:
             // we may still want to suppress empty collections
-            if (actualType.isContainerType()
-                    && !_config.isEnabled(SerializationFeature.WRITE_EMPTY_JSON_ARRAYS)) {
+            @SuppressWarnings("deprecation")
+            final SerializationFeature emptyJsonArrays = SerializationFeature.WRITE_EMPTY_JSON_ARRAYS;
+            if (actualType.isContainerType() && !_config.isEnabled(emptyJsonArrays)) {
                 valueToSuppress = BeanPropertyWriter.MARKER_FOR_EMPTY;
             }
             break;
@@ -223,7 +224,7 @@ public class PropertyBuilder
         if (views == null) {
             views = _beanDesc.findDefaultViews();
         }
-        BeanPropertyWriter bpw = new BeanPropertyWriter(propDef,
+        BeanPropertyWriter bpw = _constructPropertyWriter(propDef,
                 am, _beanDesc.getClassAnnotations(), declaredType,
                 ser, typeSer, serializationType, suppressNulls, valueToSuppress, views);
 
@@ -238,6 +239,23 @@ public class PropertyBuilder
             bpw = bpw.unwrappingWriter(unwrapper);
         }
         return bpw;
+    }
+
+    /**
+     * Overridable factory method for actual construction of {@link BeanPropertyWriter};
+     * often needed if subclassing {@link #buildWriter} method.
+     */
+    protected BeanPropertyWriter _constructPropertyWriter(BeanPropertyDefinition propDef,
+            AnnotatedMember member, Annotations contextAnnotations,
+            JavaType declaredType,
+            JsonSerializer<?> ser, TypeSerializer typeSer, JavaType serType,
+            boolean suppressNulls, Object suppressableValue,
+            Class<?>[] includeInViews)
+        throws JsonMappingException
+    {
+        return new BeanPropertyWriter(propDef,
+                member, contextAnnotations, declaredType,
+                ser, typeSer, serType, suppressNulls, suppressableValue, includeInViews);
     }
 
     /*

@@ -173,7 +173,7 @@ public abstract class PropertyNamingStrategies
      * the first character are replaced only by their lower case equivalent,
      * and are not preceded by an underscore.
      * <ul><li>This provides for reasonable translations of upper case acronyms,
-     * e.g., &quot;theWWW&quot; is translated to &quot;the_www&quot;.</li></ul></li
+     * e.g., &quot;theWWW&quot; is translated to &quot;the_www&quot;.</li></ul></li>
      * <li>An upper case character in the first position of the Java property
      * name is not preceded by an underscore character, and is translated only
      * to its lower case equivalent.
@@ -288,7 +288,7 @@ public abstract class PropertyNamingStrategies
          */
         @Override
         public String translate(String input) {
-            if (input == null || input.length() == 0){
+            if (input == null || input.isEmpty()){
                 return input; // garbage in, garbage out
             }
             // Replace first lower-case letter with upper-case equivalent

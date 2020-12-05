@@ -256,9 +256,8 @@ public enum MapperFeature implements ConfigFeature
 
     /**
      * Feature that defines default property serialization order used
-     * for POJO fields (note: does <b>not</b> apply to {@link java.util.Map}
-     * serialization!):
-     * if enabled, default ordering is alphabetic (similar to
+     * for POJO properties.
+     * If enabled, default ordering is alphabetic (similar to
      * how {@link com.fasterxml.jackson.annotation.JsonPropertyOrder#alphabetic()}
      * works); if disabled, order is unspecified (based on what JDK gives
      * us, which may be declaration order, but is not guaranteed).
@@ -267,9 +266,29 @@ public enum MapperFeature implements ConfigFeature
      * explicit overrides in classes (for example with
      * {@link com.fasterxml.jackson.annotation.JsonPropertyOrder} annotation)
      *<p>
+     * Note: does <b>not</b> apply to {@link java.util.Map} serialization (since
+     * entries are not considered Bean/POJO properties.
+     *<p>
      * Feature is disabled by default.
      */
     SORT_PROPERTIES_ALPHABETICALLY(false),
+
+    /**
+     * Feature that defines whether Creator properties (ones passed through
+     * constructor or static factory method) should be sorted before other properties
+     * for which no explicit order is specified, in case where alphabetic
+     * ordering is to be used for such properties.
+     * Note that in either case explicit order (whether by name or by index)
+     * will have precedence over this setting.
+     *<p>
+     * Note: does <b>not</b> apply to {@link java.util.Map} serialization (since
+     * entries are not considered Bean/POJO properties.
+     *<p>
+     * Feature is enabled by default.
+     *
+     * @since 2.12
+     */
+    SORT_CREATOR_PROPERTIES_FIRST(true),
 
     /*
     /**********************************************************************
@@ -297,7 +316,10 @@ public enum MapperFeature implements ConfigFeature
      * If enabled, Enum deserialization will ignore case, that is, case of incoming String
      * value and enum id (depending on other settings, either `name()`, `toString()`, or
      * explicit override) do not need to match.
-     * <p>
+     *<p>
+     * This allows both Enum-as-value deserialization and Enum-as-Map-key, unlike some
+     * other settings that are separate for value/key handling.
+     *<p>
      * Feature is disabled by default.
      */
     ACCEPT_CASE_INSENSITIVE_ENUMS(false),

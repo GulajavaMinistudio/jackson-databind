@@ -187,7 +187,7 @@ final class AnnotatedCreatorCollector
 
         // First find all potentially relevant static methods
         for (Method m : ClassUtil.getClassMethods(type.getRawClass())) {
-            if (!Modifier.isStatic(m.getModifiers())) {
+            if (!_isIncludableFactoryMethod(m)) {
                 continue;
             }
             // all factory methods are fine:
@@ -206,7 +206,15 @@ final class AnnotatedCreatorCollector
         //   passing that should not break things, it appears to... Regardless,
         //   it should not be needed or useful as those bindings are only available
         //   to non-static members
-        TypeResolutionContext typeResCtxt = new TypeResolutionContext.Empty(_config.getTypeFactory());
+//        final TypeResolutionContext typeResCtxt = new TypeResolutionContext.Empty(_config.getTypeFactory());
+
+        // 27-Oct-2020, tatu: SIGH. As per [databind#2894] there is widespread use of
+        //   incorrect bindings in the wild -- not supported (no tests) but used
+        //   nonetheless. So, for 2.11.x, put back "Bad Bindings"...
+//        final TypeResolutionContext typeResCtxt = _typeContext;
+
+        // 03-Nov-2020, ckozak: Implement generic JsonCreator TypeVariable handling [databind#2895]
+        final TypeResolutionContext emptyTypeResCtxt = new TypeResolutionContext.Empty(_config.getTypeFactory());
 
         int factoryCount = candidates.size();
         List<AnnotatedMethod> result = new ArrayList<>(factoryCount);
@@ -217,7 +225,7 @@ final class AnnotatedCreatorCollector
         if (primaryMixIn != null) {
             MemberKey[] methodKeys = null;
             for (Method mixinFactory : primaryMixIn.getDeclaredMethods()) {
-                if (!Modifier.isStatic(mixinFactory.getModifiers())) {
+                if (!_isIncludableFactoryMethod(mixinFactory)) {
                     continue;
                 }
                 if (methodKeys == null) {
@@ -231,7 +239,7 @@ final class AnnotatedCreatorCollector
                     if (key.equals(methodKeys[i])) {
                         result.set(i,
                                 constructFactoryCreator(candidates.get(i),
-                                        typeResCtxt, mixinFactory));
+                                        emptyTypeResCtxt, mixinFactory));
                         break;
                     }
                 }
@@ -241,12 +249,25 @@ final class AnnotatedCreatorCollector
         for (int i = 0; i < factoryCount; ++i) {
             AnnotatedMethod factory = result.get(i);
             if (factory == null) {
+                Method candidate = candidates.get(i);
+                // 06-Nov-2020, tatu: Fix from [databind#2895] will try to resolve
+                //   nominal static method type bindings into expected target type
+                //   (if generic types involved)
+                TypeResolutionContext typeResCtxt = MethodGenericTypeResolver.narrowMethodTypeParameters(
+                        candidate, type, _config.getTypeFactory(), emptyTypeResCtxt);
                 result.set(i,
-                        constructFactoryCreator(candidates.get(i),
-                                typeResCtxt, null));
+                        constructFactoryCreator(candidate, typeResCtxt, null));
             }
         }
         return result;
+    }
+
+    private static boolean _isIncludableFactoryMethod(Method m)
+    {
+        return Modifier.isStatic(m.getModifiers())
+                // 09-Nov-2020, ckozak: Avoid considering synthetic methods such as
+                // lambdas used within methods because they're not relevant.
+                && !m.isSynthetic();
     }
 
     protected AnnotatedConstructor constructDefaultConstructor(ClassUtil.Ctor ctor,

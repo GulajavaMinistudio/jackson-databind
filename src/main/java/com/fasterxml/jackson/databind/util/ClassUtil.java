@@ -874,15 +874,10 @@ public final class ClassUtil
      * class of enum instance (for "simple" enumerations), or its
      * superclass (for enums with instance fields or methods)
      */
-    @SuppressWarnings("unchecked")
     public static Class<? extends Enum<?>> findEnumType(Enum<?> en)
     {
         // enums with "body" are sub-classes of the formal type
-    	Class<?> ec = en.getClass();
-    	if (ec.getSuperclass() != Enum.class) {
-    	    ec = ec.getSuperclass();
-    	}
-    	return (Class<? extends Enum<?>>) ec;
+        return en.getDeclaringClass();
     }
 
     /**
@@ -906,14 +901,17 @@ public final class ClassUtil
      * <p>
      * If there's more than one value annotated, the first one found will be returned. Which one exactly is used is undetermined.
      *
-     * @param enumClass The Enum class to scan for a value with the given annotation
+     * @param enumClass0 The Enum class to scan for a value with the given annotation
      * @param annotationClass The annotation to look for.
      * @return the Enum value annotated with the given Annotation or {@code null} if none is found.
+     *
      * @throws IllegalArgumentException if there's a reflection issue accessing the Enum
-     * @since 2.8
      */
-    public static <T extends Annotation> Enum<?> findFirstAnnotatedEnumValue(Class<Enum<?>> enumClass, Class<T> annotationClass)
+    public static <T extends Annotation> Enum<?> findFirstAnnotatedEnumValue(Class<?> enumClass0,
+            Class<T> annotationClass)
     {
+        @SuppressWarnings("unchecked")
+        final Class<Enum<?>> enumClass = (Class<Enum<?>>) enumClass0;
         Field[] fields = enumClass.getDeclaredFields();
         for (Field field : fields) {
             if (field.isEnumConstant()) {
@@ -1004,17 +1002,33 @@ public final class ClassUtil
             final ClassLoader loader = Thread.currentThread().getContextClassLoader();
             if (loader == null){
                 // Nope... this is going to end poorly
-                throw ex;
+                return _failGetClassMethods(cls, ex);
             }
             final Class<?> contextClass;
             try {
                 contextClass = loader.loadClass(cls.getName());
             } catch (ClassNotFoundException e) {
                 ex.addSuppressed(e);
-                throw ex;
+                return _failGetClassMethods(cls, ex);
             }
-            return contextClass.getDeclaredMethods(); // Cross fingers
+            try {
+                return contextClass.getDeclaredMethods(); // Cross fingers
+            } catch (Throwable t) {
+                return _failGetClassMethods(cls, t);
+            }
+        } catch (Throwable t) {
+            return _failGetClassMethods(cls, t);
         }
+    }
+
+    // @since 2.11.4 (see [databind#2807])
+    private static Method[] _failGetClassMethods(Class<?> cls, Throwable rootCause)
+            throws IllegalArgumentException
+    {
+        throw new IllegalArgumentException(String.format(
+"Failed on call to `getDeclaredMethods()` on class `%s`, problem: (%s) %s",
+cls.getName(), rootCause.getClass().getName(), rootCause.getMessage()),
+                rootCause);
     }
     
     /**

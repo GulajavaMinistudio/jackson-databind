@@ -147,8 +147,8 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines what happens when type of a polymorphic
      * value (indicated for example by {@link com.fasterxml.jackson.annotation.JsonTypeInfo})
-     * cannot be found (missing) or resolved (invalid class name, unmappable id);
-     * if enabled, an exception ir thrown; if false, null value is used instead.
+     * cannot be found (missing) or resolved (invalid class name, non-mappable id);
+     * if enabled, an exception is thrown; if false, null value is used instead.
      *<p>
      * Feature is enabled by default so that exception is thrown for missing or invalid
      * type information.
@@ -265,6 +265,12 @@ public enum DeserializationFeature implements ConfigFeature
      * declared, and so there is more contextual information.
      * However, sometimes calling application may just want "raw"
      * unchecked exceptions passed as is.
+     *<p>
+     * NOTE: most of the time exceptions that may or may not be wrapped are of
+     * type {@link RuntimeException}: as mentioned earlier, various
+     * {@link java.io.IOException}s (and in particular
+     * {@link com.fasterxml.jackson.core.JsonProcessingException}s) will
+     * always be passed as-is.
      *<p>
      * Feature is enabled by default.
      */

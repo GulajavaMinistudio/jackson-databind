@@ -179,8 +179,7 @@ public abstract class BasicSerializerFactory
 
     @Override
     @SuppressWarnings("unchecked")
-    public JsonSerializer<Object> createKeySerializer(SerializerProvider ctxt,
-            JavaType keyType, JsonSerializer<Object> defaultImpl)
+    public JsonSerializer<Object> createKeySerializer(SerializerProvider ctxt, JavaType keyType)
         throws JsonMappingException
     {
         BeanDescription beanDesc = ctxt.introspectBeanDescription(keyType);
@@ -200,27 +199,26 @@ public abstract class BasicSerializerFactory
             // [databind#2503]: Support `@Json[De]Serialize(keyUsing)` on key type too
             ser = _findKeySerializer(ctxt, beanDesc.getClassInfo());
             if (ser == null) {
+                // If no explicit serializer, see if type is JDK one for which there is
+                // explicit deserializer: if so, can avoid further annotation lookups:
                 ser = StdKeySerializers.getStdKeySerializer(config, keyType.getRawClass(), false);
-                // As per [databind#47], also need to support @JsonValue
                 if (ser == null) {
-                    AnnotatedMember am = beanDesc.findJsonValueAccessor();
-                    if (am != null) {
-                        final Class<?> rawType = am.getRawType();
-                        JsonSerializer<?> delegate = StdKeySerializers.getStdKeySerializer(config,
-                                rawType, true);
+                    // Check `@JsonKey` and `@JsonValue`, in this order
+                    AnnotatedMember acc = beanDesc.findJsonKeyAccessor();
+                    if (acc == null) {
+                        acc = beanDesc.findJsonValueAccessor();
+                    }
+                    if (acc != null) {
+                        JsonSerializer<?> delegate = createKeySerializer(ctxt, acc.getType());
                         if (config.canOverrideAccessModifiers()) {
-                            ClassUtil.checkAndFixAccess(am.getMember(),
+                            ClassUtil.checkAndFixAccess(acc.getMember(),
                                     config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
                         }
                         // need to pass both type of key Object (on which accessor called), and actual
                         // value type that `JsonType`-annotated accessor returns (or contains, in case of field)
-                        ser = new JsonValueSerializer(keyType, am.getType(), false, null, delegate, am);
+                        ser = new JsonValueSerializer(keyType, acc.getType(), false, null, delegate, acc);
                     } else {
-                        // And aside from JDK defaults, use `defaultImpl` if any specified
-                        ser = defaultImpl;
-                        if (ser == null) {
-                            ser = StdKeySerializers.getFallbackKeySerializer(config, keyType.getRawClass());
-                        }
+                        ser = StdKeySerializers.getFallbackKeySerializer(config, keyType.getRawClass());
                     }
                 }
             }
@@ -328,7 +326,6 @@ public abstract class BasicSerializerFactory
             }
             JsonSerializer<Object> ser = findSerializerFromAnnotation(ctxt, valueAccessor);
             JavaType valueType = valueAccessor.getType();
-            // note: must get different `BeanDescription` since valueType different
             TypeSerializer vts = ctxt.findTypeSerializer(valueType);
             return new JsonValueSerializer(type, valueType, /* static typing */ false,
                     vts, ser, valueAccessor);
@@ -352,7 +349,15 @@ public abstract class BasicSerializerFactory
         if (type.isTypeOrSubTypeOf(Calendar.class)) {
             return CalendarSerializer.instance;
         }
-        if (type.isTypeOrSubTypeOf(java.util.Date.class)) {
+        if (type.isTypeOrSubTypeOf(Date.class)) {
+            // 06-Nov-2020, tatu: Strange precedence challenge; need to consider
+            //   "java.sql.Date" unfortunately
+            if (!type.hasRawClass(Date.class)) {
+                JsonSerializer<?> ser = OptionalHandlerFactory.instance.findSerializer(ctxt.getConfig(), type);
+                if (ser != null) {
+                    return ser;
+                }
+            }
             return DateSerializer.instance;
         }
         // 19-Sep-2017, tatu: Jackson 3.x adds Java 8 types.

@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 import com.fasterxml.jackson.databind.*;
-
 import com.fasterxml.jackson.databind.cfg.HandlerInstantiator;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.util.ClassUtil;
@@ -99,12 +98,24 @@ public class POJOPropertiesCollector
     
     protected LinkedList<AnnotatedMember> _anyGetters;
 
+    /**
+     * @since 2.12
+     */
+    protected LinkedList<AnnotatedMember> _anyGetterField;
+
     protected LinkedList<AnnotatedMethod> _anySetters;
     
     protected LinkedList<AnnotatedMember> _anySetterField;
 
     /**
-     * Method(s) marked with 'JsonValue' annotation
+     * Accessors (field or "getter" method annotated with
+     * {@link com.fasterxml.jackson.annotation.JsonKey}
+     */
+    protected LinkedList<AnnotatedMember> _jsonKeyAccessors;
+
+    /**
+     * Accessors (field or "getter" method) annotated with
+     * {@link com.fasterxml.jackson.annotation.JsonValue}
      */
     protected LinkedList<AnnotatedMember> _jsonValueAccessors;
 
@@ -182,6 +193,26 @@ public class POJOPropertiesCollector
         return _injectables;
     }
 
+    /**
+     * @since 2.12
+     */
+    public AnnotatedMember getJsonKeyAccessor() {
+        if (!_collected) {
+            collectAll();
+        }
+        // If @JsonKey defined, must have a single one
+        if (_jsonKeyAccessors != null) {
+            if (_jsonKeyAccessors.size() > 1) {
+                reportProblem("Multiple 'as-key' properties defined (%s vs %s)",
+                        _jsonKeyAccessors.get(0),
+                        _jsonKeyAccessors.get(1));
+            }
+            // otherwise we won't greatly care
+            return _jsonKeyAccessors.get(0);
+        }
+        return null;
+    }
+
     public AnnotatedMember getJsonValueAccessor()
     {
         if (!_collected) {
@@ -200,18 +231,50 @@ public class POJOPropertiesCollector
         return null;
     }
 
-    public AnnotatedMember getAnyGetter()
+    /**
+     * Alias for {@link #getAnyGetterMethod()}.
+     *
+     * @deprecated Since 2.12 use separate {@link #getAnyGetterMethod()} and
+     *     {@link #getAnyGetterField()}.
+     */
+    @Deprecated // since 2.12
+    public AnnotatedMember getAnyGetter() {
+        return getAnyGetterMethod();
+    }
+
+    /**
+     * @since 2.12 (before only had "getAnyGetter()")
+     */
+    public AnnotatedMember getAnyGetterField()
+    {
+        if (!_collected) {
+            collectAll();
+        }
+        if (_anyGetterField != null) {
+            if (_anyGetterField.size() > 1) {
+                reportProblem("Multiple 'any-getter' fields defined (%s vs %s)",
+                        _anyGetterField.get(0), _anyGetterField.get(1));
+            }
+            return _anyGetterField.getFirst();
+        }
+        return null;
+    }
+
+    /**
+     * @since 2.12 (before only had "getAnyGetter()")
+     */
+    public AnnotatedMember getAnyGetterMethod()
     {
         if (!_collected) {
             collectAll();
         }
         if (_anyGetters != null) {
             if (_anyGetters.size() > 1) {
-                reportProblem("Multiple 'any-getters' defined (%s vs %s)",
+                reportProblem("Multiple 'any-getter' methods defined (%s vs %s)",
                         _anyGetters.get(0), _anyGetters.get(1));
             }
             return _anyGetters.getFirst();
-        }        
+        }
         return null;
     }
 
@@ -357,6 +420,13 @@ public class POJOPropertiesCollector
         final boolean transientAsIgnoral = _config.isEnabled(MapperFeature.PROPAGATE_TRANSIENT_MARKER);
 
         for (AnnotatedField f : _classDef.fields()) {
+            // @JsonKey?
+            if (Boolean.TRUE.equals(ai.hasAsKey(_config, f))) {
+                if (_jsonKeyAccessors == null) {
+                    _jsonKeyAccessors = new LinkedList<>();
+                }
+                _jsonKeyAccessors.add(f);
+            }
             // @JsonValue?
             if (Boolean.TRUE.equals(ai.hasAsValue(_config, f))) {
                 if (_jsonValueAccessors == null) {
@@ -365,12 +435,25 @@ public class POJOPropertiesCollector
                 _jsonValueAccessors.add(f);
                 continue;
             }
-            // @JsonAnySetter?
-            if (Boolean.TRUE.equals(ai.hasAnySetter(_config, f))) {
-                if (_anySetterField == null) {
-                    _anySetterField = new LinkedList<>();
+            // 12-October-2020, dominikrebhan: [databind#1458] Support @JsonAnyGetter on
+            //   fields and allow @JsonAnySetter to be declared as well.
+            boolean anyGetter = Boolean.TRUE.equals(ai.hasAnyGetter(_config, f));
+            boolean anySetter = Boolean.TRUE.equals(ai.hasAnySetter(_config, f));
+            if (anyGetter || anySetter) {
+                // @JsonAnyGetter?
+                if (anyGetter) {
+                    if (_anyGetterField == null) {
+                        _anyGetterField = new LinkedList<>();
+                    }
+                    _anyGetterField.add(f);
                 }
-                _anySetterField.add(f);
+                // @JsonAnySetter?
+                if (anySetter) {
+                    if (_anySetterField == null) {
+                        _anySetterField = new LinkedList<>();
+                    }
+                    _anySetterField.add(f);
+                }
                 continue;
             }
             String implName = ai.findImplicitPropertyName(_config, f);
@@ -566,6 +649,14 @@ public class POJOPropertiesCollector
             _anyGetters.add(m);
             return;
         }
+        // @JsonKey?
+        if (Boolean.TRUE.equals(ai.hasAsKey(_config, m))) {
+            if (_jsonKeyAccessors == null) {
+                _jsonKeyAccessors = new LinkedList<>();
+            }
+            _jsonKeyAccessors.add(m);
+            return;
+        }
         // @JsonValue?
         if (Boolean.TRUE.equals(ai.hasAsValue(_config, m))) {
             if (_jsonValueAccessors == null) {
@@ -655,7 +746,7 @@ public class POJOPropertiesCollector
         }
         // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
         implName = _checkRenameByField(implName);
-        boolean ignore = (ai == null) ? false : ai.hasIgnoreMarker(_config, m);
+        boolean ignore = (ai != null) && ai.hasIgnoreMarker(_config, m);
         _property(props, implName).addSetter(m, pn, nameExplicit, visible, ignore);
     }
 
@@ -691,7 +782,7 @@ public class POJOPropertiesCollector
             if (prev.getClass() == m.getClass()) {
                 String type = id.getClass().getName();
                 throw new IllegalArgumentException("Duplicate injectable value with id '"
-                        +String.valueOf(id)+"' (of type "+type+")");
+                        + id +"' (of type "+type+")");
             }
         }
     }
@@ -970,8 +1061,8 @@ public class POJOPropertiesCollector
     {
         // Then how about explicit ordering?
         final AnnotationIntrospector intr = _annotationIntrospector;
-        Boolean alpha = intr.findSerializationSortAlphabetically(_config, (Annotated) _classDef);
-        final boolean sort = (alpha == null)
+        Boolean alpha = intr.findSerializationSortAlphabetically(_config, _classDef);
+        final boolean sortAlpha = (alpha == null)
                 ? _config.shouldSortPropertiesAlphabetically()
                 : alpha.booleanValue();
         final boolean indexed = _anyIndexed(props.values());
@@ -979,13 +1070,13 @@ public class POJOPropertiesCollector
         String[] propertyOrder = intr.findSerializationPropertyOrder(_config, _classDef);
         
         // no sorting? no need to shuffle, then
-        if (!sort && !indexed && (_creatorProperties == null) && (propertyOrder == null)) {
+        if (!sortAlpha && !indexed && (_creatorProperties == null) && (propertyOrder == null)) {
             return;
         }
         int size = props.size();
         Map<String, POJOPropertyBuilder> all;
         // Need to (re)sort alphabetically?
-        if (sort) {
+        if (sortAlpha) {
             all = new TreeMap<String,POJOPropertyBuilder>();
         } else {
             all = new LinkedHashMap<String,POJOPropertyBuilder>(size+size);
@@ -1034,14 +1125,16 @@ public class POJOPropertiesCollector
         }
 
         // Third by sorting Creator properties before other unordered properties
-        if (_creatorProperties != null) {
+        // (unless strict ordering is requested)
+        if ((_creatorProperties != null)
+                && (!sortAlpha || _config.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST))) {
             /* As per [databind#311], this is bit delicate; but if alphabetic ordering
              * is mandated, at least ensure creator properties are in alphabetic
              * order. Related question of creator vs non-creator is punted for now,
              * so creator properties still fully predate non-creator ones.
              */
             Collection<POJOPropertyBuilder> cr;
-            if (sort) {
+            if (sortAlpha) {
                 TreeMap<String, POJOPropertyBuilder> sorted =
                         new TreeMap<String,POJOPropertyBuilder>();
                 for (POJOPropertyBuilder prop : _creatorProperties) {

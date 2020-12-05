@@ -226,6 +226,12 @@ public class BasicBeanDescription extends BeanDescription
         return _properties();
     }
 
+    @Override // since 2.12
+    public AnnotatedMember findJsonKeyAccessor() {
+        return (_propCollector == null) ? null
+                : _propCollector.getJsonKeyAccessor();
+    }
+
     @Override // since 2.9
     public AnnotatedMember findJsonValueAccessor() {
         return (_propCollector == null) ? null
@@ -437,18 +443,34 @@ anyField.getName()));
     @Override
     public AnnotatedMember findAnyGetter() throws IllegalArgumentException
     {
-        AnnotatedMember anyGetter = (_propCollector == null) ? null
-                : _propCollector.getAnyGetter();
-        if (anyGetter != null) {
-            /* For now let's require a Map; in future can add support for other
-             * types like perhaps Iterable<Map.Entry>?
-             */
-            Class<?> type = anyGetter.getRawType();
-            if (!Map.class.isAssignableFrom(type)) {
-                throw new IllegalArgumentException("Invalid 'any-getter' annotation on method "+anyGetter.getName()+"(): return type is not instance of java.util.Map");
+        if (_propCollector != null) {
+            AnnotatedMember anyGetter = _propCollector.getAnyGetterMethod();
+            if (anyGetter != null) {
+                // For now let's require a Map; in future can add support for other
+                // types like perhaps Iterable<Map.Entry>?
+                Class<?> type = anyGetter.getRawType();
+                if (!Map.class.isAssignableFrom(type)) {
+                    throw new IllegalArgumentException(String.format(
+                            "Invalid 'any-getter' annotation on method %s(): return type is not instance of java.util.Map",
+                            anyGetter.getName()));
+                }
+                return anyGetter;
+            }
+
+            AnnotatedMember anyField = _propCollector.getAnyGetterField();
+            if (anyField != null) {
+                // For now let's require a Map; in future can add support for other
+                // types like perhaps Iterable<Map.Entry>?
+                Class<?> type = anyField.getRawType();
+                if (!Map.class.isAssignableFrom(type)) {
+                    throw new IllegalArgumentException(String.format(
+                            "Invalid 'any-getter' annotation on field '%s': type is not instance of java.util.Map",
+                            anyField.getName()));
+                }
+                return anyField;
             }
         }
-        return anyGetter;
+        return null;
     }
 
     @Override

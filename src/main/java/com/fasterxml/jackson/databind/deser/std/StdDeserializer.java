@@ -213,8 +213,7 @@ public abstract class StdDeserializer<T>
         if ((inst != null) && inst.canCreateFromString()) {
             return (T) inst.createFromString(ctxt, value);
         }
-
-        if (value.length() == 0) {
+        if (value.isEmpty()) {
             final CoercionAction act = ctxt.findCoercionAction(logicalType(), rawTargetType,
                     CoercionInputShape.EmptyString);
             return (T) _deserializeFromEmptyString(p, ctxt, act, rawTargetType,
@@ -266,16 +265,24 @@ public abstract class StdDeserializer<T>
     protected Object _deserializeFromEmptyString(JsonParser p, DeserializationContext ctxt,
             CoercionAction act, Class<?> rawTargetType, String desc) throws IOException
     {
+
         switch (act) {
         case AsEmpty:
             return getEmptyValue(ctxt);
+        case Fail:
+            // This will throw an exception
+            _checkCoercionFail(ctxt, act, rawTargetType, "", "empty String (\"\")");
+            // ... so will never fall through
         case TryConvert:
             // hmmmh... empty or null, typically? Assume "as null" for now
         case AsNull:
+        default:
             return null;
-        case Fail:
-            break;
         }
+
+        // 06-Nov-2020, tatu: This was behavior pre-2.12, giving less useful
+        //    exception
+        /*
         final ValueInstantiator inst = getValueInstantiator();
 
         // 03-Jun-2020, tatu: Should ideally call `handleUnexpectedToken()` instead, but
@@ -283,6 +290,7 @@ public abstract class StdDeserializer<T>
         return ctxt.handleMissingInstantiator(rawTargetType, inst, p,
 "Cannot deserialize value of type %s from %s (no String-argument constructor/factory method; coercion not enabled)",
                 ClassUtil.getTypeDescription(getValueType(ctxt)), desc);
+                */
     }
 
     /**
@@ -318,10 +326,6 @@ public abstract class StdDeserializer<T>
     /**
      * @param ctxt Deserialization context for accessing configuration
      * @param p Underlying parser
-     * @param targetType Actual type that is being deserialized, typically
-     *    same as {@link #handledType}, and not necessarily {@code boolean}
-     *    (may be {@code boolean[]} or {@code AtomicBoolean} for example);
-     *    used for coercion config access
      */
     protected final boolean _parseBooleanPrimitive(JsonParser p, DeserializationContext ctxt)
             throws IOException
@@ -335,7 +339,7 @@ public abstract class StdDeserializer<T>
             // may accept ints too, (0 == false, otherwise true)
 
             // call returns `null`, Boolean.TRUE or Boolean.FALSE so:
-            return _coerceBooleanFromInt(p, ctxt, Boolean.TYPE) == Boolean.TRUE;
+            return Boolean.TRUE.equals(_coerceBooleanFromInt(p, ctxt, Boolean.TYPE));
         case JsonTokenId.ID_TRUE: // usually caller should have handled but:
             return true;
         case JsonTokenId.ID_FALSE:
@@ -894,6 +898,16 @@ public abstract class StdDeserializer<T>
             return ((Number) ctxt.handleUnexpectedToken(ctxt.constructType(Float.TYPE), p)).floatValue();
         }
 
+        // 18-Nov-2020, tatu: Special case, Not-a-Numbers as String need to be
+        //     considered "native" representation as JSON does not allow as numbers,
+        //     and hence not bound by coercion rules
+        {
+            Float nan = _checkFloatSpecialValue(text);
+            if (nan != null) {
+                return nan.floatValue();
+            }
+        }
+
         final CoercionAction act = _checkFromStringCoercion(ctxt, text,
                 LogicalType.Integer, Float.TYPE);
         if (act == CoercionAction.AsNull) {
@@ -916,27 +930,47 @@ public abstract class StdDeserializer<T>
     protected final float _parseFloatPrimitive(DeserializationContext ctxt, String text)
         throws IOException
     {
-        switch (text.charAt(0)) {
-        case 'I':
-            if (_isPosInf(text)) {
-                return Float.POSITIVE_INFINITY;
-            }
-            break;
-        case 'N':
-            if (_isNaN(text)) { return Float.NaN; }
-            break;
-        case '-':
-            if (_isNegInf(text)) {
-                return Float.NEGATIVE_INFINITY;
-            }
-            break;
-        }
         try {
             return Float.parseFloat(text);
         } catch (IllegalArgumentException iae) { }
         Number v = (Number) ctxt.handleWeirdStringValue(Float.TYPE, text,
                 "not a valid `float` value");
         return _nonNullNumber(v).floatValue();
+    }
+
+    /**
+     * Helper method called to check whether given String value contains one of
+     * "special" values (currently, NaN ("not-a-number") and plus/minus Infinity)
+     * and if so, returns that value; otherwise returns {@code null}.
+     *
+     * @param text String value to check
+     *
+     * @return One of {@link Float} constants referring to special value decoded,
+     *   if value matched; {@code null} otherwise.
+     *
+     * @since 2.12
+     */
+    protected Float _checkFloatSpecialValue(String text)
+    {
+        if (!text.isEmpty()) {
+            switch (text.charAt(0)) {
+            case 'I':
+                if (_isPosInf(text)) {
+                    return Float.POSITIVE_INFINITY;
+                }
+                break;
+            case 'N':
+                if (_isNaN(text)) { return Float.NaN; }
+                break;
+            case '-':
+                if (_isNegInf(text)) {
+                    return Float.NEGATIVE_INFINITY;
+                }
+                break;
+            default:
+            }
+        }
+        return null;
     }
 
     protected final double _parseDoublePrimitive(JsonParser p, DeserializationContext ctxt)
@@ -969,6 +1003,16 @@ public abstract class StdDeserializer<T>
             return ((Number) ctxt.handleUnexpectedToken(ctxt.constructType(Double.TYPE), p)).doubleValue();
         }
 
+        // 18-Nov-2020, tatu: Special case, Not-a-Numbers as String need to be
+        //     considered "native" representation as JSON does not allow as numbers,
+        //     and hence not bound by coercion rules
+        {
+            Double nan = this._checkDoubleSpecialValue(text);
+            if (nan != null) {
+                return nan.doubleValue();
+            }
+        }
+
         final CoercionAction act = _checkFromStringCoercion(ctxt, text,
                 LogicalType.Integer, Double.TYPE);
         if (act == CoercionAction.AsNull) {
@@ -988,23 +1032,6 @@ public abstract class StdDeserializer<T>
     protected final double _parseDoublePrimitive(DeserializationContext ctxt, String text)
         throws IOException
     {
-        switch (text.charAt(0)) {
-        case 'I':
-            if (_isPosInf(text)) {
-                return Double.POSITIVE_INFINITY;
-            }
-            break;
-        case 'N':
-            if (_isNaN(text)) {
-                return Double.NaN;
-            }
-            break;
-        case '-':
-            if (_isNegInf(text)) {
-                return Double.NEGATIVE_INFINITY;
-            }
-            break;
-        }
         try {
             return _parseDouble(text);
         } catch (IllegalArgumentException iae) { }
@@ -1024,6 +1051,43 @@ public abstract class StdDeserializer<T>
             return Double.MIN_NORMAL; // since 2.7; was MIN_VALUE prior
         }
         return Double.parseDouble(numStr);
+    }
+
+    /**
+     * Helper method called to check whether given String value contains one of
+     * "special" values (currently, NaN ("not-a-number") and plus/minus Infinity)
+     * and if so, returns that value; otherwise returns {@code null}.
+     *
+     * @param text String value to check
+     *
+     * @return One of {@link Double} constants referring to special value decoded,
+     *   if value matched; {@code null} otherwise.
+     *
+     * @since 2.12
+     */
+    protected Double _checkDoubleSpecialValue(String text)
+    {
+        if (!text.isEmpty()) {
+            switch (text.charAt(0)) {
+            case 'I':
+                if (_isPosInf(text)) {
+                    return Double.POSITIVE_INFINITY;
+                }
+                break;
+            case 'N':
+                if (_isNaN(text)) {
+                    return Double.NaN;
+                }
+                break;
+            case '-':
+                if (_isNegInf(text)) {
+                    return Double.NEGATIVE_INFINITY;
+                }
+                break;
+            default:
+            }
+        }
+        return null;
     }
 
     protected java.util.Date _parseDate(JsonParser p, DeserializationContext ctxt)
@@ -1097,7 +1161,7 @@ public abstract class StdDeserializer<T>
     {
         try {
             // Take empty Strings to mean 'empty' Value, usually 'null':
-            if (value.length() == 0) {
+            if (value.isEmpty()) {
                 final CoercionAction act = _checkFromStringCoercion(ctxt, value);
                 switch (act) { // note: Fail handled above
                 case AsEmpty:
@@ -1207,13 +1271,15 @@ public abstract class StdDeserializer<T>
     {
         final CoercionAction act;
 
-        if (value.length() == 0) {
+        if (value.isEmpty()) {
             act = ctxt.findCoercionAction(logicalType, rawTargetType,
                     CoercionInputShape.EmptyString);
-            return _checkCoercionActionFail(ctxt, act, "empty String (\"\")");
+            return _checkCoercionFail(ctxt, act, rawTargetType, value,
+                    "empty String (\"\")");
         } else if (_isBlank(value)) {
             act = ctxt.findCoercionFromBlankString(logicalType, rawTargetType, CoercionAction.Fail);
-            return _checkCoercionActionFail(ctxt, act, "blank String (all whitespace)");
+            return _checkCoercionFail(ctxt, act, rawTargetType, value,
+                    "blank String (all whitespace)");
         } else {
             act = ctxt.findCoercionAction(logicalType, rawTargetType, CoercionInputShape.String);
             if (act == CoercionAction.Fail) {
@@ -1236,7 +1302,8 @@ value, _coercedTypeDesc());
         final CoercionAction act = ctxt.findCoercionAction(LogicalType.Integer,
                 rawTargetType, CoercionInputShape.Float);
         if (act == CoercionAction.Fail) {
-            _checkCoercionActionFail(ctxt, act, "Floating-point value ("+p.getText()+")");
+            return _checkCoercionFail(ctxt, act, rawTargetType, p.getNumberValue(),
+                    "Floating-point value ("+p.getText()+")");
         }
         return act;
     }
@@ -1251,8 +1318,9 @@ value, _coercedTypeDesc());
         CoercionAction act = ctxt.findCoercionAction(LogicalType.Boolean, rawTargetType, CoercionInputShape.Integer);
         switch (act) {
         case Fail:
-            _checkCoercionActionFail(ctxt, act, "Integer value ("+p.getText()+")");
-            break;
+            _checkCoercionFail(ctxt, act, rawTargetType, p.getNumberValue(),
+                    "Integer value ("+p.getText()+")");
+            return Boolean.FALSE;
         case AsNull:
             return null;
         case AsEmpty:
@@ -1269,11 +1337,16 @@ value, _coercedTypeDesc());
         return !"0".equals(p.getText());
     }
 
-    protected CoercionAction _checkCoercionActionFail(DeserializationContext ctxt,
-            CoercionAction act, String inputDesc) throws IOException
+    /**
+     * @since 2.12
+     */
+    protected CoercionAction _checkCoercionFail(DeserializationContext ctxt,
+            CoercionAction act, Class<?> targetType, Object inputValue,
+            String inputDesc)
+        throws IOException
     {
         if (act == CoercionAction.Fail) {
-            ctxt.reportInputMismatch(this,
+            ctxt.reportBadCoercion(this, targetType, inputValue,
 "Cannot coerce %s to %s (but could if coercion was enabled using `CoercionConfig`)",
 inputDesc, _coercedTypeDesc());
         }
@@ -1376,7 +1449,7 @@ inputDesc, _coercedTypeDesc());
     {
         String enableDesc = state ? "enable" : "disable";
         ctxt.reportInputMismatch(this, "Cannot coerce %s to Null value as %s (%s `%s.%s` to allow)",
-            inputDesc, _coercedTypeDesc(), enableDesc, feature.getClass().getSimpleName(), feature.name());
+            inputDesc, _coercedTypeDesc(), enableDesc, feature.getDeclaringClass().getSimpleName(), feature.name());
     }
 
     /**

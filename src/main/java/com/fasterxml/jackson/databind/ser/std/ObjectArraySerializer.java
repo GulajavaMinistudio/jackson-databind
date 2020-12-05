@@ -1,6 +1,7 @@
 package com.fasterxml.jackson.databind.ser.std;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -66,7 +67,7 @@ public class ObjectArraySerializer
         _staticTyping = src._staticTyping;
         _elementSerializer = src._elementSerializer;
     }
-    
+
     @SuppressWarnings("unchecked")
     public ObjectArraySerializer(ObjectArraySerializer src,
             BeanProperty property, TypeSerializer vts, JsonSerializer<?> elementSerializer,
@@ -93,7 +94,7 @@ public class ObjectArraySerializer
     public ObjectArraySerializer withResolved(BeanProperty prop,
             TypeSerializer vts, JsonSerializer<?> ser, Boolean unwrapSingle) {
         if ((_property == prop) && (ser == _elementSerializer)
-                && (_valueTypeSerializer == vts) && (_unwrapSingle == unwrapSingle)) {
+                && (_valueTypeSerializer == vts) && (Objects.equals(_unwrapSingle, unwrapSingle))) {
             return this;
         }
         return new ObjectArraySerializer(this, prop, vts, ser, unwrapSingle);

@@ -167,7 +167,8 @@ public class JacksonAnnotationIntrospector
 
     @Override
     public String[] findEnumValues(MapperConfig<?> config,
-            Class<?> enumType, Enum<?>[] enumValues, String[] names) {
+            Class<?> enumType, Enum<?>[] enumValues, String[] names)
+    {
         HashMap<String,String> expl = null;
         for (Field f : enumType.getDeclaredFields()) {
             if (!f.isEnumConstant()) {
@@ -234,7 +235,7 @@ public class JacksonAnnotationIntrospector
      * @since 2.8
      */
     @Override
-    public Enum<?> findDefaultEnumValue(MapperConfig<?> config, Class<Enum<?>> enumCls) {
+    public Enum<?> findDefaultEnumValue(MapperConfig<?> config, Class<?> enumCls) {
         return ClassUtil.findFirstAnnotatedEnumValue(enumCls, JsonEnumDefaultValue.class);
     }
 
@@ -252,7 +253,7 @@ public class JacksonAnnotationIntrospector
             return null;
         }
         String ns = ann.namespace();
-        if (ns != null && ns.length() == 0) {
+        if (ns != null && ns.isEmpty()) {
             ns = null;
         }
         return PropertyName.construct(ann.value(), ns);
@@ -290,7 +291,7 @@ public class JacksonAnnotationIntrospector
         if (ann != null) {
             String id = ann.value();
             // Empty String is same as not having annotation, to allow overrides
-            if (id.length() > 0) {
+            if (!id.isEmpty()) {
                 return id;
             }
         }
@@ -1032,12 +1033,26 @@ public class JacksonAnnotationIntrospector
         }
         JsonProperty pann = _findAnnotation(a, JsonProperty.class);
         if (pann != null) {
-            return PropertyName.construct(pann.value());
+            // 14-Nov-2020, tatu: "namespace" added in 2.12
+            String ns = pann.namespace();
+            if (ns != null && ns.isEmpty()) {
+                ns = null;
+            }
+            return PropertyName.construct(pann.value(), ns);
         }
         if (useDefault || _hasOneOf(a, ANNOTATIONS_TO_INFER_SER)) {
             return PropertyName.USE_DEFAULT;
         }
         return null;
+    }
+
+    @Override // since 2.12
+    public Boolean hasAsKey(MapperConfig<?> config, Annotated a) {
+        JsonKey ann = _findAnnotation(a, JsonKey.class);
+        if (ann == null) {
+            return null;
+        }
+        return ann.value();
     }
 
     @Override
@@ -1238,7 +1253,12 @@ public class JacksonAnnotationIntrospector
         }
         JsonProperty pann = _findAnnotation(a, JsonProperty.class);
         if (pann != null) {
-            return PropertyName.construct(pann.value());
+            // 14-Nov-2020, tatu: "namespace" added in 2.12
+            String ns = pann.namespace();
+            if (ns != null && ns.isEmpty()) {
+                ns = null;
+            }
+            return PropertyName.construct(pann.value(), ns);
         }
         if (useDefault || _hasOneOf(a, ANNOTATIONS_TO_INFER_DESER)) {
             return PropertyName.USE_DEFAULT;

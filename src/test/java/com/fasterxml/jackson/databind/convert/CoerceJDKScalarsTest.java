@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.*;
@@ -17,6 +19,18 @@ public class CoerceJDKScalarsTest extends BaseMapTest
 {
     static class BooleanPOJO {
         public Boolean value;
+    }
+
+    static class BooleanWrapper {
+        public Boolean wrapper;
+        public boolean primitive;
+        
+        protected Boolean ctor;
+        
+        @JsonCreator
+        public BooleanWrapper(@JsonProperty("ctor") Boolean foo) {
+            ctor = foo;
+        }
     }
 
     private final ObjectMapper COERCING_MAPPER = jsonMapperBuilder()
@@ -113,7 +127,7 @@ public class CoerceJDKScalarsTest extends BaseMapTest
     /**********************************************************
      */
 
-    public void testStringCoercionOkBoolean() throws Exception
+    public void testStringToBooleanCoercionOk() throws Exception
     {
         // first successful coercions. Boolean has a ton...
         _verifyCoerceSuccess("1", Boolean.TYPE, Boolean.TRUE);
@@ -134,7 +148,7 @@ public class CoerceJDKScalarsTest extends BaseMapTest
         _verifyCoerceSuccess(quote("FALSE"), Boolean.class, Boolean.FALSE);
     }
 
-    public void testStringCoercionOkNumbers() throws Exception
+    public void testStringToNumbersCoercionOk() throws Exception
     {
         _verifyCoerceSuccess(quote("123"), Byte.TYPE, Byte.valueOf((byte) 123));
         _verifyCoerceSuccess(quote("123"), Byte.class, Byte.valueOf((byte) 123));
@@ -157,7 +171,7 @@ public class CoerceJDKScalarsTest extends BaseMapTest
         assertTrue(ab.get());
     }
 
-    public void testStringCoercionFailBoolean() throws Exception
+    public void testStringToBooleanCoercionFail() throws Exception
     {
         _verifyRootStringCoerceFail("true", Boolean.TYPE);
         _verifyRootStringCoerceFail("true", Boolean.class);

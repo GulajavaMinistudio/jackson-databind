@@ -805,9 +805,17 @@ Jakub Skierbiszewski (jskierbi@github)
     `@JsonCreator` + `@JsonProperty` for same property name
    (2.9.6)
 
-Carter Kozak (cakofony@github)
+Carter Kozak (carterkozak@github)
   * Reported #2016: Delegating JsonCreator disregards JsonDeserialize info
    (2.9.6)
+  * Contributed #2895: Improve static factory method generic type resolution logic
+    (as well as better test coverage)
+   (2.12.0)
+  * Contributed #2928: `AnnotatedCreatorCollector` should avoid processing synthetic static
+    (factory) methods
+   (2.12.0)
+  * Contributed #2931: Add errorprone static analysis profile to detect bugs at build time
+   (2.12.0)
 
 Reinhard Prechtl (dnno@github)
   * Reported #2034: Serialization problem with type specialization of nested generic types
@@ -976,18 +984,24 @@ David Connelly (dconnelly@github)
     no Java7 support added
    (2.10.0)
 
+XakepSDK@github
+  * Reported #2458: `Nulls` property metadata ignored for creators
+   (2.10.0)
+  * Contributed #2910: Make some java platform modules optional
+   (2.12.0)
+
 Wahey (KevynBct@github)
   * Reported #2466: Didn't find class "java.nio.file.Path" below Android api 26
-  (2.10.0)
+   (2.10.0)
 
 Martín Coll (colltoaction@github)
   * Contributed #2467: Accept `JsonTypeInfo.As.WRAPPER_ARRAY` with no second argument to
-   deserialize as "null value"
-  (2.10.0)
+    deserialize as "null value"
+   (2.10.0)
 
 Andrey Kulikov (ankulikov@github)
   * Reported #2457: Extended enum values are not handled as enums when used as Map keys
-  (2.10.1)
+   (2.10.1)
 
 João Guerra (joca-bt@github)
   * Reported #2473: Array index missing in path of `JsonMappingException` for `Collection<String>`,
@@ -1164,6 +1178,15 @@ Daniel Wu (DanielYWoo@github)
   * Reported #2840: `ObjectMapper.activateDefaultTypingAsProperty()` is not using
   (2.11.3)
 
+Łukasz Walkiewicz (lukasz-walkiewicz@github)
+  * Reported #2894: Fix type resolution for static methods (regression in 2.11.3)
+  (2.11.4)
+
+Lucian H (symposion@github)
+  * Reported, suggested fix for #2944: `@JsonCreator` on constructor not compatible
+    with `@JsonIdentityInfo`, `PropertyGenerator`
+  (2.11.4)
+
 Marc Carter (drekbour@github)
   * Contributed #43 implementation: Add option to resolve type from multiple existing properties,
    `@JsonTypeInfo(use=DEDUCTION)`
@@ -1178,6 +1201,10 @@ Baptiste Pernet (sp4ce@github)
     of `@JsonIgnoreProperties`)
   (2.12.0)
 
+Dominik Krebhan (dominikrebhan@github)
+  * Contributed #1458: `@JsonAnyGetter` should be allowed on a field
+  (2.12.0)
+ 
 Patrick Jungermann (pjungermann@github)
   * Requested #1852: Allow case insensitive deserialization of String value into
   `boolean`/`Boolean` (esp for Excel)
@@ -1221,3 +1248,31 @@ Jendrik Johannes (jjohannes@github)
 Swayam Raina (swayamraina@github)
   * Contributed #2761: Support multiple names in `JsonSubType.Type`
   (2.12.0)
+
+Oguzhan Unlu (oguzhanunlu@github)
+  * Requested #2855: Add `JsonNode.canConvertToExactIntegral()` to indicate whether
+    floating-point/BigDecimal values could be converted to integers losslessly
+  (2.12.0)
+
+Siavash Soleymani (siavashsoleymani@github)
+  * Contributed implementation for #2855: Add `JsonNode.canConvertToExactIntegral()` to
+    indicate whether floating-point/BigDecimal values could be converted to integers losslessly
+  (2.12.0)
+
+Kevin Binswanger (Anusien@github)
+  * Contributed implementation for #2871: Add `@JsonKey` annotation (similar to `@JsonValue`)
+    for customizable serialization of Map keys
+  (2.12.0)
+
+Ilya Golovin (ilgo0413@github)
+  * Contributed #2873: `MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS` should work for enum as keys
+  (2.12.0)
+
+Sergiy Yevtushenko (siy@github)
+  * Contributed #2879: Add support for disabling special handling of "Creator properties" wrt
+    alphabetic property ordering
+  (2.12.0)
+
+M Rizky Satrio (rsatrio@github)
+  * Contributed #2925: Add support for `java.sql.Blob`
+   (2.12.0)

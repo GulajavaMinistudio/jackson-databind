@@ -493,13 +493,22 @@ public class ObjectMapper
         return _typeFactory.constructType(type);
     }
 
+    /**
+     * Convenience method for constructing {@link JavaType} out of given
+     * type reference.
+     */
+    public JavaType constructType(TypeReference<?> typeReference) {
+        _assertNotNull("typeReference", typeReference);
+        return _typeFactory.constructType(typeReference);
+    }
+
     /*
     /**********************************************************************
     /* Configuration, accessing features
     /**********************************************************************
      */
 
-    public boolean isEnabled(JsonFactory.Feature f) {
+    public boolean isEnabled(TokenStreamFactory.Feature f) {
         return _streamFactory.isEnabled(f);
     }
 
@@ -1201,10 +1210,18 @@ public class ObjectMapper
      *<pre>
      *   objectMapper.convertValue(n, valueClass);
      *</pre>
+     *<p>
+     * Note: inclusion of {@code throws JsonProcessingException} is not accidental
+     * since while there can be no input decoding problems, it is possible that content
+     * does not match target type: in such case various {@link JsonMappingException}s
+     * are possible. In addition {@link IllegalArgumentException} is possible in some
+     * cases, depending on whether {@link DeserializationFeature#WRAP_EXCEPTIONS}
+     * is enabled or not.
      */
     @SuppressWarnings("unchecked")
     public <T> T treeToValue(TreeNode n, Class<T> valueType)
-        throws IllegalArgumentException
+        throws IllegalArgumentException,
+            JsonProcessingException
     {
         if (n == null) {
             return null;
@@ -1232,6 +1249,10 @@ public class ObjectMapper
                 }
             }
             return readValue(treeAsTokens(n), valueType);
+        } catch (JsonProcessingException e) {
+            // 12-Nov-2020, tatu: These can legit happen, during conversion, especially
+            //   with things like Builders that validate arguments.
+            throw e;
         } catch (IOException e) { // should not occur, no real i/o...
             throw new IllegalArgumentException(e.getMessage(), e);
         }

@@ -4,7 +4,7 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.12.0 (not yet released)
+2.12.0 (29-Nov-2020)
 
 #43: Add option to resolve type from multiple existing properties,
   `@JsonTypeInfo(use=DEDUCTION)`
@@ -16,6 +16,8 @@ Project: jackson-databind
  (reported by Mike G; fix contributed by Ville K)
 #1296: Add `@JsonIncludeProperties(propertyNames)` (reverse of `@JsonIgnoreProperties`)
  (contributed Baptiste P)
+#1458: `@JsonAnyGetter` should be allowed on a field
+ (contributed by Dominik K)
 #1498: Allow handling of single-arg constructor as property based by default
  (requested by Lovro P)
 #1852: Allow case insensitive deserialization of String value into
@@ -58,6 +60,8 @@ Project: jackson-databind
 #2751: Add `ValueInstantiator.createContextual(...)
 #2761: Support multiple names in `JsonSubType.Type`
  (contributed by Swayam R)
+#2775: Disabling `FAIL_ON_INVALID_SUBTYPE` breaks polymorphic deserialization of Enums
+ (reported by holgerknoche@github)
 #2776: Explicitly fail (de)serialization of `org.joda.time.*` types in absence of registered
   custom (de)serializers
 #2784: Trailing zeros are stripped when deserializing BigDecimal values inside a
@@ -65,9 +69,47 @@ Project: jackson-databind
  (reported by mjustin@github)
 #2800: Extract getter/setter/field name mangling from `BeanUtil` into
   pluggable `AccessorNamingStrategy`
-#2805: Remove `JsonProcessingException` from `ObjectMapper.treeToValue()`
+#2804: Throw `InvalidFormatException` instead of `MismatchedInputException`
+   for ACCEPT_FLOAT_AS_INT coercion failures
+ (requested by mjustin@github)
+#2871: Add `@JsonKey` annotation (similar to `@JsonValue`) for customizable
+  serialization of Map keys
+ (requested by CidTori@github; implementation contributed by Kevin B)
+#2873: `MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS` should work for enum as keys
+ (fix contributed by Ilya G)
+#2879: Add support for disabling special handling of "Creator properties" wrt
+  alphabetic property ordering
+ (contributed by Sergiy Y)
+#2885: Add `JsonNode.canConvertToExactIntegral()` to indicate whether floating-point/BigDecimal
+  values could be converted to integers losslessly
+ (requested by Oguzhan U; implementation contributed by Siavash S)
+#2895: Improve static factory method generic type resolution logic
+ (contributed by Carter K)
+#2903: Allow preventing "Enum from integer" coercion using new `CoercionConfig` system
+#2909: `@JsonValue` not considered when evaluating inclusion
+ (reported by chrylis@github)
+#2910: Make some java platform modules optional
+ (contributed by XakepSDK@github)
+#2925: Add support for serializing `java.sql.Blob`
+ (contributed by M Rizky S)
+#2928: `AnnotatedCreatorCollector` should avoid processing synthetic static
+  (factory) methods
+ (contributed by Carter K)
+#2931: Add errorprone static analysis profile to detect bugs at build time
+ (contributed by Carter K)
+#2932: Problem with implicit creator name detection for constructor detection
 - Add `BeanDeserializerBase.isCaseInsensitive()`
 - Some refactoring of `CollectionDeserializer` to solve CSV array handling issues
+- Full "LICENSE" included in jar for easier access by compliancy tools
+
+2.11.4 (not yet released)
+
+#2894: Fix type resolution for static methods (regression in 2.11.3 due to #2821 fix)
+ (reported by Łukasz W)
+#2944: `@JsonCreator` on constructor not compatible with `@JsonIdentityInfo`,
+  `PropertyGenerator`
+ (reported by Lucian H)
+- Add debug improvements wrt #2807 (`ClassUtil.getClassMethods()`)
 
 2.11.3 (02-Oct-2020)
 
@@ -161,7 +203,7 @@ Project: jackson-databind
 #2587: Add `MapperFeature.BLOCK_UNSAFE_POLYMORPHIC_BASE_TYPES` to allow blocking
   use of unsafe base type for polymorphic deserialization
 #2589: `DOMDeserializer`: setExpandEntityReferences(false) may not prevent
-  external entity expansion in all cases
+  external entity expansion in all cases [CVE-2020-25649]
  (reported by Bartosz B)
 #2592: `ObjectMapper.setSerializationInclusion()` is ignored for `JsonAnyGetter`
  (reported by Oleksii K)
@@ -187,6 +229,10 @@ Project: jackson-databind
 #2693: Add convenience methods for creating `List`, `Map` valued `ObjectReader`s
   (ObjectMapper.readerForListOf())
 - Add `SerializerProvider.findContentValueSerializer()` methods
+
+2.10.5.1 (02-Dec-2020)
+
+#2589: (see desc on 2.11.0 -- backported)
 
 2.10.5 (21-Jul-2020)
 

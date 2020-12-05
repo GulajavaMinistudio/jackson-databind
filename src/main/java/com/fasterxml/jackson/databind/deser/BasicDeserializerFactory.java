@@ -1144,7 +1144,11 @@ candidate.creator());
             final DeserializationConfig config = ctxt.getConfig();
             PropertyName name = intr.findNameForDeserialization(config, param);
             if (name != null) {
-                return name;
+                // 16-Nov-2020, tatu: One quirk, wrt [databind#2932]; may get "use implicit"
+                //    marker; should not return that
+                if (!name.isEmpty()) {
+                    return name;
+                }
             }
             // 14-Apr-2014, tatu: Need to also consider possible implicit name
             //  (for JDK8, or via paranamer)
@@ -2276,12 +2280,12 @@ factory.toString()));
                 ClassUtil.checkAndFixAccess(jsonValueAccessor.getMember(),
                         ctxt.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
             }
-            return EnumResolver.constructUnsafeUsingMethod(ctxt.getConfig(),
+            return EnumResolver.constructUsingMethod(ctxt.getConfig(),
                     enumClass, jsonValueAccessor);
         }
         // 14-Mar-2016, tatu: We used to check `DeserializationFeature.READ_ENUMS_USING_TO_STRING`
         //   here, but that won't do: it must be dynamically changeable...
-        return EnumResolver.constructUnsafe(ctxt.getConfig(), enumClass);
+        return EnumResolver.constructFor(ctxt.getConfig(), enumClass);
     }
 
     protected boolean _hasCreatorAnnotation(DeserializationContext ctxt,

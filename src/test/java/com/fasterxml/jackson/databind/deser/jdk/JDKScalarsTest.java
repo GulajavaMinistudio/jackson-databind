@@ -123,10 +123,6 @@ public class JDKScalarsTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
-    private final ObjectMapper MAPPER_NO_COERCION = jsonMapperBuilder()
-            .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-            .build();
-
     /*
     /**********************************************************
     /* Scalar tests for boolean
@@ -163,39 +159,6 @@ public class JDKScalarsTest
         assertEquals(Boolean.TRUE, result);
         result = MAPPER.readValue("false", Boolean.class);
         assertEquals(Boolean.FALSE, result);
-
-        // should accept ints too, (0 == false, otherwise true)
-        result = MAPPER.readValue("0", Boolean.class);
-        assertEquals(Boolean.FALSE, result);
-        result = MAPPER.readValue("1", Boolean.class);
-        assertEquals(Boolean.TRUE, result);
-    }
-
-    // Test for verifying that Long values are coerced to boolean correctly as well
-    public void testLongToBoolean() throws Exception
-    {
-        long value = 1L + Integer.MAX_VALUE;
-        BooleanWrapper b = MAPPER.readValue("{\"primitive\" : "+value+", \"wrapper\":"+value+", \"ctor\":"+value+"}",
-                BooleanWrapper.class);
-        assertEquals(Boolean.TRUE, b.wrapper);
-        assertTrue(b.primitive);
-        assertEquals(Boolean.TRUE, b.ctor);
-
-        // but ensure we can also get `false`
-        b = MAPPER.readValue("{\"primitive\" : 0 , \"wrapper\":0, \"ctor\":0}",
-                BooleanWrapper.class);
-        assertEquals(Boolean.FALSE, b.wrapper);
-        assertFalse(b.primitive);
-        assertEquals(Boolean.FALSE, b.ctor);
-
-        boolean[] boo = MAPPER.readValue("[ 0, 15, \"\", \"false\", \"True\" ]",
-                boolean[].class);
-        assertEquals(5, boo.length);
-        assertFalse(boo[0]);
-        assertTrue(boo[1]);
-        assertFalse(boo[2]);
-        assertFalse(boo[3]);
-        assertTrue(boo[4]);
     }
 
     /*
@@ -472,7 +435,7 @@ public class JDKScalarsTest
             // First, as regular double value
             if (NAN_STRING != str) {
                 result = MAPPER.readValue(str, Double.class);
-               assertEquals(exp, result);
+                assertEquals(exp, result);
             }
             // and then as coerced String:
             result = MAPPER.readValue(" \""+str+"\"", Double.class);
@@ -519,35 +482,6 @@ public class JDKScalarsTest
         assertNotNull(array);
         assertEquals(1, array.length);
         assertEquals(0d, array[0]);
-    }
-
-    public void testDoublePrimitiveNonNumeric() throws Exception
-    {
-        // first, simple case:
-        // bit tricky with binary fps but...
-        double value = Double.POSITIVE_INFINITY;
-        DoubleBean result = MAPPER.readValue("{\"v\":\""+value+"\"}", DoubleBean.class);
-        assertEquals(value, result._v);
-        
-        // should work with arrays too..
-        double[] array = MAPPER.readValue("[ \"Infinity\" ]", double[].class);
-        assertNotNull(array);
-        assertEquals(1, array.length);
-        assertEquals(Double.POSITIVE_INFINITY, array[0]);
-    }
-    
-    public void testFloatPrimitiveNonNumeric() throws Exception
-    {
-        // bit tricky with binary fps but...
-        float value = Float.POSITIVE_INFINITY;
-        FloatBean result = MAPPER.readValue("{\"v\":\""+value+"\"}", FloatBean.class);
-        assertEquals(value, result._v);
-        
-        // should work with arrays too..
-        float[] array = MAPPER.readValue("[ \"Infinity\" ]", float[].class);
-        assertNotNull(array);
-        assertEquals(1, array.length);
-        assertEquals(Float.POSITIVE_INFINITY, array[0]);
     }
 
     /*
@@ -615,13 +549,6 @@ public class JDKScalarsTest
     /**********************************************************
      */
 
-    // by default, should return nulls, n'est pas?
-    public void testEmptyStringForBooleanWrapper() throws IOException
-    {
-        WrappersBean bean = MAPPER.readValue("{\"booleanValue\":\"\"}", WrappersBean.class);
-        assertNull(bean.booleanValue);
-    }
-
     public void testEmptyStringForIntegerWrappers() throws IOException
     {
         WrappersBean bean = MAPPER.readValue("{\"byteValue\":\"\"}", WrappersBean.class);
@@ -673,21 +600,6 @@ public class JDKScalarsTest
         assertEquals(0.0f, bean.floatValue);
         bean = MAPPER.readValue("{\"doubleValue\":\"\"}", PrimitivesBean.class);
         assertEquals(0.0, bean.doubleValue);
-    }
-
-    // for [databind#403]
-    public void testEmptyStringFailForBooleanPrimitive() throws IOException
-    {
-        final ObjectReader reader = MAPPER
-                .readerFor(PrimitivesBean.class)
-                .with(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
-        try {
-            reader.readValue(aposToQuotes("{'booleanValue':''}"));
-            fail("Expected failure for boolean + empty String");
-        } catch (JsonMappingException e) {
-            verifyException(e, "Cannot coerce `null` to `boolean`");
-            verifyException(e, "FAIL_ON_NULL_FOR_PRIMITIVES");
-        }
     }
 
     /*
@@ -843,15 +755,7 @@ public class JDKScalarsTest
             assertEquals(1, Array.getLength(ob));
             assertEquals(defValue, Array.get(ob, 0));
 
-            final ObjectReader readerNoEmpty = MAPPER_NO_COERCION.readerFor(cls);
-            try {
-                readerNoEmpty.readValue(EMPTY_STRING_JSON);
-                fail("Should not pass");
-            } catch (JsonMappingException e) {
-                // 07-Jun-2020, tatu: during transition, two acceptable alternatives
-                verifyException(e, "Cannot coerce `null` to", "Cannot coerce empty String (\"\")");
-                verifyException(e, "element of "+SIMPLE_NAME);
-            }
+            // Note: coercion tests moved to under "com.fasterxml.jackson.databind.convert"
         }
     }
 
