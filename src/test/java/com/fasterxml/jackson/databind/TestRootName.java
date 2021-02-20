@@ -59,7 +59,7 @@ public class TestRootName extends BaseMapTest
             mapper.readValue(aposToQuotes("[{'rudy':{'a':3}}]"), Bean.class);
             fail("Should not pass");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Unexpected token (START_ARRAY");
+            verifyException(e, "Unexpected token (`JsonToken.START_ARRAY`");
         }
 
         // Third: empty Object
@@ -67,7 +67,7 @@ public class TestRootName extends BaseMapTest
             mapper.readValue(aposToQuotes("{}]"), Bean.class);
             fail("Should not pass");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Current token not FIELD_NAME");
+            verifyException(e, "Current token not `JsonToken.PROPERTY_NAME`");
         }
 
         // Fourth, stuff after wrapped
@@ -76,7 +76,7 @@ public class TestRootName extends BaseMapTest
             fail("Should not pass");
         } catch (MismatchedInputException e) {
             verifyException(e, "Unexpected token");
-            verifyException(e, "Current token not END_OBJECT (to match wrapper");
+            verifyException(e, "Current token not `JsonToken.END_OBJECT` (to match wrapper");
         }
     }
 
@@ -96,7 +96,7 @@ public class TestRootName extends BaseMapTest
             reader.readValue(aposToQuotes("[{'rudy':{'a':3}}]"));
             fail("Should not pass");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Unexpected token (START_ARRAY");
+            verifyException(e, "Unexpected token (`JsonToken.START_ARRAY`");
         }
 
         // Third: empty Object
@@ -104,7 +104,7 @@ public class TestRootName extends BaseMapTest
             reader.readValue(aposToQuotes("{}]"));
             fail("Should not pass");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Current token not FIELD_NAME");
+            verifyException(e, "Current token not `JsonToken.PROPERTY_NAME`");
         }
 
         // Fourth, stuff after wrapped
@@ -113,7 +113,7 @@ public class TestRootName extends BaseMapTest
             fail("Should not pass");
         } catch (MismatchedInputException e) {
             verifyException(e, "Unexpected token");
-            verifyException(e, "Current token not END_OBJECT (to match wrapper");
+            verifyException(e, "Current token not `JsonToken.END_OBJECT` (to match wrapper");
         }
     }
 
@@ -145,7 +145,7 @@ public class TestRootName extends BaseMapTest
             result = mapper.readerFor(Bean.class).with(DeserializationFeature.UNWRAP_ROOT_VALUE)
                 .readValue(jsonUnwrapped);
             fail("Should have failed");
-        } catch (JsonMappingException e) {
+        } catch (MismatchedInputException e) {
             verifyException(e, "Root name ('a')");
         }
         // except wrapping may be expected:
@@ -153,8 +153,7 @@ public class TestRootName extends BaseMapTest
             .readValue(jsonWrapped);
         assertNotNull(result);
     }
-    
-    // [JACKSON-764]
+
     public void testRootUsingExplicitConfig() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();

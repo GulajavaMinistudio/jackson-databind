@@ -816,6 +816,8 @@ Carter Kozak (carterkozak@github)
    (2.12.0)
   * Contributed #2931: Add errorprone static analysis profile to detect bugs at build time
    (2.12.0)
+  * Contributed #2978: Fix failing `double` JsonCreators in jackson 2.12.0
+   (2.12.1)
 
 Reinhard Prechtl (dnno@github)
   * Reported #2034: Serialization problem with type specialization of nested generic types
@@ -1164,6 +1166,8 @@ Joshua Shannon (retrodaredevil@github)
 Daniel Hrabovcak (TheSpiritXIII@github)
   * Reported #2796: `TypeFactory.constructType()` does not take `TypeBindings` correctly
   (2.11.2)
+  * Reported #2900: Jackson does not support deserializing new Java 9 unmodifiable collections
+  (2.13.0)
 
 Lari Hotari (lhotari@github)
   * Reported #2821: Json serialization fails or a specific case that contains generics and
@@ -1187,11 +1191,18 @@ Lucian H (symposion@github)
     with `@JsonIdentityInfo`, `PropertyGenerator`
   (2.11.4)
 
+Gian Merlino (gianm@github)
+  * Reported #3022: Property ignorals cause `BeanDeserializer `to forget how to read
+   from arrays (not copying `_arrayDelegateDeserializer`)
+  (2.11.5 / 2.12.2)
+
 Marc Carter (drekbour@github)
   * Contributed #43 implementation: Add option to resolve type from multiple existing properties,
    `@JsonTypeInfo(use=DEDUCTION)`
   (2.12.0)
- 
+  * Contributed #3055: Polymorphic subtype deduction ignores `defaultImpl` attribute
+  (2.12.2)
+
 Mike Gilbode (gilbode@github)
   * Reported #792: Deserialization Not Working Right with Generic Types and Builders
   (2.12.0)
@@ -1276,3 +1287,26 @@ Sergiy Yevtushenko (siy@github)
 M Rizky Satrio (rsatrio@github)
   * Contributed #2925: Add support for `java.sql.Blob`
    (2.12.0)
+
+Halil İbrahim Şener (hisener@github)
+  * Reported #2962: Auto-detection of constructor-based creator method skipped if there is
+   an annotated factory-based creator method (regression from 2.11)
+   (2.12.1)
+
+Faron Dutton (fdutton@github)
+  * Contributed fix for #2990: Breaking API change in `BasicClassIntrospector` (2.12.0)
+   (2.12.1)
+
+SunYiJun (xiaosunzhu@github)
+  * Reported, suggested fix for #2979: Conflicting in POJOPropertiesCollector when
+    having namingStrategy
+   (2.12.1)
+
+Miguel G (Migwel@github)
+  * Reported, contributed fix for #3025: UntypedObjectDeserializer` mixes multiple unwrapped
+    collections (related to #2733)
+   (2.12.2)
+
+Jelle Voost (jellevoost@github)
+  * Reported #3038: Two cases of incorrect error reporting about DeserializationFeature
+   (2.12.2)

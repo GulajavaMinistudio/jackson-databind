@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.ser;
 
-import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
 
@@ -11,14 +10,16 @@ import org.w3c.dom.Element;
 import com.fasterxml.jackson.annotation.JsonFilter;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.CollectionSerializer;
+import com.fasterxml.jackson.databind.ser.jdk.CollectionSerializer;
+import com.fasterxml.jackson.databind.ser.std.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.std.SimpleFilterProvider;
 import com.fasterxml.jackson.databind.ser.std.StdDelegatingSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
@@ -34,7 +35,7 @@ public class TestCustomSerializers extends BaseMapTest
     {
         public ElementSerializer() { super(Element.class); }
         @Override
-        public void serialize(Element value, JsonGenerator gen, SerializerProvider provider) throws IOException, JsonProcessingException {
+        public void serialize(Element value, JsonGenerator gen, SerializerProvider provider) {
             gen.writeString("element");
         }
     }
@@ -120,8 +121,8 @@ public class TestCustomSerializers extends BaseMapTest
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws IOException {
-            Object parent = gen.getCurrentValue();
+                SerializerProvider provider) {
+            Object parent = gen.currentValue();
             String desc = (parent == null) ? "NULL" : parent.getClass().getSimpleName();
             gen.writeString(desc+"/"+value);
         }
@@ -133,7 +134,7 @@ public class TestCustomSerializers extends BaseMapTest
 
         @Override
         public void serialize(String value, JsonGenerator gen,
-                SerializerProvider provider) throws IOException {
+                SerializerProvider provider) {
             gen.writeString(value.toUpperCase());
         }
     }
@@ -155,15 +156,15 @@ public class TestCustomSerializers extends BaseMapTest
     // [databind#2475]
     static class MyFilter2475 extends SimpleBeanPropertyFilter {
         @Override
-        public void serializeAsField(Object pojo, JsonGenerator jgen, SerializerProvider provider, PropertyWriter writer) throws Exception {
+        public void serializeAsProperty(Object pojo, JsonGenerator jgen, SerializerProvider provider, PropertyWriter writer) throws Exception {
             // Ensure that "current value" remains pojo
-            final TokenStreamContext ctx = jgen.getOutputContext();
-            final Object curr = ctx.getCurrentValue();
+            final TokenStreamContext ctx = jgen.streamWriteContext();
+            final Object curr = ctx.currentValue();
 
             if (!(curr instanceof Item2475)) {
                 throw new Error("Field '"+writer.getName()+"', context not that of `Item2475` instance");
             }
-            super.serializeAsField(pojo, jgen, provider, writer);
+            super.serializeAsProperty(pojo, jgen, provider, writer);
         }
     }
 
@@ -210,13 +211,12 @@ public class TestCustomSerializers extends BaseMapTest
     public void testCustomLists() throws Exception
     {
         SimpleModule module = new SimpleModule("test", Version.unknownVersion());
-        JsonSerializer<?> ser = new CollectionSerializer(null, false, null, null);
-        final JsonSerializer<Object> collectionSerializer = (JsonSerializer<Object>) ser;
+        ValueSerializer<?> ser = new CollectionSerializer(null, false, null, null);
+        final ValueSerializer<Object> collectionSerializer = (ValueSerializer<Object>) ser;
 
-        module.addSerializer(Collection.class, new JsonSerializer<Collection>() {
+        module.addSerializer(Collection.class, new ValueSerializer<Collection>() {
             @Override
             public void serialize(Collection value, JsonGenerator gen, SerializerProvider provider)
-                    throws IOException
             {
                 if (value.size() != 0) {
                     collectionSerializer.serialize(value, gen, provider);

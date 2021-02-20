@@ -2,8 +2,9 @@ package com.fasterxml.jackson.databind.deser.creators;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
+
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 
 /**
  * Tests to ensure one can disable {@link JsonCreator} annotations.
@@ -36,7 +37,7 @@ public class DisablingCreatorsTest extends BaseMapTest
 
      public void testDisabling() throws Exception
      {
-          final ObjectMapper mapper = objectMapper();
+          final ObjectMapper mapper = newJsonMapper();
 
           // first, non-problematic case
           NonConflictingCreators value = mapper.readValue(quote("abc"), NonConflictingCreators.class);
@@ -47,7 +48,7 @@ public class DisablingCreatorsTest extends BaseMapTest
           try {
                /*ConflictingCreators value =*/ mapper.readValue(quote("abc"), ConflictingCreators.class);
                fail("Should have failed with JsonCreator conflict");
-          } catch (JsonProcessingException e) {
+          } catch (InvalidDefinitionException e) {
                verifyException(e, "Conflicting property-based creators");
           }
      }

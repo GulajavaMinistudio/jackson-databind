@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.exc.WrappedIOException;
 import com.fasterxml.jackson.core.filter.FilteringParserDelegate;
 import com.fasterxml.jackson.core.filter.JsonPointerBasedFilter;
 import com.fasterxml.jackson.core.filter.TokenFilter;
@@ -15,7 +16,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.cfg.DeserializationContexts;
-import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
+import com.fasterxml.jackson.databind.deser.DeserializationContextExt;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -105,7 +106,7 @@ public class ObjectReader
      * This allows avoiding further deserializer lookups and increases
      * performance a bit on cases where readers are reused.
      */
-    protected final JsonDeserializer<Object> _rootDeserializer;
+    protected final ValueDeserializer<Object> _rootDeserializer;
     
     /**
      * Instance to update with data binding; if any. If null,
@@ -138,7 +139,7 @@ public class ObjectReader
      * Root-level cached deserializers.
      * Passed by {@link ObjectMapper}, shared with it.
      */
-    final protected ConcurrentHashMap<JavaType, JsonDeserializer<Object>> _rootDeserializers;
+    final protected ConcurrentHashMap<JavaType, ValueDeserializer<Object>> _rootDeserializers;
 
     /*
     /**********************************************************************
@@ -179,7 +180,7 @@ public class ObjectReader
      * Copy constructor used for building variations.
      */
     protected ObjectReader(ObjectReader base, DeserializationConfig config,
-            JavaType valueType, JsonDeserializer<Object> rootDeser, Object valueToUpdate,
+            JavaType valueType, ValueDeserializer<Object> rootDeser, Object valueToUpdate,
             FormatSchema schema, InjectableValues injectableValues)
     {
         _config = config;
@@ -259,7 +260,7 @@ public class ObjectReader
      * Factory method called by various "withXxx()" methods
      */
     protected ObjectReader _new(ObjectReader base, DeserializationConfig config,
-            JavaType valueType, JsonDeserializer<Object> rootDeser, Object valueToUpdate,
+            JavaType valueType, ValueDeserializer<Object> rootDeser, Object valueToUpdate,
             FormatSchema schema, InjectableValues injectableValues) {
         return new ObjectReader(base, config, valueType, rootDeser,  valueToUpdate,
                  schema,  injectableValues);
@@ -270,7 +271,7 @@ public class ObjectReader
      * either default, or custom subtype.
      */
     protected <T> MappingIterator<T> _newIterator(JsonParser p, DeserializationContext ctxt,
-            JsonDeserializer<?> deser, boolean parserManaged)
+            ValueDeserializer<?> deser, boolean parserManaged)
     {
         return new MappingIterator<T>(_valueType, p, ctxt,
                 deser, parserManaged, _valueToUpdate);
@@ -282,8 +283,7 @@ public class ObjectReader
     /**********************************************************************
      */
 
-    protected JsonToken _initForReading(DefaultDeserializationContext ctxt, JsonParser p)
-        throws IOException
+    protected JsonToken _initForReading(DeserializationContextExt ctxt, JsonParser p)
     {
         ctxt.assignParser(p);
 
@@ -309,8 +309,7 @@ public class ObjectReader
      *<p>
      * Base implementation only sets configured {@link FormatSchema}, if any, on parser.
      */
-    protected void _initForMultiRead(DefaultDeserializationContext ctxt, JsonParser p)
-        throws IOException
+    protected void _initForMultiRead(DeserializationContextExt ctxt, JsonParser p)
     {
         ctxt.assignParser(p);
     }
@@ -571,7 +570,7 @@ public class ObjectReader
         if (valueType != null && valueType.equals(_valueType)) {
             return this;
         }
-        JsonDeserializer<Object> rootDeser = _prefetchRootDeserializer(valueType);
+        ValueDeserializer<Object> rootDeser = _prefetchRootDeserializer(valueType);
         return _new(this, _config, valueType, rootDeser,
                 _valueToUpdate, _schema, _injectableValues);
     }    
@@ -657,6 +656,17 @@ public class ObjectReader
         return _with(_config.with(defaultBase64));
     }
 
+    /**
+     * Mutant factory for overriding set of (default) attributes for
+     * {@link ObjectReader} to use.
+     *<p>
+     * Note that this will replace defaults passed by {@link ObjectMapper}.
+     *
+     * @param attrs Default {@link ContextAttributes} to use with a reader
+     *
+     * @return {@link ObjectReader} instance with specified default attributes (which
+     *    is usually a newly constructed reader instance with otherwise identical settings)
+     */
     public ObjectReader with(ContextAttributes attrs) {
         return _with(_config.with(attrs));
     }
@@ -757,9 +767,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(File src) throws IOException {
+    public JsonParser createParser(File src) throws JacksonException {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
     }
 
@@ -771,9 +781,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(URL src) throws IOException {
+    public JsonParser createParser(URL src) throws JacksonException {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
     }
 
@@ -785,9 +795,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(InputStream src) throws IOException {
+    public JsonParser createParser(InputStream src) throws JacksonException {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
     }
 
@@ -799,9 +809,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(Reader src) throws IOException {
+    public JsonParser createParser(Reader src) throws JacksonException {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
     }
 
@@ -813,9 +823,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(byte[] content) throws IOException {
+    public JsonParser createParser(byte[] content) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
     }
 
@@ -827,9 +837,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(byte[] content, int offset, int len) throws IOException {
+    public JsonParser createParser(byte[] content, int offset, int len) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content, offset, len));
     }
 
@@ -841,9 +851,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(String content) throws IOException {
+    public JsonParser createParser(String content) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
     }
 
@@ -855,9 +865,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(char[] content) throws IOException {
+    public JsonParser createParser(char[] content) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
     }
 
@@ -869,9 +879,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(char[] content, int offset, int len) throws IOException {
+    public JsonParser createParser(char[] content, int offset, int len) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content, offset, len));
     }
 
@@ -883,9 +893,9 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createParser(DataInput content) throws IOException {
+    public JsonParser createParser(DataInput content) throws JacksonException {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, content));
     }
 
@@ -897,8 +907,8 @@ public class ObjectReader
      *
      * @since 3.0
      */
-    public JsonParser createNonBlockingByteArrayParser() throws IOException {
-        DefaultDeserializationContext ctxt = _deserializationContext();
+    public JsonParser createNonBlockingByteArrayParser() throws JacksonException {
+        DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createNonBlockingByteArrayParser(ctxt));
     }
 
@@ -966,16 +976,14 @@ public class ObjectReader
      */
     @SuppressWarnings("unchecked")
     @Override
-    public JsonNode readTree(JsonParser p) throws IOException {
+    public JsonNode readTree(JsonParser p) throws JacksonException {
         _assertNotNull("p", p);
         return _bindAsTreeOrNull(_deserializationContext(p), p);
     }
 
     // Alas, can't really support this part...
     @Override
-    public void writeTree(JsonGenerator g, TreeNode tree)
-        throws IOException, JsonProcessingException
-    {
+    public void writeTree(JsonGenerator g, TreeNode tree) {
         throw new UnsupportedOperationException();
     }
 
@@ -992,56 +1000,10 @@ public class ObjectReader
      * was specified with {@link #withValueToUpdate(Object)}.
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(JsonParser p) throws IOException {
+    public <T> T readValue(JsonParser p) throws JacksonException {
         _assertNotNull("p", p);
-        DefaultDeserializationContext ctxt = _deserializationContext(p);
+        DeserializationContextExt ctxt = _deserializationContext(p);
         return (T) _bind(ctxt, p, _valueToUpdate);
-    }
-
-    /**
-     * Convenience method that binds content read using given parser, using
-     * configuration of this reader, except that expected value type
-     * is specified with the call (instead of currently configured root type).
-     * Value return is either newly constructed, or root value that
-     * was specified with {@link #withValueToUpdate(Object)}.
-     */
-    public <T> T readValue(JsonParser p, Class<T> valueType) throws IOException {
-        _assertNotNull("p", p);
-        return forType(valueType).readValue(p);
-    }
-
-    /**
-     * Convenience method that binds content read using given parser, using
-     * configuration of this reader, except that expected value type
-     * is specified with the call (instead of currently configured root type).
-     * Value return is either newly constructed, or root value that
-     * was specified with {@link #withValueToUpdate(Object)}.
-     */
-    public <T> T readValue(JsonParser p, TypeReference<T> valueTypeRef) throws IOException {
-        _assertNotNull("p", p);
-        return forType(valueTypeRef).readValue(p);
-    }
-
-    /**
-     * Convenience method that binds content read using given parser, using
-     * configuration of this reader, except that expected value type
-     * is specified with the call (instead of currently configured root type).
-     * Value return is either newly constructed, or root value that
-     * was specified with {@link #withValueToUpdate(Object)}.
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(JsonParser p, ResolvedType valueType) throws IOException {
-        _assertNotNull("p", p);
-        return (T) forType((JavaType)valueType).readValue(p);
-    }
-
-    /**
-     * Type-safe overloaded method, basically alias for {@link #readValue(JsonParser, ResolvedType)}.
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(JsonParser p, JavaType valueType) throws IOException {
-        _assertNotNull("p", p);
-        return (T) forType(valueType).readValue(p);
     }
 
     /**
@@ -1060,7 +1022,9 @@ public class ObjectReader
      * contains values to read) but rather to the token following it which is the first
      * token of the first value to read.
      */
-    public <T> Iterator<T> readValues(JsonParser p, Class<T> valueType) throws IOException {
+    public <T> Iterator<T> readValues(JsonParser p, Class<T> valueType)
+        throws JacksonException
+    {
         _assertNotNull("p", p);
         return forType(valueType).readValues(p);
     }
@@ -1081,7 +1045,9 @@ public class ObjectReader
      * contains values to read) but rather to the token following it which is the first
      * token of the first value to read.
      */
-    public <T> Iterator<T> readValues(JsonParser p, TypeReference<T> valueTypeRef) throws IOException {
+    public <T> Iterator<T> readValues(JsonParser p, TypeReference<T> valueTypeRef)
+        throws JacksonException
+    {
         _assertNotNull("p", p);
         return forType(valueTypeRef).readValues(p);
     }
@@ -1102,7 +1068,7 @@ public class ObjectReader
      * contains values to read) but rather to the token following it which is the first
      * token of the first value to read.
      */
-    public <T> Iterator<T> readValues(JsonParser p, ResolvedType valueType) throws IOException {
+    public <T> Iterator<T> readValues(JsonParser p, ResolvedType valueType) throws JacksonException {
         _assertNotNull("p", p);
         return readValues(p, (JavaType) valueType);
     }
@@ -1123,7 +1089,7 @@ public class ObjectReader
      * contains values to read) but rather to the token following it which is the first
      * token of the first value to read.
      */
-    public <T> Iterator<T> readValues(JsonParser p, JavaType valueType) throws IOException {
+    public <T> Iterator<T> readValues(JsonParser p, JavaType valueType) throws JacksonException {
         _assertNotNull("p", p);
         return forType(valueType).readValues(p);
     }
@@ -1141,27 +1107,12 @@ public class ObjectReader
      * was specified with {@link #withValueToUpdate(Object)}.
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(InputStream in) throws IOException
+    public <T> T readValue(InputStream in) throws JacksonException
     {
         _assertNotNull("in", in);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, in), false));
-    }
-
-    /**
-     * Same as {@link #readValue(InputStream)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param src Source to read content from
-     * @param valueType Target type to bind content to
-     *
-     * @since 2.11
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(InputStream src, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(src);
     }
 
     /**
@@ -1173,27 +1124,12 @@ public class ObjectReader
      * @param r Source to read content from
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(Reader r) throws IOException
+    public <T> T readValue(Reader r) throws JacksonException
     {
         _assertNotNull("r", r);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, r), false));
-    }
-
-    /**
-     * Same as {@link #readValue(Reader)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param src Source to read content from
-     * @param valueType Target type to bind content to
-     *
-     * @since 2.11
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(Reader src, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(src);
     }
 
     /**
@@ -1205,25 +1141,12 @@ public class ObjectReader
      * @param content String that contains content to read
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(String content) throws IOException
+    public <T> T readValue(String content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
-    }
-
-    /**
-     * Same as {@link #readValue(String)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param src String that contains content to read
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(String src, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(src);
     }
 
     /**
@@ -1235,25 +1158,12 @@ public class ObjectReader
      * @param content Byte array that contains encoded content to read
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(byte[] content) throws IOException
+    public <T> T readValue(byte[] content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
-    }
-
-    /**
-     * Same as {@link #readValue(byte[])} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param content Byte array that contains encoded content to read
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(byte[] content, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(content);
     }
 
     /**
@@ -1267,27 +1177,12 @@ public class ObjectReader
      * @param length Length of content in {@code buffer}, in bytes
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(byte[] buffer, int offset, int length) throws IOException
+    public <T> T readValue(byte[] buffer, int offset, int length) throws JacksonException
     {
         _assertNotNull("buffer", buffer);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, buffer, offset, length), false));
-    }
-
-    /**
-     * Same as {@link #readValue(byte[],int,int)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param buffer Byte array that contains encoded content to read
-     * @param offset Offset of the first content byte in {@code buffer}
-     * @param length Length of content in {@code buffer}, in bytes
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(byte[] buffer, int offset, int length, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(buffer, offset, length);
     }
 
     /**
@@ -1299,25 +1194,12 @@ public class ObjectReader
      * @param f File that contains content to read
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(File f) throws IOException
+    public <T> T readValue(File f) throws JacksonException
     {
         _assertNotNull("f", f);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, f), false));
-    }
-
-    /**
-     * Same as {@link #readValue(File)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param src File that contains content to read
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(File src, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(src);
     }
 
     /**
@@ -1334,25 +1216,12 @@ public class ObjectReader
      * to create {@link java.io.InputStream} separately.
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(URL url) throws IOException
+    public <T> T readValue(URL url) throws JacksonException
     {
         _assertNotNull("src", url);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, url), false));
-    }
-
-    /**
-     * Same as {@link #readValue(URL)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param src URL pointing to resource that contains content to read
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(URL src, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(src);
     }
 
     /**
@@ -1365,47 +1234,21 @@ public class ObjectReader
      * @param node Tree that contains content to convert
      */
     @SuppressWarnings("unchecked")
-    public <T> T readValue(JsonNode node) throws IOException
+    public <T> T readValue(JsonNode node) throws JacksonException
     {
         _assertNotNull("node", node);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(treeAsTokens(node, ctxt), false));
     }
 
-    /**
-     * Same as {@link #readValue(JsonNode)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param content Tree that contains content to convert
-     * @param valueType Target type to convert content to
-     */
-    @SuppressWarnings({ "unchecked" })
-    public <T> T readValue(JsonNode content, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(content);
-    }
-
     @SuppressWarnings("unchecked")
-    public <T> T readValue(DataInput input) throws IOException
+    public <T> T readValue(DataInput input) throws JacksonException
     {
         _assertNotNull("input", input);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, input), false));
-    }
-
-    /**
-     * Same as {@link #readValue(DataInput)} except that target value type
-     * overridden as {@code valueType}
-     *
-     * @param content DataInput that contains content to read
-     * @param valueType Target type to bind content to
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(DataInput content, Class<T> valueType) throws IOException
-    {
-        return (T) forType(valueType).readValue(content);
     }
 
     /*
@@ -1431,10 +1274,10 @@ public class ObjectReader
      * it will just be ignored; result is always a newly constructed
      * {@link JsonNode} instance.
      */
-    public JsonNode readTree(InputStream src) throws IOException
+    public JsonNode readTree(InputStream src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), false));
     }
@@ -1443,10 +1286,10 @@ public class ObjectReader
      * Same as {@link #readTree(InputStream)} except content accessed through
      * passed-in {@link Reader}
      */
-    public JsonNode readTree(Reader src) throws IOException
+    public JsonNode readTree(Reader src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), false));
     }
@@ -1455,10 +1298,10 @@ public class ObjectReader
      * Same as {@link #readTree(InputStream)} except content read from
      * passed-in {@link String}
      */
-    public JsonNode readTree(String content) throws IOException
+    public JsonNode readTree(String content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
     }
@@ -1467,10 +1310,10 @@ public class ObjectReader
      * Same as {@link #readTree(InputStream)} except content read from
      * passed-in byte array.
      */
-    public JsonNode readTree(byte[] content) throws IOException
+    public JsonNode readTree(byte[] content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
     }
@@ -1479,10 +1322,10 @@ public class ObjectReader
      * Same as {@link #readTree(InputStream)} except content read from
      * passed-in byte array.
      */
-    public JsonNode readTree(byte[] content, int offset, int len) throws IOException
+    public JsonNode readTree(byte[] content, int offset, int len) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content, offset, len), false));
     }
@@ -1491,10 +1334,10 @@ public class ObjectReader
      * Same as {@link #readTree(InputStream)} except content read using
      * passed-in {@link DataInput}.
      */
-    public JsonNode readTree(DataInput content) throws IOException
+    public JsonNode readTree(DataInput content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
     }
@@ -1517,7 +1360,7 @@ public class ObjectReader
      * to the token following it.
      */
     public <T> MappingIterator<T> readValues(JsonParser p)
-        throws IOException
+        throws JacksonException
     {
         _assertNotNull("p", p);
         DeserializationContext ctxt = _deserializationContext(p);
@@ -1545,10 +1388,10 @@ public class ObjectReader
      * points to the first token of the first element (i.e. the second
      * <code>START_ARRAY</code> which is part of the first element).
      */
-    public <T> MappingIterator<T> readValues(InputStream src) throws IOException
+    public <T> MappingIterator<T> readValues(InputStream src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
@@ -1557,10 +1400,10 @@ public class ObjectReader
      * Overloaded version of {@link #readValue(InputStream)}.
      */
     @SuppressWarnings("resource")
-    public <T> MappingIterator<T> readValues(Reader src) throws IOException
+    public <T> MappingIterator<T> readValues(Reader src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         JsonParser p = _considerFilter(_parserFactory.createParser(ctxt, src), true);
         _initForMultiRead(ctxt, p);
         p.nextToken();
@@ -1573,10 +1416,10 @@ public class ObjectReader
      * @param content String that contains JSON content to parse
      */
     @SuppressWarnings("resource")
-    public <T> MappingIterator<T> readValues(String content) throws IOException
+    public <T> MappingIterator<T> readValues(String content) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         JsonParser p = _considerFilter(_parserFactory.createParser(ctxt, content), true);
         _initForMultiRead(ctxt, p);
         p.nextToken();
@@ -1586,10 +1429,10 @@ public class ObjectReader
     /**
      * Overloaded version of {@link #readValue(InputStream)}.
      */
-    public <T> MappingIterator<T> readValues(byte[] content, int offset, int length) throws IOException
+    public <T> MappingIterator<T> readValues(byte[] content, int offset, int length) throws JacksonException
     {
         _assertNotNull("content", content);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, content, offset, length), true));
     }
@@ -1597,7 +1440,7 @@ public class ObjectReader
     /**
      * Overloaded version of {@link #readValue(InputStream)}.
      */
-    public final <T> MappingIterator<T> readValues(byte[] content) throws IOException {
+    public final <T> MappingIterator<T> readValues(byte[] content) throws JacksonException {
         _assertNotNull("content", content);
         return readValues(content, 0, content.length);
     }
@@ -1605,10 +1448,10 @@ public class ObjectReader
     /**
      * Overloaded version of {@link #readValue(InputStream)}.
      */
-    public <T> MappingIterator<T> readValues(File src) throws IOException
+    public <T> MappingIterator<T> readValues(File src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
@@ -1624,18 +1467,18 @@ public class ObjectReader
      * 
      * @param src URL to read to access JSON content to parse.
      */
-    public <T> MappingIterator<T> readValues(URL src) throws IOException
+    public <T> MappingIterator<T> readValues(URL src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
 
-    public <T> MappingIterator<T> readValues(DataInput src) throws IOException
+    public <T> MappingIterator<T> readValues(DataInput src) throws JacksonException
     {
         _assertNotNull("src", src);
-        DefaultDeserializationContext ctxt = _deserializationContext();
+        DeserializationContextExt ctxt = _deserializationContext();
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
@@ -1646,16 +1489,16 @@ public class ObjectReader
     /**********************************************************************
      */
 
-    public <T> T treeToValue(TreeNode n, Class<T> valueType) throws JsonProcessingException
+    public <T> T treeToValue(TreeNode n, Class<T> valueType) throws JacksonException
     {
         _assertNotNull("n", n);
-        try {
-            return readValue(treeAsTokens(n), valueType);
-        } catch (JsonProcessingException e) {
-            throw e;
-        } catch (IOException e) { // should not occur, no real i/o...
-            throw JsonMappingException.fromUnexpectedIOE(e);
-        }
+        return forType(valueType).readValue(treeAsTokens(n));
+    }
+
+    public <T> T treeToValue(TreeNode n, JavaType valueType) throws JacksonException
+    {
+        _assertNotNull("n", n);
+        return forType(valueType).readValue(treeAsTokens(n));
     }
 
     /*
@@ -1667,8 +1510,8 @@ public class ObjectReader
     /**
      * Actual implementation of value reading+binding operation.
      */
-    protected Object _bind(DefaultDeserializationContext ctxt,
-            JsonParser p, Object valueToUpdate) throws IOException
+    protected Object _bind(DeserializationContextExt ctxt,
+            JsonParser p, Object valueToUpdate) throws JacksonException
     {
         // First: may need to read the next token, to initialize state (either
         // before first read from parser, or after previous token has been cleared)
@@ -1693,8 +1536,8 @@ public class ObjectReader
         return result;
     }
 
-    protected Object _bindAndClose(DefaultDeserializationContext ctxt,
-            JsonParser p0) throws IOException
+    protected Object _bindAndClose(DeserializationContextExt ctxt,
+            JsonParser p0) throws JacksonException
     {
         try (JsonParser p = p0) {
             Object result;
@@ -1717,15 +1560,16 @@ public class ObjectReader
         }
     }
 
-    protected final JsonNode _bindAndCloseAsTree(DefaultDeserializationContext ctxt,
-            JsonParser p0) throws IOException {
+    protected final JsonNode _bindAndCloseAsTree(DeserializationContextExt ctxt,
+            JsonParser p0) throws JacksonException {
         try (JsonParser p = ctxt.assignAndReturnParser(p0)) {
             return _bindAsTree(ctxt, p);
         }
     }
 
-    protected final JsonNode _bindAsTree(DefaultDeserializationContext ctxt,
-            JsonParser p) throws IOException
+    protected final JsonNode _bindAsTree(DeserializationContextExt ctxt,
+            JsonParser p)
+        throws JacksonException
     {
         JsonToken t = p.currentToken();
         if (t == null) {
@@ -1753,8 +1597,8 @@ public class ObjectReader
      * Same as {@link #_bindAsTree} except end-of-input is reported by returning
      * {@code null}, not "missing node"
      */
-    protected final JsonNode _bindAsTreeOrNull(DefaultDeserializationContext ctxt,
-            JsonParser p) throws IOException
+    protected final JsonNode _bindAsTreeOrNull(DeserializationContextExt ctxt,
+            JsonParser p) throws JacksonException
     {
         ctxt.assignParser(p);
         JsonToken t = p.currentToken();
@@ -1777,8 +1621,8 @@ public class ObjectReader
         return resultNode;
     }
     
-    protected <T> MappingIterator<T> _bindAndReadValues(DefaultDeserializationContext ctxt,
-            JsonParser p) throws IOException
+    protected <T> MappingIterator<T> _bindAndReadValues(DeserializationContextExt ctxt,
+            JsonParser p) throws JacksonException
     {
         _initForMultiRead(ctxt, p);
         p.nextToken();
@@ -1797,7 +1641,7 @@ public class ObjectReader
 
     protected final void _verifyNoTrailingTokens(JsonParser p, DeserializationContext ctxt,
             JavaType bindType)
-        throws IOException
+        throws JacksonException
     {
         JsonToken t = p.nextToken();
         if (t != null) {
@@ -1832,21 +1676,29 @@ public class ObjectReader
      * for deserializing a single root value.
      * Can be overridden if a custom context is needed.
      */
-    protected DefaultDeserializationContext _deserializationContext() {
+    protected DeserializationContextExt _deserializationContext() {
         return _contexts.createContext(_config, _schema, _injectableValues);
     }
 
-    protected DefaultDeserializationContext _deserializationContext(JsonParser p) {
+    protected DeserializationContextExt _deserializationContext(JsonParser p) {
         return _contexts.createContext(_config, _schema, _injectableValues)
                 .assignParser(p);
     }
 
-    protected InputStream _inputStream(URL src) throws IOException {
-        return src.openStream();
+    protected InputStream _inputStream(URL src) throws JacksonException {
+        try {
+            return src.openStream();
+        } catch (IOException e) {
+            throw WrappedIOException.construct(e);
+        }
     }
 
-    protected InputStream _inputStream(File f) throws IOException {
-        return new FileInputStream(f);
+    protected InputStream _inputStream(File f) throws JacksonException {
+        try {
+            return new FileInputStream(f);
+        } catch (IOException e) {
+            throw WrappedIOException.construct(e);
+        }
     }
 
     protected final void _assertNotNull(String paramName, Object src) {
@@ -1864,8 +1716,8 @@ public class ObjectReader
     /**
      * Method called to locate deserializer for the passed root-level value.
      */
-    protected JsonDeserializer<Object> _findRootDeserializer(DeserializationContext ctxt)
-        throws JsonMappingException
+    protected ValueDeserializer<Object> _findRootDeserializer(DeserializationContext ctxt)
+        throws DatabindException
     {
         if (_rootDeserializer != null) {
             return _rootDeserializer;
@@ -1878,7 +1730,7 @@ public class ObjectReader
                     "No value type configured for ObjectReader");
         }
         // First: have we already seen it?
-        JsonDeserializer<Object> deser = _rootDeserializers.get(t);
+        ValueDeserializer<Object> deser = _rootDeserializers.get(t);
         if (deser != null) {
             return deser;
         }
@@ -1891,10 +1743,10 @@ public class ObjectReader
         return deser;
     }
 
-    protected JsonDeserializer<Object> _findTreeDeserializer(DeserializationContext ctxt)
-        throws JsonMappingException
+    protected ValueDeserializer<Object> _findTreeDeserializer(DeserializationContext ctxt)
+        throws DatabindException
     {
-        JsonDeserializer<Object> deser = _rootDeserializers.get(JSON_NODE_TYPE);
+        ValueDeserializer<Object> deser = _rootDeserializers.get(JSON_NODE_TYPE);
         if (deser == null) {
             // Nope: need to ask provider to resolve it
             deser = ctxt.findRootValueDeserializer(JSON_NODE_TYPE);
@@ -1912,13 +1764,13 @@ public class ObjectReader
      * by configuration. Method also is NOT to throw an exception if
      * access fails.
      */
-    protected JsonDeserializer<Object> _prefetchRootDeserializer(JavaType valueType)
+    protected ValueDeserializer<Object> _prefetchRootDeserializer(JavaType valueType)
     {
         if ((valueType == null) || !_config.isEnabled(DeserializationFeature.EAGER_DESERIALIZER_FETCH)) {
             return null;
         }
         // already cached?
-        JsonDeserializer<Object> deser = _rootDeserializers.get(valueType);
+        ValueDeserializer<Object> deser = _rootDeserializers.get(valueType);
         if (deser == null) {
             try {
                 // If not, need to resolve; for which we need a temporary context as well:
@@ -1928,8 +1780,10 @@ public class ObjectReader
                     _rootDeserializers.put(valueType, deser);
                 }
                 return deser;
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 // need to swallow?
+                // 20-Jan-2021, tatu: Not 100% sure actually... but was that way in 2.x
+                //    so leaving for now
             }
         }
         return deser;

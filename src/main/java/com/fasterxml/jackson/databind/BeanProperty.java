@@ -26,8 +26,8 @@ import com.fasterxml.jackson.databind.util.FullyNamed;
  * Instances are not typically passed when constructing serializers
  * and deserializers, but rather only passed when context
  * is known and
- * {@link JsonSerializer#createContextual} and
- * {@link JsonDeserializer#createContextual} are called.
+ * {@link ValueSerializer#createContextual} and
+ * {@link ValueDeserializer#createContextual} are called.
  * References may (need to) be retained by serializers and deserializers,
  * especially when further resolving dependent handlers like value
  * serializers/deserializers or structured types.
@@ -161,8 +161,7 @@ public interface BeanProperty extends FullyNamed
      * @param objectVisitor Visitor to used as the callback handler
      */
     public void depositSchemaProperty(JsonObjectFormatVisitor objectVisitor,
-            SerializerProvider provider)
-        throws JsonMappingException;
+            SerializerProvider provider);
 
     /*
     /**********************************************************************
@@ -365,7 +364,7 @@ public interface BeanProperty extends FullyNamed
 
         @Override
         public void depositSchemaProperty(JsonObjectFormatVisitor objectVisitor,
-                SerializerProvider provider) throws JsonMappingException {
+                SerializerProvider provider) {
         }
     }
 }

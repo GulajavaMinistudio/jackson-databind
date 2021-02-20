@@ -1,14 +1,12 @@
 package com.fasterxml.jackson.databind.deser.creators;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.deser.ValueInstantiators;
-import com.fasterxml.jackson.databind.deser.impl.PropertyValueBuffer;
+import com.fasterxml.jackson.databind.deser.bean.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
@@ -19,7 +17,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
  * and {@link PropertyValueBuffer#getParameter(SettableBeanProperty)} methods.
  */
 @SuppressWarnings("serial")
-public class TestCustomValueInstDefaults extends BaseTest
+public class TestCustomValueInstDefaults
+    extends BaseMapTest
 {
     static class Bucket
     {
@@ -119,10 +118,8 @@ public class TestCustomValueInstDefaults extends BaseTest
         }
 
         @Override
-        public Object createFromObjectWith(
-                DeserializationContext ctxt,
-                SettableBeanProperty[] props,
-                PropertyValueBuffer buffer) throws JsonMappingException
+        public Object createFromObjectWith(DeserializationContext ctxt,
+                SettableBeanProperty[] props, PropertyValueBuffer buffer)
         {
             int a = Bucket.DEFAULT_A;
             int b = Bucket.DEFAULT_B;
@@ -153,10 +150,8 @@ public class TestCustomValueInstDefaults extends BaseTest
         }
 
         @Override
-        public Object createFromObjectWith(
-                DeserializationContext ctxt,
-                SettableBeanProperty[] props,
-                PropertyValueBuffer buffer) throws JsonMappingException
+        public Object createFromObjectWith(DeserializationContext ctxt,
+                SettableBeanProperty[] props, PropertyValueBuffer buffer)
         {
             int i01 = BigBucket.DEFAULT_I;
             int i02 = BigBucket.DEFAULT_I;
@@ -337,7 +332,8 @@ public class TestCustomValueInstDefaults extends BaseTest
         }
 
         @Override
-        public Object createFromObjectWith(DeserializationContext ctxt, SettableBeanProperty[] props, PropertyValueBuffer buffer) throws IOException {
+        public Object createFromObjectWith(DeserializationContext ctxt, SettableBeanProperty[] props, PropertyValueBuffer buffer)
+        {
             for (SettableBeanProperty prop : props) {
                 assertTrue("prop " + prop.getName() + " was expected to have buffer.hasParameter(prop) be true but was false", buffer.hasParameter(prop));
             }

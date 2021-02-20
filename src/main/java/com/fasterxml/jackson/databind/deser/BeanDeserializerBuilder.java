@@ -5,9 +5,11 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import com.fasterxml.jackson.databind.deser.impl.BeanPropertyMap;
-import com.fasterxml.jackson.databind.deser.impl.ObjectIdValueProperty;
+import com.fasterxml.jackson.databind.deser.bean.BeanDeserializer;
+import com.fasterxml.jackson.databind.deser.bean.BeanPropertyMap;
+import com.fasterxml.jackson.databind.deser.bean.BuilderBasedDeserializer;
 import com.fasterxml.jackson.databind.deser.impl.ObjectIdReader;
+import com.fasterxml.jackson.databind.deser.impl.ObjectIdValueProperty;
 import com.fasterxml.jackson.databind.deser.impl.ValueInjector;
 import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.util.Annotations;
@@ -16,42 +18,42 @@ import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 
 /**
  * Builder class used for aggregating deserialization information about
- * a POJO, in order to build a {@link JsonDeserializer} for deserializing
- * instances.
+ * a property-based POJO, in order to build a {@link ValueDeserializer}
+ * for deserializing POJO instances.
  */
 public class BeanDeserializerBuilder
 {
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Configuration
-    /**********************************************************
+    /**********************************************************************
      */
 
-    final protected DeserializationConfig _config;
+    protected final DeserializationConfig _config;
 
-    final protected DeserializationContext _context;
+    protected final DeserializationContext _context;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* General information about POJO
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Introspected information about POJO for deserializer to handle
      */
-    final protected BeanDescription _beanDesc;
+    protected final BeanDescription _beanDesc;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Accumulated information about properties
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Properties to deserialize collected so far.
      */
-    final protected Map<String, SettableBeanProperty> _properties
+    protected final Map<String, SettableBeanProperty> _properties
         = new LinkedHashMap<String, SettableBeanProperty>();
 
     /**
@@ -112,9 +114,9 @@ public class BeanDeserializerBuilder
     protected JsonPOJOBuilder.Value _builderConfig;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle: construction
-    /**********************************************************
+    /**********************************************************************
      */
 
     public BeanDeserializerBuilder(BeanDescription beanDesc,
@@ -162,9 +164,9 @@ public class BeanDeserializerBuilder
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle: state modification (adders, setters)
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -294,9 +296,9 @@ public class BeanDeserializerBuilder
     }
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public accessors
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -347,24 +349,21 @@ public class BeanDeserializerBuilder
         return _builderConfig;
     }
 
-    /**
-     * @since 2.9.4
-     */
     public boolean hasIgnorable(String name) {
         return IgnorePropertiesUtil.shouldIgnore(name, _ignorableProps, _includableProps);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Build method(s)
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
      * Method for constructing a {@link BeanDeserializer}, given all
      * information collected.
      */
-    public JsonDeserializer<?> build()
+    public ValueDeserializer<?> build()
     {
         Collection<SettableBeanProperty> props = _properties.values();
         _fixAccess(props);
@@ -393,8 +392,7 @@ public class BeanDeserializerBuilder
      * Method for constructing a specialized deserializer that uses
      * additional external Builder object during data binding.
      */
-    public JsonDeserializer<?> buildBuilderBased(JavaType valueType, String expBuildMethodName)
-        throws JsonMappingException
+    public ValueDeserializer<?> buildBuilderBased(JavaType valueType, String expBuildMethodName)
     {
         // First: validation; must have build method that returns compatible type
         if (_buildMethod == null) {
@@ -437,7 +435,7 @@ public class BeanDeserializerBuilder
     /**
      * Extension point for overriding the actual creation of the builder deserializer.
      */
-    protected JsonDeserializer<?> createBuilderBasedDeserializer(JavaType valueType,
+    protected ValueDeserializer<?> createBuilderBasedDeserializer(JavaType valueType,
             BeanPropertyMap propertyMap, boolean anyViews) {
         return new BuilderBasedDeserializer(this,
                 _beanDesc, valueType, propertyMap, _backRefProperties, _ignorableProps, _ignoreAllUnknown,
@@ -445,9 +443,9 @@ public class BeanDeserializerBuilder
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal helper method(s)
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected void _fixAccess(Collection<SettableBeanProperty> mainProps)

@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.deser.creators;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -326,7 +325,7 @@ public class TestValueInstantiator extends BaseMapTest
         }
         
         @Override
-        public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+        public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) {
             return new AnnotatedBeanDelegating(delegate, false);
         }
     }
@@ -601,11 +600,9 @@ public class TestValueInstantiator extends BaseMapTest
         try {
             MAPPER.readValue("{ }", MyBean.class);
             fail("Should not succeed");
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "Cannot construct instance of");
             verifyException(e, "no Creators");
-            // as per [databind#1414], is definition problem
-            assertEquals(InvalidDefinitionException.class, e.getClass());
         }
     }
 
@@ -615,11 +612,9 @@ public class TestValueInstantiator extends BaseMapTest
         try {
             MAPPER.readValue("\"foo\"", MyBean.class);
             fail("Should not succeed");
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "Cannot construct instance of");
             verifyException(e, "no String-argument constructor/factory");
-            // as per [databind#1414], is definition problem
-            assertEquals(InvalidDefinitionException.class, e.getClass());
         }
     }
 }

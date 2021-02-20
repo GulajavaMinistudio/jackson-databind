@@ -1,17 +1,15 @@
 package com.fasterxml.jackson.databind.exc;
 
-import java.io.*;
-
 import com.fasterxml.jackson.core.*;
-
+import com.fasterxml.jackson.core.exc.WrappedIOException;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.testutil.BrokenStringReader;
 
 /**
  * Unit test for verifying that exceptions are properly handled (caught,
  * re-thrown or wrapped, depending) with Object deserialization,
- * including using concrete subtypes of {@link JsonMappingException}
- * (or, for low-level parsing, {@link JsonParseException}).
+ * including using concrete subtypes of {@link DatabindException}
+ * (and streaming-level equivalents).
  */
 public class DeserExceptionTypeTest
     extends BaseMapTest
@@ -56,16 +54,15 @@ public class DeserExceptionTypeTest
 
     /**
      * Simple test to check behavior when end-of-stream is encountered
-     * without content. Used to expect EOFException (Jackson 1.x); but
-     * nowadays ought to be JsonMappingException
+     * without content.
      */
     public void testExceptionWithEmpty() throws Exception
     {
         try {
             Object result = MAPPER.readValue("    ", Object.class);
             fail("Expected an exception, but got result value: "+result);
-        } catch (Exception e) {
-            verifyException(e, MismatchedInputException.class, "No content");
+        } catch (MismatchedInputException e) {
+            verifyException(e, "No content");
         }
     }
 
@@ -77,10 +74,10 @@ public class DeserExceptionTypeTest
             @SuppressWarnings("unused")
             Object ob = MAPPER.readValue(p, Object.class);
             fail("Should have gotten an exception");
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             // For "bona fide" IO problems (due to low-level problem,
             // thrown by reader/stream), IOException must be thrown
-            verifyException(e, IOException.class, "TEST");
+            verifyException(e, WrappedIOException.class, "TEST");
         }
     }
 
@@ -95,7 +92,7 @@ public class DeserExceptionTypeTest
         try {
             I = MAPPER.readValue(p, Integer.class);
             fail("Should have gotten an exception");
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             verifyException(e, MismatchedInputException.class, "No content");
         }
         // also: should have no current token after end-of-input
@@ -112,7 +109,7 @@ public class DeserExceptionTypeTest
         try {
             NoCreatorsBean b = MAPPER.readValue("{}", NoCreatorsBean.class);
             fail("Should not succeed, got: "+b);
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, InvalidDefinitionException.class, "no Creators");
         }
     }

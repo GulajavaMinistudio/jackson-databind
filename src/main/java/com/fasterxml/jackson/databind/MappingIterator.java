@@ -1,17 +1,18 @@
 package com.fasterxml.jackson.databind;
 
 import java.io.Closeable;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.databind.exc.RuntimeJsonMappingException;
 
 /**
  * Iterator exposed by {@link ObjectMapper} when binding sequence of
- * objects. Extension is done to allow more convenient exposing of
- * {@link IOException} (which basic {@link Iterator} does not expose)
+ * objects. Extension is done to allow more convenient access to some
+ * aspects of databinding, such as current location (see {@link #currentLocation()}.
+ *<p>
+ * NOTE: in Jackson 2.x exception handling required use of this class in many case
+ * (due to Jackson 2.x API exposing checked exceptions) but this is no longer
+ * necessary with Jackson 3.x.
  */
 public class MappingIterator<T> implements Iterator<T>, Closeable
 {
@@ -65,7 +66,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     /**
      * Deserializer for individual element values.
      */
-    protected final JsonDeserializer<T> _deserializer;
+    protected final ValueDeserializer<T> _deserializer;
 
     /**
      * Underlying parser used for reading content to bind. Initialized
@@ -118,13 +119,13 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      */
     @SuppressWarnings("unchecked")
     protected MappingIterator(JavaType type, JsonParser p, DeserializationContext ctxt,
-            JsonDeserializer<?> deser,
+            ValueDeserializer<?> deser,
             boolean managedParser, Object valueToUpdate)
     {
         _type = type;
         _parser = p;
         _context = ctxt;
-        _deserializer = (JsonDeserializer<T>) deser;
+        _deserializer = (ValueDeserializer<T>) deser;
         _closeParser = managedParser;
         if (valueToUpdate == null) {
             _updatedValue = null;
@@ -146,7 +147,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
             _seqContext = null;
             _state = STATE_CLOSED;
         } else {
-            TokenStreamContext sctxt = p.getParsingContext();
+            TokenStreamContext sctxt = p.streamReadContext();
             if (managedParser && p.isExpectedStartArrayToken()) {
                 // If pointing to START_ARRAY, context should be that ARRAY
                 p.clearCurrentToken();
@@ -167,8 +168,6 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     /**
      * Method for getting an "empty" iterator instance: one that never
      * has more values; may be freely shared.
-     *
-     * @since 2.10 Existed earlier but {@code public} since 2.10
      */
     @SuppressWarnings("unchecked")
     public static <T> MappingIterator<T> emptyIterator() {
@@ -184,25 +183,13 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     @Override
     public boolean hasNext()
     {
-        try {
-            return hasNextValue();
-        } catch (JsonMappingException e) {
-            return (Boolean) _handleMappingException(e);
-        } catch (IOException e) {
-            return (Boolean) _handleIOException(e);
-        }
+        return hasNextValue();
     }
 
     @Override
     public T next()
     {
-        try {
-            return nextValue();
-        } catch (JsonMappingException e) {
-            return _handleMappingException(e);
-        } catch (IOException e) {
-            return _handleIOException(e);
-        }
+        return nextValue();
     }
 
     @Override
@@ -211,7 +198,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     }
     
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (_state != STATE_CLOSED) {
             _state = STATE_CLOSED;
             if (_parser != null) {
@@ -230,7 +217,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      * Equivalent of {@link #next} but one that may throw checked
      * exceptions from Jackson due to invalid input.
      */
-    public boolean hasNextValue() throws IOException
+    public boolean hasNextValue() throws JacksonException
     {
         switch (_state) {
         case STATE_CLOSED:
@@ -259,7 +246,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
         return true;
     }
 
-    public T nextValue() throws IOException
+    public T nextValue() throws JacksonException
     {
         switch (_state) {
         case STATE_CLOSED:
@@ -299,7 +286,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      * 
      * @return List of entries read
      */
-    public List<T> readAll() throws IOException {
+    public List<T> readAll() throws JacksonException {
         return readAll(new ArrayList<T>());
     }
 
@@ -309,7 +296,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      * 
      * @return List of entries read (same as passed-in argument)
      */
-    public <L extends List<? super T>> L readAll(L resultList) throws IOException
+    public <L extends List<? super T>> L readAll(L resultList) throws JacksonException
     {
         while (hasNextValue()) {
             resultList.add(nextValue());
@@ -321,7 +308,7 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      * Convenience method for reading all entries accessible via
      * this iterator
      */
-    public <C extends Collection<? super T>> C readAll(C results) throws IOException
+    public <C extends Collection<? super T>> C readAll(C results) throws JacksonException
     {
         while (hasNextValue()) {
             results.add(nextValue());
@@ -338,17 +325,17 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     /**
      * Accessor for getting underlying parser this iterator uses.
      */
-    public JsonParser getParser() {
+    public JsonParser parser() {
         return _parser;
     }
 
     /**
      * Accessor for accessing {@link FormatSchema} that the underlying parser
-     * (as per {@link #getParser}) is using, if any; only parser of schema-aware
+     * (as per {@link #parser}) is using, if any; only parser of schema-aware
      * formats use schemas.
      */
-    public FormatSchema getParserSchema() {
-    	return _parser.getSchema();
+    public FormatSchema parserSchema() {
+        return _parser.getSchema();
     }
 
     /**
@@ -359,8 +346,8 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
      * 
      * @return Location of the input stream of the underlying parser
      */
-    public JsonLocation getCurrentLocation() {
-        return _parser.getCurrentLocation();
+    public JsonLocation currentLocation() {
+        return _parser.currentLocation();
     }
 
     /*
@@ -369,18 +356,18 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
     /**********************************************************************
      */
 
-    protected void _resync() throws IOException
+    protected void _resync() throws JacksonException
     {
         final JsonParser p = _parser;
         // First, a quick check to see if we might have been lucky and no re-sync needed
-        if (p.getParsingContext() == _seqContext) {
+        if (p.streamReadContext() == _seqContext) {
             return;
         }
 
         while (true) {
             JsonToken t = p.nextToken();
             if ((t == JsonToken.END_ARRAY) || (t == JsonToken.END_OBJECT)) {
-                if (p.getParsingContext() == _seqContext) {
+                if (p.streamReadContext() == _seqContext) {
                     p.clearCurrentToken();
                     return;
                 }
@@ -394,13 +381,5 @@ public class MappingIterator<T> implements Iterator<T>, Closeable
 
     protected <R> R _throwNoSuchElement() {
         throw new NoSuchElementException();
-    }
-    
-    protected <R> R _handleMappingException(JsonMappingException e) {
-        throw new RuntimeJsonMappingException(e.getMessage(), e);
-    }
-
-    protected <R> R _handleIOException(IOException e) {
-        throw new UncheckedIOException(e.getMessage(), e);
     }
 }

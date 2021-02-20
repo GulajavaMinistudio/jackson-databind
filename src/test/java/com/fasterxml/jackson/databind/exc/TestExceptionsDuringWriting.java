@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.testutil.BrokenStringWriter;
@@ -27,7 +28,7 @@ public class TestExceptionsDuringWriting
     }
 
     static class SerializerWithErrors
-        extends JsonSerializer<Bean>
+        extends ValueSerializer<Bean>
     {
         @Override
         public void serialize(Bean value, JsonGenerator jgen, SerializerProvider provider)
@@ -44,7 +45,7 @@ public class TestExceptionsDuringWriting
 
     /**
      * Unit test that verifies that by default all exceptions except for
-     * JsonMappingException are caught and wrapped.
+     * JacksonExceptions are caught and wrapped.
      */
     public void testCatchAndRethrow()
         throws Exception
@@ -62,7 +63,7 @@ public class TestExceptionsDuringWriting
             l.add(b);
             mapper.writeValue(sw, l);
             fail("Should have gotten an exception");
-        } catch (IOException e) {
+        } catch (DatabindException e) { // too generic but will do for now
             // should contain original message somewhere
             verifyException(e, "test string");
             Throwable root = e.getCause();
@@ -82,15 +83,22 @@ public class TestExceptionsDuringWriting
     public void testExceptionWithSimpleMapper()
         throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = newJsonMapper();
         try {
             BrokenStringWriter sw = new BrokenStringWriter("TEST");
             mapper.writeValue(sw, createLongObject());
             fail("Should have gotten an exception");
-        } catch (IOException e) {
-            verifyException(e, IOException.class, "TEST");
+        } catch (DatabindException e) {
+            verifyException(e, "TEST");
+            Throwable root = e.getCause();
+            assertNotNull(root);
+
+            if (!(root instanceof IOException)) {
+                fail("Wrapped exception not IOException, but "+root.getClass());
+            }
         }
     }
+
     /*
     /**********************************************************
     /* Helper methods

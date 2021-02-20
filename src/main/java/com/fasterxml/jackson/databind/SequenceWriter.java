@@ -5,8 +5,9 @@ import java.io.IOException;
 import java.util.Collection;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.exc.WrappedIOException;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
+import com.fasterxml.jackson.databind.ser.SerializationContextExt;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 import com.fasterxml.jackson.databind.ser.impl.TypeWrappedSerializer;
 
@@ -35,11 +36,11 @@ public class SequenceWriter
     /**********************************************************************
      */
 
-    protected final DefaultSerializerProvider _provider;
+    protected final SerializationContextExt _provider;
     protected final SerializationConfig _config;
     protected final JsonGenerator _generator;
 
-    protected final JsonSerializer<Object> _rootSerializer;
+    protected final ValueSerializer<Object> _rootSerializer;
     protected final TypeSerializer _typeSerializer;
     
     protected final boolean _closeGenerator;
@@ -73,9 +74,8 @@ public class SequenceWriter
     /**********************************************************************
      */
 
-    public SequenceWriter(DefaultSerializerProvider prov, JsonGenerator gen,
+    public SequenceWriter(SerializationContextExt prov, JsonGenerator gen,
             boolean closeGenerator, ObjectWriter.Prefetch prefetch)
-        throws IOException
     {
         _provider = prov;
         _generator = gen;
@@ -95,7 +95,7 @@ public class SequenceWriter
      * Internal method called by {@link ObjectWriter}: should not be called by code
      * outside {@code jackson-databind} classes.
      */
-    public SequenceWriter init(boolean wrapInArray) throws IOException
+    public SequenceWriter init(boolean wrapInArray) throws JacksonException
     {
         if (wrapInArray) {
             _generator.writeStartArray();
@@ -130,7 +130,7 @@ public class SequenceWriter
      * to write. If root type was specified for {@link ObjectWriter},
      * value must be of compatible type (same or subtype).
      */
-    public SequenceWriter write(Object value) throws IOException
+    public SequenceWriter write(Object value) throws JacksonException
     {
         if (value == null) {
             _provider.serializeValue(_generator, null);
@@ -140,7 +140,7 @@ public class SequenceWriter
         if (_cfgCloseCloseable && (value instanceof Closeable)) {
             return _writeCloseableValue(value);
         }
-        JsonSerializer<Object> ser = _rootSerializer;
+        ValueSerializer<Object> ser = _rootSerializer;
         if (ser == null) {
             Class<?> type = value.getClass();
             ser = _dynamicSerializers.serializerFor(type);
@@ -159,12 +159,12 @@ public class SequenceWriter
      * Method for writing given value into output, as part of sequence
      * to write; further, full type (often generic, like {@link java.util.Map}
      * is passed in case a new
-     * {@link JsonSerializer} needs to be fetched to handle type
+     * {@link ValueSerializer} needs to be fetched to handle type
      * 
      * If root type was specified for {@link ObjectWriter},
      * value must be of compatible type (same or subtype).
      */
-    public SequenceWriter write(Object value, JavaType type) throws IOException
+    public SequenceWriter write(Object value, JavaType type) throws JacksonException
     {
         if (value == null) {
             _provider.serializeValue(_generator, null);
@@ -179,7 +179,7 @@ public class SequenceWriter
          *   is likely to run into other issues. But who knows; if it does become an
          *   issue, may need to implement alternative, JavaType-based map.
          */
-        JsonSerializer<Object> ser = _dynamicSerializers.serializerFor(type.getRawClass());
+        ValueSerializer<Object> ser = _dynamicSerializers.serializerFor(type.getRawClass());
         if (ser == null) {
             ser = _findAndAddDynamic(type);
         }
@@ -190,7 +190,7 @@ public class SequenceWriter
         return this;
     }
 
-    public SequenceWriter writeAll(Object[] value) throws IOException
+    public SequenceWriter writeAll(Object[] value) throws JacksonException
     {
         for (int i = 0, len = value.length; i < len; ++i) {
             write(value[i]);
@@ -200,17 +200,14 @@ public class SequenceWriter
 
     // NOTE: redundant wrt variant that takes Iterable, but cannot remove or even
     // deprecate due to backwards-compatibility needs
-    public <C extends Collection<?>> SequenceWriter writeAll(C container) throws IOException {
+    public <C extends Collection<?>> SequenceWriter writeAll(C container) throws JacksonException {
         for (Object value : container) {
             write(value);
         }
         return this;
     }
 
-    /**
-     * @since 2.7
-     */
-    public SequenceWriter writeAll(Iterable<?> iterable) throws IOException
+    public SequenceWriter writeAll(Iterable<?> iterable) throws JacksonException
     {
         for (Object value : iterable) {
             write(value);
@@ -219,14 +216,14 @@ public class SequenceWriter
     }
     
     @Override
-    public void flush() throws IOException {
+    public void flush() {
         if (!_closed) {
             _generator.flush();
         }
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
     {
         if (!_closed) {
             _closed = true;
@@ -246,11 +243,11 @@ public class SequenceWriter
     /**********************************************************************
      */
 
-    protected SequenceWriter _writeCloseableValue(Object value) throws IOException
+    protected SequenceWriter _writeCloseableValue(Object value) throws JacksonException
     {
         Closeable toClose = (Closeable) value;
         try {
-            JsonSerializer<Object> ser = _rootSerializer;
+            ValueSerializer<Object> ser = _rootSerializer;
             if (ser == null) {
                 Class<?> type = value.getClass();
                 ser = _dynamicSerializers.serializerFor(type);
@@ -264,9 +261,13 @@ public class SequenceWriter
             }
             Closeable tmpToClose = toClose;
             toClose = null;
-            tmpToClose.close();
+            try {
+                tmpToClose.close();
+            } catch (IOException e) {
+                throw WrappedIOException.construct(e, _generator);
+            }
         } finally {
-            if (toClose != null) {
+            if (toClose != null) { // only if there was other throwable
                 try {
                     toClose.close();
                 } catch (IOException ioe) { }
@@ -275,12 +276,13 @@ public class SequenceWriter
         return this;
     }
 
-    protected SequenceWriter _writeCloseableValue(Object value, JavaType type) throws IOException
+    protected SequenceWriter _writeCloseableValue(Object value, JavaType type)
+        throws JacksonException
     {
         Closeable toClose = (Closeable) value;
         try {
             // 15-Dec-2014, tatu: As per above, could be problem that we do not pass generic type
-            JsonSerializer<Object> ser = _dynamicSerializers.serializerFor(type.getRawClass());
+            ValueSerializer<Object> ser = _dynamicSerializers.serializerFor(type.getRawClass());
             if (ser == null) {
                 ser = _findAndAddDynamic(type);
             }
@@ -290,9 +292,13 @@ public class SequenceWriter
             }
             Closeable tmpToClose = toClose;
             toClose = null;
-            tmpToClose.close();
+            try {
+                tmpToClose.close();
+            } catch (IOException e) {
+                throw WrappedIOException.construct(e);
+            }
         } finally {
-            if (toClose != null) {
+            if (toClose != null) { // only if there was another throwable
                 try {
                     toClose.close();
                 } catch (IOException ioe) { }
@@ -301,7 +307,7 @@ public class SequenceWriter
         return this;
     }
 
-    private final JsonSerializer<Object> _findAndAddDynamic(Class<?> type) throws JsonMappingException
+    private final ValueSerializer<Object> _findAndAddDynamic(Class<?> type)
     {
         PropertySerializerMap.SerializerAndMapResult result;
         if (_typeSerializer == null) {
@@ -315,7 +321,7 @@ public class SequenceWriter
         return result.serializer;
     }
 
-    private final JsonSerializer<Object> _findAndAddDynamic(JavaType type) throws JsonMappingException
+    private final ValueSerializer<Object> _findAndAddDynamic(JavaType type)
     {
         PropertySerializerMap.SerializerAndMapResult result;
         if (_typeSerializer == null) {

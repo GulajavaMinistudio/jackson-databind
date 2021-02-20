@@ -1,9 +1,9 @@
 package com.fasterxml.jackson.databind.module;
 
-import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.MapperBuilder;
@@ -37,23 +37,21 @@ public class SimpleModuleTest extends BaseMapTest
 
         @Override
         public void serialize(CustomBean value, JsonGenerator g, SerializerProvider provider)
-            throws IOException, JsonProcessingException
         {
             // We will write it as a String, with '|' as delimiter
             g.writeString(value.str + "|" + value.num);
         }
     }
-    
-    static class CustomBeanDeserializer extends JsonDeserializer<CustomBean>
+
+    static class CustomBeanDeserializer extends ValueDeserializer<CustomBean>
     {
         @Override
         public CustomBean deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             String text = p.getText();
             int ix = text.indexOf('|');
             if (ix < 0) {
-                throw new IOException("Failed to parse String value of \""+text+"\"");
+                throw new StreamReadException(p, "Failed to parse String value of \""+text+"\"");
             }
             String str = text.substring(0, ix);
             int num = Integer.parseInt(text.substring(ix+1));
@@ -67,17 +65,15 @@ public class SimpleModuleTest extends BaseMapTest
 
         @Override
         public void serialize(SimpleEnum value, JsonGenerator g, SerializerProvider provider)
-            throws IOException
         {
             g.writeString(value.name().toLowerCase());
         }
     }
 
-    static class SimpleEnumDeserializer extends JsonDeserializer<SimpleEnum>
+    static class SimpleEnumDeserializer extends ValueDeserializer<SimpleEnum>
     {
         @Override
         public SimpleEnum deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             return SimpleEnum.valueOf(p.getText().toUpperCase());
         }
@@ -102,7 +98,7 @@ public class SimpleModuleTest extends BaseMapTest
         public BaseSerializer() { super(Base.class); }
         
         @Override
-        public void serialize(Base value, JsonGenerator g, SerializerProvider provider) throws IOException {
+        public void serialize(Base value, JsonGenerator g, SerializerProvider provider) {
             g.writeString("Base:"+value.getText());
         }
     }
@@ -174,7 +170,7 @@ public class SimpleModuleTest extends BaseMapTest
         try {
             mapper.writeValueAsString(new CustomBean("foo", 3));
             fail("Should have caused an exception");
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             verifyException(e, "No serializer found");
         }
 
@@ -269,7 +265,7 @@ public class SimpleModuleTest extends BaseMapTest
         mod1.addSerializer(SimpleEnum.class, new SimpleEnumSerializer());
         mod1.addDeserializer(CustomBean.class, new CustomBeanDeserializer());
 
-        Map<Class<?>,JsonDeserializer<?>> desers = new HashMap<>();
+        Map<Class<?>,ValueDeserializer<?>> desers = new HashMap<>();
         desers.put(SimpleEnum.class, new SimpleEnumDeserializer());
         mod2.setDeserializers(new SimpleDeserializers(desers));
         mod2.addSerializer(CustomBean.class, new CustomBeanSerializer());
@@ -302,7 +298,7 @@ public class SimpleModuleTest extends BaseMapTest
                 .addModule(mod2)
                 .build();
 
-        List<com.fasterxml.jackson.databind.Module> mods = new ArrayList<>(mapper.getRegisteredModules());
+        List<JacksonModule> mods = new ArrayList<>(mapper.getRegisteredModules());
         assertEquals(2, mods.size());
         // Should retain ordering even if not mandated
         assertEquals("test1", mods.get(0).getModuleName());
@@ -335,7 +331,7 @@ public class SimpleModuleTest extends BaseMapTest
 
     public void testAccessToMapper() throws Exception
     {
-        com.fasterxml.jackson.databind.Module module = new com.fasterxml.jackson.databind.Module()
+        final JacksonModule module = new JacksonModule()
         {
             @Override
             public String getModuleName() { return "x"; }

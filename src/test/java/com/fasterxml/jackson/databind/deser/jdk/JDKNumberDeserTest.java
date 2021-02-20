@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.deser.jdk;
 
-import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -82,11 +81,10 @@ public class JDKNumberDeserTest extends BaseMapTest
     /**********************************************************************
      */
     
-    static class MyBeanDeserializer extends JsonDeserializer<MyBeanValue>
+    static class MyBeanDeserializer extends ValueDeserializer<MyBeanValue>
     {
         @Override
         public MyBeanValue deserialize(JsonParser jp, DeserializationContext ctxt)
-                throws IOException
         {
             return new MyBeanValue(jp.getDecimalValue());
         }
@@ -192,7 +190,7 @@ public class JDKNumberDeserTest extends BaseMapTest
         try {
             MAPPER.readValue(json, MyBeanHolder.class);
             fail("should have raised exception");
-        } catch (JsonProcessingException e) {
+        } catch (DatabindException e) {
             verifyException(e, "not numeric");
         }
     }
@@ -202,7 +200,7 @@ public class JDKNumberDeserTest extends BaseMapTest
         try {
             MyBeanHolder result = MAPPER.readValue(json, MyBeanHolder.class);
             fail("should have raised exception instead value was set to " + result.defaultValue.value.decimal.toString());
-        } catch (JsonProcessingException e) {
+        } catch (DatabindException e) {
             verifyException(e, "not numeric");
         }
     }

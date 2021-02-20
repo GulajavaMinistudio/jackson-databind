@@ -1,13 +1,15 @@
 package com.fasterxml.jackson.databind.ser;
 
-import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
+
 import com.fasterxml.jackson.core.JsonGenerator;
+
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.ser.impl.*;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.std.SimpleFilterProvider;
 import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
@@ -86,14 +88,13 @@ public class AnyGetterTest extends BaseMapTest
         }
 
         @Override
-        public void serialize(Object value, JsonGenerator jgen,
-                SerializerProvider provider) throws IOException
+        public void serialize(Object value, JsonGenerator g, SerializerProvider ctxt)
         {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<?,?> entry : ((Map<?,?>) value).entrySet()) {
                 sb.append('[').append(entry.getKey()).append('/').append(entry.getValue()).append(']');
             }
-            jgen.writeStringField("stuff", sb.toString());
+            g.writeStringProperty("stuff", sb.toString());
         }
     }
 
@@ -125,7 +126,7 @@ public class AnyGetterTest extends BaseMapTest
 
         @Override
         public void serialize(String value, JsonGenerator gen,
-                SerializerProvider provider) throws IOException {
+                SerializerProvider provider) {
             gen.writeString(value.toUpperCase());
         }
     }

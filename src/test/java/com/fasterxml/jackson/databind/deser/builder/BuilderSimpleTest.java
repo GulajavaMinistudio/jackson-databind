@@ -243,7 +243,7 @@ public class BuilderSimpleTest extends BaseMapTest
         }
     }
 
-    protected static class NopModule1557 extends com.fasterxml.jackson.databind.Module
+    protected static class NopModule1557 extends com.fasterxml.jackson.databind.JacksonModule
     {
         @Override
         public String getModuleName() {
@@ -294,7 +294,6 @@ public class BuilderSimpleTest extends BaseMapTest
             }
         }
     }
-
 
     /*
     /**********************************************************

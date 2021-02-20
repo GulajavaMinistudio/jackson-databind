@@ -12,9 +12,9 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import com.fasterxml.jackson.databind.ser.*;
-import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.MapProperty;
+import com.fasterxml.jackson.databind.ser.jdk.MapProperty;
+import com.fasterxml.jackson.databind.ser.std.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.std.SimpleFilterProvider;
 
 @SuppressWarnings("serial")
 public class TestMapFiltering extends BaseMapTest
@@ -62,7 +62,7 @@ public class TestMapFiltering extends BaseMapTest
         }
         
         @Override
-        public void serializeAsField(Object bean, JsonGenerator g,
+        public void serializeAsProperty(Object bean, JsonGenerator g,
                 SerializerProvider provider, PropertyWriter writer)
             throws Exception
         {
@@ -84,7 +84,7 @@ public class TestMapFiltering extends BaseMapTest
             Integer old = (Integer) prop.getValue();
             prop.setValue(Integer.valueOf(offset + old.intValue()));
 
-            writer.serializeAsField(bean, g, provider);
+            writer.serializeAsProperty(bean, g, provider);
         }
 
         @Override
@@ -95,9 +95,10 @@ public class TestMapFiltering extends BaseMapTest
         }
 
         @Override
+
         public void depositSchemaProperty(PropertyWriter writer,
                 JsonObjectFormatVisitor objectVisitor,
-                SerializerProvider provider) throws JsonMappingException { }
+                SerializerProvider provider) { }
     }
 
     // [databind#527]

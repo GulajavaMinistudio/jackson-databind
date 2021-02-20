@@ -2,16 +2,17 @@ package com.fasterxml.jackson.databind.deser.creators;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.fasterxml.jackson.databind.BaseMapTest;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 
 import java.io.IOException;
 
-public class TestCreatorNullPrimitives extends BaseMapTest {
-
+public class TestCreatorNullPrimitives extends BaseMapTest
+{
     // [databind#2101]
     static class JsonEntity {
         protected final int x;
@@ -39,7 +40,7 @@ public class TestCreatorNullPrimitives extends BaseMapTest {
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = sharedMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     // [databind#2101]: ensure that the property is included in the path
     public void testCreatorNullPrimitive() throws IOException {
@@ -49,10 +50,10 @@ public class TestCreatorNullPrimitives extends BaseMapTest {
         try {
             r.readValue(json);
             fail("Should not have succeeded");
-        } catch (JsonMappingException e) {
-            verifyException(e, "Cannot map `null` into type int");
+        } catch (MismatchedInputException e) {
+            verifyException(e, "Cannot map `null` into type `int`");
             assertEquals(1, e.getPath().size());
-            assertEquals("y", e.getPath().get(0).getFieldName());
+            assertEquals("y", e.getPath().get(0).getPropertyName());
         }
     }
 
@@ -63,11 +64,11 @@ public class TestCreatorNullPrimitives extends BaseMapTest {
         try {
             r.readValue(json);
             fail("Should not have succeeded");
-        } catch (JsonMappingException e) {
-            verifyException(e, "Cannot map `null` into type int");
+        } catch (MismatchedInputException e) {
+            verifyException(e, "Cannot map `null` into type `int`");
             assertEquals(2, e.getPath().size());
-            assertEquals("y", e.getPath().get(1).getFieldName());
-            assertEquals("entity", e.getPath().get(0).getFieldName());
+            assertEquals("y", e.getPath().get(1).getPropertyName());
+            assertEquals("entity", e.getPath().get(0).getPropertyName());
         }
     }
 }

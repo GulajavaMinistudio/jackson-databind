@@ -7,7 +7,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.ser.std.DateSerializer;
+import com.fasterxml.jackson.databind.ser.jdk.JavaUtilDateSerializer;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 
@@ -48,9 +48,9 @@ public class OptionalHandlerFactory
     protected OptionalHandlerFactory() {
         _sqlDeserializers = new HashMap<>();
         _sqlDeserializers.put(CLS_NAME_JAVA_SQL_DATE,
-                "com.fasterxml.jackson.databind.deser.std.DateDeserializers$SqlDateDeserializer");
+                "com.fasterxml.jackson.databind.ext.sql.JavaSqlDateDeserializer");
         _sqlDeserializers.put(CLS_NAME_JAVA_SQL_TIMESTAMP,
-                "com.fasterxml.jackson.databind.deser.std.DateDeserializers$TimestampDeserializer");
+                "com.fasterxml.jackson.databind.ext.sql.JavaSqlTimestampDeserializer");
         // 09-Nov-2020, tatu: No deserializer for `java.sql.Blob` yet; would require additional
         //    dependency and not yet requested by anyone. Add if requested
 
@@ -59,16 +59,16 @@ public class OptionalHandlerFactory
         //   of some environments missing `java.sql.` types
 
         // note: timestamps are very similar to java.util.Date, thus serialized as such
-        _sqlSerializers.put(CLS_NAME_JAVA_SQL_TIMESTAMP, DateSerializer.instance);
-        _sqlSerializers.put(CLS_NAME_JAVA_SQL_DATE, "com.fasterxml.jackson.databind.ser.std.SqlDateSerializer");
-        _sqlSerializers.put(CLS_NAME_JAVA_SQL_TIME, "com.fasterxml.jackson.databind.ser.std.SqlTimeSerializer");
+        _sqlSerializers.put(CLS_NAME_JAVA_SQL_TIMESTAMP, JavaUtilDateSerializer.instance);
+        _sqlSerializers.put(CLS_NAME_JAVA_SQL_DATE, "com.fasterxml.jackson.databind.ext.sql.JavaSqlDateSerializer");
+        _sqlSerializers.put(CLS_NAME_JAVA_SQL_TIME, "com.fasterxml.jackson.databind.ext.sql.JavaSqlTimeSerializer");
 
         // 09-Nov-2020, tatu: Not really optimal way to deal with these, problem  being that
         //   Blob is interface and actual instance we get is usually different. So may
         //   need to improve if we reported bugs. But for now, do this
         
-        _sqlSerializers.put(CLS_NAME_JAVA_SQL_BLOB, "com.fasterxml.jackson.databind.ext.SqlBlobSerializer");
-        _sqlSerializers.put(CLS_NAME_JAVA_SQL_SERIALBLOB, "com.fasterxml.jackson.databind.ext.SqlBlobSerializer");
+        _sqlSerializers.put(CLS_NAME_JAVA_SQL_BLOB, "com.fasterxml.jackson.databind.ext.sql.JavaSqlBlobSerializer");
+        _sqlSerializers.put(CLS_NAME_JAVA_SQL_SERIALBLOB, "com.fasterxml.jackson.databind.ext.sql.JavaSqlBlobSerializer");
     }
 
     /*
@@ -77,10 +77,10 @@ public class OptionalHandlerFactory
     /**********************************************************************
      */
 
-    public JsonSerializer<?> findSerializer(SerializationConfig config, JavaType type)
+    public ValueSerializer<?> findSerializer(SerializationConfig config, JavaType type)
     {
         final Class<?> rawType = type.getRawClass();
-        if ((CLASS_DOM_NODE != null) && CLASS_DOM_NODE.isAssignableFrom(rawType)) {
+        if (_IsXOfY(rawType, CLASS_DOM_NODE)) {
             return new DOMSerializer();
         }
 
@@ -88,11 +88,11 @@ public class OptionalHandlerFactory
         Object sqlHandler = _sqlSerializers.get(className);
 
         if (sqlHandler != null) {
-            if (sqlHandler instanceof JsonSerializer<?>) {
-                return (JsonSerializer<?>) sqlHandler;
+            if (sqlHandler instanceof ValueSerializer<?>) {
+                return (ValueSerializer<?>) sqlHandler;
             }
             // must be class name otherwise
-            return (JsonSerializer<?>) instantiate((String) sqlHandler, type);
+            return (ValueSerializer<?>) instantiate((String) sqlHandler, type);
         }
         if (className.startsWith(PACKAGE_PREFIX_JAVAX_XML) || hasSuperClassStartingWith(rawType, PACKAGE_PREFIX_JAVAX_XML)) {
             if (Duration.class.isAssignableFrom(rawType) || QName.class.isAssignableFrom(rawType)) {
@@ -105,20 +105,19 @@ public class OptionalHandlerFactory
         return null;
     }
 
-    public JsonDeserializer<?> findDeserializer(DeserializationConfig config, JavaType type)
-        throws JsonMappingException
+    public ValueDeserializer<?> findDeserializer(DeserializationConfig config, JavaType type)
     {
         final Class<?> rawType = type.getRawClass();
-        if ((CLASS_DOM_NODE != null) && CLASS_DOM_NODE.isAssignableFrom(rawType)) {
+        if (_IsXOfY(rawType, CLASS_DOM_NODE)) {
             return new DOMDeserializer.NodeDeserializer();
         }
-        if ((CLASS_DOM_DOCUMENT != null) && CLASS_DOM_DOCUMENT.isAssignableFrom(rawType)) {
+        if (_IsXOfY(rawType, CLASS_DOM_DOCUMENT)) {
             return new DOMDeserializer.DocumentDeserializer();
         }
         String className = rawType.getName();
         final String deserName = _sqlDeserializers.get(className);
         if (deserName != null) {
-            return (JsonDeserializer<?>) instantiate(deserName, type);
+            return (ValueDeserializer<?>) instantiate(deserName, type);
         }
         if (className.startsWith(PACKAGE_PREFIX_JAVAX_XML)
                 || hasSuperClassStartingWith(rawType, PACKAGE_PREFIX_JAVAX_XML)) {
@@ -128,10 +127,10 @@ public class OptionalHandlerFactory
     }
 
     public boolean hasDeserializerFor(Class<?> valueType) {
-        if ((CLASS_DOM_NODE != null) && CLASS_DOM_NODE.isAssignableFrom(valueType)) {
+        if (_IsXOfY(valueType, CLASS_DOM_NODE)) {
             return true;
         }
-        if ((CLASS_DOM_DOCUMENT != null) && CLASS_DOM_DOCUMENT.isAssignableFrom(valueType)) {
+        if (_IsXOfY(valueType, CLASS_DOM_DOCUMENT)) {
             return true;
         }
         String className = valueType.getName();
@@ -143,7 +142,11 @@ public class OptionalHandlerFactory
         // 06-Nov-2020, tatu: One of "java.sql" types?
         return _sqlDeserializers.containsKey(className);
     }
-    
+
+    private boolean _IsXOfY(Class<?> valueType, Class<?> expType) {
+        return (expType != null) && expType.isAssignableFrom(valueType);
+    }
+
     /*
     /**********************************************************************
     /* Internal helper methods

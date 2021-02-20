@@ -1,8 +1,8 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Assert;
 
@@ -49,18 +49,18 @@ public class TestConversions extends BaseMapTest
     static class Issue467Tree  {
     }
     
-    static class Issue467Serializer extends JsonSerializer<Issue467Bean> {
+    static class Issue467Serializer extends ValueSerializer<Issue467Bean> {
         @Override
         public void serialize(Issue467Bean value, JsonGenerator g,
-                SerializerProvider provider) throws IOException {
-            g.writeObject(new Issue467TmpBean(value.i));
+                SerializerProvider provider) {
+            g.writePOJO(new Issue467TmpBean(value.i));
         }
     }    
 
-    static class Issue467TreeSerializer extends JsonSerializer<Issue467Tree> {
+    static class Issue467TreeSerializer extends ValueSerializer<Issue467Tree> {
         @Override
         public void serialize(Issue467Tree value, JsonGenerator g,
-                SerializerProvider provider) throws IOException {
+                SerializerProvider provider) {
             g.writeTree(BooleanNode.TRUE);
         }
     }    
@@ -81,7 +81,7 @@ public class TestConversions extends BaseMapTest
     }
 
     // [databind#433]
-    static class CustomSerializedPojo implements JsonSerializable
+    static class CustomSerializedPojo implements JacksonSerializable
     {
         private final ObjectNode node = JsonNodeFactory.instance.objectNode();
 
@@ -90,14 +90,14 @@ public class TestConversions extends BaseMapTest
         }
     
         @Override
-        public void serialize(final JsonGenerator jgen, final SerializerProvider provider) throws IOException
+        public void serialize(final JsonGenerator jgen, final SerializerProvider provider)
         {
             jgen.writeTree(node);
         }
 
         @Override
         public void serializeWithType(JsonGenerator g,
-                SerializerProvider ctxt, TypeSerializer typeSer) throws IOException
+                SerializerProvider ctxt, TypeSerializer typeSer)
         {
             WritableTypeId typeIdDef = new WritableTypeId(this, JsonToken.START_OBJECT);
             typeSer.writeTypePrefix(g, ctxt, typeIdDef);
@@ -141,11 +141,10 @@ public class TestConversions extends BaseMapTest
     }
     
     // Deserializer to trigger the problem described in [JACKSON-554]
-    public static class LeafDeserializer extends JsonDeserializer<Leaf>
+    public static class LeafDeserializer extends ValueDeserializer<Leaf>
     {
         @Override
         public Leaf deserialize(JsonParser jp, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
         {
             JsonNode tree = (JsonNode) jp.readValueAsTree();
             Leaf leaf = new Leaf();
@@ -244,7 +243,7 @@ public class TestConversions extends BaseMapTest
     public void testEmbeddedByteArray() throws Exception
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
-        buf.writeObject(new byte[3]);
+        buf.writePOJO(new byte[3]);
         JsonNode node = MAPPER.readTree(buf.asParser(ObjectReadContext.empty()));
         buf.close();
         assertTrue(node.isBinary());
@@ -327,5 +326,11 @@ public class TestConversions extends BaseMapTest
         // and vice versa
         Object pojo = MAPPER.treeToValue(n, Root.class);
         assertNull(pojo);
+
+        // [databind#2972]
+        AtomicReference<?> result = MAPPER.treeToValue(NullNode.instance,
+                AtomicReference.class);
+        assertNotNull(result);
+        assertNull(result.get());
     }
 }

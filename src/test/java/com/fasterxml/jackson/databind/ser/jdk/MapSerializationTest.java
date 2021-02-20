@@ -25,11 +25,11 @@ public class MapSerializationTest extends BaseMapTest
         }
     }
 
-    static class PseudoMapSerializer extends JsonSerializer<Map<String,String>>
+    static class PseudoMapSerializer extends ValueSerializer<Map<String,String>>
     {
         @Override
         public void serialize(Map<String,String> value,
-                JsonGenerator gen, SerializerProvider provider) throws IOException
+                JsonGenerator gen, SerializerProvider provider)
         {
             // just use standard Map.toString(), output as JSON String
             gen.writeString(value.toString());
@@ -97,7 +97,7 @@ public class MapSerializationTest extends BaseMapTest
     /**********************************************************
      */
 
-    final private ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     public void testUsingObjectWriter() throws IOException
     {
@@ -161,7 +161,7 @@ public class MapSerializationTest extends BaseMapTest
         try {
             /*String json =*/ sortingW.writeValueAsString(mapWithNullKey);
             //assertEquals(aposToQuotes("{'':1,'b':2}"), json);
-        } catch (JsonMappingException e) {
+        } catch (DatabindException e) {
             verifyException(e, "Null key for a Map not allowed");
         }
     }

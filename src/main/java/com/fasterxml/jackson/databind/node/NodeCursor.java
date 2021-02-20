@@ -56,12 +56,12 @@ abstract class NodeCursor
     }
 
     @Override
-    public java.lang.Object getCurrentValue() {
+    public java.lang.Object currentValue() {
         return _currentValue;
     }
 
     @Override
-    public void setCurrentValue(java.lang.Object v) {
+    public void assignCurrentValue(java.lang.Object v) {
         _currentValue = v;
     }
 
@@ -210,7 +210,7 @@ abstract class NodeCursor
                 _needEntry = false;
                 _current = _contents.next();
                 _currentName = (_current == null) ? null : _current.getKey();
-                return JsonToken.FIELD_NAME;
+                return JsonToken.PROPERTY_NAME;
             }
             _needEntry = true;
             return _current.getValue().asToken();

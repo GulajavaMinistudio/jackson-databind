@@ -1,7 +1,5 @@
 package com.fasterxml.jackson.databind.deser.std;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -17,7 +15,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 public abstract class StdNodeBasedDeserializer<T>
     extends StdDeserializer<T>
 {
-    protected JsonDeserializer<Object> _treeDeserializer;
+    protected ValueDeserializer<Object> _treeDeserializer;
 
     /*
     /**********************************************************************
@@ -35,7 +33,7 @@ public abstract class StdNodeBasedDeserializer<T>
 
     /**
      * "Copy-constructor" used when creating a modified copies, most often
-     * if sub-class overrides {@link com.fasterxml.jackson.databind.JsonDeserializer#createContextual}.
+     * if sub-class overrides {@link com.fasterxml.jackson.databind.ValueDeserializer#createContextual}.
      */
     protected StdNodeBasedDeserializer(StdNodeBasedDeserializer<?> src) {
         super(src);
@@ -43,7 +41,7 @@ public abstract class StdNodeBasedDeserializer<T>
     }
 
     @Override
-    public void resolve(DeserializationContext ctxt) throws JsonMappingException {
+    public void resolve(DeserializationContext ctxt) {
         _treeDeserializer = ctxt.findRootValueDeserializer(ctxt.constructType(JsonNode.class));
     }
 
@@ -53,16 +51,17 @@ public abstract class StdNodeBasedDeserializer<T>
     /**********************************************************************
      */
 
-    public abstract T convert(JsonNode root, DeserializationContext ctxt) throws IOException;
+    public abstract T convert(JsonNode root, DeserializationContext ctxt)
+        throws JacksonException;
 
     /*
     /**********************************************************************
-    /* JsonDeserializer impl
+    /* ValueDeserializer impl
     /**********************************************************************
      */
     
     @Override
-    public T deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public T deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         JsonNode n = (JsonNode) _treeDeserializer.deserialize(p, ctxt);
         return convert(n, ctxt);
     }
@@ -70,7 +69,7 @@ public abstract class StdNodeBasedDeserializer<T>
     @Override
     public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
             TypeDeserializer td)
-        throws IOException
+        throws JacksonException
     {
         // 19-Nov-2014, tatu: Quite likely we'd have some issues but... let's
         //   try, just in case.

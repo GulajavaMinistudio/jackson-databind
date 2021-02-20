@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind;
 
-import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
@@ -63,7 +62,7 @@ public class TestHandlerInstantiation extends BaseMapTest
     /**********************************************************************
      */
     
-    static class MyBeanDeserializer extends JsonDeserializer<MyBean>
+    static class MyBeanDeserializer extends ValueDeserializer<MyBean>
     {
         public String _prefix = "";
 
@@ -73,7 +72,6 @@ public class TestHandlerInstantiation extends BaseMapTest
         
         @Override
         public MyBean deserialize(JsonParser jp, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
         {
             return new MyBean(_prefix+jp.getText());
         }
@@ -85,13 +83,12 @@ public class TestHandlerInstantiation extends BaseMapTest
         
         @Override
         public Object deserializeKey(String key, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
         {
             return "KEY";
         }
     }
     
-    static class MyBeanSerializer extends JsonSerializer<MyBean>
+    static class MyBeanSerializer extends ValueSerializer<MyBean>
     {
         public String _prefix = "";
 
@@ -101,7 +98,6 @@ public class TestHandlerInstantiation extends BaseMapTest
         
         @Override
         public void serialize(MyBean value, JsonGenerator jgen, SerializerProvider provider)
-            throws IOException, JsonProcessingException
         {
             jgen.writeString(_prefix + value.value);
         }
@@ -173,7 +169,7 @@ public class TestHandlerInstantiation extends BaseMapTest
         }
         
         @Override
-        public JsonDeserializer<?> deserializerInstance(DeserializationConfig config,
+        public ValueDeserializer<?> deserializerInstance(DeserializationConfig config,
                 Annotated annotated,
                 Class<?> deserClass)
         {
@@ -195,7 +191,7 @@ public class TestHandlerInstantiation extends BaseMapTest
         }
         
         @Override
-        public JsonSerializer<?> serializerInstance(SerializationConfig config,
+        public ValueSerializer<?> serializerInstance(SerializationConfig config,
                 Annotated annotated, Class<?> serClass)
         {
             if (serClass == MyBeanSerializer.class) {

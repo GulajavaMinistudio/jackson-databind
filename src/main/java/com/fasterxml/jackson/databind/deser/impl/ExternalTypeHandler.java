@@ -1,11 +1,13 @@
 package com.fasterxml.jackson.databind.deser.impl;
 
-import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
+import com.fasterxml.jackson.databind.deser.bean.BeanPropertyMap;
+import com.fasterxml.jackson.databind.deser.bean.PropertyBasedCreator;
+import com.fasterxml.jackson.databind.deser.bean.PropertyValueBuffer;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 
@@ -55,9 +57,6 @@ public class ExternalTypeHandler
         _tokens = new TokenBuffer[len];
     }
 
-    /**
-     * @since 2.9
-     */
     public static Builder builder(JavaType beanType) {
         return new Builder(beanType);
     }
@@ -80,7 +79,7 @@ public class ExternalTypeHandler
     @SuppressWarnings("unchecked")
     public boolean handleTypePropertyValue(JsonParser p, DeserializationContext ctxt,
             String propName, Object bean)
-        throws IOException
+        throws JacksonException
     {
         Object ob = _nameToPropertyIndex.get(propName);
         if (ob == null) {
@@ -104,7 +103,7 @@ public class ExternalTypeHandler
 
     private final boolean _handleTypePropertyValue(JsonParser p, DeserializationContext ctxt,
             String propName, Object bean, String typeId, int index)
-        throws IOException
+        throws JacksonException
     {
         ExtTypedProperty prop = _properties[index];
         if (!prop.hasTypePropertyName(propName)) { // when could/should this ever happen?
@@ -133,7 +132,7 @@ public class ExternalTypeHandler
      */
     @SuppressWarnings("unchecked")
     public boolean handlePropertyValue(JsonParser p, DeserializationContext ctxt,
-            String propName, Object bean) throws IOException
+            String propName, Object bean) throws JacksonException
     {
         Object ob = _nameToPropertyIndex.get(propName);
         if (ob == null) {
@@ -172,7 +171,9 @@ public class ExternalTypeHandler
         ExtTypedProperty prop = _properties[index];
         boolean canDeserialize;
         if (prop.hasTypePropertyName(propName)) {
-            _typeIds[index] = p.getText();
+            // 19-Feb-2021, tatu: as per [databind#3008], don't use "getText()"
+            //    since that'll coerce null value into String "null"...
+            _typeIds[index] = p.getValueAsString();
             p.skipChildren();
             canDeserialize = (bean != null) && (_tokens[index] != null);
         } else {
@@ -200,7 +201,7 @@ public class ExternalTypeHandler
      */
     @SuppressWarnings("resource")
     public Object complete(JsonParser p, DeserializationContext ctxt, Object bean)
-        throws IOException
+        throws JacksonException
     {
         for (int i = 0, len = _properties.length; i < len; ++i) {
             String typeId = _typeIds[i];
@@ -260,7 +261,7 @@ public class ExternalTypeHandler
      */
     public Object complete(JsonParser p, DeserializationContext ctxt,
             PropertyValueBuffer buffer, PropertyBasedCreator creator)
-        throws IOException
+        throws JacksonException
     {
         // first things first: deserialize all data buffered:
         final int len = _properties.length;
@@ -270,7 +271,12 @@ public class ExternalTypeHandler
             final ExtTypedProperty extProp = _properties[i];
             if (typeId == null) {
                 // let's allow missing both type and property (may already have been set, too)
-                if (_tokens[i] == null) {
+                TokenBuffer tb = _tokens[i];
+                if ((tb == null)
+                        // 19-Feb-2021, tatu: Both missing value and explicit `null`
+                        //    should be accepted...
+                        || (tb.firstToken() == JsonToken.VALUE_NULL)
+                    ) {
                     continue;
                 }
                 // but not just one
@@ -332,7 +338,7 @@ public class ExternalTypeHandler
 
     @SuppressWarnings("resource")
     protected final Object _deserialize(JsonParser p, DeserializationContext ctxt,
-            int index, String typeId) throws IOException
+            int index, String typeId) throws JacksonException
     {
         JsonParser p2 = _tokens[index].asParser(ctxt, p);
         JsonToken t = p2.nextToken();
@@ -354,7 +360,7 @@ public class ExternalTypeHandler
 
     @SuppressWarnings("resource")
     protected final void _deserializeAndSet(JsonParser p, DeserializationContext ctxt,
-            Object bean, int index, String typeId) throws IOException
+            Object bean, int index, String typeId) throws JacksonException
     {
         // 11-Nov-2020, tatu: Should never get `null` passed this far,
         if (typeId == null) {

@@ -3,17 +3,19 @@ package com.fasterxml.jackson.databind.jsontype;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import com.fasterxml.jackson.databind.BaseMapTest;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+
 import static com.fasterxml.jackson.annotation.JsonSubTypes.Type;
 import static com.fasterxml.jackson.annotation.JsonTypeInfo.Id.DEDUCTION;
 
@@ -22,28 +24,16 @@ public class TestPolymorphicDeduction extends BaseMapTest {
 
   @JsonTypeInfo(use = DEDUCTION)
   @JsonSubTypes( {@Type(LiveCat.class), @Type(DeadCat.class)})
-  static abstract class Cat {
-    public final String name;
-
-    protected Cat(String name) {
-      this.name = name;
-    }
+  public static class Cat {
+    public String name;
   }
 
   static class DeadCat extends Cat {
     public String causeOfDeath;
-
-    DeadCat(@JsonProperty("name") String name) {
-      super(name);
-    }
   }
 
   static class LiveCat extends Cat {
     public boolean angry;
-
-    LiveCat(@JsonProperty("name") String name) {
-      super(name);
-    }
   }
 
   static class Box {
@@ -144,9 +134,9 @@ public class TestPolymorphicDeduction extends BaseMapTest {
   }
 
   public void testIgnoreProperties() throws Exception {
-    Cat cat = sharedMapper().reader()
+    Cat cat = sharedMapper().readerFor(Cat.class)
       .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-      .readValue(luckyCatJson, Cat.class);
+      .readValue(luckyCatJson);
     assertTrue(cat instanceof LiveCat);
     assertSame(cat.getClass(), LiveCat.class);
     assertEquals("Felix", cat.name);
@@ -155,10 +145,6 @@ public class TestPolymorphicDeduction extends BaseMapTest {
 
   static class AnotherLiveCat extends Cat {
     public boolean angry;
-
-    AnotherLiveCat(@JsonProperty("name") String name) {
-      super(name);
-    }
   }
 
   public void testAmbiguousClasses() throws Exception {
@@ -168,7 +154,7 @@ public class TestPolymorphicDeduction extends BaseMapTest {
               .build();
       /*Cat cat =*/ mapper.readValue(liveCatJson, Cat.class);
       fail("Should not get here");
-    } catch (IllegalStateException e) {
+    } catch (InvalidDefinitionException e) {
         verifyException(e, "Subtypes ");
         verifyException(e, "have the same signature");
         verifyException(e, "cannot be uniquely deduced");
@@ -180,8 +166,38 @@ public class TestPolymorphicDeduction extends BaseMapTest {
       /*Cat cat =*/ sharedMapper().readValue(ambiguousCatJson, Cat.class);
       fail("Should not get here");
     } catch (InvalidTypeIdException e) {
-        verifyException(e, "Cannot deduce unique subtype of");
+        verifyException(e, "Cannot deduce unique subtype");
     }
+  }
+
+  public void testFailOnInvalidSubtype() throws Exception {
+    // Given:
+    JsonMapper mapper = JsonMapper.builder() // Don't use shared mapper!
+      .disable(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
+      .build();
+    // When:
+    Cat cat = mapper.readValue(ambiguousCatJson, Cat.class);
+    // Then:
+    assertNull(cat);
+  }
+
+  @JsonTypeInfo(use = DEDUCTION, defaultImpl = Cat.class)
+  abstract static class CatMixin {
+  }
+
+  public void testDefaultImpl() throws Exception {
+    // Given:
+    JsonMapper mapper = JsonMapper.builder() // Don't use shared mapper!
+      .addMixIn(Cat.class, CatMixin.class)
+      .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+      .build();
+    // When:
+    Cat cat = mapper.readValue(ambiguousCatJson, Cat.class);
+    // Then:
+    // Even though "age":2 implies this was a failed subtype, we are instructed to fallback to Cat regardless.
+    assertTrue(cat instanceof Cat);
+    assertSame(Cat.class, cat.getClass());
+    assertEquals("Felix", cat.name);
   }
 
   public void testSimpleSerialization() throws Exception {

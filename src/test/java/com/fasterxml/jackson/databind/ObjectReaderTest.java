@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind;
 
-import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
 
@@ -8,10 +7,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -35,9 +36,9 @@ public class ObjectReaderTest extends BaseMapTest
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods, simple read/write with defaults
-    /**********************************************************
+    /**********************************************************************
      */
 
     public void testSimpleViaParser() throws Exception
@@ -114,9 +115,9 @@ public class ObjectReaderTest extends BaseMapTest
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods, some alternative JSON settings
-    /**********************************************************
+    /**********************************************************************
      */
 
     public void testJsonReadFeaturesComments() throws Exception
@@ -135,7 +136,8 @@ public class ObjectReaderTest extends BaseMapTest
         try {
             reader.without(JsonReadFeature.ALLOW_JAVA_COMMENTS).readValue(JSON);
             fail("Should not have passed");
-        } catch (JsonProcessingException e) {
+        } catch (DatabindException e) {
+            // DatabindException since it gets wrapped
             verifyException(e, "foo");
         }
     }
@@ -151,7 +153,7 @@ public class ObjectReaderTest extends BaseMapTest
         try {
             result = MAPPER.readValue(JSON, Map.class);
             fail("Should not pass with defaylt settings");
-        } catch (JsonParseException e) {
+        } catch (StreamReadException e) {
             verifyException(e, "Illegal unquoted character");
         }
 
@@ -171,9 +173,9 @@ public class ObjectReaderTest extends BaseMapTest
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods, config setting verification
-    /**********************************************************
+    /**********************************************************************
      */
 
     public void testFeatureSettings() throws Exception
@@ -388,7 +390,7 @@ public class ObjectReaderTest extends BaseMapTest
 
         ObjectReader reader = MAPPER.readerFor(POJO.class).at("/foo/bar/caller");
 
-        process(reader.readValue(source, POJO.class));
+        process((POJO) reader.readValue(source));
     }
 
     void process(POJO pojo) {
@@ -406,13 +408,18 @@ public class ObjectReaderTest extends BaseMapTest
     /**********************************************************************
      */
 
-    public void testTreeToValue() throws Exception
+    public void testTreeToValue()
     {
         ArrayNode n = MAPPER.createArrayNode();
         n.add("xyz");
         ObjectReader r = MAPPER.readerFor(String.class);
         List<?> list = r.treeToValue(n, List.class);
         assertEquals(1, list.size());
+
+        // since 2.13:
+        String[] arr = r.treeToValue(n, MAPPER.constructType(String[].class));
+        assertEquals(1, arr.length);
+        assertEquals("xyz", arr[0]);
     }
 
     /*
@@ -427,7 +434,7 @@ public class ObjectReaderTest extends BaseMapTest
         try {
             r.readValue("1");
             fail("Should not pass");
-        } catch (JsonMappingException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "No value type configured");
         }
     }
@@ -455,7 +462,7 @@ public class ObjectReaderTest extends BaseMapTest
     {
         ObjectMapper mapper = JsonMapper.builder().addHandler(new DeserializationProblemHandler(){
             @Override
-            public boolean handleUnknownProperty(DeserializationContext ctxt, JsonParser p, JsonDeserializer<?> deserializer, Object beanOrClass, String propertyName) throws IOException {
+            public boolean handleUnknownProperty(DeserializationContext ctxt, JsonParser p, ValueDeserializer<?> deserializer, Object beanOrClass, String propertyName) {
                 p.readValueAsTree();
                 return true;
             }

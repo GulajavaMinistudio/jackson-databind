@@ -7,7 +7,7 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
-
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.Version;
 
 import com.fasterxml.jackson.databind.*;
@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.impl.AttributePropertyWriter;
-import com.fasterxml.jackson.databind.ser.std.RawSerializer;
+import com.fasterxml.jackson.databind.ser.jackson.RawSerializer;
 import com.fasterxml.jackson.databind.type.MapLikeType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.*;
@@ -672,10 +672,10 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: general annotations
-    /**********************************************************
-    */
+    /**********************************************************************
+     */
 
     @Override
     public Object findSerializer(MapperConfig<?> config, Annotated a)
@@ -683,8 +683,8 @@ public class JacksonAnnotationIntrospector
         JsonSerialize ann = _findAnnotation(a, JsonSerialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonSerializer> serClass = ann.using();
-            if (serClass != JsonSerializer.None.class) {
+            Class<? extends ValueSerializer> serClass = ann.using();
+            if (serClass != ValueSerializer.None.class) {
                 return serClass;
             }
         }
@@ -708,8 +708,8 @@ public class JacksonAnnotationIntrospector
         JsonSerialize ann = _findAnnotation(a, JsonSerialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonSerializer> serClass = ann.keyUsing();
-            if (serClass != JsonSerializer.None.class) {
+            Class<? extends ValueSerializer> serClass = ann.keyUsing();
+            if (serClass != ValueSerializer.None.class) {
                 return serClass;
             }
         }
@@ -722,8 +722,8 @@ public class JacksonAnnotationIntrospector
         JsonSerialize ann = _findAnnotation(a, JsonSerialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonSerializer> serClass = ann.contentUsing();
-            if (serClass != JsonSerializer.None.class) {
+            Class<? extends ValueSerializer> serClass = ann.contentUsing();
+            if (serClass != ValueSerializer.None.class) {
                 return serClass;
             }
         }
@@ -736,8 +736,8 @@ public class JacksonAnnotationIntrospector
         JsonSerialize ann = _findAnnotation(a, JsonSerialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonSerializer> serClass = ann.nullsUsing();
-            if (serClass != JsonSerializer.None.class) {
+            Class<? extends ValueSerializer> serClass = ann.nullsUsing();
+            if (serClass != ValueSerializer.None.class) {
                 return serClass;
             }
         }
@@ -772,14 +772,14 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: type refinements
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
     public JavaType refineSerializationType(final MapperConfig<?> config,
-            final Annotated a, final JavaType baseType) throws JsonMappingException
+            final Annotated a, final JavaType baseType)
     {
         JavaType type = baseType;
         final TypeFactory tf = config.getTypeFactory();
@@ -807,15 +807,14 @@ public class JacksonAnnotationIntrospector
                         // 27-Apr-2017, tatu: [databind#1592] ignore primitive<->wrapper refinements
                         type = type.withStaticTyping();
                     } else {
-                        throw new JsonMappingException(null,
+                        throw _databindException(
                                 String.format("Cannot refine serialization type %s into %s; types not related",
                                         type, serClass.getName()));
                     }
                 } catch (IllegalArgumentException iae) {
-                    throw new JsonMappingException(null,
+                    throw _databindException(iae,
                             String.format("Failed to widen type %s with annotation (value %s), from '%s': %s",
-                                    type, serClass.getName(), a.getName(), iae.getMessage()),
-                                    iae);
+                                    type, serClass.getName(), a.getName(), iae.getMessage()));
                 }
             }
         }
@@ -842,15 +841,14 @@ public class JacksonAnnotationIntrospector
                             // 27-Apr-2017, tatu: [databind#1592] ignore primitive<->wrapper refinements
                             keyType = keyType.withStaticTyping();
                         } else {
-                            throw new JsonMappingException(null,
+                            throw _databindException(
                                     String.format("Cannot refine serialization key type %s into %s; types not related",
                                             keyType, keyClass.getName()));
                         }
                     } catch (IllegalArgumentException iae) {
-                        throw new JsonMappingException(null,
+                        throw _databindException(iae,
                                 String.format("Failed to widen key type of %s with concrete-type annotation (value %s), from '%s': %s",
-                                        type, keyClass.getName(), a.getName(), iae.getMessage()),
-                                        iae);
+                                        type, keyClass.getName(), a.getName(), iae.getMessage()));
                     }
                 }
                 type = ((MapLikeType) type).withKeyType(keyType);
@@ -878,15 +876,14 @@ public class JacksonAnnotationIntrospector
                            // 27-Apr-2017, tatu: [databind#1592] ignore primitive<->wrapper refinements
                            contentType = contentType.withStaticTyping();
                        } else {
-                           throw new JsonMappingException(null,
+                           throw _databindException(
                                    String.format("Cannot refine serialization content type %s into %s; types not related",
                                            contentType, contentClass.getName()));
                        }
                    } catch (IllegalArgumentException iae) { // shouldn't really happen
-                       throw new JsonMappingException(null,
+                       throw _databindException(iae,
                                String.format("Internal error: failed to refine value type of %s with concrete-type annotation (value %s), from '%s': %s",
-                                       type, contentClass.getName(), a.getName(), iae.getMessage()),
-                                       iae);
+                                       type, contentClass.getName(), a.getName(), iae.getMessage()));
                    }
                }
                type = type.withContentType(contentType);
@@ -896,9 +893,9 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: class annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -1013,9 +1010,9 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Serialization: property annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -1074,9 +1071,9 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: general annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -1085,8 +1082,8 @@ public class JacksonAnnotationIntrospector
         JsonDeserialize ann = _findAnnotation(a, JsonDeserialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonDeserializer> deserClass = ann.using();
-            if (deserClass != JsonDeserializer.None.class) {
+            Class<? extends ValueDeserializer> deserClass = ann.using();
+            if (deserClass != ValueDeserializer.None.class) {
                 return deserClass;
             }
         }
@@ -1112,8 +1109,8 @@ public class JacksonAnnotationIntrospector
         JsonDeserialize ann = _findAnnotation(a, JsonDeserialize.class);
         if (ann != null) {
             @SuppressWarnings("rawtypes")
-            Class<? extends JsonDeserializer> deserClass = ann.contentUsing();
-            if (deserClass != JsonDeserializer.None.class) {
+            Class<? extends ValueDeserializer> deserClass = ann.contentUsing();
+            if (deserClass != ValueDeserializer.None.class) {
                 return deserClass;
             }
         }
@@ -1135,14 +1132,14 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: type modifications
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
     public JavaType refineDeserializationType(final MapperConfig<?> config,
-            final Annotated a, final JavaType baseType) throws JsonMappingException
+            final Annotated a, final JavaType baseType)
     {
         JavaType type = baseType;
         final TypeFactory tf = config.getTypeFactory();
@@ -1156,10 +1153,9 @@ public class JacksonAnnotationIntrospector
             try {
                 type = tf.constructSpecializedType(type, valueClass);
             } catch (IllegalArgumentException iae) {
-                throw new JsonMappingException(null,
+                throw _databindException(iae,
                         String.format("Failed to narrow type %s with annotation (value %s), from '%s': %s",
-                                type, valueClass.getName(), a.getName(), iae.getMessage()),
-                                iae);
+                                type, valueClass.getName(), a.getName(), iae.getMessage()));
             }
         }
         // Then further processing for container types
@@ -1174,10 +1170,9 @@ public class JacksonAnnotationIntrospector
                     keyType = tf.constructSpecializedType(keyType, keyClass);
                     type = ((MapLikeType) type).withKeyType(keyType);
                 } catch (IllegalArgumentException iae) {
-                    throw new JsonMappingException(null,
+                    throw _databindException(iae,
                             String.format("Failed to narrow key type of %s with concrete-type annotation (value %s), from '%s': %s",
-                                    type, keyClass.getName(), a.getName(), iae.getMessage()),
-                                    iae);
+                                    type, keyClass.getName(), a.getName(), iae.getMessage()));
                 }
             }
         }
@@ -1191,10 +1186,9 @@ public class JacksonAnnotationIntrospector
                     contentType = tf.constructSpecializedType(contentType, contentClass);
                     type = type.withContentType(contentType);
                 } catch (IllegalArgumentException iae) {
-                    throw new JsonMappingException(null,
+                    throw _databindException(iae,
                             String.format("Failed to narrow value type of %s with concrete-type annotation (value %s), from '%s': %s",
-                                    type, contentClass.getName(), a.getName(), iae.getMessage()),
-                            iae);
+                                    type, contentClass.getName(), a.getName(), iae.getMessage()));
                 }
             }
         }
@@ -1202,9 +1196,9 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: Class annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -1228,11 +1222,11 @@ public class JacksonAnnotationIntrospector
         JsonPOJOBuilder ann = _findAnnotation(ac, JsonPOJOBuilder.class);
         return (ann == null) ? null : new JsonPOJOBuilder.Value(ann);
     }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization: property annotations
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -1305,9 +1299,9 @@ public class JacksonAnnotationIntrospector
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Helper methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected boolean _isIgnorable(Annotated a)
@@ -1368,5 +1362,17 @@ public class JacksonAnnotationIntrospector
             return refinement == ClassUtil.primitiveType(baseType.getRawClass());
         }
         return false;
+    }
+
+    // @since 2.12
+    private DatabindException _databindException(String msg) {
+        // not optimal as we have no parser/generator/context to pass
+        return DatabindException.from((JsonParser) null, msg);
+    }
+
+    // @since 2.12
+    private DatabindException _databindException(Throwable t, String msg) {
+        // not optimal as we have no parser/generator/context to pass
+        return DatabindException.from((JsonParser) null, msg, t);
     }
 }

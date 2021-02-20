@@ -9,10 +9,10 @@ import com.fasterxml.jackson.core.Version;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
-import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
-import com.fasterxml.jackson.databind.deser.std.UntypedObjectDeserializer;
+import com.fasterxml.jackson.databind.deser.jdk.StringDeserializer;
+import com.fasterxml.jackson.databind.deser.jdk.UntypedObjectDeserializer;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.fasterxml.jackson.databind.ser.std.StringSerializer;
+import com.fasterxml.jackson.databind.ser.jdk.StringSerializer;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 // started with [databind#1025] in mind
@@ -176,6 +176,27 @@ public class IntrospectorPairTest extends BaseMapTest
 
         /*
         /******************************************************
+        /* Serialization introspection
+        /******************************************************
+         */
+
+        @Override
+        public Boolean hasAsKey(MapperConfig<?> config, Annotated a) {
+            return (Boolean) values.get("hasAsKey");
+        }
+
+        @Override
+        public Boolean hasAsValue(MapperConfig<?> config, Annotated a) {
+            return (Boolean) values.get("hasAsValue");
+        }
+
+        @Override
+        public Boolean hasAnyGetter(MapperConfig<?> config, Annotated ann) {
+            return (Boolean) values.get("hasAnyGetter");
+        }
+
+        /*
+        /******************************************************
         /* Deserialization introspection
         /******************************************************
          */
@@ -331,13 +352,13 @@ public class IntrospectorPairTest extends BaseMapTest
 
     public void testFindSerializer() throws Exception
     {
-        final JsonSerializer<?> serString = new StringSerializer();
-        final JsonSerializer<?> serToString = ToStringSerializer.instance;
+        final ValueSerializer<?> serString = new StringSerializer();
+        final ValueSerializer<?> serToString = ToStringSerializer.instance;
 
         AnnotationIntrospector intr1 = new IntrospectorWithHandlers(null, serString);
         AnnotationIntrospector intr2 = new IntrospectorWithHandlers(null, serToString);
         AnnotationIntrospector nop = AnnotationIntrospector.nopInstance();
-        AnnotationIntrospector nop2 = new IntrospectorWithHandlers(null, JsonSerializer.None.class);
+        AnnotationIntrospector nop2 = new IntrospectorWithHandlers(null, ValueSerializer.None.class);
 
         assertSame(serString,
                 new AnnotationIntrospectorPair(intr1, intr2).findSerializer(null, null));
@@ -355,15 +376,90 @@ public class IntrospectorPairTest extends BaseMapTest
         assertNull(new AnnotationIntrospectorPair(nop2, nop).findSerializer(null, null));
     }
 
+    public void testHasAsValue() throws Exception
+    {
+        IntrospectorWithMap intr1 = new IntrospectorWithMap()
+                .add("hasAsValue", Boolean.TRUE);
+        IntrospectorWithMap intr2 = new IntrospectorWithMap()
+                .add("hasAsValue", Boolean.FALSE);
+        assertNull(new AnnotationIntrospectorPair(NO_ANNOTATIONS, NO_ANNOTATIONS)
+                .hasAsValue(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, NO_ANNOTATIONS)
+                .hasAsValue(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr1)
+                .hasAsValue(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, NO_ANNOTATIONS)
+                .hasAsValue(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr2)
+                .hasAsValue(null, null));
+
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, intr2)
+                .hasAsValue(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, intr1)
+                .hasAsValue(null, null));
+    }
+
+    public void testHasAsKey() throws Exception
+    {
+        IntrospectorWithMap intr1 = new IntrospectorWithMap()
+                .add("hasAsKey", Boolean.TRUE);
+        IntrospectorWithMap intr2 = new IntrospectorWithMap()
+                .add("hasAsKey", Boolean.FALSE);
+        assertNull(new AnnotationIntrospectorPair(NO_ANNOTATIONS, NO_ANNOTATIONS)
+                .hasAsKey(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, NO_ANNOTATIONS)
+                .hasAsKey(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr1)
+                .hasAsKey(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, NO_ANNOTATIONS)
+                .hasAsKey(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr2)
+                .hasAsKey(null, null));
+
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, intr2)
+                .hasAsKey(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, intr1)
+                .hasAsKey(null, null));
+    }
+
+    public void testHasAnyGetter() throws Exception
+    {
+        IntrospectorWithMap intr1 = new IntrospectorWithMap()
+                .add("hasAnyGetter", Boolean.TRUE);
+        IntrospectorWithMap intr2 = new IntrospectorWithMap()
+                .add("hasAnyGetter", Boolean.FALSE);
+        assertNull(new AnnotationIntrospectorPair(NO_ANNOTATIONS, NO_ANNOTATIONS)
+                .hasAnyGetter(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, NO_ANNOTATIONS)
+                .hasAnyGetter(null, null));
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr1)
+                .hasAnyGetter(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, NO_ANNOTATIONS)
+                .hasAnyGetter(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(NO_ANNOTATIONS, intr2)
+                .hasAnyGetter(null, null));
+
+        assertEquals(Boolean.TRUE, new AnnotationIntrospectorPair(intr1, intr2)
+                .hasAnyGetter(null, null));
+        assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, intr1)
+                .hasAnyGetter(null, null));
+    }
+
+    /*
+    /**********************************************************
+    /* Test methods, deser
+    /**********************************************************
+     */
+
     public void testFindDeserializer() throws Exception
     {
-        final JsonDeserializer<?> deserString = StringDeserializer.instance;
-        final JsonDeserializer<?> deserObject = UntypedObjectDeserializer.Vanilla.std;
+        final ValueDeserializer<?> deserString = StringDeserializer.instance;
+        final ValueDeserializer<?> deserObject = UntypedObjectDeserializer.Vanilla.std;
 
         AnnotationIntrospector intr1 = new IntrospectorWithHandlers(deserString, null);
         AnnotationIntrospector intr2 = new IntrospectorWithHandlers(deserObject, null);
         AnnotationIntrospector nop = AnnotationIntrospector.nopInstance();
-        AnnotationIntrospector nop2 = new IntrospectorWithHandlers(JsonDeserializer.None.class, null);
+        AnnotationIntrospector nop2 = new IntrospectorWithHandlers(ValueDeserializer.None.class, null);
 
         assertSame(deserString,
                 new AnnotationIntrospectorPair(intr1, intr2).findDeserializer(null, null));

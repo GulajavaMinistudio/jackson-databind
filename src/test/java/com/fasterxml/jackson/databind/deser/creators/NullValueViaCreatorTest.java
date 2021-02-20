@@ -1,12 +1,12 @@
 package com.fasterxml.jackson.databind.deser.creators;
 
-import java.io.IOException;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 
 public class NullValueViaCreatorTest extends BaseMapTest
 {
@@ -25,9 +25,9 @@ public class NullValueViaCreatorTest extends BaseMapTest
 
     protected static final NullContained NULL_CONTAINED = new NullContained();
 
-    protected static class ContainedDeserializer extends JsonDeserializer<Contained<?>> {
+    protected static class ContainedDeserializer extends ValueDeserializer<Contained<?>> {
         @Override
-        public Contained<?> deserialize(JsonParser jp, DeserializationContext ctxt) throws JsonProcessingException {
+        public Contained<?> deserialize(JsonParser jp, DeserializationContext ctxt) {
             return null;
         }
 
@@ -39,9 +39,8 @@ public class NullValueViaCreatorTest extends BaseMapTest
 
     protected static class ContainerDeserializerResolver extends Deserializers.Base {
         @Override
-        public JsonDeserializer<?> findBeanDeserializer(JavaType type,
+        public ValueDeserializer<?> findBeanDeserializer(JavaType type,
                 DeserializationConfig config, BeanDescription beanDesc)
-            throws JsonMappingException
         {
             if (!Contained.class.isAssignableFrom(type.getRawClass())) {
                 return null;
@@ -56,7 +55,7 @@ public class NullValueViaCreatorTest extends BaseMapTest
         }
     }
 
-    protected static class TestModule extends com.fasterxml.jackson.databind.Module
+    protected static class TestModule extends com.fasterxml.jackson.databind.JacksonModule
     {
         @Override
         public String getModuleName() {
@@ -109,13 +108,14 @@ public class NullValueViaCreatorTest extends BaseMapTest
     }
 
     // [databind#597]: ensure that a useful exception is thrown
-    public void testCreatorReturningNull() throws IOException {
+    public void testCreatorReturningNull()
+    {
         ObjectMapper objectMapper = new ObjectMapper();
         String json = "{ \"type\" : \"     \", \"id\" : \"000c0ffb-a0d6-4d2e-a379-4aeaaf283599\" }";
         try {
             objectMapper.readValue(json, JsonEntity.class);
             fail("Should not have succeeded");
-        } catch (JsonMappingException e) {
+        } catch (ValueInstantiationException e) {
             verifyException(e, "JSON creator returned null");
         }
     }    

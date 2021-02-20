@@ -1,10 +1,8 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.JsonSerializable;
+import com.fasterxml.jackson.databind.JacksonSerializable;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
@@ -13,7 +11,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
  * Abstract base class common to all standard {@link JsonNode}
  * implementations.
  * The main addition here is that we declare that sub-classes must
- * implement {@link JsonSerializable}.
+ * implement {@link JacksonSerializable}.
  * This simplifies object mapping aspects a bit, as no external serializers are needed.
  *<p>
  * Note that support for {@link java.io.Serializable} is added here and so all subtypes
@@ -115,7 +113,7 @@ public abstract class BaseJsonNode
 
     /*
     /**********************************************************
-    /* JsonSerializable
+    /* JacksonSerializable
     /**********************************************************
      */
 
@@ -123,7 +121,8 @@ public abstract class BaseJsonNode
      * Method called to serialize node instances using given generator.
      */
     @Override
-    public abstract void serialize(JsonGenerator jgen, SerializerProvider provider) throws IOException;
+    public abstract void serialize(JsonGenerator jgen, SerializerProvider provider)
+        throws JacksonException;
 
     /**
      * Type information is needed, even if JsonNode instances are "plain" JSON,
@@ -131,7 +130,8 @@ public abstract class BaseJsonNode
      */
     @Override
     public abstract void serializeWithType(JsonGenerator jgen, SerializerProvider provider,
-            TypeSerializer typeSer)  throws IOException;
+            TypeSerializer typeSer)
+        throws JacksonException;
 
     /*
    /**********************************************************
@@ -141,21 +141,13 @@ public abstract class BaseJsonNode
 
    @Override
    public String toString() {
-       try {
-           return JsonMapper.shared().writeValueAsString(this);
-       } catch (IOException e) { // should never occur
-           throw new RuntimeException(e);
-       }
+       return JsonMapper.shared().writeValueAsString(this);
    }
 
    @Override
    public String toPrettyString() {
-       try {
-           return JsonMapper.shared()
-                   .writerWithDefaultPrettyPrinter()
-                   .writeValueAsString(this);
-       } catch (IOException e) { // should never occur
-           throw new RuntimeException(e);
-       }
+       return JsonMapper.shared()
+               .writerWithDefaultPrettyPrinter()
+               .writeValueAsString(this);
    }
 }

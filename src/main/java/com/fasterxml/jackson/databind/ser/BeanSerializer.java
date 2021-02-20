@@ -1,15 +1,15 @@
 package com.fasterxml.jackson.databind.ser;
 
-import java.io.IOException;
 import java.util.Set;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
-import com.fasterxml.jackson.databind.ser.impl.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.bean.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.bean.BeanSerializerBase;
+import com.fasterxml.jackson.databind.ser.bean.UnwrappingBeanSerializer;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
-import com.fasterxml.jackson.databind.ser.impl.UnwrappingBeanSerializer;
-import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 
 /**
@@ -90,7 +90,7 @@ public class BeanSerializer
     }
 
     @Override
-    public JsonSerializer<Object> unwrappingSerializer(NameTransformer unwrapper) {
+    public ValueSerializer<Object> unwrappingSerializer(NameTransformer unwrapper) {
         return new UnwrappingBeanSerializer(this, unwrapper);
     }
 
@@ -133,7 +133,7 @@ public class BeanSerializer
 
     /*
     /**********************************************************************
-    /* JsonSerializer implementation that differs between impls
+    /* ValueSerializer implementation that differs between impls
     /**********************************************************************
      */
 
@@ -144,7 +144,7 @@ public class BeanSerializer
      */
     @Override
     public final void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
-        throws IOException
+        throws JacksonException
     {
         if (_objectIdWriter != null) {
             _serializeWithObjectId(bean, gen, provider, true);
@@ -152,19 +152,19 @@ public class BeanSerializer
         }
         if (_propertyFilterId != null) {
             gen.writeStartObject(bean);
-            _serializeFieldsFiltered(bean, gen, provider, _propertyFilterId);
+            _serializePropertiesFiltered(bean, gen, provider, _propertyFilterId);
             gen.writeEndObject();
             return;
         }
         BeanPropertyWriter[] fProps = _filteredProps;
         if ((fProps != null) && (provider.getActiveView() != null)) {
             gen.writeStartObject(bean);
-            _serializeFieldsMaybeView(bean, gen, provider, fProps);
+            _serializePropertiesMaybeView(bean, gen, provider, fProps);
             gen.writeEndObject();
             return;
         }
         gen.writeStartObject(bean);
-        _serializeFieldsNoView(bean, gen, provider, _props);
+        _serializePropertiesNoView(bean, gen, provider, _props);
         gen.writeEndObject();
     }
 }

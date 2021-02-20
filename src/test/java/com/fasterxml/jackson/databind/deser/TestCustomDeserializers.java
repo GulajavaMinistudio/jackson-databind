@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.deser;
 
-import java.io.*;
 import java.lang.annotation.*;
 import java.util.*;
 
@@ -8,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import com.fasterxml.jackson.core.*;
-
+import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.*;
 import com.fasterxml.jackson.databind.deser.std.*;
@@ -35,7 +34,6 @@ public class TestCustomDeserializers
 
         @Override
         public T deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             // need to skip, if structured...
             p.skipChildren();
@@ -59,23 +57,23 @@ public class TestCustomDeserializers
         }
     }
 
-    static class CustomBeanDeserializer extends JsonDeserializer<CustomBean>
+    static class CustomBeanDeserializer extends ValueDeserializer<CustomBean>
     {
         @Override
-        public CustomBean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
+        public CustomBean deserialize(JsonParser p, DeserializationContext ctxt)
         {
             int a = 0, b = 0;
             JsonToken t = p.currentToken();
             if (t == JsonToken.START_OBJECT) {
                 t = p.nextToken();
-            } else if (t != JsonToken.FIELD_NAME) {
+            } else if (t != JsonToken.PROPERTY_NAME) {
                 throw new Error();
             }
-            while(t == JsonToken.FIELD_NAME) {
+            while(t == JsonToken.PROPERTY_NAME) {
                 final String fieldName = p.currentName();
                 t = p.nextToken();
                 if (t != JsonToken.VALUE_NUMBER_INT) {
-                    throw new JsonParseException(p, "expecting number got "+ t);
+                    throw new StreamReadException(p, "expecting number got "+ t);
                 }
                 if (fieldName.equals("a")) {
                     a = p.getIntValue();
@@ -124,16 +122,16 @@ public class TestCustomDeserializers
         }
     }
      
-    static class CustomKeySerializer extends JsonSerializer<CustomKey> {
+    static class CustomKeySerializer extends ValueSerializer<CustomKey> {
         @Override
-        public void serialize(CustomKey value, JsonGenerator g, SerializerProvider provider) throws IOException {
-            g.writeFieldName(String.valueOf(value.getId()));
+        public void serialize(CustomKey value, JsonGenerator g, SerializerProvider provider) {
+            g.writeName(String.valueOf(value.getId()));
         }
     }
 
     static class CustomKeyDeserializer extends KeyDeserializer {
         @Override
-        public CustomKey deserializeKey(String key, DeserializationContext ctxt) throws IOException {
+        public CustomKey deserializeKey(String key, DeserializationContext ctxt) {
             return new CustomKey(Integer.valueOf(key));
         }
     }
@@ -172,14 +170,14 @@ public class TestCustomDeserializers
         }
 
         @Override
-        public Bean375Outer deserialize(JsonParser p, DeserializationContext ctxt) throws IOException,
-                JsonProcessingException {
+        public Bean375Outer deserialize(JsonParser p, DeserializationContext ctxt)
+        {
             Object ob = ctxt.readPropertyValue(p, prop, Bean375Inner.class);
             return new Bean375Outer((Bean375Inner) ob);
         }
         @Override
-        public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
-                throws JsonMappingException {
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
+        {
             return new Bean375OuterDeserializer(property);
         }
     }
@@ -196,7 +194,7 @@ public class TestCustomDeserializers
 
         @Override
         public Bean375Inner deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException {
+        {
             int x = p.getIntValue();
             if (negative) {
                 x = -x;
@@ -207,8 +205,8 @@ public class TestCustomDeserializers
         }
 
         @Override
-        public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
-                throws JsonMappingException {
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
+        {
             if (property != null) {
                 Negative n = property.getAnnotation(Negative.class);
                 if (n != null) {
@@ -235,8 +233,8 @@ public class TestCustomDeserializers
 
         @Override
         public Object deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException {
-            Object parent = p.getCurrentValue();
+        {
+            Object parent = p.currentValue();
             String desc = (parent == null) ? "NULL" : parent.getClass().getSimpleName();
             return "prop/"+ desc;
         }
@@ -247,7 +245,7 @@ public class TestCustomDeserializers
 
         @Override
         public String deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException {
+        {
             return p.getText().toUpperCase();
         }
     }
@@ -262,12 +260,12 @@ public class TestCustomDeserializers
         public void setupModule(SetupContext context)
         {
             super.setupModule(context);
-            context.addDeserializerModifier(new BeanDeserializerModifier() {
+            context.addDeserializerModifier(new ValueDeserializerModifier() {
                 @Override
-                public JsonDeserializer<?> modifyDeserializer(DeserializationConfig config,
-                        BeanDescription beanDesc, JsonDeserializer<?> deserializer) {
+                public ValueDeserializer<?> modifyDeserializer(DeserializationConfig config,
+                        BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
                     if (deserializer.handledType() == String.class) {
-                        JsonDeserializer<?> d = new MyStringDeserializer(deserializer);
+                        ValueDeserializer<?> d = new MyStringDeserializer(deserializer);
                         // just for test coverage purposes...
                         if (d.getDelegatee() != deserializer) {
                             throw new Error("Cannot access delegatee!");
@@ -282,18 +280,17 @@ public class TestCustomDeserializers
 
     static class MyStringDeserializer extends DelegatingDeserializer
     {
-        public MyStringDeserializer(JsonDeserializer<?> newDel) {
+        public MyStringDeserializer(ValueDeserializer<?> newDel) {
             super(newDel);
         }
 
         @Override
-        protected JsonDeserializer<?> newDelegatingInstance(JsonDeserializer<?> newDel) {
+        protected ValueDeserializer<?> newDelegatingInstance(ValueDeserializer<?> newDel) {
             return new MyStringDeserializer(newDel);
         }
 
         @Override
         public Object deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             Object ob = _delegatee.deserialize(p, ctxt);
             return "MY:"+ob;
@@ -305,18 +302,46 @@ public class TestCustomDeserializers
 
         @Override
         public Object deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException {
+        {
             return ctxt.readTree(p);
         }
     }
 
+    @JsonDeserialize(using = NamedPointDeserializer.class)
+    static class NamedPoint
+    {
+        public Point point;
+        public String name;
+
+        public NamedPoint(String name, Point point) {
+            this.point = point;
+            this.name = name;
+        }
+    }
+
+    static class NamedPointDeserializer extends StdDeserializer<NamedPoint>
+    {
+        public NamedPointDeserializer() {
+            super(NamedPoint.class);
+        }
+
+        @Override
+        public NamedPoint deserialize(JsonParser p, DeserializationContext ctxt)
+        {
+            JsonNode tree = ctxt.readTree(p);
+            String name = tree.path("name").asText(null);
+            Point point = ctxt.readTreeAsValue(tree.get("point"), Point.class);
+            return new NamedPoint(name, point);
+        }
+    }
+
     /*
-    /**********************************************************
-    /* Unit tests
-    /**********************************************************
+    /**********************************************************************
+    /* Test methods
+    /**********************************************************************
      */
 
-    final ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
     
     public void testCustomBeanDeserializer() throws Exception
     {
@@ -389,7 +414,7 @@ public class TestCustomDeserializers
         module.addDeserializer(Immutable.class,
             new StdNodeBasedDeserializer<Immutable>(Immutable.class) {
                 @Override
-                public Immutable convert(JsonNode root, DeserializationContext ctxt) throws IOException {
+                public Immutable convert(JsonNode root, DeserializationContext ctxt) {
                     int x = root.path("x").asInt();
                     int y = root.path("y").asInt();
                     return new Immutable(x, y);
@@ -469,10 +494,10 @@ public class TestCustomDeserializers
     {
         ObjectMapper mapper = jsonMapperBuilder()
                 .addModule(new SimpleModule()
-                        .setDeserializerModifier(new BeanDeserializerModifier() {
+                        .setDeserializerModifier(new ValueDeserializerModifier() {
                             @Override
-                            public JsonDeserializer<?> modifyDeserializer(DeserializationConfig config,
-                                    BeanDescription beanDesc, JsonDeserializer<?> deserializer) {
+                            public ValueDeserializer<?> modifyDeserializer(DeserializationConfig config,
+                                    BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
                                 if (deserializer instanceof DummyDeserializer<?>) {
                                     return new DummyDeserializer<String>("FOOBAR", String.class);
                                 }
@@ -486,7 +511,7 @@ public class TestCustomDeserializers
     }
 
     // [databind#2452]
-    public void testCustomSerializerWithReadTree() throws Exception
+    public void testCustomDeserializerWithReadTree() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
                 .addModule(new SimpleModule()
@@ -499,5 +524,27 @@ public class TestCustomDeserializers
         JsonNode n = (JsonNode) w.getObject();
         assertEquals(3, n.size());
         assertEquals(123, n.get(2).intValue());
+    }
+
+    // [databind#3002]
+    public void testCustomDeserializerWithReadTreeAsValue() throws Exception
+    {
+        final String json = a2q("{'point':{'x':13, 'y':-4}, 'name':'Foozibald' }");
+        NamedPoint result = MAPPER.readValue(json, NamedPoint.class);
+        assertNotNull(result);
+        assertEquals("Foozibald", result.name);
+        assertEquals(new Point(13, -4), result.point);
+
+        // and with JavaType variant too
+        result = MAPPER.readValue(json, MAPPER.constructType(NamedPoint.class));
+        assertNotNull(result);
+        assertEquals("Foozibald", result.name);
+        assertEquals(new Point(13, -4), result.point);
+
+        // also, try some edge conditions
+        result = MAPPER.readValue(a2q("{'name':4})"), NamedPoint.class);
+        assertNotNull(result);
+        assertEquals("4", result.name);
+        assertNull(result.point);
     }
 }

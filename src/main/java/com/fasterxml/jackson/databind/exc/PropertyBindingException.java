@@ -6,15 +6,14 @@ import java.util.Iterator;
 
 import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonMappingException;
 
 /**
- * Base class for {@link JsonMappingException}s that are specifically related
+ * Base class for {@link MismatchedInputException}s that are specifically related
  * to problems related to binding an individual property.
  */
 @SuppressWarnings("serial")
 public abstract class PropertyBindingException
-    extends MismatchedInputException // since 2.9
+    extends MismatchedInputException
 {
     /**
      * Class that does not contain mapping for the unrecognized property.
@@ -63,7 +62,7 @@ public abstract class PropertyBindingException
     private final static int MAX_DESC_LENGTH = 1000;
 
     @Override
-    public String getMessageSuffix()
+    public String messageSuffix()
     {
         String suffix = _propertiesAsString;
         if (suffix == null && _propertyIds != null) {

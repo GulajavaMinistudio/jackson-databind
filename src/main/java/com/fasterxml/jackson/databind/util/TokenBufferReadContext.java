@@ -19,9 +19,9 @@ public class TokenBufferReadContext extends TokenStreamContext
 //    protected JsonReadContext _child;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Location/state information (minus source reference)
-    /**********************************************************
+    /**********************************************************************
      */
 
     protected String _currentName;
@@ -32,7 +32,7 @@ public class TokenBufferReadContext extends TokenStreamContext
         super(base);
         _parent = base.getParent();
         _currentName = base.currentName();
-        _currentValue = base.getCurrentValue();
+        _currentValue = base.currentValue();
         if (base instanceof JsonReadContext) {
             JsonReadContext rc = (JsonReadContext) base;
             _startLocation = rc.getStartLocation(srcRef);
@@ -45,7 +45,7 @@ public class TokenBufferReadContext extends TokenStreamContext
         super(base);
         _parent = base.getParent();
         _currentName = base.currentName();
-        _currentValue = base.getCurrentValue();
+        _currentValue = base.currentValue();
         _startLocation = startLoc;
     }
 
@@ -66,19 +66,19 @@ public class TokenBufferReadContext extends TokenStreamContext
     }
 
     @Override
-    public Object getCurrentValue() {
+    public Object currentValue() {
         return _currentValue;
     }
 
     @Override
-    public void setCurrentValue(Object v) {
+    public void assignCurrentValue(Object v) {
         _currentValue = v;
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Factory methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     public static TokenBufferReadContext createRootContext(TokenStreamContext origContext) {
@@ -119,9 +119,9 @@ public class TokenBufferReadContext extends TokenStreamContext
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Abstract method implementation
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override public String currentName() { return _currentName; }
@@ -130,14 +130,14 @@ public class TokenBufferReadContext extends TokenStreamContext
 
     @Override public TokenStreamContext getParent() { return _parent; }
 
-    public void setCurrentName(String name) throws JsonProcessingException {
+    public void setCurrentName(String name) {
         _currentName = name;
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Extended support for context updates
-    /**********************************************************
+    /**********************************************************************
      */
 
     public void updateForValue() {

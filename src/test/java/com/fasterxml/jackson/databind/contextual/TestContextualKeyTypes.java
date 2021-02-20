@@ -1,12 +1,10 @@
 package com.fasterxml.jackson.databind.contextual;
 
-import java.io.IOException;
 import java.util.*;
 
-
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.ContextualKeyDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -25,7 +23,7 @@ public class TestContextualKeyTypes extends BaseMapTest
      */
 
     static class ContextualKeySerializer
-        extends JsonSerializer<String>
+        extends ValueSerializer<String>
     {
         protected final String _prefix;
     
@@ -35,17 +33,16 @@ public class TestContextualKeyTypes extends BaseMapTest
         }
 
         @Override
-        public void serialize(String value, JsonGenerator jgen, SerializerProvider provider) throws IOException
+        public void serialize(String value, JsonGenerator g, SerializerProvider provider)
         {
             if (_prefix != null) {
                 value = _prefix + value;
             }
-            jgen.writeFieldName(value);
+            g.writeName(value);
         }
 
         @Override
-        public JsonSerializer<?> createContextual(SerializerProvider prov, BeanProperty property)
-            throws JsonMappingException
+        public ValueSerializer<?> createContextual(SerializerProvider prov, BeanProperty property)
         {
             return new ContextualKeySerializer(_prefix+":");
         }
@@ -63,14 +60,13 @@ public class TestContextualKeyTypes extends BaseMapTest
 
         @Override
         public Object deserializeKey(String key, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
         {
             return _prefix + ":" + key;
         }
 
         @Override
         public KeyDeserializer createContextual(DeserializationContext ctxt,
-                BeanProperty property) throws JsonMappingException
+                BeanProperty property)
         {
             return new ContextualDeser((property == null) ? "ROOT" : property.getName());
         }

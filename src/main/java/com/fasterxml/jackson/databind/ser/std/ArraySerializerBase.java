@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.ser.std;
 
-import java.io.IOException;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -10,7 +9,6 @@ import com.fasterxml.jackson.core.type.WritableTypeId;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.*;
 
 /**
  * Intermediate base class for serializers used for various Java arrays.
@@ -18,7 +16,7 @@ import com.fasterxml.jackson.databind.ser.*;
  * @param <T> Type of arrays serializer handles
  */
 public abstract class ArraySerializerBase<T>
-    extends ContainerSerializer<T>
+    extends StdContainerSerializer<T>
 {
     /**
      * Setting for specific local override for "unwrap single element arrays":
@@ -45,12 +43,12 @@ public abstract class ArraySerializerBase<T>
         _unwrapSingle = unwrapSingle;
     }
 
-    public abstract JsonSerializer<?> _withResolved(BeanProperty prop,
+    public abstract ValueSerializer<?> _withResolved(BeanProperty prop,
             Boolean unwrapSingle);
 
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider serializers,
-            BeanProperty property) throws JsonMappingException
+    public ValueSerializer<?> createContextual(SerializerProvider serializers,
+            BeanProperty property)
     {
         Boolean unwrapSingle = null;
 
@@ -70,18 +68,18 @@ public abstract class ArraySerializerBase<T>
     @Override
     public final void serializeWithType(T value, JsonGenerator g, SerializerProvider ctxt,
             TypeSerializer typeSer)
-        throws IOException
+        throws JacksonException
     {
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
                 typeSer.typeId(value, JsonToken.START_ARRAY));
         // [databind#631]: Assign current value, to be accessible by custom serializers
-        g.setCurrentValue(value);
+        g.assignCurrentValue(value);
         serializeContents(value, g, ctxt);
         typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
     }
 
     protected abstract void serializeContents(T value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException;
+        throws JacksonException;
 
     protected final boolean _shouldUnwrapSingle(SerializerProvider provider) {
         if (_unwrapSingle == null) {

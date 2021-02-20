@@ -101,7 +101,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**
      * Modules registered for addition, indexed by registration id.
      */
-    protected Map<Object, com.fasterxml.jackson.databind.Module> _modules;
+    protected Map<Object, JacksonModule> _modules;
 
     /*
     /**********************************************************************
@@ -181,6 +181,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected AbstractTypeResolver[] _abstractTypeResolvers;
 
     protected ConstructorDetector _ctorDetector;
+
+    /*
+    /**********************************************************************
+    /* Handlers/factories, other:
+    /**********************************************************************
+     */
+
+    /**
+     * Explicitly configured default {@link ContextAttributes}, if any.
+     */
+    protected ContextAttributes _defaultAttributes;
 
     /*
     /**********************************************************************
@@ -286,6 +297,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _problemHandlers = null;
         _ctorDetector = null;
         _abstractTypeResolvers = NO_ABSTRACT_TYPE_RESOLVERS;
+
+        _defaultAttributes = null;
     }
 
     /**
@@ -330,13 +343,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _abstractTypeResolvers = state._abstractTypeResolvers;
         _ctorDetector = state._ctorDetector;
 
+        // Factories/handlers, other
+        _defaultAttributes = Snapshottable.takeSnapshot(state._defaultAttributes);
+
         // Modules
         if (state._modules == null) {
             _modules = null;
         } else {
             _modules = new LinkedHashMap<>();
-            for (Object mod : state._modules) {
-                addModule((com.fasterxml.jackson.databind.Module) mod);
+            for (JacksonModule mod : state._modules) {
+                addModule(mod);
             }
         }
     }
@@ -431,7 +447,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return new SerializationConfig(this,
                 _mapperFeatures, _serFeatures, _streamWriteFeatures, _formatWriteFeatures,
                 configOverrides,
-                tf, classIntr, mixins, str, rootNames,
+                tf, classIntr, mixins, str,
+                defaultAttributes(), rootNames,
                 filterProvider);
     }
 
@@ -443,7 +460,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return new DeserializationConfig(this,
                 _mapperFeatures, _deserFeatures, _streamReadFeatures, _formatReadFeatures,
                 configOverrides, coercionConfigs,
-                tf, classIntr, mixins, str, rootNames,
+                tf, classIntr, mixins, str,
+                defaultAttributes(), rootNames,
                 _abstractTypeResolvers, _ctorDetector);
     }
 
@@ -488,6 +506,27 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _baseSettings.getAnnotationIntrospector();
     }
 
+    /**
+     * Overridable method for changing default {@link ContextAttributes} instance to use
+     * if not explicitly specified during build process.
+     */
+    public ContextAttributes defaultAttributes() {
+        // 01-Feb-2020, tatu: Looks different from pattern used with other
+        //    defaults; seems better not to change state of builder?
+        if (_defaultAttributes == null) {
+            return ContextAttributes.getEmpty();
+        }
+        return _defaultAttributes;
+    }
+
+    /**
+     * Overridable method for changing default {@link ContextAttributes} instance to use
+     * if not explicitly specified during build process.
+     */
+    protected ContextAttributes _defaultDefaultAttributes() {
+        return ContextAttributes.getEmpty();
+    }
+    
     /*
     /**********************************************************************
     /* Accessors, introspection
@@ -940,11 +979,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**
      * Method will add given module to be registered when mapper is built, possibly
      * replacing an earlier instance of the module (as specified by its
-     * {@link Module#getRegistrationId()}).
+     * {@link JacksonModule#getRegistrationId()}).
      * Actual registration occurs in addition order (considering last add to count,
      * in case of re-registration for same id) when {@link #build()} is called.
      */
-    public B addModule(com.fasterxml.jackson.databind.Module module)
+    public B addModule(JacksonModule module)
     {
         _verifyModuleMetadata(module);
         final Object moduleId = module.getRegistrationId();
@@ -959,7 +998,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
         // 10-Sep-2019, tatu: [databind#2432] Module dependencies; need to add first
         //   but unlike main module, do NOT replace module if already added
-        for (com.fasterxml.jackson.databind.Module dep : module.getDependencies()) {
+        for (JacksonModule dep : module.getDependencies()) {
             _verifyModuleMetadata(dep);
             _modules.putIfAbsent(dep.getRegistrationId(), dep);
         }
@@ -967,7 +1006,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
-    private void _verifyModuleMetadata(com.fasterxml.jackson.databind.Module module)
+    private void _verifyModuleMetadata(JacksonModule module)
     {
         if (module.getModuleName() == null) {
             throw new IllegalArgumentException("Module ("+module.getClass().getName()+") without defined name");
@@ -977,17 +1016,17 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         }
     }
 
-    public B addModules(com.fasterxml.jackson.databind.Module... modules)
+    public B addModules(JacksonModule... modules)
     {
-        for (com.fasterxml.jackson.databind.Module module : modules) {
+        for (JacksonModule module : modules) {
             addModule(module);
         }
         return _this();
     }
 
-    public B addModules(Iterable<? extends com.fasterxml.jackson.databind.Module> modules)
+    public B addModules(Iterable<? extends JacksonModule> modules)
     {
-        for (com.fasterxml.jackson.databind.Module module : modules) {
+        for (JacksonModule module : modules) {
             addModule(module);
         }
         return _this();
@@ -1000,7 +1039,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * Note that method does not do any caching, so calls should be considered
      * potentially expensive.
      */
-    public static List<com.fasterxml.jackson.databind.Module> findModules() {
+    public static List<JacksonModule> findModules() {
         return findModules(null);
     }
 
@@ -1011,11 +1050,11 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * Note that method does not do any caching, so calls should be considered
      * potentially expensive.
      */
-    public static List<com.fasterxml.jackson.databind.Module> findModules(ClassLoader classLoader)
+    public static List<JacksonModule> findModules(ClassLoader classLoader)
     {
-        ArrayList<com.fasterxml.jackson.databind.Module> modules = new ArrayList<>();
-        ServiceLoader<com.fasterxml.jackson.databind.Module> loader = secureGetServiceLoader(com.fasterxml.jackson.databind.Module.class, classLoader);
-        for (com.fasterxml.jackson.databind.Module module : loader) {
+        ArrayList<JacksonModule> modules = new ArrayList<>();
+        ServiceLoader<JacksonModule> loader = secureGetServiceLoader(JacksonModule.class, classLoader);
+        for (JacksonModule module : loader) {
             modules.add(module);
         }
         return modules;
@@ -1054,7 +1093,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * "Accessor" method that will expose set of registered modules, in addition
      * order, to given handler.
      */
-    public B withModules(Consumer<com.fasterxml.jackson.databind.Module> handler) {
+    public B withModules(Consumer<JacksonModule> handler) {
         if (_modules != null) {
             _modules.values().forEach(handler);
         }
@@ -1084,6 +1123,23 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     public B annotationIntrospector(AnnotationIntrospector intr) {
         _baseSettings = _baseSettings.withAnnotationIntrospector(intr);
+        return _this();
+    }
+
+    /**
+     * Method for replacing default {@link ContextAttributes} that the mapper
+     * uses: usually one initialized with a set of default shared attributes, but
+     * potentially also with a custom implementation.
+     *<p>
+     * NOTE: instance specified will need to be thread-safe for usage, similar to the
+     * default ({@link ContextAttributes.Impl}).
+     *
+     * @param attrs Default instance to use, if not {@code null}, or {@code null} for "use empty default set".
+     *
+     * @return This Builder instance to allow call chaining
+     */
+    public B defaultAttributes(ContextAttributes attrs) {
+        _defaultAttributes = attrs;
         return _this();
     }
 
@@ -1159,8 +1215,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * @param s Strategy instance to use; if null, use the default implementation
      *
      * @return Builder instance itself to allow chaining
-     *
-     * @since 2.12
      */
     public B accessorNaming(AccessorNamingStrategy.Provider s) {
         if (s == null) {
@@ -1331,7 +1385,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
 
     /*
     /**********************************************************************
-    /* Adding Mix-ins
+    /* Configuring Mix-ins
     /**********************************************************************
      */
 
@@ -1354,7 +1408,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _mixInHandler = mixInHandler().withOverrides(r);
         return _this();
     }
-    
+
     /**
      * Method to use for defining mix-in annotations to use for augmenting
      * annotations that processable (serializable / deserializable)
@@ -1381,10 +1435,35 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * source class per target, so if there was a previous mix-in defined target it will
      * be cleared. This also means that you can remove mix-in definition by specifying
      * {@code mixinSource} of {@code null}
+     * (although preferred mechanism is {@link #removeMixIn})
+     *
+     * @param target Target class on which to add annotations
+     * @param mixinSource Class that has annotations to add
+     *
+     * @return This builder instance to allow call chaining
      */
     public B addMixIn(Class<?> target, Class<?> mixinSource)
     {
         mixInHandler().addLocalDefinition(target, mixinSource);
+        return _this();
+    }
+
+    /**
+     * Method that allows making sure that specified {@code target} class
+     * does not have associated mix-in annotations: basically can be used
+     * to undo an earlier call to {@link #addMixIn}.
+     *<p>
+     * NOTE: removing mix-ins for given class does not try to remove possible
+     * mix-ins for any of its super classes and super interfaces; only direct
+     * mix-in addition, if any, is removed.
+     *
+     * @param target Target class for which no mix-ins should remain after call
+     *
+     * @return This builder instance to allow call chaining
+     */
+    public B removeMixIn(Class<?> target)
+    {
+        mixInHandler().addLocalDefinition(target, null);
         return _this();
     }
 

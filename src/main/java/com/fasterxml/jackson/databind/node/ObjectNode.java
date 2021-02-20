@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
@@ -58,7 +57,7 @@ public class ObjectNode
 
     /*
     /**********************************************************
-    /* Overrides for JsonSerializable.Base
+    /* Overrides for JacksonSerializable.Base
     /**********************************************************
      */
 
@@ -107,7 +106,7 @@ public class ObjectNode
     }
 
     @Override
-    public Iterator<String> fieldNames() {
+    public Iterator<String> propertyNames() {
         return _children.keySet().iterator();
     }
 
@@ -299,7 +298,7 @@ public class ObjectNode
      */
     @Override
     public void serialize(JsonGenerator g, SerializerProvider provider)
-        throws IOException
+        throws JacksonException
     {
         @SuppressWarnings("deprecation")
         boolean trimEmptyArray = (provider != null) &&
@@ -308,7 +307,7 @@ public class ObjectNode
         for (Map.Entry<String, JsonNode> en : _children.entrySet()) {
             /* 17-Feb-2009, tatu: Can we trust that all nodes will always
              *   extend BaseJsonNode? Or if not, at least implement
-             *   JsonSerializable? Let's start with former, change if
+             *   JacksonSerializable? Let's start with former, change if
              *   we must.
              */
             BaseJsonNode value = (BaseJsonNode) en.getValue();
@@ -319,7 +318,7 @@ public class ObjectNode
             if (trimEmptyArray && value.isArray() && value.isEmpty(provider)) {
             	continue;
             }
-            g.writeFieldName(en.getKey());
+            g.writeName(en.getKey());
             value.serialize(g, provider);
         }
         g.writeEndObject();
@@ -328,7 +327,7 @@ public class ObjectNode
     @Override
     public void serializeWithType(JsonGenerator g, SerializerProvider ctxt,
             TypeSerializer typeSer)
-        throws IOException
+        throws JacksonException
     {
         @SuppressWarnings("deprecation")
         boolean trimEmptyArray = (ctxt != null) &&
@@ -346,7 +345,7 @@ public class ObjectNode
                 continue;
             }
             
-            g.writeFieldName(en.getKey());
+            g.writeName(en.getKey());
             value.serialize(g, ctxt);
         }
         typeSer.writeTypeSuffix(g, ctxt, typeIdDef);

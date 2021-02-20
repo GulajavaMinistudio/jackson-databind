@@ -1,9 +1,8 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.databind.JsonSerializable;
+
+import com.fasterxml.jackson.databind.JacksonSerializable;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
 /**
@@ -42,7 +41,7 @@ public class POJONode
      * binary data here too.
      */
     @Override
-    public byte[] binaryValue() throws IOException
+    public byte[] binaryValue()
     {
         if (_value instanceof byte[]) {
             return (byte[]) _value;
@@ -106,12 +105,12 @@ public class POJONode
      */
 
     @Override
-    public final void serialize(JsonGenerator gen, SerializerProvider ctxt) throws IOException
+    public final void serialize(JsonGenerator gen, SerializerProvider ctxt) throws JacksonException
     {
         if (_value == null) {
             ctxt.defaultSerializeNullValue(gen);
-        } else if (_value instanceof JsonSerializable) {
-            ((JsonSerializable) _value).serialize(gen, ctxt);
+        } else if (_value instanceof JacksonSerializable) {
+            ((JacksonSerializable) _value).serialize(gen, ctxt);
         } else {
             // 25-May-2018, tatu: [databind#1991] do not call via generator but through context;
             //    this to preserve contextual information

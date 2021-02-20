@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.deser.jdk;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -10,8 +9,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
@@ -47,7 +46,7 @@ public class EnumDeserializationTest
     {
         public LcEnumDeserializer() { super(TestEnum.class); }
         @Override
-        public TestEnum deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
+        public TestEnum deserialize(JsonParser p, DeserializationContext ctxt)
         {
             return TestEnum.valueOf(p.getText().toUpperCase());
         }
@@ -147,7 +146,7 @@ public class EnumDeserializationTest
         }
 
         @Override
-        protected AnEnum _deserialize(String value, DeserializationContext ctxt) throws IOException {
+        protected AnEnum _deserialize(String value, DeserializationContext ctxt) {
             try {
                 return AnEnum.valueOf(value);
             } catch (IllegalArgumentException e) {
@@ -160,7 +159,7 @@ public class EnumDeserializationTest
     public static class AnEnumKeyDeserializer extends KeyDeserializer {
 
         @Override
-        public Object deserializeKey(String key, DeserializationContext ctxt) throws IOException {
+        public Object deserializeKey(String key, DeserializationContext ctxt) {
             try {
                 return AnEnum.valueOf(key);
             } catch (IllegalArgumentException e) {
@@ -587,7 +586,7 @@ public class EnumDeserializationTest
                 .without(DeserializationFeature.WRAP_EXCEPTIONS)
                 .readValue(quote("B"));
             fail("Should not pass");
-        } catch (JsonMappingException e) {
+        } catch (DatabindException e) {
             fail("Wrong exception, should not wrap, got: "+e);
         } catch (IllegalArgumentException e) {
             verifyException(e, "2164");

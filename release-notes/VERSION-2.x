@@ -4,6 +4,63 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+(3.0.x and later changes not included here)
+
+2.13.0 (not yet released)
+
+#2828: Add `DatabindException` as intermediate subtype of `JsonMappingException`
+#2900: Jackson does not support deserializing new Java 9 unmodifiable collections
+ (reported by Daniel H)
+#3001: Add mechanism for setting default `ContextAttributes` for `ObjectMapper`
+#3002: Add `DeserializationContext.readTreeAsValue()` methods for more convenient
+  conversions for deserializers to use
+#3011: Clean up support of typed "unmodifiable", "singleton" Maps/Sets/Collections
+#3035: Add `removeMixIn()` method in `MapperBuilder`
+#3036: Backport `MapperBuilder` lambda-taking methods: `withConfigOverride()`,
+  `withCoercionConfig()`, `withCoercionConfigDefaults()`
+
+2.12.2 (not yet released)
+
+#3008: String property deserializes null as "null" for
+   `JsonTypeInfo.As.EXTERNAL_PROPERTY`
+#3022: Property ignorals cause `BeanDeserializer `to forget how to read
+  from arrays (not copying `_arrayDelegateDeserializer`)
+ (reported by Gian M)
+#3025: UntypedObjectDeserializer` mixes multiple unwrapped
+  collections (related to #2733)
+ (fix contributed by Migwel@github)
+#3038: Two cases of incorrect error reporting about DeserializationFeature
+ (reported by Jelle V)
+#3045: Bug in polymorphic deserialization with `@JsonCreator`, `@JsonAnySetter`,
+  `JsonTypeInfo.As.EXTERNAL_PROPERTY`
+ (reported by martineaus83@github)
+#3055: Polymorphic subtype deduction ignores `defaultImpl` attribute
+ (contributed by drekbour@github)
+#3056: MismatchedInputException: Cannot deserialize instance of
+  `com.fasterxml.jackson.databind.node.ObjectNode` out of VALUE_NULL token
+ (reported by Stexxen@github)
+#3060: Missing override for `hasAsKey()` in `AnnotationIntrospectorPair`
+
+2.12.1 (08-Jan-2021)
+
+#2962: Auto-detection of constructor-based creator method skipped if there is
+   an annotated factory-based creator method (regression from 2.11)
+ (reported by Halil I-S)
+#2972: `ObjectMapper.treeToValue()` no longer invokes `JsonDeserializer.getNullValue()`
+ (reported by andpal@github)
+#2973: DeserializationProblemHandler is not invoked when trying to deserializing String
+ (reported by zigzago@github)
+#2978: Fix failing `double` JsonCreators in jackson 2.12.0
+ (contributed by Carter K)
+#2979: Conflicting in POJOPropertiesCollector when having namingStrategy
+ (reported, fix suggested by SunYiJun)
+#2990: Breaking API change in `BasicClassIntrospector` (2.12.0)
+ (reported, fix contributed by Faron D)
+#3005: `JsonNode.requiredAt()` does NOT fail on some path expressions
+#3009: Exception thrown when `Collections.synchronizedList()` is serialized
+  with type info, deserialized
+ (reported by pcloves@github)
+
 2.12.0 (29-Nov-2020)
 
 #43: Add option to resolve type from multiple existing properties,
@@ -102,7 +159,7 @@ Project: jackson-databind
 - Some refactoring of `CollectionDeserializer` to solve CSV array handling issues
 - Full "LICENSE" included in jar for easier access by compliancy tools
 
-2.11.4 (not yet released)
+2.11.4 (12-Dec-2020)
 
 #2894: Fix type resolution for static methods (regression in 2.11.3 due to #2821 fix)
  (reported by Łukasz W)

@@ -73,8 +73,6 @@ public enum DeserializationFeature implements ConfigFeature
      * If enabled, such values will be deserialized as {@link java.lang.Long};
      * if disabled, they will be deserialized as "smallest" available type,
      * {@link Integer}.
-     * In addition, if enabled, trying to bind values that do not fit in {@link java.lang.Long}
-     * will throw a {@link com.fasterxml.jackson.core.JsonProcessingException}.
      *<p>
      * Note: if {@link #USE_BIG_INTEGER_FOR_INTS} is enabled, it has precedence
      * over this setting, forcing use of {@link java.math.BigInteger} for all
@@ -108,13 +106,13 @@ public enum DeserializationFeature implements ConfigFeature
      * properties (ones that do not map to a property, and there is
      * no "any setter" or handler that can handle it)
      * should result in a failure (by throwing a
-     * {@link JsonMappingException}) or not.
+     * {@link DatabindException}) or not.
      * This setting only takes effect after all other handling
      * methods for unknown properties have been tried, and
      * property remains unhandled.
      *<p>
      * Feature is enabled by default (meaning that a
-     * {@link JsonMappingException} will be thrown if an unknown property
+     * {@link DatabindException} will be thrown if an unknown property
      * is encountered).
      */
     FAIL_ON_UNKNOWN_PROPERTIES(true),
@@ -122,7 +120,7 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines whether encountering of JSON null
      * is an error when deserializing into Java primitive types
-     * (like 'int' or 'double'). If it is, a JsonProcessingException
+     * (like 'int' or 'double'). If it is, a {@link DatabindException}
      * is thrown to indicate this; if not, default value is used
      * (0 for 'int', 0.0 for double, same defaulting as what JVM uses).
      *<p>
@@ -135,7 +133,7 @@ public enum DeserializationFeature implements ConfigFeature
      * values to be used for deserializing Java enum values.
      * If set to 'false' numbers are acceptable and are used to map to
      * ordinal() of matching enumeration value; if 'true', numbers are
-     * not allowed and a {@link JsonMappingException} will be thrown.
+     * not allowed and a {@link DatabindException} will be thrown.
      * Latter behavior makes sense if there is concern that accidental
      * mapping from integer values to enums might happen (and when enums
      * are always serialized as JSON Strings)
@@ -159,7 +157,7 @@ public enum DeserializationFeature implements ConfigFeature
      * Feature that determines what happens when reading JSON content into tree
      * ({@link com.fasterxml.jackson.core.TreeNode}) and a duplicate key
      * is encountered (property name that was already seen for the JSON Object).
-     * If enabled, {@link JsonMappingException} will be thrown; if disabled, no exception
+     * If enabled, {@link DatabindException} will be thrown; if disabled, no exception
      * is thrown and the new (later) value overwrites the earlier value.
      *<p>
      * Note that this property does NOT affect other aspects of data-binding; that is,
@@ -173,7 +171,7 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines what happens when a property that has been explicitly
      * marked as ignorable is encountered in input: if feature is enabled,
-     * {@link JsonMappingException} is thrown; if false, property is quietly skipped.
+     * {@link DatabindException} is thrown; if false, property is quietly skipped.
      *<p>
      * Feature is disabled by default so that no exception is thrown.
      */
@@ -197,7 +195,7 @@ public enum DeserializationFeature implements ConfigFeature
      * Feature that determines what happens if one or more Creator properties (properties
      * bound to parameters of Creator method (constructor or static factory method))
      * are missing value to bind to from content.
-     * If enabled, such missing values result in a {@link JsonMappingException} being
+     * If enabled, such missing values result in a {@link DatabindException} being
      * thrown with information on the first one (by index) of missing properties.
      * If disabled, and if property is NOT marked as required,
      * missing Creator properties are filled
@@ -226,7 +224,7 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines what happens when a property annotated with
      * {@link com.fasterxml.jackson.annotation.JsonTypeInfo.As#EXTERNAL_PROPERTY} is missing,
-     * but associated type id is available. If enabled, {@link JsonMappingException} is always
+     * but associated type id is available. If enabled, a {@link DatabindException} is always
      * thrown when property value is missing (if type id does exist);
      * if disabled, exception is only thrown if property is marked as `required`.
      *<p>
@@ -255,22 +253,14 @@ public enum DeserializationFeature implements ConfigFeature
     
     /**
      * Feature that determines whether Jackson code should catch
-     * and wrap {@link Exception}s (but never {@link Error}s!)
+     * and wrap non-Jackson {@link Exception}s (but never {@link Error}s!)
      * to add additional information about
      * location (within input) of problem or not. If enabled,
-     * most exceptions will be caught and re-thrown (exception
-     * specifically being that {@link java.io.IOException}s may be passed
-     * as is, since they are declared as throwable); this can be
+     * most exceptions will be caught and re-thrown; this can be
      * convenient both in that all exceptions will be checked and
      * declared, and so there is more contextual information.
      * However, sometimes calling application may just want "raw"
      * unchecked exceptions passed as is.
-     *<p>
-     * NOTE: most of the time exceptions that may or may not be wrapped are of
-     * type {@link RuntimeException}: as mentioned earlier, various
-     * {@link java.io.IOException}s (and in particular
-     * {@link com.fasterxml.jackson.core.JsonProcessingException}s) will
-     * always be passed as-is.
      *<p>
      * Feature is enabled by default.
      */
@@ -298,7 +288,7 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines whether it is acceptable to coerce single value array (in JSON)
      * values to the corresponding value type.  This is basically the opposite of the {@link #ACCEPT_SINGLE_VALUE_AS_ARRAY}
-     * feature.  If more than one value is found in the array, a JsonMappingException is thrown.
+     * feature.  If more than one value is found in the array, a {@link DatabindException} is thrown.
      * <p>
      * 
      * Feature is disabled by default
@@ -310,7 +300,7 @@ public enum DeserializationFeature implements ConfigFeature
      * {@link SerializationFeature#WRAP_ROOT_VALUE} used for serialization.
      * Will verify that the root JSON value is a JSON Object, and that it has
      * a single property with expected root name. If not, a
-     * {@link JsonMappingException} is thrown; otherwise value of the wrapped property
+     * {@link DatabindException} is thrown; otherwise value of the wrapped property
      * will be deserialized as if it was the root value.
      *<p>
      * Feature is disabled by default.
@@ -360,7 +350,7 @@ public enum DeserializationFeature implements ConfigFeature
      * number (anything with command (`.`) or exponent portion (`e` / `E'))
      * to an expected integral number (`int`, `long`, `java.lang.Integer`, `java.lang.Long`,
      * `java.math.BigDecimal`) is allowed or not.
-     * If enabled, coercion truncates value; if disabled, a {@link JsonMappingException}
+     * If enabled, coercion truncates value; if disabled, a {@link DatabindException}
      * will be thrown.
      *<p>
      * Feature is enabled by default.
@@ -448,7 +438,7 @@ public enum DeserializationFeature implements ConfigFeature
 
     /**
      * Feature that determines whether {@link ObjectReader} should
-     * try to eagerly fetch necessary {@link JsonDeserializer} when
+     * try to eagerly fetch necessary {@link ValueDeserializer} when
      * possible. This improves performance in cases where similarly
      * configured {@link ObjectReader} instance is used multiple
      * times; and should not significantly affect single-use cases.

@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.type.*;
 /**
  * Abstract class that defines API used by {@link DeserializationContext}
  * to construct actual
- * {@link JsonDeserializer} instances (which are then cached by
+ * {@link ValueDeserializer} instances (which are then cached by
  * context and/or dedicated cache).
  *<p>
  * Since there are multiple broad categories of deserializers, there are 
@@ -52,9 +52,8 @@ public abstract class DeserializerFactory
      * for the bean type to deserialize.
      */
     public abstract ValueInstantiator findValueInstantiator(DeserializationContext ctxt,
-            BeanDescription beanDesc)
-        throws JsonMappingException;
-    
+            BeanDescription beanDesc);
+
     /**
      * Method called to create (or, for completely immutable deserializers,
      * reuse) a deserializer that can convert JSON content into values of
@@ -67,36 +66,30 @@ public abstract class DeserializerFactory
      *
      * @param type Type to be deserialized
      */
-    public abstract JsonDeserializer<Object> createBeanDeserializer(DeserializationContext ctxt,
-            JavaType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<Object> createBeanDeserializer(DeserializationContext ctxt,
+            JavaType type, BeanDescription beanDesc);
 
     /**
      * Method called to create a deserializer that will use specified Builder
      * class for building value instances.
      */
-    public abstract JsonDeserializer<Object> createBuilderBasedDeserializer(
+    public abstract ValueDeserializer<Object> createBuilderBasedDeserializer(
     		DeserializationContext ctxt, JavaType type, BeanDescription beanDesc,
-    		Class<?> builderClass)
-        throws JsonMappingException;
+    		Class<?> builderClass);
 
+    public abstract ValueDeserializer<?> createEnumDeserializer(DeserializationContext ctxt,
+            JavaType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createEnumDeserializer(DeserializationContext ctxt,
-            JavaType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createReferenceDeserializer(DeserializationContext ctxt,
+            ReferenceType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createReferenceDeserializer(DeserializationContext ctxt,
-            ReferenceType type, BeanDescription beanDesc)
-        throws JsonMappingException;
-    
     /**
      * Method called to create and return a deserializer that can construct
      * JsonNode(s) from JSON content.
      */
-    public abstract JsonDeserializer<?> createTreeDeserializer(DeserializationConfig config,
-            JavaType type, BeanDescription beanDesc)
-        throws JsonMappingException;
-    
+    public abstract ValueDeserializer<?> createTreeDeserializer(DeserializationConfig config,
+            JavaType type, BeanDescription beanDesc);
+
     /**
      * Method called to create (or, for completely immutable deserializers,
      * reuse) a deserializer that can convert JSON content into values of
@@ -104,25 +97,20 @@ public abstract class DeserializerFactory
      *
      * @param type Type to be deserialized
      */
-    public abstract JsonDeserializer<?> createArrayDeserializer(DeserializationContext ctxt,
-            ArrayType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createArrayDeserializer(DeserializationContext ctxt,
+            ArrayType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createCollectionDeserializer(DeserializationContext ctxt,
-            CollectionType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createCollectionDeserializer(DeserializationContext ctxt,
+            CollectionType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createCollectionLikeDeserializer(DeserializationContext ctxt,
-            CollectionLikeType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createCollectionLikeDeserializer(DeserializationContext ctxt,
+            CollectionLikeType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createMapDeserializer(DeserializationContext ctxt,
-            MapType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createMapDeserializer(DeserializationContext ctxt,
+            MapType type, BeanDescription beanDesc);
 
-    public abstract JsonDeserializer<?> createMapLikeDeserializer(DeserializationContext ctxt,
-            MapLikeType type, BeanDescription beanDesc)
-        throws JsonMappingException;
+    public abstract ValueDeserializer<?> createMapLikeDeserializer(DeserializationContext ctxt,
+            MapLikeType type, BeanDescription beanDesc);
 
     /**
      * Method called to find if factory knows how to create a key deserializer
@@ -133,14 +121,13 @@ public abstract class DeserializerFactory
      *   (and default key deserializer should be used)
      */
     public abstract KeyDeserializer createKeyDeserializer(DeserializationContext ctxt,
-            JavaType type)
-        throws JsonMappingException;
+            JavaType type);
 
     /**
      * Method that can be used to check if databind module has explicitly declared deserializer
      * for given (likely JDK) type, explicit meaning that there is specific deserializer for
      * given type as opposed to auto-generated "Bean" deserializer. Factory itself will check
-     * for known JDK-provided types, but registered {@link com.fasterxml.jackson.databind.Module}s
+     * for known JDK-provided types, but registered {@link com.fasterxml.jackson.databind.JacksonModule}s
      * are also called to see if they might provide explicit deserializer.
      *<p> 
      * Main use for this method is with Safe Default Typing (and generally Safe Polymorphic
@@ -175,9 +162,9 @@ public abstract class DeserializerFactory
     
     /**
      * Convenience method for creating a new factory instance with additional
-     * {@link BeanDeserializerModifier}.
+     * {@link ValueDeserializerModifier}.
      */
-    public abstract DeserializerFactory withDeserializerModifier(BeanDeserializerModifier modifier);
+    public abstract DeserializerFactory withDeserializerModifier(ValueDeserializerModifier modifier);
 
     /**
      * Convenience method for creating a new factory instance with additional

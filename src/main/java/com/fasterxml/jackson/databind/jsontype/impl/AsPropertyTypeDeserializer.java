@@ -1,17 +1,13 @@
 package com.fasterxml.jackson.databind.jsontype.impl;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
+
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.util.JsonParserSequence;
-import com.fasterxml.jackson.databind.BeanProperty;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.MapperFeature;
+
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.jsontype.TypeIdResolver;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
@@ -28,6 +24,10 @@ import com.fasterxml.jackson.databind.util.TokenBuffer;
 public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
 {
     protected final As _inclusion;
+
+    protected final String _msgForMissingId = (_property == null)
+            ? String.format("missing type id property '%s'", _typePropertyName)
+            : String.format("missing type id property '%s' (for POJO property '%s')", _typePropertyName, _property.getName());
 
     public AsPropertyTypeDeserializer(JavaType bt, TypeIdResolver idRes,
             String typePropertyName, boolean typeIdVisible, JavaType defaultImpl)
@@ -61,7 +61,8 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
      * for may be anywhere...
      */
     @Override
-    public Object deserializeTypedFromObject(JsonParser p, DeserializationContext ctxt) throws IOException
+    public Object deserializeTypedFromObject(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
     {
         // 02-Aug-2013, tatu: May need to use native type ids
         if (p.canReadTypeId()) {
@@ -71,11 +72,11 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
             }
         }
 
-        // but first, sanity check to ensure we have START_OBJECT or FIELD_NAME
+        // but first, sanity check to ensure we have START_OBJECT or PROPERTY_NAME
         JsonToken t = p.currentToken();
         if (t == JsonToken.START_OBJECT) {
             t = p.nextToken();
-        } else if (/*t == JsonToken.START_ARRAY ||*/ t != JsonToken.FIELD_NAME) {
+        } else if (/*t == JsonToken.START_ARRAY ||*/ t != JsonToken.PROPERTY_NAME) {
             /* This is most likely due to the fact that not all Java types are
              * serialized as JSON Objects; so if "as-property" inclusion is requested,
              * serialization of things like Lists must be instead handled as if
@@ -83,13 +84,13 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
              * But this can also be due to some custom handling: so, if "defaultImpl"
              * is defined, it will be asked to handle this case.
              */
-            return _deserializeTypedUsingDefaultImpl(p, ctxt, null);
+            return _deserializeTypedUsingDefaultImpl(p, ctxt, null, _msgForMissingId);
         }
         // Ok, let's try to find the property. But first, need token buffer...
         TokenBuffer tb = null;
         final boolean ignoreCase = ctxt.isEnabled(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES);
 
-        for (; t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+        for (; t == JsonToken.PROPERTY_NAME; t = p.nextToken()) {
             final String name = p.currentName();
             p.nextToken(); // to point to the value
             if (name.equals(_typePropertyName)
@@ -99,20 +100,22 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
             if (tb == null) {
                 tb = new TokenBuffer(p, ctxt);
             }
-            tb.writeFieldName(name);
+            tb.writeName(name);
             tb.copyCurrentStructure(p);
         }
-        return _deserializeTypedUsingDefaultImpl(p, ctxt, tb);
+        return _deserializeTypedUsingDefaultImpl(p, ctxt, tb, _msgForMissingId);
     }
 
     protected Object _deserializeTypedForId(JsonParser p, DeserializationContext ctxt,
-            TokenBuffer tb, String typeId) throws IOException {
-        JsonDeserializer<Object> deser = _findDeserializer(ctxt, typeId);
+            TokenBuffer tb, String typeId)
+        throws JacksonException
+    {
+        ValueDeserializer<Object> deser = _findDeserializer(ctxt, typeId);
         if (_typeIdVisible) { // need to merge id back in JSON input?
             if (tb == null) {
                 tb = TokenBuffer.forInputBuffering(p, ctxt);
             }
-            tb.writeFieldName(p.currentName());
+            tb.writeName(p.currentName());
             tb.writeString(typeId);
         }
         if (tb != null) { // need to put back skipped properties?
@@ -129,7 +132,8 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
 
     // off-lined to keep main method lean and mean...
     protected Object _deserializeTypedUsingDefaultImpl(JsonParser p,
-            DeserializationContext ctxt, TokenBuffer tb) throws IOException
+            DeserializationContext ctxt, TokenBuffer tb, String priorFailureMsg)
+        throws JacksonException
     {
         // May have default implementation to use
         // 13-Oct-2020, tatu: As per [databind#2775], need to be careful to
@@ -155,15 +159,9 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
         }
         // ... and here we will check for default implementation handling (either
         // genuine, or faked for "dont fail on bad type id")
-        JsonDeserializer<Object> deser = _findDefaultImplDeserializer(ctxt);
+        ValueDeserializer<Object> deser = _findDefaultImplDeserializer(ctxt);
         if (deser == null) {
-            String msg = String.format("missing type id property '%s'",
-                    _typePropertyName);
-            // even better, may know POJO property polymorphic value would be assigned to
-            if (_property != null) {
-                msg = String.format("%s (for POJO property '%s')", msg, _property.getName());
-            }
-            JavaType t = _handleMissingTypeId(ctxt, msg);
+            JavaType t = _handleMissingTypeId(ctxt, priorFailureMsg);
             if (t == null) {
                 // 09-Mar-2017, tatu: Is this the right thing to do?
                 return null;
@@ -185,7 +183,9 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
      * no negative side effects (at least within existing unit test suite).
      */
     @Override
-    public Object deserializeTypedFromAny(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public Object deserializeTypedFromAny(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
+    {
         // Sometimes, however, we get an array wrapper; specifically
         // when an array or list has been serialized with type information.
         if (p.hasToken(JsonToken.START_ARRAY)) {
@@ -195,6 +195,6 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
     }    
     
     // These are fine from base class:
-    //public Object deserializeTypedFromArray(JsonParser jp, DeserializationContext ctxt)
-    //public Object deserializeTypedFromScalar(JsonParser jp, DeserializationContext ctxt)    
+    //public Object deserializeTypedFromArray(JsonParser p, DeserializationContext ctxt)
+    //public Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt)    
 }

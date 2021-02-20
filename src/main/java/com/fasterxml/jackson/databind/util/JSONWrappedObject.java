@@ -1,7 +1,5 @@
 package com.fasterxml.jackson.databind.util;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.core.*;
 
 import com.fasterxml.jackson.databind.*;
@@ -15,7 +13,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
  * 
  * @see com.fasterxml.jackson.databind.util.JSONPObject
  */
-public class JSONWrappedObject implements JsonSerializable
+public class JSONWrappedObject implements JacksonSerializable
 {
     /**
      * Literal String to output before serialized value.
@@ -61,13 +59,13 @@ public class JSONWrappedObject implements JsonSerializable
     
     /*
     /**********************************************************************
-    /* JsonSerializable implementation
+    /* JacksonSerializable implementation
     /**********************************************************************
      */
 
     @Override
     public void serializeWithType(JsonGenerator g, SerializerProvider provider, TypeSerializer typeSer)
-            throws IOException, JsonProcessingException
+        throws JacksonException
     {
         // No type for JSONP wrapping: value serializer will handle typing for value:
         serialize(g, provider);
@@ -75,7 +73,7 @@ public class JSONWrappedObject implements JsonSerializable
 
     @Override
     public void serialize(JsonGenerator g, SerializerProvider provider)
-            throws IOException, JsonProcessingException
+        throws JacksonException
     {
         // First, wrapping:
     	if (_prefix != null) g.writeRaw(_prefix);

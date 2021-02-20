@@ -44,7 +44,7 @@ public class ObjectMapperTest extends BaseMapTest
         }
 
         @Override
-        public void writeArrayValueSeparator(JsonGenerator g) throws IOException
+        public void writeArrayValueSeparator(JsonGenerator g)
         {
             g.writeRaw(" , ");
         }
@@ -60,8 +60,8 @@ public class ObjectMapperTest extends BaseMapTest
 
     public void testFeatureDefaults()
     {
-        assertTrue(MAPPER.isEnabled(TokenStreamFactory.Feature.CANONICALIZE_FIELD_NAMES));
-        assertTrue(MAPPER.isEnabled(JsonWriteFeature.QUOTE_FIELD_NAMES));
+        assertTrue(MAPPER.isEnabled(TokenStreamFactory.Feature.CANONICALIZE_PROPERTY_NAMES));
+        assertTrue(MAPPER.isEnabled(JsonWriteFeature.QUOTE_PROPERTY_NAMES));
         assertTrue(MAPPER.isEnabled(StreamReadFeature.AUTO_CLOSE_SOURCE));
         assertTrue(MAPPER.isEnabled(StreamWriteFeature.AUTO_CLOSE_TARGET));
         assertFalse(MAPPER.isEnabled(JsonWriteFeature.ESCAPE_NON_ASCII));
@@ -271,7 +271,7 @@ public class ObjectMapperTest extends BaseMapTest
 
         final SimpleModule mainModule = new SimpleModule() {
             @Override
-            public Iterable<? extends Module> getDependencies() {
+            public Iterable<? extends JacksonModule> getDependencies() {
                 return Arrays.asList(secondModule, thirdModule);
             }
 
@@ -285,7 +285,7 @@ public class ObjectMapperTest extends BaseMapTest
                 .addModule(mainModule)
                 .build();
 
-        Collection<Module> mods = objectMapper.getRegisteredModules();
+        Collection<JacksonModule> mods = objectMapper.getRegisteredModules();
         List<Object> ids = mods.stream().map(mod -> mod.getRegistrationId())
                 .collect(Collectors.toList());
         assertEquals(Arrays.asList("dep1", "dep2", "main"), ids);

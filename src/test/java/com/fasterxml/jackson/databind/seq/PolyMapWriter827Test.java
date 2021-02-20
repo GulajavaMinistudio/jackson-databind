@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.seq;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,8 +27,8 @@ public class PolyMapWriter827Test extends BaseMapTest
     public class CustomKeySerializer extends StdSerializer<CustomKey> {
         public CustomKeySerializer() { super(CustomKey.class); }
         @Override
-        public void serialize(CustomKey key, JsonGenerator g, SerializerProvider serializerProvider) throws IOException {
-            g.writeFieldName(key.a + "," + key.b);
+        public void serialize(CustomKey key, JsonGenerator g, SerializerProvider serializerProvider) {
+            g.writeName(key.a + "," + key.b);
         }
     }
 

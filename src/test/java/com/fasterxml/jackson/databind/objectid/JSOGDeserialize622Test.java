@@ -10,8 +10,6 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-import java.io.IOException;
-
 /**
  * Unit test(s) for [databind#622], supporting non-scalar-Object-ids,
  * to support things like JSOG.
@@ -82,17 +80,18 @@ public class JSOGDeserialize622Test extends BaseMapTest
     /**
      * The reference deserializer
      */
-    static class JSOGRefDeserializer extends JsonDeserializer<JSOGRef>
+    static class JSOGRefDeserializer extends ValueDeserializer<JSOGRef>
     {
         @Override
-        public JSOGRef deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
+        public JSOGRef deserialize(JsonParser p, DeserializationContext ctx)
+        {
             JsonNode node = p.readValueAsTree();
             if (node.isTextual()) {
                 return new JSOGRef(node.asInt());
             }
             JsonNode n = node.get(REF_KEY);
             if (n == null) {
-                throw new JsonMappingException(p, "Could not find key '"+REF_KEY
+                ctx.reportInputMismatch(JSOGRef.class, "Could not find key '"+REF_KEY
                         +"' from ("+node.getClass().getName()+"): "+node);
             }
             return new JSOGRef(n.asInt());

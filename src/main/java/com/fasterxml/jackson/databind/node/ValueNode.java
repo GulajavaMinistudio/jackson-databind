@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.IOException;
 import java.util.List;
 
 import com.fasterxml.jackson.core.*;
@@ -25,9 +24,9 @@ public abstract class ValueNode
 
     @Override
     protected JsonNode _at(JsonPointer ptr) {
-        // will only allow direct matches, but no traversal through
-        // (base class checks for direct match)
-        return MISSING;
+        // 02-Jan-2020, tatu: As per [databind#3005] must return `null` and NOT
+        //    "missing node"
+        return null;
     }
 
     /**
@@ -43,7 +42,7 @@ public abstract class ValueNode
     @Override
     public void serializeWithType(JsonGenerator g, SerializerProvider ctxt,
             TypeSerializer typeSer)
-        throws IOException
+        throws JacksonException
     {
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
                 typeSer.typeId(this, asToken()));

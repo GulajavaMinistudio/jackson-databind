@@ -1,9 +1,8 @@
 package com.fasterxml.jackson.databind.util;
 
-import java.io.IOException;
-
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.util.JsonpCharacterEscapes;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 
@@ -15,7 +14,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
  * @see com.fasterxml.jackson.databind.util.JSONWrappedObject
  */
 public class JSONPObject
-    implements JsonSerializable
+    implements JacksonSerializable
 {
     /**
      * JSONP function name to use for serialization
@@ -47,14 +46,14 @@ public class JSONPObject
     }
     
     /*
-    /**********************************************************
-    /* JsonSerializable(WithType) implementation
-    /**********************************************************
+    /**********************************************************************
+    /* JacksonSerializable implementation
+    /**********************************************************************
      */
 
     @Override
     public void serializeWithType(JsonGenerator gen, SerializerProvider provider, TypeSerializer typeSer)
-            throws IOException
+        throws JacksonException
     {
         // No type for JSONP wrapping: value serializer will handle typing for value:
         serialize(gen, provider);
@@ -62,7 +61,7 @@ public class JSONPObject
 
     @Override
     public void serialize(JsonGenerator gen, SerializerProvider provider)
-            throws IOException
+        throws JacksonException
     {
         // First, wrapping:
         gen.writeRaw(_function);
@@ -95,9 +94,9 @@ public class JSONPObject
     }
 
     /*
-    /**************************************************************
+    /**********************************************************************
     /* Accessors
-    /**************************************************************
+    /**********************************************************************
      */
     
     public String getFunction() { return _function; }

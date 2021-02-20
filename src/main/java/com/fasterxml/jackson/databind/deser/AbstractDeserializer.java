@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.deser;
 
-import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
@@ -12,7 +11,6 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.impl.ObjectIdReader;
 import com.fasterxml.jackson.databind.deser.impl.PropertyBasedObjectIdGenerator;
-import com.fasterxml.jackson.databind.deser.impl.ReadableObjectId;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.ObjectIdInfo;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
@@ -26,7 +24,7 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  * pass such resolver will result in an error.
  */
 public class AbstractDeserializer
-    extends JsonDeserializer<Object>
+    extends ValueDeserializer<Object>
 {
     protected final JavaType _baseType;
 
@@ -44,9 +42,9 @@ public class AbstractDeserializer
     protected final boolean _acceptDouble;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -104,8 +102,8 @@ public class AbstractDeserializer
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext ctxt,
-            BeanProperty property) throws JsonMappingException
+    public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+            BeanProperty property)
     {
         final AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
         if (property != null && intr != null) {
@@ -144,7 +142,7 @@ handledType().getName()));
                         idType = ctxt.getTypeFactory().findTypeParameters(type, ObjectIdGenerator.class)[0];
                         idGen = ctxt.objectIdGeneratorInstance(accessor, objectIdInfo);
                     }
-                    JsonDeserializer<?> deser = ctxt.findRootValueDeserializer(idType);
+                    ValueDeserializer<?> deser = ctxt.findRootValueDeserializer(idType);
                     ObjectIdReader oir = ObjectIdReader.construct(idType, objectIdInfo.getPropertyName(),
                              idGen, deser, idProp, resolver);
                     return new AbstractDeserializer(this, oir, null);
@@ -159,9 +157,9 @@ handledType().getName()));
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -207,17 +205,17 @@ handledType().getName()));
     public SettableBeanProperty findBackReference(String logicalName) {
         return (_backRefProperties == null) ? null : _backRefProperties.get(logicalName);
     }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserializer implementation
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
     public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
             TypeDeserializer typeDeserializer)
-        throws IOException
+        throws JacksonException
     {
         // Hmmh. One tricky question; for scalar, is it an Object Id, or "Natural" type?
         // for now, prefer Object Id:
@@ -232,7 +230,7 @@ handledType().getName()));
                 if (t == JsonToken.START_OBJECT) {
                     t = p.nextToken();
                 }
-                if ((t == JsonToken.FIELD_NAME) && _objectIdReader.maySerializeAsObject()
+                if ((t == JsonToken.PROPERTY_NAME) && _objectIdReader.maySerializeAsObject()
                         && _objectIdReader.isValidReferencePropertyName(p.currentName(), p)) {
                     return _deserializeFromObjectId(p, ctxt);
                 }
@@ -248,7 +246,7 @@ handledType().getName()));
 
     @Override
     public Object deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException
+        throws JacksonException
     {
         // 16-Oct-2016, tatu: Let's pass non-null value instantiator so that we will
         //    get proper exception type; needed to establish there are no creators
@@ -259,12 +257,13 @@ handledType().getName()));
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Internal methods
-    /**********************************************************
+    /**********************************************************************
      */
 
-    protected Object _deserializeIfNatural(JsonParser p, DeserializationContext ctxt) throws IOException
+    protected Object _deserializeIfNatural(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
     {
         /* There is a chance we might be "natural" types
          * (String, Boolean, Integer, Double), which do not include any type information...
@@ -306,7 +305,8 @@ handledType().getName()));
      * Method called in cases where it looks like we got an Object Id
      * to parse and use as a reference.
      */
-    protected Object _deserializeFromObjectId(JsonParser p, DeserializationContext ctxt) throws IOException
+    protected Object _deserializeFromObjectId(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
     {
         Object id = _objectIdReader.readObjectReference(p, ctxt);
         ReadableObjectId roid = ctxt.findObjectId(id, _objectIdReader.generator, _objectIdReader.resolver);
@@ -314,7 +314,7 @@ handledType().getName()));
         Object pojo = roid.resolve();
         if (pojo == null) { // not yet; should wait...
             throw new UnresolvedForwardReference(p,
-                    "Could not resolve Object Id ["+id+"] -- unresolved forward-reference?", p.getCurrentLocation(), roid);
+                    "Could not resolve Object Id ["+id+"] -- unresolved forward-reference?", p.currentLocation(), roid);
         }
         return pojo;
     }

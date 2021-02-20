@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
@@ -37,7 +36,7 @@ import com.fasterxml.jackson.databind.util.ClassUtil;
  * and {@link ObjectMapper#treeAsTokens(TreeNode)}
  */
 public abstract class JsonNode
-    extends JsonSerializable.Base // i.e. implements JsonSerializable
+    extends JacksonSerializable.Base // i.e. implements JacksonSerializable
     implements TreeNode, Iterable<JsonNode>
 {
     /*
@@ -186,7 +185,7 @@ public abstract class JsonNode
     public abstract JsonNode path(int index);
 
     @Override
-    public Iterator<String> fieldNames() {
+    public Iterator<String> propertyNames() {
         return ClassUtil.emptyIterator();
     }
 
@@ -235,6 +234,16 @@ public abstract class JsonNode
         return at(JsonPointer.compile(jsonPtrExpr));
     }
 
+    /**
+     * Helper method used by other methods for traversing the next step
+     * of given path expression, and returning matching value node if any:
+     * if no match, {@code null} is returned.
+     *
+     * @param ptr Path expression to use
+     *
+     * @return Either matching {@link JsonNode} for the first step of path or
+     *    {@code null} if no match (including case that this node is not a container)
+     */
     protected abstract JsonNode _at(JsonPointer ptr);
 
     /*
@@ -444,7 +453,7 @@ public abstract class JsonNode
      * @return Binary data this node contains, iff it is a binary
      *   node; null otherwise
      */
-    public byte[] binaryValue() throws IOException {
+    public byte[] binaryValue() {
         return null;
     }
 
@@ -724,16 +733,17 @@ public abstract class JsonNode
      * and can be used to check that this node is an {@code ObjectNode} (that is, represents
      * JSON Object value) and has value for specified property with key {@code fieldName}
      * (but note that value may be explicit JSON null value).
-     * If this node is Object Node and has value for specified property, {@code this} is returned
-     * to allow chaining;
-     * otherwise exception is thrown.
+     * If this node is Object Node and has value for specified property, matching value
+     * is returned; otherwise {@link IllegalArgumentException} is thrown.
      *
-     * @return {@code this} node to allow chaining
+     * @param propertyName Name of property to access
+     *
+     * @return Value of the specified property of this Object node
      *
      * @throws IllegalArgumentException if this node is not an Object node or if it does not
      *   have value for specified property
      */
-    public JsonNode required(String fieldName) {
+    public JsonNode required(String propertyName) {
         return _reportRequiredViolation("Node of type `%s` has no fields", getClass().getName());
     }
 
@@ -745,11 +755,12 @@ public abstract class JsonNode
      * and can be used to check that this node is an {@code ArrayNode} (that is, represents
      * JSON Array value) and has value for specified {@code index}
      * (but note that value may be explicit JSON null value).
-     * If this node is Array Node and has value for specified index, {@code this} is returned
-     * to allow chaining;
-     * otherwise exception is thrown.
+     * If this node is Array Node and has value for specified index, value at index
+     * is returned; otherwise {@link IllegalArgumentException} is thrown.
      *
-     * @return {@code this} node to allow chaining
+     * @param index Index of the value of this Array node to access
+     *
+     * @return Value at specified index of this Array node
      *
      * @throws IllegalArgumentException if this node is not an Array node or if it does not
      *   have value for specified index
@@ -766,11 +777,12 @@ public abstract class JsonNode
      * and can be used to check that there is an actual value node at specified {@link JsonPointer}
      * starting from {@code this} node
      * (but note that value may be explicit JSON null value).
-     * If such value node exists {@code this} is returned
-     * to allow chaining;
-     * otherwise exception is thrown.
+     * If such value node exists it is returned;
+     * otherwise {@link IllegalArgumentException} is thrown.
      *
-     * @return {@code this} node to allow chaining
+     * @param pathExpr {@link JsonPointer} expression (as String) to use for finding value node
+     *
+     * @return Matching value node for given expression
      *
      * @throws IllegalArgumentException if no value node exists at given {@code JSON Pointer} path
      */
@@ -786,10 +798,12 @@ public abstract class JsonNode
      * and can be used to check that there is an actual value node at specified {@link JsonPointer}
      * starting from {@code this} node
      * (but note that value may be explicit JSON null value).
-     * If such value node exists {@code this} is returned
-     * to allow chaining; otherwise {@link IllegalArgumentException} is thrown.
+     * If such value node exists it is returned;
+     * otherwise {@link IllegalArgumentException} is thrown.
      *
-     * @return {@code this} node to allow chaining
+     * @param path {@link JsonPointer} expression to use for finding value node
+     *
+     * @return Matching value node for given expression
      *
      * @throws IllegalArgumentException if no value node exists at given {@code JSON Pointer} path
      */

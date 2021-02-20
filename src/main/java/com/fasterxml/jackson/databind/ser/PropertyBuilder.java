@@ -86,16 +86,15 @@ public class PropertyBuilder
      *    of container type)
      */
     protected BeanPropertyWriter buildWriter(SerializerProvider ctxt,
-            BeanPropertyDefinition propDef, JavaType declaredType, JsonSerializer<?> ser,
+            BeanPropertyDefinition propDef, JavaType declaredType, ValueSerializer<?> ser,
             TypeSerializer typeSer, TypeSerializer contentTypeSer,
             AnnotatedMember am, boolean defaultUseStaticTyping)
-        throws JsonMappingException
     {
         // do we have annotation that forces type to use (to declared type or its super type)?
         JavaType serializationType;
         try {
             serializationType = findSerializationType(am, defaultUseStaticTyping, declaredType);
-        } catch (JsonMappingException e) {
+        } catch (DatabindException e) {
             if (propDef == null) {
                 return ctxt.reportBadDefinition(declaredType, ClassUtil.exceptionMessage(e));
             }
@@ -248,10 +247,9 @@ public class PropertyBuilder
     protected BeanPropertyWriter _constructPropertyWriter(BeanPropertyDefinition propDef,
             AnnotatedMember member, Annotations contextAnnotations,
             JavaType declaredType,
-            JsonSerializer<?> ser, TypeSerializer typeSer, JavaType serType,
+            ValueSerializer<?> ser, TypeSerializer typeSer, JavaType serType,
             boolean suppressNulls, Object suppressableValue,
             Class<?>[] includeInViews)
-        throws JsonMappingException
     {
         return new BeanPropertyWriter(propDef,
                 member, contextAnnotations, declaredType,
@@ -271,7 +269,6 @@ public class PropertyBuilder
      * If neither can be used (no annotations, dynamic typing), returns null.
      */
     protected JavaType findSerializationType(Annotated a, boolean useStaticTyping, JavaType declaredType)
-        throws JsonMappingException
     {
         JavaType secondary = _annotationIntrospector.refineSerializationType(_config, a, declaredType);
 

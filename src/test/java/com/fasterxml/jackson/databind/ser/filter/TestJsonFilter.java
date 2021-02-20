@@ -5,10 +5,13 @@ import com.fasterxml.jackson.annotation.*;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.TokenStreamContext;
+
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.PropertyWriter;
-import com.fasterxml.jackson.databind.ser.impl.*;
+import com.fasterxml.jackson.databind.ser.std.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.std.SimpleFilterProvider;
 
 /**
  * Tests for verifying that bean property filtering using JsonFilter
@@ -41,15 +44,15 @@ public class TestJsonFilter extends BaseMapTest
 
     static class CheckSiblingContextFilter extends SimpleBeanPropertyFilter {
         @Override
-        public void serializeAsField(Object bean, JsonGenerator jgen, SerializerProvider prov, PropertyWriter writer) throws Exception {
-            TokenStreamContext sc = jgen.getOutputContext();
+        public void serializeAsProperty(Object bean, JsonGenerator jgen, SerializerProvider prov, PropertyWriter writer) throws Exception {
+            TokenStreamContext sc = jgen.streamWriteContext();
 
             if (writer.getName() != null && writer.getName().equals("c")) {
                 //This assertion is failing as sc.getParent() incorrectly returns 'a'. If you comment out the member 'a'
                 // in the CheckSiblingContextBean, you'll see that the sc.getParent() correctly returns 'b'
                 assertEquals("b", sc.getParent().currentName());
             }
-            writer.serializeAsField(bean, jgen, prov);
+            writer.serializeAsProperty(bean, jgen, prov);
         }
     }
 
@@ -111,7 +114,7 @@ public class TestJsonFilter extends BaseMapTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     public void testSimpleInclusionFilter() throws Exception
     {
@@ -146,7 +149,7 @@ public class TestJsonFilter extends BaseMapTest
         try {
             MAPPER.writeValueAsString(new Bean());
             fail("Should have failed without configured filter");
-        } catch (JsonMappingException e) { // should be resolved to a MappingException (internally may be something else)
+        } catch (InvalidDefinitionException e) { // should be resolved to this (internally may be something else)
             verifyException(e, "Cannot resolve PropertyFilter with id 'RootFilter'");
         }
         
@@ -168,16 +171,15 @@ public class TestJsonFilter extends BaseMapTest
     // [databind#89] combining @JsonIgnore, @JsonProperty
     public void testIssue89() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         Pod pod = new Pod();
         pod.username = "Bob";
         pod.userPassword = "s3cr3t!";
 
-        String json = mapper.writeValueAsString(pod);
+        String json = MAPPER.writeValueAsString(pod);
 
         assertEquals("{\"username\":\"Bob\"}", json);
 
-        Pod pod2 = mapper.readValue("{\"username\":\"Bill\",\"user_password\":\"foo!\"}", Pod.class);
+        Pod pod2 = MAPPER.readValue("{\"username\":\"Bill\",\"user_password\":\"foo!\"}", Pod.class);
         assertEquals("Bill", pod2.username);
         assertEquals("foo!", pod2.userPassword);
     }

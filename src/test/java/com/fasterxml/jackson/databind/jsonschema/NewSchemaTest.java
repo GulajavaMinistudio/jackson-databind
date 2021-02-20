@@ -114,7 +114,7 @@ public class NewSchemaTest extends BaseMapTest
         public JsonObjectFormatVisitor expectObjectFormat(JavaType type) {
             return new JsonObjectFormatVisitor.Base(getProvider()) {
                 @Override
-                public void property(BeanProperty prop) throws JsonMappingException {
+                public void property(BeanProperty prop) {
                     _visit(prop);
                 }
 
@@ -123,21 +123,21 @@ public class NewSchemaTest extends BaseMapTest
                         JavaType propertyTypeHint) { }
 
                 @Override
-                public void optionalProperty(BeanProperty prop) throws JsonMappingException {
+                public void optionalProperty(BeanProperty prop) {
                     _visit(prop);
                 }
 
                 @Override
                 public void optionalProperty(String name, JsonFormatVisitable handler,
-                        JavaType propertyTypeHint) throws JsonMappingException { }
+                        JavaType propertyTypeHint) { }
 
-                private void _visit(BeanProperty prop) throws JsonMappingException
+                private void _visit(BeanProperty prop)
                 {
                     if (!(prop instanceof BeanPropertyWriter)) {
                         return;
                     }
                     BeanPropertyWriter bpw = (BeanPropertyWriter) prop;
-                    JsonSerializer<?> ser = bpw.getSerializer();
+                    ValueSerializer<?> ser = bpw.getSerializer();
                     final SerializerProvider prov = getProvider();
                     if (ser == null) {
                         if (prov == null) {
@@ -296,9 +296,9 @@ public class NewSchemaTest extends BaseMapTest
             public JsonObjectFormatVisitor expectObjectFormat(final JavaType type) {
                 return new JsonObjectFormatVisitor.Base(getProvider()) {
                     @Override
-                    public void optionalProperty(BeanProperty prop) throws JsonMappingException {
+                    public void optionalProperty(BeanProperty prop) {
                         sb.append("[optProp ").append(prop.getName()).append("(");
-                        JsonSerializer<Object> ser = null;
+                        ValueSerializer<Object> ser = null;
                         if (prop instanceof BeanPropertyWriter) {
                             BeanPropertyWriter bpw = (BeanPropertyWriter) prop;
                             ser = bpw.getSerializer();
@@ -310,7 +310,7 @@ public class NewSchemaTest extends BaseMapTest
                         ser.acceptJsonFormatVisitor(new JsonFormatVisitorWrapper.Base() {
                             @Override
                             public JsonNumberFormatVisitor expectNumberFormat(
-                                    JavaType t) throws JsonMappingException {
+                                    JavaType t) {
                                 return new JsonNumberFormatVisitor() {
                                     @Override
                                     public void format(JsonValueFormat format) {
@@ -328,7 +328,7 @@ public class NewSchemaTest extends BaseMapTest
                             }
 
                             @Override
-                            public JsonIntegerFormatVisitor expectIntegerFormat(JavaType t) throws JsonMappingException {
+                            public JsonIntegerFormatVisitor expectIntegerFormat(JavaType t) {
                                 return new JsonIntegerFormatVisitor() {
                                     @Override
                                     public void format(JsonValueFormat format) {

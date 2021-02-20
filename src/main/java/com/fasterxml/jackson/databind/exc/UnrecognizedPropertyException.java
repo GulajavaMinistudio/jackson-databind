@@ -4,10 +4,9 @@ import java.util.*;
 
 import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonMappingException;
 
 /**
- * Specialized {@link JsonMappingException} sub-class specifically used
+ * Specialized {@link PropertyBindingException} sub-class specifically used
  * to indicate problems due to encountering a JSON property that could
  * not be mapped to an Object property (via getter, constructor argument
  * or field).
@@ -49,7 +48,7 @@ public class UnrecognizedPropertyException
         String msg = String.format("Unrecognized property \"%s\" (class %s), not marked as ignorable",
                 propertyName, ref.getName());
         UnrecognizedPropertyException e = new UnrecognizedPropertyException(p, msg,
-                p.getCurrentLocation(), ref, propertyName, propertyIds);
+                p.currentLocation(), ref, propertyName, propertyIds);
         // but let's also ensure path includes this last (missing) segment
         e.prependPath(fromObjectOrClass, propertyName);
         return e;

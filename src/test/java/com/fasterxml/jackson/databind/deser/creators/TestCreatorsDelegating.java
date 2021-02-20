@@ -5,7 +5,7 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.ObjectReadContext;
@@ -180,7 +180,7 @@ public class TestCreatorsDelegating extends BaseMapTest
         CtorBean711 bean = null;
         try {
             bean = mapper.readValue("38", CtorBean711.class);
-        } catch (JsonMappingException e) {
+        } catch (JacksonException e) {
             fail("Did not expect problems, got: "+e.getMessage());
         }
         assertEquals(38, bean.age);
@@ -196,7 +196,7 @@ public class TestCreatorsDelegating extends BaseMapTest
         FactoryBean711 bean = null;
         try {
             bean = mapper.readValue("38", FactoryBean711.class);
-        } catch (JsonMappingException e) {
+        } catch (JacksonException e) {
             fail("Did not expect problems, got: "+e.getMessage());
         }
         assertEquals(38, bean.age);
@@ -211,18 +211,18 @@ public class TestCreatorsDelegating extends BaseMapTest
         assertNotNull(value);
         Object ob = value.stuff;
         assertEquals(TokenBuffer.class, ob.getClass());
-        JsonParser jp = ((TokenBuffer) ob).asParser(ObjectReadContext.empty());
-        assertToken(JsonToken.START_OBJECT, jp.nextToken());
-        assertToken(JsonToken.FIELD_NAME, jp.nextToken());
-        assertEquals("a", jp.currentName());
-        assertToken(JsonToken.VALUE_NUMBER_INT, jp.nextToken());
-        assertEquals(1, jp.getIntValue());
-        assertToken(JsonToken.FIELD_NAME, jp.nextToken());
-        assertEquals("b", jp.currentName());
-        assertToken(JsonToken.VALUE_NUMBER_INT, jp.nextToken());
-        assertEquals(2, jp.getIntValue());
-        assertToken(JsonToken.END_OBJECT, jp.nextToken());
-        jp.close();
+        JsonParser p = ((TokenBuffer) ob).asParser(ObjectReadContext.empty());
+        assertToken(JsonToken.START_OBJECT, p.nextToken());
+        assertToken(JsonToken.PROPERTY_NAME, p.nextToken());
+        assertEquals("a", p.currentName());
+        assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
+        assertEquals(1, p.getIntValue());
+        assertToken(JsonToken.PROPERTY_NAME, p.nextToken());
+        assertEquals("b", p.currentName());
+        assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
+        assertEquals(2, p.getIntValue());
+        assertToken(JsonToken.END_OBJECT, p.nextToken());
+        p.close();
     }
 
     @SuppressWarnings("unchecked")

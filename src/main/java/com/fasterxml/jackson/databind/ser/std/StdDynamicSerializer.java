@@ -1,10 +1,6 @@
 package com.fasterxml.jackson.databind.ser.std;
 
-import com.fasterxml.jackson.databind.BeanProperty;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 
@@ -34,7 +30,7 @@ public abstract class StdDynamicSerializer<T>
      * Eagerly fetched serializer for actual value contained or referenced,
      * if fetched.
      */
-    protected final JsonSerializer<Object> _valueSerializer;
+    protected final ValueSerializer<Object> _valueSerializer;
 
     /**
      * If value type cannot be statically determined, mapping from
@@ -52,12 +48,12 @@ public abstract class StdDynamicSerializer<T>
 
     @SuppressWarnings("unchecked")
     protected StdDynamicSerializer(JavaType type, BeanProperty prop,
-            TypeSerializer vts, JsonSerializer<?> valueSer)
+            TypeSerializer vts, ValueSerializer<?> valueSer)
     {
         super(type);
         _property = prop;
         _valueTypeSerializer = vts;
-        _valueSerializer = (JsonSerializer<Object>) valueSer;
+        _valueSerializer = (ValueSerializer<Object>) valueSer;
     }
 
     protected StdDynamicSerializer(StdDynamicSerializer<?> src, BeanProperty prop)
@@ -70,12 +66,12 @@ public abstract class StdDynamicSerializer<T>
 
     @SuppressWarnings("unchecked")
     protected StdDynamicSerializer(StdDynamicSerializer<?> src,
-            BeanProperty prop, TypeSerializer vts, JsonSerializer<?> valueSer)
+            BeanProperty prop, TypeSerializer vts, ValueSerializer<?> valueSer)
     {
         super(src);
         _property = prop;
         _valueTypeSerializer = vts;
-        _valueSerializer = (JsonSerializer<Object>) valueSer;
+        _valueSerializer = (ValueSerializer<Object>) valueSer;
     }
 
     /*
@@ -84,8 +80,7 @@ public abstract class StdDynamicSerializer<T>
     /**********************************************************************
      */
 
-    protected final JsonSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, Class<?> type)
-        throws JsonMappingException
+    protected final ValueSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, Class<?> type)
     {
         PropertySerializerMap map = _dynamicValueSerializers;
         PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type,
@@ -96,8 +91,7 @@ public abstract class StdDynamicSerializer<T>
         return result.serializer;
     }
 
-    protected final JsonSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, JavaType type)
-        throws JsonMappingException
+    protected final ValueSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, JavaType type)
     {
         PropertySerializerMap map = _dynamicValueSerializers;
         PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type,

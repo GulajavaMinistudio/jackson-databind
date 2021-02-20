@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.ser.std;
 
-import java.io.IOException;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -12,7 +11,6 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.ContainerSerializer;
 
 /**
  * Base class for serializers that will output contents as JSON
@@ -20,7 +18,7 @@ import com.fasterxml.jackson.databind.ser.ContainerSerializer;
  * and array types.
  */
 public abstract class AsArraySerializerBase<T>
-    extends ContainerSerializer<T>
+    extends StdContainerSerializer<T>
 {
     protected final JavaType _elementType;
 
@@ -41,7 +39,7 @@ public abstract class AsArraySerializerBase<T>
     /**
      * Value serializer to use, if it can be statically determined
      */
-    protected final JsonSerializer<Object> _elementSerializer;
+    protected final ValueSerializer<Object> _elementSerializer;
 
     /*
     /**********************************************************************
@@ -54,7 +52,7 @@ public abstract class AsArraySerializerBase<T>
      * instance is created, without knowledge of property it was used via.
      */
     protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
-            TypeSerializer vts, JsonSerializer<?> elementSerializer)
+            TypeSerializer vts, ValueSerializer<?> elementSerializer)
     {
         this(cls, elementType, staticTyping, vts, elementSerializer, null);
     }
@@ -64,7 +62,7 @@ public abstract class AsArraySerializerBase<T>
      */
     @SuppressWarnings("unchecked")
     protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
-            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle)
     {
         super(cls);
@@ -72,7 +70,7 @@ public abstract class AsArraySerializerBase<T>
         // static if explicitly requested, or if element type is final
         _staticTyping = staticTyping || (elementType != null && elementType.isFinal());
         _valueTypeSerializer = vts;
-        _elementSerializer = (JsonSerializer<Object>) elementSerializer;
+        _elementSerializer = (ValueSerializer<Object>) elementSerializer;
         _unwrapSingle = unwrapSingle;
     }
 
@@ -81,7 +79,7 @@ public abstract class AsArraySerializerBase<T>
      */
     @SuppressWarnings("unchecked")
     protected AsArraySerializerBase(Class<?> cls, JavaType elementType, boolean staticTyping,
-            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle, BeanProperty property)
     {
         super(cls, property);
@@ -89,25 +87,25 @@ public abstract class AsArraySerializerBase<T>
         // static if explicitly requested, or if element type is final
         _staticTyping = staticTyping || (elementType != null && elementType.isFinal());
         _valueTypeSerializer = vts;
-        _elementSerializer = (JsonSerializer<Object>) elementSerializer;
+        _elementSerializer = (ValueSerializer<Object>) elementSerializer;
         _unwrapSingle = unwrapSingle;
     }
 
     @SuppressWarnings("unchecked")
     protected AsArraySerializerBase(AsArraySerializerBase<?> src,
-            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle, BeanProperty property)
     {
         super(src, property);
         _elementType = src._elementType;
         _staticTyping = src._staticTyping;
         _valueTypeSerializer = vts;
-        _elementSerializer = (JsonSerializer<Object>) elementSerializer;
+        _elementSerializer = (ValueSerializer<Object>) elementSerializer;
         _unwrapSingle = unwrapSingle;
     }
 
     public abstract AsArraySerializerBase<T> withResolved(BeanProperty property,
-            TypeSerializer vts, JsonSerializer<?> elementSerializer,
+            TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle);
 
     /*
@@ -123,15 +121,14 @@ public abstract class AsArraySerializerBase<T>
      * known statically.
      */
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
             BeanProperty property)
-        throws JsonMappingException
     {
         TypeSerializer typeSer = _valueTypeSerializer;
         if (typeSer != null) {
             typeSer = typeSer.forProperty(ctxt, property);
         }
-        JsonSerializer<?> ser = null;
+        ValueSerializer<?> ser = null;
         Boolean unwrapSingle = null;
         // First: if we have a property, may have property-annotation overrides
         
@@ -182,7 +179,7 @@ public abstract class AsArraySerializerBase<T>
     }
 
     @Override
-    public JsonSerializer<?> getContentSerializer() {
+    public ValueSerializer<?> getContentSerializer() {
         return _elementSerializer;
     }
 
@@ -199,7 +196,7 @@ public abstract class AsArraySerializerBase<T>
     // variant that passes size of array to output, which is helpful with some data formats
     /*
     @Override
-    public void serialize(T value, JsonGenerator gen, SerializerProvider ctxt) throws IOException
+    public void serialize(T value, JsonGenerator gen, SerializerProvider ctxt) throws JacksonException
     {
         if (provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
                 && hasSingleElement(value)) {
@@ -214,24 +211,25 @@ public abstract class AsArraySerializerBase<T>
 
     @Override
     public void serializeWithType(T value, JsonGenerator g, SerializerProvider ctxt,
-            TypeSerializer typeSer) throws IOException
+            TypeSerializer typeSer)
+        throws JacksonException
     {
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
                 typeSer.typeId(value, JsonToken.START_ARRAY));
         // [databind#631]: Assign current value, to be accessible by custom serializers
-        g.setCurrentValue(value);
+        g.assignCurrentValue(value);
         serializeContents(value, g, ctxt);
         typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
     }
 
     protected abstract void serializeContents(T value, JsonGenerator gen, SerializerProvider provider)
-        throws IOException;
+        throws JacksonException;
 
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
-        throws JsonMappingException
+        throws JacksonException
     {
-        JsonSerializer<?> valueSer = _elementSerializer;
+        ValueSerializer<?> valueSer = _elementSerializer;
         if (valueSer == null) {
             // 19-Oct-2016, tatu: Apparently we get null for untyped/raw `EnumSet`s... not 100%
             //   sure what'd be the clean way but let's try this for now:

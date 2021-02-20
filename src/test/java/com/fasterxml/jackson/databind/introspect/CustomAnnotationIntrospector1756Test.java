@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.introspect;
 
-import java.io.IOException;
 import java.lang.annotation.*;
 
 import com.fasterxml.jackson.annotation.*;
@@ -34,10 +33,10 @@ public class CustomAnnotationIntrospector1756Test extends BaseMapTest
     /**
      * Custom String deserializer.
      */
-    private static class CustomStringDeserializer extends JsonDeserializer<String> {
+    private static class CustomStringDeserializer extends ValueDeserializer<String> {
 
       @Override
-      public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      public String deserialize(JsonParser p, DeserializationContext ctxt) {
         return p.getText();
       }
     }

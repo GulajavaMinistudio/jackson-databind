@@ -29,7 +29,7 @@ public class UntypedDeserializationTest
         public UCStringDeserializer() { super(String.class); }
 
         @Override
-        public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        public String deserialize(JsonParser p, DeserializationContext ctxt) {
             return p.getText().toUpperCase();
         }
     }
@@ -45,7 +45,7 @@ public class UntypedDeserializationTest
         }
 
         @Override
-        public Number deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        public Number deserialize(JsonParser p, DeserializationContext ctxt) {
             return value;
         }
     }
@@ -57,7 +57,6 @@ public class UntypedDeserializationTest
 
         @Override
         public List<Object> deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             ArrayList<Object> list = new ArrayList<Object>();
             while (p.nextValue() != JsonToken.END_ARRAY) {
@@ -67,12 +66,12 @@ public class UntypedDeserializationTest
         }
 
         @Override
-        public JsonDeserializer<?> createContextual(DeserializationContext ctxt,
-                BeanProperty property) throws JsonMappingException
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+                BeanProperty property)
         {
             // For now, we just need to access "untyped" deserializer; not use it.
             
-            /*JsonDeserializer<Object> ob = */
+            /*ValueDeserializer<Object> ob = */
             ctxt.findContextualValueDeserializer(ctxt.constructType(Object.class), property);
             return this;
         }
@@ -84,7 +83,6 @@ public class UntypedDeserializationTest
 
         @Override
         public Map<String,Object> deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException
         {
             Map<String,Object> map = new LinkedHashMap<String,Object>();
             while (p.nextValue() != JsonToken.END_OBJECT) {

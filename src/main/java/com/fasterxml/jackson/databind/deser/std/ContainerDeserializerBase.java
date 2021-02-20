@@ -1,8 +1,8 @@
 package com.fasterxml.jackson.databind.deser.std;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.NullValueProvider;
 import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
@@ -82,7 +82,7 @@ public abstract class ContainerDeserializerBase<T>
 
     @Override
     public SettableBeanProperty findBackReference(String refName) {
-        JsonDeserializer<Object> valueDeser = getContentDeserializer();
+        ValueDeserializer<Object> valueDeser = getContentDeserializer();
         if (valueDeser == null) {
             throw new IllegalArgumentException(String.format(
                     "Cannot handle managed/back reference '%s': type: container deserializer of type %s returned null for 'getContentDeserializer()'",
@@ -111,7 +111,7 @@ public abstract class ContainerDeserializerBase<T>
     /**
      * Accesor for deserializer use for deserializing content values.
      */
-    public abstract JsonDeserializer<Object> getContentDeserializer();
+    public abstract ValueDeserializer<Object> getContentDeserializer();
 
     @Override
     public AccessPattern getEmptyAccessPattern() {
@@ -121,18 +121,14 @@ public abstract class ContainerDeserializerBase<T>
     }
     
     @Override
-    public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Object getEmptyValue(DeserializationContext ctxt) throws JacksonException {
         ValueInstantiator vi = getValueInstantiator();
         if (vi == null || !vi.canCreateUsingDefault()) {
             JavaType type = getValueType();
             ctxt.reportBadDefinition(type,
                     String.format("Cannot create empty instance of %s, no default Creator", type));
         }
-        try {
-            return vi.createUsingDefault(ctxt);
-        } catch (IOException e) {
-            return ClassUtil.throwAsMappingException(ctxt, e);
-        }
+        return vi.createUsingDefault(ctxt);
     }
 
     /*
@@ -144,20 +140,17 @@ public abstract class ContainerDeserializerBase<T>
     /**
      * Helper method called by various Map(-like) deserializers.
      */
-    protected <BOGUS> BOGUS wrapAndThrow(Throwable t, Object ref, String key) throws IOException
+    protected <BOGUS> BOGUS wrapAndThrow(Throwable t, Object ref, String key)
+        throws JacksonException
     {
         // to handle StackOverflow:
         while (t instanceof InvocationTargetException && t.getCause() != null) {
             t = t.getCause();
         }
-        // Errors and "plain" IOExceptions to be passed as is
+        // Errors to be passed as is
         ClassUtil.throwIfError(t);
-        // ... except for mapping exceptions
-        if (t instanceof IOException && !(t instanceof JsonMappingException)) {
-            throw (IOException) t;
-        }
         // for [databind#1141]
-        throw JsonMappingException.wrapWithPath(t, ref,
+        throw DatabindException.wrapWithPath(t, ref,
                 ClassUtil.nonNull(key, "N/A"));
     }
 }

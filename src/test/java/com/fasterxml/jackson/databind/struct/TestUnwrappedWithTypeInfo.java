@@ -1,19 +1,12 @@
 package com.fasterxml.jackson.databind.struct;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
-import com.fasterxml.jackson.databind.BaseMapTest;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.annotation.*;
 
-// Tests for [#81]
+import com.fasterxml.jackson.databind.*;
+
+// Tests for [databind#81]
 public class TestUnwrappedWithTypeInfo extends BaseMapTest
 {
-
 	@JsonTypeInfo(use=JsonTypeInfo.Id.NAME, property="@type")
 	@JsonTypeName("OuterType")
 	static class Outer {
@@ -43,9 +36,9 @@ public class TestUnwrappedWithTypeInfo extends BaseMapTest
 	}
     
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Tests, serialization
-    /**********************************************************
+    /**********************************************************************
      */
 
 	// [Issue#81]
@@ -63,7 +56,7 @@ public class TestUnwrappedWithTypeInfo extends BaseMapTest
 	    try {
 	        mapper.writeValueAsString(outer);
 	         fail("Expected exception to be thrown.");
-	    } catch (JsonMappingException ex) {
+	    } catch (DatabindException ex) {
 	        verifyException(ex, "requires use of type information");
 	    }
 	}

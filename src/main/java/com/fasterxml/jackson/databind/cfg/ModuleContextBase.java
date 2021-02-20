@@ -6,17 +6,17 @@ import java.util.function.UnaryOperator;
 import com.fasterxml.jackson.core.*;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.Module.SetupContext;
+import com.fasterxml.jackson.databind.JacksonModule.SetupContext;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.ser.ValueSerializerModifier;
 import com.fasterxml.jackson.databind.ser.SerializerFactory;
 import com.fasterxml.jackson.databind.ser.Serializers;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.type.TypeModifier;
 
 public class ModuleContextBase
-    implements SetupContext
+    implements JacksonModule.SetupContext
 {
     // // // Immutable objects we need to access information
 
@@ -141,7 +141,7 @@ public class ModuleContextBase
     }
 
     @Override
-    public SetupContext addDeserializerModifier(BeanDeserializerModifier modifier) {
+    public SetupContext addDeserializerModifier(ValueDeserializerModifier modifier) {
         _set(_deserializerFactory().withDeserializerModifier(modifier));
         return this;
     }
@@ -171,19 +171,19 @@ public class ModuleContextBase
     }
 
     @Override
-    public SetupContext addSerializerModifier(BeanSerializerModifier modifier) {
+    public SetupContext addSerializerModifier(ValueSerializerModifier modifier) {
         _set(_serializerFactory().withSerializerModifier(modifier));
         return this;
     }
 
     @Override
-    public SetupContext overrideDefaultNullKeySerializer(JsonSerializer<?> ser) {
+    public SetupContext overrideDefaultNullKeySerializer(ValueSerializer<?> ser) {
         _set(_serializerFactory().withNullKeySerializer(ser));
         return this;
     }
     
     @Override
-    public SetupContext overrideDefaultNullValueSerializer(JsonSerializer<?> ser) {
+    public SetupContext overrideDefaultNullValueSerializer(ValueSerializer<?> ser) {
         _set(_serializerFactory().withNullValueSerializer(ser));
         return this;
     }

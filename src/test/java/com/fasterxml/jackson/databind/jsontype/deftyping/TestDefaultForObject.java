@@ -172,9 +172,8 @@ public class TestDefaultForObject
         try {
             m.readValue(serial, AbstractBean[].class);
             fail("Should have failed");
-        } catch (JsonMappingException e) {
-            // let's use whatever is currently thrown exception... may change tho
-            verifyException(e, "cannot construct");
+        } catch (InvalidDefinitionException e) {
+            verifyException(e, "cannot construct instance of");
         }
         // and then that we will succeed with default type info
         m = jsonMapperBuilder()
@@ -316,7 +315,7 @@ public class TestDefaultForObject
         // Ok, first test JSON Object containing buffer:
         TokenBuffer buf = TokenBuffer.forGeneration();
         buf.writeStartObject();
-        buf.writeNumberField("num", 42);
+        buf.writeNumberProperty("num", 42);
         buf.writeEndObject();
         String json = mapper.writeValueAsString(new ObjectHolder(buf));
         ObjectHolder holder = mapper.readValue(json, ObjectHolder.class);
@@ -324,7 +323,7 @@ public class TestDefaultForObject
         assertSame(TokenBuffer.class, holder.value.getClass());
         JsonParser jp = ((TokenBuffer) holder.value).asParser(ObjectReadContext.empty());
         assertToken(JsonToken.START_OBJECT, jp.nextToken());
-        assertToken(JsonToken.FIELD_NAME, jp.nextToken());
+        assertToken(JsonToken.PROPERTY_NAME, jp.nextToken());
         assertToken(JsonToken.VALUE_NUMBER_INT, jp.nextToken());
         assertToken(JsonToken.END_OBJECT, jp.nextToken());
         assertNull(jp.nextToken());

@@ -1,11 +1,11 @@
 package com.fasterxml.jackson.databind.deser.filter;
 
-import java.io.*;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.type.TypeReference;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
@@ -16,14 +16,6 @@ import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 public class UnknownPropertyDeserTest
     extends BaseMapTest
 {
-    final static String JSON_UNKNOWN_FIELD = "{ \"a\" : 1, \"foo\" : [ 1, 2, 3], \"b\" : -1 }";
-
-    /*
-    /**********************************************************
-    /* Helper classes
-    /**********************************************************
-     */
-
     final static class TestBean
     {
         String _unknown;
@@ -48,9 +40,8 @@ public class UnknownPropertyDeserTest
     {
         @Override
         public boolean handleUnknownProperty(DeserializationContext ctxt,
-                JsonParser jp, JsonDeserializer<?> deserializer,
+                JsonParser jp, ValueDeserializer<?> deserializer,
                 Object bean, String propertyName)
-            throws IOException, JsonProcessingException
         {
             // very simple, just to verify that we do see correct token type
             ((TestBean) bean).markUnknown(propertyName+":"+jp.currentToken().toString());
@@ -128,6 +119,8 @@ public class UnknownPropertyDeserTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    final static String JSON_UNKNOWN_FIELD = "{ \"a\" : 1, \"foo\" : [ 1, 2, 3], \"b\" : -1 }";
+    
     /**
      * By default we should just get an exception if an unknown property
      * is encountered
@@ -135,7 +128,8 @@ public class UnknownPropertyDeserTest
     public void testUnknownHandlingDefault() throws Exception
     {
         try {
-            MAPPER.readValue(new StringReader(JSON_UNKNOWN_FIELD), TestBean.class);
+            MAPPER.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
+            fail("Should not pass");
         } catch (UnrecognizedPropertyException jex) {
             verifyException(jex, "Unrecognized property \"foo\"");
         }
@@ -150,7 +144,7 @@ public class UnknownPropertyDeserTest
         ObjectMapper mapper = jsonMapperBuilder()
                 .addHandler(new MyHandler())
                 .build();
-        TestBean result = mapper.readValue(new StringReader(JSON_UNKNOWN_FIELD), TestBean.class);
+        TestBean result = mapper.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
         assertNotNull(result);
         assertEquals(1, result._a);
         assertEquals(-1, result._b);
@@ -165,7 +159,7 @@ public class UnknownPropertyDeserTest
     {
         ObjectMapper mapper = newJsonMapper();
         TestBean result = mapper.readerFor(TestBean.class).withHandler(new MyHandler())
-                .readValue(new StringReader(JSON_UNKNOWN_FIELD));
+                .readValue(JSON_UNKNOWN_FIELD);
         assertNotNull(result);
         assertEquals(1, result._a);
         assertEquals(-1, result._b);
@@ -183,8 +177,8 @@ public class UnknownPropertyDeserTest
                 .build();
         TestBean result = null;
         try {
-            result = mapper.readValue(new StringReader(JSON_UNKNOWN_FIELD), TestBean.class);
-        } catch (JsonMappingException jex) {
+            result = mapper.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
+        } catch (JacksonException jex) {
             fail("Did not expect a problem, got: "+jex.getMessage());
         }
         assertNotNull(result);
@@ -276,7 +270,7 @@ public class UnknownPropertyDeserTest
                 .addHandler(new DeserializationProblemHandler() {
                     @Override
                     public boolean handleUnknownProperty(DeserializationContext ctxt, JsonParser p,
-                            JsonDeserializer<?> deserializer, Object beanOrClass, String propertyName) throws IOException {
+                            ValueDeserializer<?> deserializer, Object beanOrClass, String propertyName) {
                         p.skipChildren();
                         return true;
                     }

@@ -4,11 +4,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.TreeNode;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.util.StdConverter;
 
@@ -103,7 +106,7 @@ public class TestBeanConversions
         public static final NullBean NULL_INSTANCE = new NullBean();
     }
     
-    static class NullBeanDeserializer extends JsonDeserializer<NullBean> {
+    static class NullBeanDeserializer extends ValueDeserializer<NullBean> {
         @Override
         public NullBean getNullValue(final DeserializationContext context) {
             return NullBean.NULL_INSTANCE;
@@ -142,14 +145,14 @@ public class TestBeanConversions
         // First: unknown property
         try {
             MAPPER.readValue("{\"unknownProp\":true}", BooleanBean.class);
-        } catch (JsonProcessingException e) {
+        } catch (UnrecognizedPropertyException e) {
             verifyException(e, "unknownProp");
         }
 
         // then bad conversion
         try {
             MAPPER.readValue("{\"boolProp\":\"foobar\"}", BooleanBean.class);
-        } catch (JsonMappingException e) {
+        } catch (InvalidFormatException e) {
             verifyException(e, "Cannot deserialize value of type `boolean` from String");
         }
     }
@@ -251,10 +254,10 @@ public class TestBeanConversions
         try {
             m = MAPPER.convertValue(plaino, Map.class);
             fail("Conversion should have failed");
-        } catch (IllegalArgumentException e) {
+        } catch (InvalidDefinitionException e) {
             verifyException(e, "no properties discovered");
         }
-        
+
         ObjectMapper mapper = jsonMapperBuilder()
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                 .build();

@@ -1,12 +1,13 @@
 package com.fasterxml.jackson.databind.exc;
 
 import com.fasterxml.jackson.databind.BaseMapTest;
-import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
-public class TestExceptionHandlingWithDefaultDeserialization extends BaseMapTest
+public class TestExceptionHandlingWithDefaultDeserialization
+    extends BaseMapTest
 {
     static class Foo {
         private Bar bar;
@@ -38,9 +39,9 @@ public class TestExceptionHandlingWithDefaultDeserialization extends BaseMapTest
         }
     }
 
-    public void testShouldThrowJsonMappingExceptionWithPathReference() throws IOException {
+    public void testShouldThrowExceptionWithPathReference() throws IOException {
         // given
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = newJsonMapper();
         String input = "{\"bar\":{\"baz\":{qux:\"quxValue\"))}";
         final String THIS = getClass().getName();
 
@@ -48,7 +49,7 @@ public class TestExceptionHandlingWithDefaultDeserialization extends BaseMapTest
         try {
             mapper.readValue(input, Foo.class);
             fail("Upsss! Exception has not been thrown.");
-        } catch (JsonMappingException ex) {
+        } catch (DatabindException ex) {
             // then
             assertEquals(THIS+"$Foo[\"bar\"]->"+THIS+"$Bar[\"baz\"]",
                     ex.getPathReference());

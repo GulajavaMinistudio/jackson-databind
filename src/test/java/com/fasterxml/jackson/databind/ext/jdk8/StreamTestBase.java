@@ -1,6 +1,5 @@
 package com.fasterxml.jackson.databind.ext.jdk8;
 
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.BaseStream;
@@ -12,7 +11,7 @@ import org.hamcrest.core.Is;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.junit.Assert.assertTrue;
@@ -61,27 +60,25 @@ public abstract class StreamTestBase
     <T, S extends BaseStream<T, S>> void assertClosesOnIoException(String exceptionMessage, Consumer<S> roundTrip,
             S baseStream) {
         AtomicBoolean closed = new AtomicBoolean();
-        initExpectedExceptionIoException(exceptionMessage,closed);
+        this.expectedException.expect(new IsClosedMatcher(closed));
+        this.expectedException.expect(Is.isA(DatabindException.class));
+        this.expectedException.expectMessage(exceptionMessage);
         roundTrip.accept(baseStream.onClose(() -> closed.set(true)));
     }
 
     <T, S extends BaseStream<T, S>> void assertClosesOnWrappedIoException(String exceptionMessage,
             Consumer<S> roundTrip, S baseStream) {
         AtomicBoolean closed = new AtomicBoolean();
-        final String actualMessage = "Unexpected IOException (of type java.io.IOException): " + exceptionMessage;
-        initExpectedExceptionIoException(actualMessage,closed);
+        final String actualMessage = exceptionMessage;
+        this.expectedException.expect(new IsClosedMatcher(closed));
+        this.expectedException.expect(Is.isA(DatabindException.class));
+        this.expectedException.expectMessage(actualMessage);
         roundTrip.accept(baseStream.onClose(() -> closed.set(true)));
     }
 
-    void initExpectedExceptionIoException(final String exceptionMessage, AtomicBoolean closed) {
-        this.expectedException.expect(new IsClosedMatcher(closed));
-        this.expectedException.expect(Is.isA(IOException.class));
-        this.expectedException.expectMessage(exceptionMessage);
-    }
-
     void initExpectedException(Class<? extends Throwable> cause, final String exceptionMessage, AtomicBoolean closed) {
-        this.expectedException.expect(AllOf.allOf(Is.isA(JsonMappingException.class), new IsClosedMatcher(closed)));
-        this.expectedException.expect(Is.isA(JsonMappingException.class));
+        this.expectedException.expect(AllOf.allOf(Is.isA(DatabindException.class), new IsClosedMatcher(closed)));
+        this.expectedException.expect(Is.isA(DatabindException.class));
         this.expectedException.expectCause(Is.isA(cause));
         this.expectedException.expectMessage(exceptionMessage);
     }

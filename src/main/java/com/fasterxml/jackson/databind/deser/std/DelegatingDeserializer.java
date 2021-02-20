@@ -1,8 +1,8 @@
 package com.fasterxml.jackson.databind.deser.std;
 
-import java.io.IOException;
 import java.util.Collection;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 
 /**
- * Base class that simplifies implementations of {@link JsonDeserializer}s
+ * Base class that simplifies implementations of {@link ValueDeserializer}s
  * that mostly delegate functionality to another deserializer implementation
  * (possibly forming a chain of deserializers delegating functionality
  * in some cases)
@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.util.AccessPattern;
 public abstract class DelegatingDeserializer
     extends StdDeserializer<Object>
 {
-    protected final JsonDeserializer<?> _delegatee;
+    protected final ValueDeserializer<?> _delegatee;
     
     /*
     /**********************************************************************
@@ -28,7 +28,7 @@ public abstract class DelegatingDeserializer
     /**********************************************************************
      */
 
-    public DelegatingDeserializer(JsonDeserializer<?> d)
+    public DelegatingDeserializer(ValueDeserializer<?> d)
     {
         super(d.handledType());
         _delegatee = d;
@@ -40,7 +40,7 @@ public abstract class DelegatingDeserializer
     /**********************************************************************
      */
     
-    protected abstract JsonDeserializer<?> newDelegatingInstance(JsonDeserializer<?> newDelegatee);
+    protected abstract ValueDeserializer<?> newDelegatingInstance(ValueDeserializer<?> newDelegatee);
     
     /*
     /**********************************************************************
@@ -49,19 +49,18 @@ public abstract class DelegatingDeserializer
      */
 
     @Override
-    public void resolve(DeserializationContext ctxt) throws JsonMappingException {
+    public void resolve(DeserializationContext ctxt) {
         if (_delegatee != null) {
             _delegatee.resolve(ctxt);
         }
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext ctxt,
+    public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
             BeanProperty property)
-        throws JsonMappingException
     {
         JavaType vt = ctxt.constructType(_delegatee.handledType());
-        JsonDeserializer<?> del = ctxt.handleSecondaryContextualization(_delegatee,
+        ValueDeserializer<?> del = ctxt.handleSecondaryContextualization(_delegatee,
                 property, vt);
         if (del == _delegatee) {
             return this;
@@ -76,7 +75,7 @@ public abstract class DelegatingDeserializer
     }
 
     @Override
-    public JsonDeserializer<?> replaceDelegatee(JsonDeserializer<?> delegatee)
+    public ValueDeserializer<?> replaceDelegatee(ValueDeserializer<?> delegatee)
     {
         if (delegatee == _delegatee) {
             return this;
@@ -92,7 +91,7 @@ public abstract class DelegatingDeserializer
 
     @Override
     public Object deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException
+        throws JacksonException
     {
         return _delegatee.deserialize(p,  ctxt);
     }
@@ -101,15 +100,15 @@ public abstract class DelegatingDeserializer
     @Override
     public Object deserialize(JsonParser p, DeserializationContext ctxt,
             Object intoValue)
-        throws IOException
+        throws JacksonException
     {
-        return ((JsonDeserializer<Object>)_delegatee).deserialize(p, ctxt, intoValue);
+        return ((ValueDeserializer<Object>)_delegatee).deserialize(p, ctxt, intoValue);
     }
 
     @Override
     public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
             TypeDeserializer typeDeserializer)
-        throws IOException
+        throws JacksonException
     {
         return _delegatee.deserializeWithType(p, ctxt, typeDeserializer);
     }
@@ -121,7 +120,7 @@ public abstract class DelegatingDeserializer
      */
 
     @Override
-    public JsonDeserializer<?> getDelegatee() {
+    public ValueDeserializer<?> getDelegatee() {
         return _delegatee;
     }
 
@@ -131,16 +130,16 @@ public abstract class DelegatingDeserializer
     }
 
     @Override
-    public Object getNullValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Object getNullValue(DeserializationContext ctxt) {
         return _delegatee.getNullValue(ctxt);
     }
 
     @Override
-    public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Object getEmptyValue(DeserializationContext ctxt) {
         return _delegatee.getEmptyValue(ctxt);
     }
 
-    @Override // since 2.12
+    @Override
     public LogicalType logicalType() {
         return _delegatee.logicalType();
     }

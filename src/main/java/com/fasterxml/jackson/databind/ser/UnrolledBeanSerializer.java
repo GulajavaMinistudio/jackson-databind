@@ -1,15 +1,16 @@
 package com.fasterxml.jackson.databind.ser;
 
-import java.io.IOException;
 import java.util.Set;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
-import com.fasterxml.jackson.databind.ser.impl.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.bean.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.bean.BeanSerializerBase;
+import com.fasterxml.jackson.databind.ser.bean.UnwrappingBeanSerializer;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
-import com.fasterxml.jackson.databind.ser.impl.UnwrappingBeanSerializer;
-import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 
 /**
@@ -38,11 +39,11 @@ public class UnrolledBeanSerializer
     protected BeanPropertyWriter _prop4;
     protected BeanPropertyWriter _prop5;
     protected BeanPropertyWriter _prop6;
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle: constructors
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -100,13 +101,13 @@ public class UnrolledBeanSerializer
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle: factory methods, fluent factories
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
-    public JsonSerializer<Object> unwrappingSerializer(NameTransformer unwrapper) {
+    public ValueSerializer<Object> unwrappingSerializer(NameTransformer unwrapper) {
         return new UnwrappingBeanSerializer(this, unwrapper);
     }
 
@@ -144,21 +145,21 @@ public class UnrolledBeanSerializer
     }
 
     @Override
-    public void resolve(SerializerProvider provider) throws JsonMappingException
+    public void resolve(SerializerProvider provider)
     {
         super.resolve(provider);
         _calcUnrolled();
     }
 
     /*
-    /**********************************************************
-    /* JsonSerializer implementation that differs between impls
-    /**********************************************************
+    /**********************************************************************
+    /* ValueSerializer implementation that differs between impls
+    /**********************************************************************
      */
 
     @Override
     public void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
-        throws IOException
+        throws JacksonException
     {
         // NOTE! We have ensured that "JSON Filter" and "Object Id" cases
         // always use "vanilla" BeanSerializer, so no need to check here
@@ -166,7 +167,7 @@ public class UnrolledBeanSerializer
         BeanPropertyWriter[] fProps = _filteredProps;        
         if ((fProps != null) && (provider.getActiveView() != null)) {
             gen.writeStartObject(bean);
-            _serializeFieldsMaybeView(bean, gen, provider, fProps);
+            _serializePropertiesMaybeView(bean, gen, provider, fProps);
             gen.writeEndObject();
             return;
         }
@@ -174,7 +175,7 @@ public class UnrolledBeanSerializer
     }
 
     protected void serializeNonFiltered(Object bean, JsonGenerator gen, SerializerProvider provider)
-        throws IOException
+        throws JacksonException
     {
         gen.writeStartObject(bean);
 
@@ -184,23 +185,23 @@ public class UnrolledBeanSerializer
             default:
             //case 6:
                 prop = _prop1;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
                 // fall through
             case 5:
                 prop = _prop2;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
             case 4:
                 prop = _prop3;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
             case 3:
                 prop = _prop4;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
             case 2:
                 prop = _prop5;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
             case 1:
                 prop = _prop6;
-                prop.serializeAsField(bean, gen, provider);
+                prop.serializeAsProperty(bean, gen, provider);
             case 0:
             }
             prop = null;
@@ -211,10 +212,9 @@ public class UnrolledBeanSerializer
             String name = (prop == null) ? "[anySetter]" : prop.getName();
             wrapAndThrow(provider, e, bean, name);
         } catch (StackOverflowError e) {
-            JsonMappingException mapE = new JsonMappingException(gen, "Infinite recursion (StackOverflowError)", e);
-            String name = (prop == null) ? "[anySetter]" : prop.getName();
-            mapE.prependPath(new JsonMappingException.Reference(bean, name));
-            throw mapE;
+            final String name = (prop == null) ? "[anySetter]" : prop.getName();
+            throw DatabindException.from(gen, "Infinite recursion (StackOverflowError)", e)
+                .prependPath(bean, name);
         }
         gen.writeEndObject();
     }

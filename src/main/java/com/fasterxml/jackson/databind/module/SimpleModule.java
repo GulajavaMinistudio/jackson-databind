@@ -4,14 +4,14 @@ import java.util.*;
 
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.ValueDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.ser.ValueSerializerModifier;
 import com.fasterxml.jackson.databind.util.UniqueId;
 
 /**
- * Vanilla {@link Module} implementation that allows registration
+ * Vanilla {@link JacksonModule} implementation that allows registration
  * of serializers and deserializers, bean serializer
  * and deserializer modifiers, registration of subtypes and mix-ins
  * as well as some other commonly
@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.util.UniqueId;
  * to do so they MUST call {@code super.setupModule(context);}
  * to ensure that registration works as expected.
  *<p>
- * WARNING: when registering {@link JsonSerializer}s and {@link JsonDeserializer}s,
+ * WARNING: when registering {@link ValueSerializer}s and {@link ValueDeserializer}s,
  * only type erased {@code Class} is compared: this means that usually you should
  * NOT use this implementation for registering structured types such as
  * {@link java.util.Collection}s or {@link java.util.Map}s: this because parametric
@@ -34,7 +34,7 @@ import com.fasterxml.jackson.databind.util.UniqueId;
  * signatures (with {@link JavaType}).
  */
 public class SimpleModule
-    extends com.fasterxml.jackson.databind.Module
+    extends JacksonModule
     implements java.io.Serializable
 {
     private static final long serialVersionUID = 3L;
@@ -59,8 +59,8 @@ public class SimpleModule
     protected SimpleSerializers _keySerializers = null;
     protected SimpleKeyDeserializers _keyDeserializers = null;
 
-    protected JsonSerializer<?> _defaultNullKeySerializer = null;
-    protected JsonSerializer<?> _defaultNullValueSerializer = null;
+    protected ValueSerializer<?> _defaultNullKeySerializer = null;
+    protected ValueSerializer<?> _defaultNullValueSerializer = null;
     
     /**
      * Lazily-constructed resolver used for storing mappings from
@@ -76,9 +76,9 @@ public class SimpleModule
      */
     protected SimpleValueInstantiators _valueInstantiators = null;
 
-    protected BeanDeserializerModifier _deserializerModifier = null;
+    protected ValueDeserializerModifier _deserializerModifier = null;
 
-    protected BeanSerializerModifier _serializerModifier = null;
+    protected ValueSerializerModifier _serializerModifier = null;
 
     /**
      * Lazily-constructed map that contains mix-in definitions, indexed
@@ -211,12 +211,12 @@ public class SimpleModule
         return this;
     }
 
-    public SimpleModule setDefaultNullKeySerializer(JsonSerializer<?> ser) {
+    public SimpleModule setDefaultNullKeySerializer(ValueSerializer<?> ser) {
         _defaultNullKeySerializer = ser;
         return this;
     }
 
-    public SimpleModule setDefaultNullValueSerializer(JsonSerializer<?> ser) {
+    public SimpleModule setDefaultNullValueSerializer(ValueSerializer<?> ser) {
         _defaultNullValueSerializer = ser;
         return this;
     }
@@ -237,12 +237,12 @@ public class SimpleModule
         return this;
     }
 
-    public SimpleModule setDeserializerModifier(BeanDeserializerModifier mod) {
+    public SimpleModule setDeserializerModifier(ValueDeserializerModifier mod) {
         _deserializerModifier = mod;
         return this;
     }
 
-    public SimpleModule setSerializerModifier(BeanSerializerModifier mod) {
+    public SimpleModule setSerializerModifier(ValueSerializerModifier mod) {
         _serializerModifier = mod;
         return this;
     }
@@ -260,13 +260,13 @@ public class SimpleModule
 
     /**
      * Method for adding serializer to handle type that the serializer claims to handle
-     * (see {@link JsonSerializer#handledType()}).
+     * (see {@link ValueSerializer#handledType()}).
      *<p>
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
      */
-    public SimpleModule addSerializer(JsonSerializer<?> ser)
+    public SimpleModule addSerializer(ValueSerializer<?> ser)
     {
         _checkNotNull(ser, "serializer");
         if (_serializers == null) {
@@ -283,7 +283,7 @@ public class SimpleModule
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
      */
-    public <T> SimpleModule addSerializer(Class<? extends T> type, JsonSerializer<T> ser)
+    public <T> SimpleModule addSerializer(Class<? extends T> type, ValueSerializer<T> ser)
     {
         _checkNotNull(type, "type to register serializer for");
         _checkNotNull(ser, "serializer");
@@ -294,7 +294,7 @@ public class SimpleModule
         return this;
     }
 
-    public <T> SimpleModule addKeySerializer(Class<? extends T> type, JsonSerializer<T> ser)
+    public <T> SimpleModule addKeySerializer(Class<? extends T> type, ValueSerializer<T> ser)
     {
         _checkNotNull(type, "type to register key serializer for");
         _checkNotNull(ser, "key serializer");
@@ -318,7 +318,7 @@ public class SimpleModule
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
      */
-    public <T> SimpleModule addDeserializer(Class<T> type, JsonDeserializer<? extends T> deser)
+    public <T> SimpleModule addDeserializer(Class<T> type, ValueDeserializer<? extends T> deser)
     {
         _checkNotNull(type, "type to register deserializer for");
         _checkNotNull(deser, "deserializer");

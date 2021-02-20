@@ -13,8 +13,8 @@ import com.fasterxml.jackson.annotation.*;
 
 import com.fasterxml.jackson.core.Base64Variants;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.ObjectReadContext;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
@@ -51,7 +51,7 @@ public class JDKStringLikeTypesTest extends BaseMapTest
         
         @Override
         public StackTraceElement deserialize(JsonParser jp,
-                DeserializationContext ctxt) throws IOException, JsonProcessingException {
+                DeserializationContext ctxt) {
             jp.skipChildren();
             return new StackTraceElement("a", "b", "b", StackTraceBean.NUM);
         }
@@ -272,13 +272,13 @@ public class JDKStringLikeTypesTest extends BaseMapTest
 
         // trivial case; null to null, embedded URL to URL
         TokenBuffer buf = TokenBuffer.forGeneration();
-        buf.writeObject(null);
+        buf.writePOJO(null);
         assertNull(MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), URL.class));
         buf.close();
 
         // then, URLitself come as is:
         buf = TokenBuffer.forGeneration();
-        buf.writeObject(exp);
+        buf.writePOJO(exp);
         assertSame(exp, MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), URL.class));
         buf.close();
     }
@@ -354,13 +354,13 @@ public class JDKStringLikeTypesTest extends BaseMapTest
 
         // first, null should come as null
         try (TokenBuffer buf = TokenBuffer.forGeneration()) {
-            buf.writeObject(null);
+            buf.writePOJO(null);
             assertNull(MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), UUID.class));
         }
 
         // then, UUID itself come as is:
         try (TokenBuffer buf = TokenBuffer.forGeneration()) {
-            buf.writeObject(value);
+            buf.writePOJO(value);
             assertSame(value, MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), UUID.class));
     
             // and finally from byte[]
@@ -373,7 +373,7 @@ public class JDKStringLikeTypesTest extends BaseMapTest
             byte[] data = bytes.toByteArray();
             assertEquals(16, data.length);
             
-            buf.writeObject(data);
+            buf.writePOJO(data);
     
             UUID value2 = MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), UUID.class);
             

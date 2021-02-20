@@ -376,16 +376,18 @@ public class POJOPropertiesCollector
         for (POJOPropertyBuilder property : props.values()) {
             property.mergeAnnotations(_forSerialization);
         }
-        // And use custom naming strategy, if applicable...
-        PropertyNamingStrategy naming = _findNamingStrategy();
-        if (naming != null) {
-            _renameUsing(props, naming);
-        }
 
         // Sort by visibility (explicit over implicit); drop all but first of member
         // type (getter, setter etc) if there is visibility difference
         for (POJOPropertyBuilder property : props.values()) {
             property.trimByVisibility();
+        }
+
+        // And use custom naming strategy, if applicable...
+        // As per [databind#2979], should be AFTER trimming
+        PropertyNamingStrategy naming = _findNamingStrategy();
+        if (naming != null) {
+            _renameUsing(props, naming);
         }
 
         // and, if required, apply wrapper name: note, MUST be done after
@@ -602,7 +604,6 @@ public class POJOPropertiesCollector
      */
     protected void _addMethods(Map<String, POJOPropertyBuilder> props)
     {
-        final AnnotationIntrospector ai = _annotationIntrospector;
         for (AnnotatedMethod m : _classDef.memberMethods()) {
             // For methods, handling differs between getters and setters; and
             // we will also only consider entries that either follow the bean
@@ -611,24 +612,22 @@ public class POJOPropertiesCollector
 
             int argCount = m.getParameterCount();
             if (argCount == 0) { // getters (including 'any getter')
-            	_addGetterMethod(props, m, ai);
+                _addGetterMethod(props, m);
             } else if (argCount == 1) { // setters
-            	_addSetterMethod(props, m, ai);
+                _addSetterMethod(props, m);
             } else if (argCount == 2) { // any getter?
-                if (ai != null) {
-                    if (Boolean.TRUE.equals(ai.hasAnySetter(_config, m))) {
-                        if (_anySetters == null) {
-                            _anySetters = new LinkedList<>();
-                        }
-                        _anySetters.add(m);
+                if (Boolean.TRUE.equals(_annotationIntrospector.hasAnySetter(_config, m))) {
+                    if (_anySetters == null) {
+                        _anySetters = new LinkedList<>();
                     }
+                    _anySetters.add(m);
                 }
             }
         }
     }
 
     protected void _addGetterMethod(Map<String, POJOPropertyBuilder> props,
-            AnnotatedMethod m, AnnotationIntrospector ai)
+            AnnotatedMethod m)
     {
         // Very first thing: skip if not returning any value
         // 06-May-2020, tatu: [databind#2675] changes handling slightly...
@@ -642,7 +641,7 @@ public class POJOPropertiesCollector
 
         // any getter?
         // @JsonAnyGetter?
-        if (Boolean.TRUE.equals(ai.hasAnyGetter(_config, m))) {
+        if (Boolean.TRUE.equals(_annotationIntrospector.hasAnyGetter(_config, m))) {
             if (_anyGetters == null) {
                 _anyGetters = new LinkedList<AnnotatedMember>();
             }
@@ -650,7 +649,7 @@ public class POJOPropertiesCollector
             return;
         }
         // @JsonKey?
-        if (Boolean.TRUE.equals(ai.hasAsKey(_config, m))) {
+        if (Boolean.TRUE.equals(_annotationIntrospector.hasAsKey(_config, m))) {
             if (_jsonKeyAccessors == null) {
                 _jsonKeyAccessors = new LinkedList<>();
             }
@@ -658,7 +657,7 @@ public class POJOPropertiesCollector
             return;
         }
         // @JsonValue?
-        if (Boolean.TRUE.equals(ai.hasAsValue(_config, m))) {
+        if (Boolean.TRUE.equals(_annotationIntrospector.hasAsValue(_config, m))) {
             if (_jsonValueAccessors == null) {
                 _jsonValueAccessors = new LinkedList<>();
             }
@@ -668,11 +667,11 @@ public class POJOPropertiesCollector
         String implName; // from naming convention
         boolean visible;
 
-        PropertyName pn = ai.findNameForSerialization(_config, m);
+        PropertyName pn = _annotationIntrospector.findNameForSerialization(_config, m);
         boolean nameExplicit = (pn != null);
 
         if (!nameExplicit) { // no explicit name; must consider implicit
-            implName = ai.findImplicitPropertyName(_config, m);
+            implName = _annotationIntrospector.findImplicitPropertyName(_config, m);
             if (implName == null) {
                 implName = _accessorNaming.findNameForRegularGetter(m, m.getName());
             }
@@ -687,7 +686,7 @@ public class POJOPropertiesCollector
             }
         } else { // explicit indication of inclusion, but may be empty
             // we still need implicit name to link with other pieces
-            implName = ai.findImplicitPropertyName(_config, m);
+            implName = _annotationIntrospector.findImplicitPropertyName(_config, m);
             if (implName == null) {
                 implName = _accessorNaming.findNameForRegularGetter(m, m.getName());
                 if (implName == null) {
@@ -707,19 +706,19 @@ public class POJOPropertiesCollector
         }
         // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
         implName = _checkRenameByField(implName);
-        boolean ignore = ai.hasIgnoreMarker(_config, m);
+        boolean ignore = _annotationIntrospector.hasIgnoreMarker(_config, m);
         _property(props, implName).addGetter(m, pn, nameExplicit, visible, ignore);
     }
 
     protected void _addSetterMethod(Map<String, POJOPropertyBuilder> props,
-            AnnotatedMethod m, AnnotationIntrospector ai)
+            AnnotatedMethod m)
     {
         String implName; // from naming convention
         boolean visible;
-        PropertyName pn = (ai == null) ? null : ai.findNameForDeserialization(_config, m);
+        PropertyName pn = _annotationIntrospector.findNameForDeserialization(_config, m);
         boolean nameExplicit = (pn != null);
         if (!nameExplicit) { // no explicit name; must follow naming convention
-            implName = (ai == null) ? null : ai.findImplicitPropertyName(_config, m);
+            implName = _annotationIntrospector.findImplicitPropertyName(_config, m);
             if (implName == null) {
                 implName = _accessorNaming.findNameForMutator(m, m.getName());
             }
@@ -729,7 +728,7 @@ public class POJOPropertiesCollector
             visible = _visibilityChecker.isSetterVisible(m);
         } else { // explicit indication of inclusion, but may be empty
             // we still need implicit name to link with other pieces
-            implName = (ai == null) ? null : ai.findImplicitPropertyName(_config, m);
+            implName = _annotationIntrospector.findImplicitPropertyName(_config, m);
             if (implName == null) {
                 implName = _accessorNaming.findNameForMutator(m, m.getName());
             }
@@ -746,16 +745,15 @@ public class POJOPropertiesCollector
         }
         // 27-Dec-2019, tatu: [databind#2527] may need to rename according to field
         implName = _checkRenameByField(implName);
-        boolean ignore = (ai != null) && ai.hasIgnoreMarker(_config, m);
+        boolean ignore = _annotationIntrospector.hasIgnoreMarker(_config, m);
         _property(props, implName).addSetter(m, pn, nameExplicit, visible, ignore);
     }
 
     protected void _addInjectables(Map<String, POJOPropertyBuilder> props)
     {
-        final AnnotationIntrospector ai = _annotationIntrospector;
         // first fields, then methods, to allow overriding
         for (AnnotatedField f : _classDef.fields()) {
-            _doAddInjectable(ai.findInjectableValue(_config, f), f);
+            _doAddInjectable(_annotationIntrospector.findInjectableValue(_config, f), f);
         }
         
         for (AnnotatedMethod m : _classDef.memberMethods()) {
@@ -763,7 +761,7 @@ public class POJOPropertiesCollector
             if (m.getParameterCount() != 1) {
                 continue;
             }
-            _doAddInjectable(ai.findInjectableValue(_config, m), m);
+            _doAddInjectable(_annotationIntrospector.findInjectableValue(_config, m), m);
         }
     }
 
@@ -933,7 +931,7 @@ public class POJOPropertiesCollector
                     old.addAll(prop);
                 }
                 // replace the creatorProperty too, if there is one
-                if (_updateCreatorProperty(prop, _creatorProperties)) {
+                if (_replaceCreatorProperty(prop, _creatorProperties)) {
                     // [databind#2001]: New name of property was ignored previously? Remove from ignored
                     // 01-May-2018, tatu: I have a feeling this will need to be revisited at some point,
                     //   to avoid removing some types of removals, possibly. But will do for now.
@@ -977,9 +975,8 @@ public class POJOPropertiesCollector
                     } else if (prop.hasField()) {
                         rename = naming.nameForField(_config, prop.getField(), fullName.getSimpleName());
                     } else if (prop.hasGetter()) {
-                        /* Plus, when getter-as-setter is used, need to convert that too..
-                         * (should we verify that's enabled? For now, assume it's ok always)
-                         */
+                        // Plus, when getter-as-setter is used, need to convert that too..
+                        // (should we verify that's enabled? For now, assume it's ok always)
                         rename = naming.nameForGetterMethod(_config, prop.getGetter(), fullName.getSimpleName());
                     }
                 }
@@ -1000,7 +997,7 @@ public class POJOPropertiesCollector
             }
 
             // replace the creatorProperty too, if there is one
-            _updateCreatorProperty(prop, _creatorProperties);
+            _replaceCreatorProperty(prop, _creatorProperties);
         }
     }
 
@@ -1244,8 +1241,12 @@ public class POJOPropertiesCollector
                     _config.canOverrideAccessModifiers());
     }
 
-    protected boolean _updateCreatorProperty(POJOPropertyBuilder prop, List<POJOPropertyBuilder> creatorProperties) {
+//    @Deprecated // since 2.12.1 (temporarily missing from 2.12.0)
+//    protected void _updateCreatorProperty(POJOPropertyBuilder prop, List<POJOPropertyBuilder> creatorProperties) {
+//        _replaceCreatorProperty(prop, creatorProperties);
+ //   }
 
+    protected boolean _replaceCreatorProperty(POJOPropertyBuilder prop, List<POJOPropertyBuilder> creatorProperties) {
         if (creatorProperties != null) {
             final String intName = prop.getInternalName();
             for (int i = 0, len = creatorProperties.size(); i < len; ++i) {

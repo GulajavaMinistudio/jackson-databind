@@ -3,7 +3,7 @@ package com.fasterxml.jackson.databind.cfg;
 import com.fasterxml.jackson.core.FormatSchema;
 import com.fasterxml.jackson.core.TokenStreamFactory;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
+import com.fasterxml.jackson.databind.deser.DeserializationContextExt;
 import com.fasterxml.jackson.databind.deser.DeserializerCache;
 import com.fasterxml.jackson.databind.deser.DeserializerFactory;
 
@@ -83,7 +83,7 @@ public abstract class DeserializationContexts
     /**
      * Factory method for constructing context object for individual {@code writeValue} call.
      */
-    public abstract DefaultDeserializationContext createContext(DeserializationConfig config,
+    public abstract DeserializationContextExt createContext(DeserializationConfig config,
             FormatSchema schema, InjectableValues injectables);
 
     /*
@@ -123,9 +123,9 @@ public abstract class DeserializationContexts
         }
 
         @Override
-        public DefaultDeserializationContext createContext(DeserializationConfig config,
+        public DeserializationContextExt createContext(DeserializationConfig config,
                 FormatSchema schema, InjectableValues injectables) {
-            return new DefaultDeserializationContext.Impl(_streamFactory,
+            return new DeserializationContextExt.Impl(_streamFactory,
                     _deserializerFactory, _cache,
                     config, schema, injectables);
         }

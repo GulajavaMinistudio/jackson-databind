@@ -1,7 +1,6 @@
 package com.fasterxml.jackson.databind.deser.std;
 
-import java.io.IOException;
-
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 
@@ -29,30 +28,29 @@ public abstract class ReferenceTypeDeserializer<T>
     protected final ValueInstantiator _valueInstantiator;
 
     protected final TypeDeserializer _valueTypeDeserializer;
-    protected final JsonDeserializer<Object> _valueDeserializer;
+    protected final ValueDeserializer<Object> _valueDeserializer;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
      */
 
     @SuppressWarnings("unchecked")
     public ReferenceTypeDeserializer(JavaType fullType, ValueInstantiator vi,
-            TypeDeserializer typeDeser, JsonDeserializer<?> deser)
+            TypeDeserializer typeDeser, ValueDeserializer<?> deser)
     {
         super(fullType);
         _valueInstantiator = vi;
         _fullType = fullType;
-        _valueDeserializer = (JsonDeserializer<Object>) deser;
+        _valueDeserializer = (ValueDeserializer<Object>) deser;
         _valueTypeDeserializer = typeDeser;
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
-            throws JsonMappingException
+    public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
     {
-        JsonDeserializer<?> deser = _valueDeserializer;
+        ValueDeserializer<?> deser = _valueDeserializer;
         if (deser == null) {
             deser = ctxt.findContextualValueDeserializer(_fullType.getReferencedType(), property);
         } else { // otherwise directly assigned, probably not contextual yet:
@@ -70,9 +68,9 @@ public abstract class ReferenceTypeDeserializer<T>
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Partial NullValueProvider impl
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -90,9 +88,9 @@ public abstract class ReferenceTypeDeserializer<T>
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Abstract methods for sub-classes to implement
-    /**********************************************************
+    /**********************************************************************
      */
     
     /**
@@ -103,13 +101,13 @@ public abstract class ReferenceTypeDeserializer<T>
      * need NOT check if a new instance is needed.
      */
     protected abstract ReferenceTypeDeserializer<T> withResolved(TypeDeserializer typeDeser,
-            JsonDeserializer<?> valueDeser);
+            ValueDeserializer<?> valueDeser);
 
     @Override
-    public abstract T getNullValue(DeserializationContext ctxt) throws JsonMappingException;
+    public abstract T getNullValue(DeserializationContext ctxt);
 
     @Override
-    public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Object getEmptyValue(DeserializationContext ctxt) {
         return getNullValue(ctxt);
     }
 
@@ -119,8 +117,6 @@ public abstract class ReferenceTypeDeserializer<T>
      * Method called in case of "merging update", in which we should try
      * update reference instead of creating a new one. If this does not
      * succeed, should just create a new instance.
-     *
-     * @since 2.9
      */
     public abstract T updateReference(T reference, Object contents);
 
@@ -129,15 +125,13 @@ public abstract class ReferenceTypeDeserializer<T>
      * if any; or `null` if none. Note that method should never fail, so
      * for types that use concept of "absence" vs "presence", `null` is
      * to be returned for both "absent" and "reference to `null`" cases.
-     *
-     * @since 2.9
      */
     public abstract Object getReferenced(T reference);
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Overridden accessors
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -146,7 +140,7 @@ public abstract class ReferenceTypeDeserializer<T>
     @Override
     public JavaType getValueType() { return _fullType; }
 
-    @Override // since 2.12
+    @Override
     public LogicalType logicalType() {
         if (_valueDeserializer != null) {
             return _valueDeserializer.logicalType();
@@ -159,20 +153,20 @@ public abstract class ReferenceTypeDeserializer<T>
      * deserializer; if it supports updates, typically that's what
      * matters. So let's just delegate.
      */
-    @Override // since 2.9
+    @Override
     public Boolean supportsUpdate(DeserializationConfig config) {
         return (_valueDeserializer == null) ? null
                 : _valueDeserializer.supportsUpdate(config);
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Deserialization
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
-    public T deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public T deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         // 23-Oct-2016, tatu: ValueInstantiator only defined for non-vanilla instances,
         //    but do check... might work
         if (_valueInstantiator != null) {
@@ -187,7 +181,8 @@ public abstract class ReferenceTypeDeserializer<T>
     }
 
     @Override
-    public T deserialize(JsonParser p, DeserializationContext ctxt, T reference) throws IOException
+    public T deserialize(JsonParser p, DeserializationContext ctxt, T reference)
+        throws JacksonException
     {
         Object contents;
         // 26-Oct-2016, tatu: first things first; see if we should be able to merge:
@@ -215,7 +210,8 @@ public abstract class ReferenceTypeDeserializer<T>
 
     @Override
     public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
-            TypeDeserializer typeDeserializer) throws IOException
+            TypeDeserializer typeDeserializer)
+        throws JacksonException
     {
         final JsonToken t = p.currentToken();
         if (t == JsonToken.VALUE_NULL) { // can this actually happen?

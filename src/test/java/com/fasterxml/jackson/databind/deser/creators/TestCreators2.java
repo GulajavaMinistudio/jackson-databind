@@ -29,12 +29,17 @@ public class TestCreators2 extends BaseMapTest
         }
     }
 
-    static class BytesDeserializer extends JsonDeserializer<byte[]>
+    static class BytesDeserializer extends ValueDeserializer<byte[]>
     {
         @Override
-        public byte[] deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
-            String str = jp.getText();
-            return str.getBytes("UTF-8");
+        public byte[] deserialize(JsonParser p, DeserializationContext ctxt)
+        {
+            String str = p.getText();
+            try {
+                return str.getBytes("UTF-8");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -242,7 +247,7 @@ public class TestCreators2 extends BaseMapTest
         try {
             MAPPER.readValue("{ \"name\":\"foobar\" }", BeanFor438.class);
             fail("Should have failed");
-        } catch (JsonMappingException e0) {
+        } catch (Exception e0) {
             e = e0;
         }
         if (!(e instanceof ValueInstantiationException)) {

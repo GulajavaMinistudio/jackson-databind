@@ -11,7 +11,7 @@ public class Jdk8OptionalDeserializer
     extends ReferenceTypeDeserializer<Optional<?>>
 {
     public Jdk8OptionalDeserializer(JavaType fullType, ValueInstantiator inst,
-            TypeDeserializer typeDeser, JsonDeserializer<?> deser)
+            TypeDeserializer typeDeser, ValueDeserializer<?> deser)
     {
         super(fullType, inst, typeDeser, deser);
     }
@@ -23,19 +23,19 @@ public class Jdk8OptionalDeserializer
      */
 
     @Override
-    public Jdk8OptionalDeserializer withResolved(TypeDeserializer typeDeser, JsonDeserializer<?> valueDeser) {
+    public Jdk8OptionalDeserializer withResolved(TypeDeserializer typeDeser, ValueDeserializer<?> valueDeser) {
         return new Jdk8OptionalDeserializer(_fullType, _valueInstantiator,
                 typeDeser, valueDeser);
     }
 
     @Override
-    public Optional<?> getNullValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Optional<?> getNullValue(DeserializationContext ctxt) {
         // 07-May-2019, tatu: changed for [databind#2303]
         return Optional.ofNullable(_valueDeserializer.getNullValue(ctxt));
     }
 
     @Override
-    public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
+    public Object getEmptyValue(DeserializationContext ctxt) {
         // 07-May-2019, tatu: I _think_ this needs to align with "null value" and
         //    not necessarily with empty value of contents? (used to just do "absent"
         //    so either way this seems to me like an improvement)
