@@ -1039,6 +1039,8 @@ João Guerra (joca-bt@github)
   (2.11.1)
   * Reported #3227: Content `null` handling not working for root values
   (2.13.0)
+  * Reported #3690: Incorrect target type for arrays when disabling coercion
+  (2.15.0)
 
 Ryan Bohn (bohnman@github)
   * Reported #2475: `StringCollectionSerializer` calls `JsonGenerator.setCurrentValue(value)`,
@@ -1528,6 +1530,10 @@ Moritz Halbritter (mhalbritter@github)
   * Reported #3665: `ObjectMapper` default heap consumption increased significantly
     from 2.13.x to 2.14.0
   (2.14.1)
+
+Philippe Marschall (marschall@github)
+  * Contributed #3699: Allow custom `JsonNode` implementations
+  (2.14.2)
 
 Hervé Boutemy (hboutemy@github)
   * Contributed fix for #3680: Timestamp in classes inside jar showing 02/01/1980
