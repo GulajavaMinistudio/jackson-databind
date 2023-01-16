@@ -26,11 +26,14 @@ Project: jackson-databind
  (reported by João G)
 #3708: Seems like `java.nio.file.Path` is safe for Android API level 26
  (contributed by @pjfanning)
+#3736: Try to avoid auto-detecting Fields for Record types
 
 2.14.2 (not yet released)
 
 #1751: `@JsonTypeInfo` does not work if the Type Id is an Integer value
  (reported by @marvin-we)
+#3063: `@JsonValue` fails for Java Record
+ (reported by Gili T)
 #3699: Allow custom `JsonNode` implementations
  (contributed by Philippe M)
 #3711: Enum polymorphism not working correctly with DEDUCTION
