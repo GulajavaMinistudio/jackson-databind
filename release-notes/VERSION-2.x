@@ -34,10 +34,12 @@ Project: jackson-databind
 #3736: Try to avoid auto-detecting Fields for Record types
 #3742: schemaType of `LongSerializer` is wrong
  (reported by @luozhenyu)
+#3745: Deprecate classes in package `com.fasterxml.jackson.databind.jsonschema`
+ (contributed by @luozhenyu)
 #3748: `DelegatingDeserializer` missing override of `getAbsentValue()`
  (and couple of other methods)
 
-2.14.2 (not yet released)
+2.14.2 (28-Jan-2023)
 
 #1751: `@JsonTypeInfo` does not work if the Type Id is an Integer value
  (reported by @marvin-we)
