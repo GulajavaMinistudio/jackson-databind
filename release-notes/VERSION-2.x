@@ -6,19 +6,33 @@ Project: jackson-databind
 
 2.15.0 (not yet released)
 
+#2536: Add `EnumFeature.READ_ENUM_KEYS_USING_INDEX` to work with
+   existing "WRITE_ENUM_KEYS_USING_INDEX"#
+#2968: Deserialization of `@JsonTypeInfo` annotated type fails with
+  missing type id even for explicit concrete subtypes
+ (requested by Patrick S) 
+ (fix contributed by Joo-Hyuk K)
 #2974: Null coercion with `@JsonSetter` does not work with `java.lang.Record`
  (fix contributed by Sim Y-T)
 #2992: Properties naming strategy do not work with Record
  (fix contributed by Sim Y-T)
+#3053: Allow serializing enums to lowercase (`EnumFeature.WRITE_ENUMS_TO_LOWERCASE`)
+ (requested by Vojtěch K)
+ (fix contributed by Joo-Hyuk K)
 #3180: Support `@JsonCreator` annotation on record classes
  (fix contributed by Sim Y-T)
 #3297: `@JsonDeserialize(converter = ...)` does not work with Records
  (fix contributed by Sim Y-T)
 #3342: `JsonTypeInfo.As.EXTERNAL_PROPERTY` does not work with record wrappers
  (fix contributed by Sim Y-T)
+#3352: Do not require the usage of opens in a modular app when using records
 #3637: Add enum features into `@JsonFormat.Feature`
  (requested by @Anatoly4444)
  (fix contributed by Ajay S)
+#3638: Case-insensitive and number-based enum deserialization are
+  (unnecessarily) mutually exclusive
+ (reported by Phil G)
+ (fix contributed by Joo-Hyuk K)
 #3651: Deprecate "exact values" setting from `JsonNodeFactory`, replace with
   `JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES`
 #3654: Infer `@JsonCreator(mode = Mode.DELEGATING)` from use of `@JsonValue`)
@@ -31,6 +45,8 @@ Project: jackson-databind
  (reported by João G)
 #3708: Seems like `java.nio.file.Path` is safe for Android API level 26
  (contributed by @pjfanning)
+#3730: Add support in `TokenBuffer` for lazily decoded (big) numbers
+ (contributed by @pjfanning)
 #3736: Try to avoid auto-detecting Fields for Record types
 #3742: schemaType of `LongSerializer` is wrong
  (reported by @luozhenyu)
@@ -38,6 +54,20 @@ Project: jackson-databind
  (contributed by @luozhenyu)
 #3748: `DelegatingDeserializer` missing override of `getAbsentValue()`
  (and couple of other methods)
+#3771: Classloader leak: DEFAULT_ANNOTATION_INTROSPECTOR holds annotation reference
+ (reported by Christoph S)
+#3796: Enum Deserialisation Failing with Polymorphic type validator
+ (reported by @sagarika4)
+#3816: TokenBuffer does not implement writeString(Reader reader, int len)
+ (reported by Patrick S)
+#3819: Add convenience method `SimpleBeanPropertyFilter.filterOutAll()` as
+  counterpart of `serializeAll()`
+ (contributed by Joo-Hyuk K)
+
+2.14.3 (not yet released)
+
+#3784: `PrimitiveArrayDeserializers$ByteDeser.deserialize` ignores
+  `DeserializationProblemHandler` for invalid Base64 content
 
 2.14.2 (28-Jan-2023)
 

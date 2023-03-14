@@ -22,7 +22,7 @@ public class SimpleModuleTest extends BaseMapTest
     {
         protected String str;
         protected int num;
-        
+
         public CustomBean(String s, int i) {
             str = s;
             num = i;
@@ -30,7 +30,7 @@ public class SimpleModuleTest extends BaseMapTest
     }
 
     static enum SimpleEnum { A, B; }
-    
+
     // Extend SerializerBase to get access to declared handledType
     static class CustomBeanSerializer extends StdSerializer<CustomBean>
     {
@@ -50,7 +50,7 @@ public class SimpleModuleTest extends BaseMapTest
             return null;
         }
     }
-    
+
     static class CustomBeanDeserializer extends JsonDeserializer<CustomBean>
     {
         @Override
@@ -99,7 +99,7 @@ public class SimpleModuleTest extends BaseMapTest
     interface Base {
         public String getText();
     }
-    
+
     static class Impl1 implements Base {
         @Override
         public String getText() { return "1"; }
@@ -113,7 +113,7 @@ public class SimpleModuleTest extends BaseMapTest
     static class BaseSerializer extends StdScalarSerializer<Base>
     {
         public BaseSerializer() { super(Base.class); }
-        
+
         @Override
         public void serialize(Base value, JsonGenerator jgen, SerializerProvider provider) throws IOException {
             jgen.writeString("Base:"+value.getText());
@@ -128,7 +128,7 @@ public class SimpleModuleTest extends BaseMapTest
 
     @JsonPropertyOrder({"c", "a", "b"})
     static class MixInForOrder { }
-    
+
     protected static class MySimpleSerializers extends SimpleSerializers { }
     protected static class MySimpleDeserializers extends SimpleDeserializers { }
 
@@ -189,6 +189,43 @@ public class SimpleModuleTest extends BaseMapTest
         }
     }
 
+    // [databind#3787]
+    static class Test3787Bean {
+        public String value;
+    }
+
+    static class Deserializer3787A extends JsonDeserializer<Test3787Bean> {
+        @Override
+        public Test3787Bean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            Test3787Bean simpleTestBean = new Test3787Bean();
+            simpleTestBean.value = "I am A";
+            return simpleTestBean;
+        }
+    }
+
+    static class Deserializer3787B extends JsonDeserializer<Test3787Bean> {
+        @Override
+        public Test3787Bean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            Test3787Bean simpleTestBean = new Test3787Bean();
+            simpleTestBean.value = "I am B";
+            return simpleTestBean;
+        }
+    }
+
+    static class Serializer3787A extends JsonSerializer<Test3787Bean> {
+        @Override
+        public void serialize(Test3787Bean value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeRaw("a-result");
+        }
+    }
+
+    static class Serializer3787B extends JsonSerializer<Test3787Bean> {
+        @Override
+        public void serialize(Test3787Bean value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeRaw("b-result");
+        }
+    }
+
     /*
     /**********************************************************
     /* Unit tests; first, verifying need for custom handlers
@@ -228,41 +265,44 @@ public class SimpleModuleTest extends BaseMapTest
 
     public void testSimpleBeanSerializer() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
         mod.addSerializer(new CustomBeanSerializer());
-        mapper.registerModule(mod);
+        ObjectMapper mapper = JsonMapper.builder()
+                .addModule(mod)
+                .build();
         assertEquals(q("abcde|5"), mapper.writeValueAsString(new CustomBean("abcde", 5)));
     }
 
     public void testSimpleEnumSerializer() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
         mod.addSerializer(new SimpleEnumSerializer());
         // for fun, call "multi-module" registration
-        mapper.registerModules(mod);
+        ObjectMapper mapper = JsonMapper.builder()
+                .addModules(mod)
+                .build();
         assertEquals(q("b"), mapper.writeValueAsString(SimpleEnum.B));
     }
 
     public void testSimpleInterfaceSerializer() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
         mod.addSerializer(new BaseSerializer());
         // and another variant here too
         List<SimpleModule> mods = Arrays.asList(mod);
-        mapper.registerModules(mods);
+        ObjectMapper mapper = JsonMapper.builder()
+                .addModules(mods)
+                .build();
         assertEquals(q("Base:1"), mapper.writeValueAsString(new Impl1()));
         assertEquals(q("Base:2"), mapper.writeValueAsString(new Impl2()));
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests; simple deserializers
     /**********************************************************
      */
-    
+
     public void testSimpleBeanDeserializer() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -412,7 +452,7 @@ public class SimpleModuleTest extends BaseMapTest
 
     public void testAccessToMapper() throws Exception
     {
-        ContextVerifierModule module = new ContextVerifierModule();        
+        ContextVerifierModule module = new ContextVerifierModule();
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(module);
     }
@@ -431,5 +471,90 @@ public class SimpleModuleTest extends BaseMapTest
     {
         List<?> mods = ObjectMapper.findModules();
         assertEquals(0, mods.size());
+    }
+
+    public void testAddSerializerTwiceThenOnlyLatestIsKept() throws JsonProcessingException {
+        SimpleModule module = new SimpleModule()
+            .addSerializer(Test3787Bean.class, new Serializer3787A())
+            .addSerializer(Test3787Bean.class, new Serializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addModule(module)
+                .build();
+        assertEquals("b-result", objectMapper.writeValueAsString(new Test3787Bean()));
+    }
+
+    public void testAddModuleWithSerializerTwiceThenOnlyLatestIsKept() throws JsonProcessingException {
+        SimpleModule firstModule = new SimpleModule()
+            .addSerializer(Test3787Bean.class, new Serializer3787A());
+        SimpleModule secondModule = new SimpleModule()
+            .addSerializer(Test3787Bean.class, new Serializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addModule(firstModule)
+                .addModule(secondModule)
+                .build();
+        Test3787Bean obj = new Test3787Bean();
+
+        String result = objectMapper.writeValueAsString(obj);
+
+        assertEquals("b-result", result);
+    }
+
+    public void testAddModuleWithSerializerTwiceThenOnlyLatestIsKept_reverseOrder() throws JsonProcessingException {
+        SimpleModule firstModule = new SimpleModule()
+            .addSerializer(Test3787Bean.class, new Serializer3787A());
+        SimpleModule secondModule = new SimpleModule()
+            .addSerializer(Test3787Bean.class, new Serializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addModule(secondModule)
+                .addModule(firstModule)
+                .build();
+
+        assertEquals("a-result", objectMapper.writeValueAsString(new Test3787Bean()));
+    }
+
+    public void testAddDeserializerTwiceThenOnlyLatestIsKept() throws Exception {
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(Test3787Bean.class, new Deserializer3787A())
+            .addDeserializer(Test3787Bean.class, new Deserializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addModule(module)
+                .build();
+
+        Test3787Bean result = objectMapper.readValue(
+            "{\"value\" : \"I am C\"}", Test3787Bean.class);
+
+        assertEquals("I am B", result.value);
+    }
+
+    public void testAddModuleWithDeserializerTwiceThenOnlyLatestIsKept() throws Exception {
+        SimpleModule firstModule = new SimpleModule()
+            .addDeserializer(Test3787Bean.class, new Deserializer3787A());
+        SimpleModule secondModule = new SimpleModule()
+            .addDeserializer(Test3787Bean.class, new Deserializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addModule(firstModule)
+                .addModule(secondModule)
+                .build();
+
+        Test3787Bean result = objectMapper.readValue(
+            "{\"value\" : \"I am C\"}", Test3787Bean.class);
+
+        assertEquals("I am B", result.value);
+    }
+
+    public void testAddModuleWithDeserializerTwiceThenOnlyLatestIsKept_reverseOrder() throws Exception {
+        SimpleModule firstModule = new SimpleModule()
+            .addDeserializer(Test3787Bean.class, new Deserializer3787A());
+        SimpleModule secondModule = new SimpleModule()
+            .addDeserializer(Test3787Bean.class, new Deserializer3787B());
+        ObjectMapper objectMapper = JsonMapper.builder()
+            .addModule(secondModule)
+            .addModule(firstModule)
+            .build();
+
+        Test3787Bean result = objectMapper.readValue(
+            "{\"value\" : \"I am C\"}", Test3787Bean.class);
+        
+        assertEquals("I am A", result.value);
     }
 }

@@ -7,6 +7,9 @@ import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.BaseMapTest;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper.DefaultTypeResolverBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping;
+import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
 
 @SuppressWarnings("serial")
 public class EnumTypingTest extends BaseMapTest
@@ -17,17 +20,17 @@ public class EnumTypingTest extends BaseMapTest
 
     public enum Tag implements EnumInterface
     { A, B };
-    
+
     static class EnumInterfaceWrapper {
         public EnumInterface value;
     }
-    
+
     static class EnumInterfaceList extends ArrayList<EnumInterface> { }
 
     static class TagList extends ArrayList<Tag> { }
 
     static enum TestEnum { A, B, C; }
-    
+
     static class UntypedEnumBean
     {
        @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY, property="__type")
@@ -71,6 +74,33 @@ public class EnumTypingTest extends BaseMapTest
         VALUE;
     }
 
+    // [databind#3796]
+    enum Greeting3796 {
+        HELLO ("hello"),
+        BYE ("bye");
+        
+        private final String value;
+
+        Greeting3796(String value) {
+          this.value = value;
+        }
+
+        @JsonCreator
+        public static Greeting3796 fromValue(String value) {
+          for (Greeting3796 b : Greeting3796.values()) {
+            if (b.value.equals(value)) {
+              return b;
+            }
+          }
+          throw new IllegalArgumentException("Unexpected value '" + value + "'");
+        }
+
+        @JsonValue
+        public String getValue() {
+          return value;
+        }
+    }
+
     /*
     /**********************************************************************
     /* Test methods
@@ -105,7 +135,7 @@ public class EnumTypingTest extends BaseMapTest
         list.add(Tag.A);
         list.add(Tag.B);
         String json = MAPPER.writeValueAsString(list);
-        
+
         EnumInterfaceList result = MAPPER.readValue(json, EnumInterfaceList.class);
         assertEquals(2, result.size());
         assertSame(Tag.A, result.get(0));
@@ -144,5 +174,21 @@ public class EnumTypingTest extends BaseMapTest
                 .without(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
                 .readValue(json);
         assertEquals(testValue, deserializedValue);
+    }
+
+    // [databind#3796]
+    public void testEnumAsPolymorphicViaCreator() throws Exception
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        StdTypeResolverBuilder typer = new DefaultTypeResolverBuilder(DefaultTyping.EVERYTHING,
+                mapper.getPolymorphicTypeValidator());
+        typer = typer.init(JsonTypeInfo.Id.CLASS, null);
+        typer = typer.inclusion(JsonTypeInfo.As.PROPERTY);
+        mapper.setDefaultTyping(typer);
+        Greeting3796 greeting = Greeting3796.BYE;
+      
+        String val = mapper.writeValueAsString(greeting);
+        Greeting3796 result = mapper.readValue(val, Greeting3796.class);
+        assertSame(greeting, result);
     }
 }

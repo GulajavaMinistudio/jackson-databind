@@ -25,7 +25,7 @@ public class PropertyAliasTest extends BaseMapTest
             @JsonAlias("A") int a) {
             _a = a;
         }
-        
+
         @JsonAlias({ "Xyz" })
         public void setXyz(int x) {
             _xyz = x;
@@ -100,7 +100,7 @@ public class PropertyAliasTest extends BaseMapTest
         assertEquals("Foobar", bean.name);
         assertEquals(3, bean._a);
         assertEquals(37, bean._xyz);
-        
+
         // and finally, constructor-backed one
         bean = MAPPER.readValue(a2q("{'name':'Foobar','A':3,'xyz':37}"),
                 AliasBean.class);
@@ -141,5 +141,77 @@ public class PropertyAliasTest extends BaseMapTest
         Pojo2669 pojo = mapper.readValue(text, Pojo2669.class);
         assertNotNull(pojo);
         assertEquals("test", pojo.getName());
+    }
+
+    static class FixedOrderAliasBean {
+        @JsonAlias({"a", "b", "c"})
+        public String value;
+    }
+
+    public void testAliasDeserializedToLastMatchingKey_ascendingKeys() throws Exception {
+        String ascendingOrderInput = a2q(
+            "{\"a\": \"a-value\", " +
+                "\"b\": \"b-value\", " +
+                "\"c\": \"c-value\"}");
+
+        FixedOrderAliasBean ascObj = MAPPER.readValue(ascendingOrderInput, FixedOrderAliasBean.class);
+        assertEquals("c-value", ascObj.value);
+    }
+
+    public void testAliasDeserializedToLastMatchingKey_descendingKeys() throws Exception {
+        String descendingOrderInput = a2q(
+            "{\"c\": \"c-value\", " +
+                "\"b\": \"b-value\", " +
+                "\"a\": \"a-value\"}");
+
+        FixedOrderAliasBean descObj = MAPPER.readValue(descendingOrderInput, FixedOrderAliasBean.class);
+        assertEquals("a-value", descObj.value);
+    }
+
+    static class AscendingOrderAliasBean {
+        @JsonAlias({"a", "b", "c"})
+        public String value;
+    }
+
+    public void testAliasDeserializedToLastMatchingKey_ascendingAliases() throws Exception {
+        String input = a2q(
+                "{\"a\": \"a-value\", " +
+                "\"b\": \"b-value\", " +
+                "\"c\": \"c-value\"}");
+
+        AscendingOrderAliasBean ascObj = MAPPER.readValue(input, AscendingOrderAliasBean.class);
+        assertEquals("c-value", ascObj.value);
+    }
+
+    static class DescendingOrderAliasBean {
+        @JsonAlias({"c", "b", "a"})
+        public String value;
+    }
+
+    public void testAliasDeserializedToLastMatchingKey_descendingAliases() throws Exception {
+        String input = a2q(
+            "{\"a\": \"a-value\", " +
+                "\"b\": \"b-value\", " +
+                "\"c\": \"c-value\"}");
+
+        DescendingOrderAliasBean descObj = MAPPER.readValue(input, DescendingOrderAliasBean.class);
+        assertEquals("c-value", descObj.value);
+    }
+
+    static class AliasTestBeanA {
+        @JsonAlias({"fullName"})
+        public String name;
+
+        @JsonAlias({"fullName"})
+        public String fullName;
+    }
+
+    public void testAliasFallBackToField() throws Exception {
+        AliasTestBeanA obj = MAPPER.readValue(a2q(
+            "{\"fullName\": \"Faster Jackson\", \"name\":\"Jackson\"}"
+        ), AliasTestBeanA.class);
+
+        assertEquals("Jackson", obj.name);
+        assertEquals("Faster Jackson", obj.fullName);
     }
 }

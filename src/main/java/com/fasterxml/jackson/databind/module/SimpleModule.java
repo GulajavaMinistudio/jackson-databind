@@ -33,7 +33,7 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
  * {@link java.util.Collection}s or {@link java.util.Map}s: this because parametric
  * type information will not be considered and you may end up having "wrong" handler
  * for your type.
- * What you need to do, instead, is to implement {@link com.fasterxml.jackson.databind.deser.Deserializers} 
+ * What you need to do, instead, is to implement {@link com.fasterxml.jackson.databind.deser.Deserializers}
  * and/or {@link com.fasterxml.jackson.databind.ser.Serializers} callbacks to match full type
  * signatures (with {@link JavaType}).
  */
@@ -96,7 +96,7 @@ public class SimpleModule
      * by target class, value being mix-in to apply.
      */
     protected HashMap<Class<?>, Class<?>> _mixins = null;
-    
+
     /**
      * Set of subtypes to register, if any.
      */
@@ -106,7 +106,7 @@ public class SimpleModule
      * @since 2.3
      */
     protected PropertyNamingStrategy _namingStrategy = null;
-    
+
     /*
     /**********************************************************
     /* Life-cycle: creation
@@ -152,7 +152,7 @@ public class SimpleModule
      * ObjectMapper may use name as identifier to notice attempts
      * for multiple registrations of the same module (although it
      * does not have to).
-     * 
+     *
      * @param name Unique name of the module
      * @param version Version of the module
      */
@@ -178,7 +178,7 @@ public class SimpleModule
             List<JsonSerializer<?>> serializers) {
         this(name, version, null, serializers);
     }
-    
+
     /**
      * @since 2.1
      */
@@ -262,7 +262,7 @@ public class SimpleModule
      * Resets currently configured abstract type mappings
      */
     public void setAbstractTypes(SimpleAbstractTypeResolver atr) {
-        _abstractTypes = atr;        
+        _abstractTypes = atr;
     }
 
     /**
@@ -295,7 +295,7 @@ public class SimpleModule
         _namingStrategy = naming;
         return this;
     }
-    
+
     /*
     /**********************************************************
     /* Configuration methods, adding serializers
@@ -309,6 +309,9 @@ public class SimpleModule
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
      */
     public SimpleModule addSerializer(JsonSerializer<?> ser)
     {
@@ -326,6 +329,9 @@ public class SimpleModule
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
      */
     public <T> SimpleModule addSerializer(Class<? extends T> type, JsonSerializer<T> ser)
     {
@@ -354,13 +360,16 @@ public class SimpleModule
     /* Configuration methods, adding deserializers
     /**********************************************************
      */
-    
+
     /**
      * Method for adding deserializer to handle specified type.
      *<p>
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
      */
     public <T> SimpleModule addDeserializer(Class<T> type, JsonDeserializer<? extends T> deser)
     {
@@ -466,7 +475,7 @@ public class SimpleModule
     /* Configuration methods, add other handlers
     /**********************************************************
      */
-    
+
     /**
      * Method for registering {@link ValueInstantiator} to use when deserializing
      * instances of type <code>beanType</code>.
@@ -509,7 +518,7 @@ public class SimpleModule
     /* Module impl
     /**********************************************************
      */
-    
+
     @Override
     public String getModuleName() {
         return _name;
@@ -517,7 +526,7 @@ public class SimpleModule
 
     /**
      * Standard implementation handles registration of all configured
-     * customizations: it is important that sub-classes call this 
+     * customizations: it is important that sub-classes call this
      * implementation (usually before additional custom logic)
      * if they choose to override it; otherwise customizations
      * will not be registered.

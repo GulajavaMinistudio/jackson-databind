@@ -42,6 +42,16 @@ public class SimpleBeanPropertyFilter
     }
 
     /**
+     * Convenience factory method that will return a filter that will
+     * simply filter out everything.
+     *
+     * @since 2.15
+     */
+    public static SimpleBeanPropertyFilter filterOutAll() {
+        return FilterExceptFilter.EXCLUDE_ALL;
+    }
+
+    /**
      * Factory method that was accidentally added in 2.5 with arguments; basically
      * works just as an alias of {@link #filterOutAllExcept(Set)} which is not
      * very useful. Instead, see {@link #serializeAll()} for intended signature.
@@ -52,7 +62,7 @@ public class SimpleBeanPropertyFilter
     public static SimpleBeanPropertyFilter serializeAll(Set<String> properties) {
         return new FilterExceptFilter(properties);
     }
-    
+
     /**
      * Factory method to construct filter that filters out all properties <b>except</b>
      * ones includes in set
@@ -80,7 +90,7 @@ public class SimpleBeanPropertyFilter
     /**
      * Helper method to ease transition from {@link BeanPropertyWriter} into
      * {@link PropertyWriter}
-     * 
+     *
      * @since 2.3
      */
     public static PropertyFilter from(final BeanPropertyFilter src)
@@ -114,7 +124,7 @@ public class SimpleBeanPropertyFilter
                 // not needed; element filtering only available through new interfaces
                 throw new UnsupportedOperationException();
             }
-            
+
         };
     }
 
@@ -146,19 +156,19 @@ public class SimpleBeanPropertyFilter
      * Method that defines what to do with container elements
      * (values contained in an array or {@link java.util.Collection}:
      * default implementation simply writes them out.
-     * 
+     *
      * @since 2.3
      */
     protected boolean includeElement(Object elementValue) {
         return true;
     }
-    
+
     /*
     /**********************************************************
     /* BeanPropertyFilter (deprecated) implementation
     /**********************************************************
      */
-    
+
     @Deprecated
     @Override
     public void serializeAsField(Object bean, JsonGenerator jgen,
@@ -198,7 +208,7 @@ public class SimpleBeanPropertyFilter
     /* PropertyFilter implementation
     /**********************************************************
      */
-    
+
     @Override
     public void serializeAsField(Object pojo, JsonGenerator jgen,
             SerializerProvider provider, PropertyWriter writer)
@@ -220,7 +230,7 @@ public class SimpleBeanPropertyFilter
             writer.serializeAsElement(elementValue, jgen, provider);
         }
     }
-    
+
     @Deprecated
     @Override
     public void depositSchemaProperty(PropertyWriter writer,
@@ -235,7 +245,7 @@ public class SimpleBeanPropertyFilter
     @Override
     public void depositSchemaProperty(PropertyWriter writer,
             JsonObjectFormatVisitor objectVisitor,
-            SerializerProvider provider) throws JsonMappingException 
+            SerializerProvider provider) throws JsonMappingException
     {
         if (include(writer)) {
             writer.depositSchemaProperty(objectVisitor, provider);
@@ -257,6 +267,8 @@ public class SimpleBeanPropertyFilter
         implements java.io.Serializable
     {
         private static final long serialVersionUID = 1L;
+
+        static final FilterExceptFilter EXCLUDE_ALL = new FilterExceptFilter(Collections.emptySet());
 
         /**
          * Set of property names to serialize.
@@ -288,17 +300,13 @@ public class SimpleBeanPropertyFilter
     {
         private static final long serialVersionUID = 1L;
 
-        final static SerializeExceptFilter INCLUDE_ALL = new SerializeExceptFilter();
+        final static SerializeExceptFilter INCLUDE_ALL = new SerializeExceptFilter(Collections.emptySet());
 
         /**
          * Set of property names to filter out.
          */
         protected final Set<String> _propertiesToExclude;
 
-        SerializeExceptFilter() {
-            _propertiesToExclude = Collections.emptySet();
-        }
-        
         public SerializeExceptFilter(Set<String> properties) {
             _propertiesToExclude = properties;
         }

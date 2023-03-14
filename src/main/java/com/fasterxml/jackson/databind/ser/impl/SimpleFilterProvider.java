@@ -39,13 +39,13 @@ public class SimpleFilterProvider
      * configured.
      */
     protected boolean _cfgFailOnUnknownId = true;
-    
+
     /*
     /**********************************************************
     /* Life-cycle: constructing, configuring
     /**********************************************************
      */
-    
+
     public SimpleFilterProvider() {
         this(new HashMap<String,Object>());
     }
@@ -86,17 +86,17 @@ public class SimpleFilterProvider
         return result;
     }
 
-    @SuppressWarnings("deprecation") 
+    @SuppressWarnings("deprecation")
     private final static PropertyFilter _convert(BeanPropertyFilter f) {
-        return SimpleBeanPropertyFilter.from((BeanPropertyFilter) f);   
+        return SimpleBeanPropertyFilter.from((BeanPropertyFilter) f);
     }
-    
+
     /**
      * Method for defining filter to return for "unknown" filters; cases
      * where there is no mapping from given id to an explicit filter.
-     * 
+     *
      * @param f Filter to return when no filter is found for given id
-     * 
+     *
      * @deprecated Since 2.3 should use {@link PropertyFilter} instead of {@link BeanPropertyFilter}
      */
     @Deprecated
@@ -128,11 +128,11 @@ public class SimpleFilterProvider
         _defaultFilter = f;
         return this;
     }
-    
+
     public PropertyFilter getDefaultFilter() {
         return _defaultFilter;
     }
-    
+
     public SimpleFilterProvider setFailOnUnknownId(boolean state) {
         _cfgFailOnUnknownId = state;
         return this;
@@ -151,6 +151,21 @@ public class SimpleFilterProvider
         return this;
     }
 
+    /**
+     * Adds an instance of {@link PropertyFilter} associated with the given {@code id} parameter.
+     * Note that there can always only be one filter associated with a single {@code id} parameter, meaning
+     * a new filter with the same {@code id} will always override the previously added filter.
+     *
+     * <p>
+     * WARNING: Binding {@code id} or {@code filter} with {@code null} value will not
+     * be validated within this method, but during serialization of target class annotated
+     * with {@link com.fasterxml.jackson.annotation.JsonFilter}.
+     *
+     * @param id The id to associate the filter with.
+     * @param filter The filter to add;
+     *
+     * @return This provider instance, for call-chaining
+     */
     public SimpleFilterProvider addFilter(String id, PropertyFilter filter) {
         _filtersById.put(id, filter);
         return this;
@@ -158,12 +173,27 @@ public class SimpleFilterProvider
 
     /**
      * Overloaded variant just to resolve "ties" when using {@link SimpleBeanPropertyFilter}.
+     * 
+     * <p>
+     * Adds an instance of {@link SimpleBeanPropertyFilter} associated with the given {@code id} parameter.
+     * Note that there can always only be one filter associated with a single {@code id} parameter, meaning
+     * a new filter with the same {@code id} will always override the previously added filter.
+     *
+     * <p>
+     * WARNING: Binding {@code id} or {@code filter} with {@code null} value will not
+     * be validated within this method, but during serialization of target class annotated
+     * with {@link com.fasterxml.jackson.annotation.JsonFilter}.
+     *
+     * @param id The id to associate the filter with.
+     * @param filter The filter to add;
+     *
+     * @return This provider instance, for call-chaining
      */
     public SimpleFilterProvider addFilter(String id, SimpleBeanPropertyFilter filter) {
         _filtersById.put(id, filter);
         return this;
     }
-    
+
     public PropertyFilter removeFilter(String id) {
         return _filtersById.remove(id);
     }

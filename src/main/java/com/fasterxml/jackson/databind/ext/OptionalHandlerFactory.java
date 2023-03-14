@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.fasterxml.jackson.databind.ser.Serializers;
 import com.fasterxml.jackson.databind.ser.std.DateSerializer;
 import com.fasterxml.jackson.databind.util.ClassUtil;
+import com.fasterxml.jackson.databind.util.ExceptionUtil;
 
 /**
  * Helper class used for isolating details of handling optional+external types
@@ -55,6 +56,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
             node = org.w3c.dom.Node.class;
             doc = org.w3c.dom.Document.class;
         } catch (Throwable e) {
+            ExceptionUtil.rethrowIfFatal(e);
             // not optimal but will do
             // 02-Nov-2020, Xakep_SDK: Remove java.logging module dependency
 //            Logger.getLogger(OptionalHandlerFactory.class.getName())
@@ -73,10 +75,12 @@ public class OptionalHandlerFactory implements java.io.Serializable
         Java7Handlers x = null;
         try {
             x = Java7Handlers.instance();
-        } catch (Throwable t) { }
+        } catch (Throwable t) {
+            ExceptionUtil.rethrowIfFatal(t);
+        }
         _jdk7Helper = x;
     }
-    
+
     public final static OptionalHandlerFactory instance = new OptionalHandlerFactory();
 
     // classes from java.sql module, this module may or may not be present at runtime
@@ -111,7 +115,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
         // 09-Nov-2020, tatu: Not really optimal way to deal with these, problem  being that
         //   Blob is interface and actual instance we get is usually different. So may
         //   need to improve if we reported bugs. But for now, do this
-        
+
         _sqlSerializers.put(CLS_NAME_JAVA_SQL_BLOB, "com.fasterxml.jackson.databind.ext.SqlBlobSerializer");
         _sqlSerializers.put(CLS_NAME_JAVA_SQL_SERIALBLOB, "com.fasterxml.jackson.databind.ext.SqlBlobSerializer");
     }
@@ -121,7 +125,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
     /* Public API
     /**********************************************************
      */
-    
+
     public JsonSerializer<?> findSerializer(SerializationConfig config, JavaType type,
             BeanDescription beanDesc)
     {
@@ -232,6 +236,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
         try {
             return instantiate(Class.forName(className), valueType);
         } catch (Throwable e) {
+            ExceptionUtil.rethrowIfFatal(e);
             throw new IllegalStateException("Failed to find class `"
 +className+"` for handling values of type "+ClassUtil.getTypeDescription(valueType)
 +", problem: ("+e.getClass().getName()+") "+e.getMessage());
@@ -243,6 +248,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
         try {
             return ClassUtil.createInstance(handlerClass, false);
         } catch (Throwable e) {
+            ExceptionUtil.rethrowIfFatal(e);
             throw new IllegalStateException("Failed to create instance of `"
 +handlerClass.getName()+"` for handling values of type "+ClassUtil.getTypeDescription(valueType)
 +", problem: ("+e.getClass().getName()+") "+e.getMessage());
@@ -254,7 +260,7 @@ public class OptionalHandlerFactory implements java.io.Serializable
      * types are classes, not interfaces. This has performance implications for
      * some cases, as we do not need to go over interfaces implemented, just
      * superclasses
-     * 
+     *
      * @since 2.7
      */
     private boolean hasSuperClassStartingWith(Class<?> rawType, String prefix)

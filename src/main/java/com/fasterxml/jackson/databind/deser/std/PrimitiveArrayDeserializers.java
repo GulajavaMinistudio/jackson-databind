@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.exc.StreamReadException;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
@@ -53,7 +54,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
     /* Life-cycle
     /********************************************************
      */
-    
+
     protected PrimitiveArrayDeserializers(Class<T> cls) {
         super(cls);
         _unwrapSingle = null;
@@ -69,7 +70,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
         _unwrapSingle = unwrapSingle;
         _nuller = nuller;
     }
-    
+
     public static JsonDeserializer<?> forType(Class<?> rawType)
     {
         // Start with more common types...
@@ -79,7 +80,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
         if (rawType == Long.TYPE) {
             return LongDeser.instance;
         }
-        
+
         if (rawType == Byte.TYPE) {
             return new ByteDeser();
         }
@@ -149,7 +150,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
 
     // since 2.9
     protected abstract T _constructEmpty();
-    
+
     /*
     /********************************************************
     /* Default implementations
@@ -160,7 +161,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
     public LogicalType logicalType() {
         return LogicalType.Array;
     }
-    
+
     @Override // since 2.9
     public Boolean supportsUpdate(DeserializationConfig config) {
         return Boolean.TRUE;
@@ -171,7 +172,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
         // Empty values shareable freely
         return AccessPattern.CONSTANT;
     }
-    
+
     @Override // since 2.9
     public Object getEmptyValue(DeserializationContext ctxt) throws JsonMappingException {
         Object empty = _emptyValue;
@@ -272,7 +273,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
                 char[] buffer = p.getTextCharacters();
                 int offset = p.getTextOffset();
                 int len = p.getTextLength();
-    
+
                 char[] result = new char[len];
                 System.arraycopy(buffer, offset, result, 0, len);
                 return result;
@@ -457,17 +458,17 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
             //    binary data so...
             return LogicalType.Binary;
         }
-        
+
         @Override
         public byte[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
         {
             JsonToken t = p.currentToken();
-            
+
             // Most likely case: base64 encoded String?
             if (t == JsonToken.VALUE_STRING) {
                 try {
                     return p.getBinaryValue(ctxt.getBase64Variant());
-                } catch (StreamReadException e) {
+                } catch (StreamReadException | DatabindException e) {
                     // 25-Nov-2016, tatu: related to [databind#1425], try to convert
                     //   to a more usable one, as it's not really a JSON-level parse
                     //   exception, but rather binding from JSON String into base64 decoded
@@ -640,7 +641,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
         private static final long serialVersionUID = 1L;
 
         public final static IntDeser instance = new IntDeser();
-        
+
         public IntDeser() { super(int[].class); }
         protected IntDeser(IntDeser base, NullValueProvider nuller, Boolean unwrapSingle) {
             super(base, nuller, unwrapSingle);
@@ -865,7 +866,7 @@ public abstract class PrimitiveArrayDeserializers<T> extends StdDeserializer<T>
         extends PrimitiveArrayDeserializers<double[]>
     {
         private static final long serialVersionUID = 1L;
-        
+
         public DoubleDeser() { super(double[].class); }
         protected DoubleDeser(DoubleDeser base, NullValueProvider nuller, Boolean unwrapSingle) {
             super(base, nuller, unwrapSingle);

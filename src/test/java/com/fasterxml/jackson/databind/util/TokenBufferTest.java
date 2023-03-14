@@ -3,15 +3,19 @@ package com.fasterxml.jackson.databind.util;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.JsonParser.NumberType;
 import com.fasterxml.jackson.core.exc.InputCoercionException;
 import com.fasterxml.jackson.core.io.SerializedString;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.JsonParserSequence;
 
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
 @SuppressWarnings("resource")
 public class TokenBufferTest extends BaseMapTest
@@ -21,6 +25,26 @@ public class TokenBufferTest extends BaseMapTest
     static class Base1730 { }
 
     static class Sub1730 extends Base1730 { }
+
+    // [databind#3816]
+    @JsonSerialize(using = Serializer3816.class)
+    static class Foo3816 { }
+
+    static class Serializer3816 extends StdSerializer<Foo3816> {
+        private static final long serialVersionUID = 1L;
+
+        Serializer3816() {
+            super(Foo3816.class);
+        }
+
+        @Override
+        public void serialize(Foo3816 value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+            gen.writeStartObject();
+            gen.writeFieldName("field");
+            gen.writeString(new StringReader("foobar"), 6);
+            gen.writeEndObject();
+        }
+    }    
 
     /*
     /**********************************************************
@@ -295,7 +319,7 @@ public class TokenBufferTest extends BaseMapTest
         p.close();
         buf.close();
     }
-    
+
     public void testSimpleObject() throws IOException
     {
         TokenBuffer buf = new TokenBuffer(null, false);
@@ -333,7 +357,7 @@ public class TokenBufferTest extends BaseMapTest
         // and override should also work:
         p.overrideCurrentName("bah");
         assertEquals("bah", p.currentName());
-        
+
         assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
         assertEquals(1.25, p.getDoubleValue());
         // should still have access to (overridden) name
@@ -367,7 +391,7 @@ public class TokenBufferTest extends BaseMapTest
         tb.close();
         p.close();
 
-    
+
         // 19-Oct-2016, tatu: Just for fun, trigger `toString()` for code coverage
         String desc = tb.toString();
         assertNotNull(desc);
@@ -379,14 +403,14 @@ public class TokenBufferTest extends BaseMapTest
         buf1.writeStartObject();
         buf1.writeFieldName("a");
         buf1.writeBoolean(true);
-        
+
         TokenBuffer buf2 = new TokenBuffer(null, false);
         buf2.writeFieldName("b");
         buf2.writeNumber(13);
         buf2.writeEndObject();
-        
+
         buf1.append(buf2);
-        
+
         // and verify that we got it all...
         JsonParser p = buf1.asParser();
         assertToken(JsonToken.START_OBJECT, p.nextToken());
@@ -419,7 +443,7 @@ public class TokenBufferTest extends BaseMapTest
             UUID uuid = UUID.fromString(value);
             MAPPER.writeValue(buf, uuid);
             buf.close();
-    
+
             // and bring it back
             UUID out = MAPPER.readValue(buf.asParser(), UUID.class);
             assertEquals(uuid.toString(), out.toString());
@@ -445,17 +469,17 @@ public class TokenBufferTest extends BaseMapTest
         TokenBuffer buf = new TokenBuffer(null, false); // no ObjectCodec
         StringWriter w = new StringWriter();
         JsonGenerator gen = MAPPER.createGenerator(w);
- 
+
         // test content: [{"a":1,"b":{"c":2}},{"a":2,"b":{"c":3}}]
 
         buf.writeStartArray();
         gen.writeStartArray();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeStartObject();
         gen.writeStartObject();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeFieldName("a");
         gen.writeFieldName("a");
         _verifyOutputContext(buf, gen);
@@ -471,7 +495,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.writeStartObject();
         gen.writeStartObject();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeFieldName("c");
         gen.writeFieldName("c");
         _verifyOutputContext(buf, gen);
@@ -491,7 +515,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.writeEndArray();
         gen.writeEndArray();
         _verifyOutputContext(buf, gen);
-        
+
         buf.close();
         gen.close();
     }
@@ -536,7 +560,7 @@ public class TokenBufferTest extends BaseMapTest
         TokenBuffer buf = new TokenBuffer(null, false); // no ObjectCodec
 
         // {"a":{},"b":{"c":"cval"}}
-        
+
         buf.writeStartObject();
         buf.writeFieldName("a");
         buf.writeStartObject();
@@ -561,7 +585,7 @@ public class TokenBufferTest extends BaseMapTest
         buf = new TokenBuffer(MAPPER, false);
         assertEquals("", MAPPER.writeValueAsString(buf));
         buf.close();
-        
+
         buf = new TokenBuffer(MAPPER, false);
         buf.writeStartArray();
         buf.writeBoolean(true);
@@ -591,7 +615,7 @@ public class TokenBufferTest extends BaseMapTest
     /* Tests to verify interaction of TokenBuffer and JsonParserSequence
     /**********************************************************
      */
-    
+
     public void testWithJsonParserSequenceSimple() throws IOException
     {
         // Let's join a TokenBuffer with JsonParser first
@@ -599,12 +623,12 @@ public class TokenBufferTest extends BaseMapTest
         buf.writeStartArray();
         buf.writeString("test");
         JsonParser p = createParserUsingReader("[ true, null ]");
-        
+
         JsonParserSequence seq = JsonParserSequence.createFlattened(false, buf.asParser(), p);
         assertEquals(2, seq.containedParsersCount());
 
         assertFalse(p.isClosed());
-        
+
         assertFalse(seq.hasCurrentToken());
         assertNull(seq.currentToken());
         assertNull(seq.currentName());
@@ -613,7 +637,7 @@ public class TokenBufferTest extends BaseMapTest
         assertToken(JsonToken.VALUE_STRING, seq.nextToken());
         assertEquals("test", seq.getText());
         // end of first parser input, should switch over:
-        
+
         assertToken(JsonToken.START_ARRAY, seq.nextToken());
         assertToken(JsonToken.VALUE_TRUE, seq.nextToken());
         assertToken(JsonToken.VALUE_NULL, seq.nextToken());
@@ -636,7 +660,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.close();
         seq.close();
     }
-    
+
     /**
      * Test to verify that TokenBuffer and JsonParserSequence work together
      * as expected.
@@ -666,7 +690,7 @@ public class TokenBufferTest extends BaseMapTest
         assertToken(JsonToken.VALUE_NUMBER_INT, combo.nextToken());
         assertEquals(13, combo.getIntValue());
         assertToken(JsonToken.END_ARRAY, combo.nextToken());
-        assertNull(combo.nextToken());        
+        assertNull(combo.nextToken());
         buf1.close();
         buf2.close();
         buf3.close();
@@ -721,5 +745,19 @@ public class TokenBufferTest extends BaseMapTest
 
             assertEquals(JsonToken.VALUE_NUMBER_INT, buf.firstToken());
         }
+    }
+
+    /*
+    /**********************************************************
+    /* Misc other tests
+    /**********************************************************
+     */
+
+    // [databind#3816]
+    public void testWriteStringFromStream() throws Exception
+    {
+        Map<String, String> map = MAPPER.convertValue(new Foo3816(),
+                new TypeReference<Map<String, String>>() {});
+        assertNotNull(map);
     }
 }
