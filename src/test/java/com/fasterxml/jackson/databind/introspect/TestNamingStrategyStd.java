@@ -609,4 +609,22 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("foobar", value._id);
         assertEquals("Foo Bar", value._fullName);
     }
+
+    public void testNamingStrategiesHandlingNullAndEmpty() {
+        PropertyNamingStrategies.NamingBase[] strategies = new PropertyNamingStrategies.NamingBase[]{
+            PropertyNamingStrategies.UpperSnakeCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.LowerCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.SnakeCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.LowerCamelCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.UpperCamelCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.LowerDotCaseStrategy.INSTANCE,
+            PropertyNamingStrategies.KebabCaseStrategy.INSTANCE
+        };
+
+        for (PropertyNamingStrategies.NamingBase namingStrategy : strategies) {
+            assertNull(namingStrategy.translate(null));
+            assertEquals("", namingStrategy.translate(""));
+            assertEquals(" ", namingStrategy.translate(" "));
+        }
+    }
 }
