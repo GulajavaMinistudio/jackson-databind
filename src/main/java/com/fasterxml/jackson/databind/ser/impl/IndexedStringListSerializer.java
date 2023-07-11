@@ -4,11 +4,12 @@ import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
-
+import com.fasterxml.jackson.core.type.WritableTypeId;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonArrayFormatVisitor;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatTypes;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.ContextualSerializer;
 import com.fasterxml.jackson.databind.ser.std.StaticListSerializerBase;
 
 /**
@@ -21,59 +22,36 @@ import com.fasterxml.jackson.databind.ser.std.StaticListSerializerBase;
 @JacksonStdImpl
 public final class IndexedStringListSerializer
     extends StaticListSerializerBase<List<String>>
-    implements ContextualSerializer
 {
+    private static final long serialVersionUID = 1L;
+
     public final static IndexedStringListSerializer instance = new IndexedStringListSerializer();
-    
-    protected final JsonSerializer<String> _serializer;
 
     /*
     /**********************************************************
     /* Life-cycle
     /**********************************************************
      */
-    
+
     protected IndexedStringListSerializer() {
-        this(null);
-    }
-
-    @SuppressWarnings("unchecked")
-    public IndexedStringListSerializer(JsonSerializer<?> ser) {
         super(List.class);
-        _serializer = (JsonSerializer<String>) ser;
-        
     }
 
-    @Override protected JsonNode contentSchema() {
-        return createSchemaNode("string", true);
+    public IndexedStringListSerializer(IndexedStringListSerializer src,
+            Boolean unwrapSingle) {
+        super(src, unwrapSingle);
     }
 
-    /*
-    /**********************************************************
-    /* Post-processing
-    /**********************************************************
-     */
-    
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider provider,
-            BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<?> ser = _serializer;
-        if (ser == null) {
-            ser = provider.findValueSerializer(String.class, property);
-        } else if (ser instanceof ContextualSerializer) {
-            ser = ((ContextualSerializer) ser).createContextual(provider, property);
-        }
-        // Optimization: default serializer just writes String, so we can avoid a call:
-        if (isDefaultSerializer(ser)) {
-            ser = null;
-        }
-        // note: will never have TypeSerializer, because Strings are "natural" type
-        if (ser == _serializer) {
-            return this;
-        }
-        return new IndexedStringListSerializer(ser);
+    public JsonSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
+        return new IndexedStringListSerializer(this, unwrapSingle);
+    }
+
+    @Override protected JsonNode contentSchema() { return createSchemaNode("string", true); }
+
+    @Override
+    protected void acceptContentVisitor(JsonArrayFormatVisitor visitor) throws JsonMappingException {
+        visitor.itemsFormat(JsonFormatTypes.STRING);
     }
 
     /*
@@ -83,64 +61,46 @@ public final class IndexedStringListSerializer
      */
 
     @Override
-    public void serialize(List<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+    public void serialize(List<String> value, JsonGenerator g,
+            SerializerProvider provider) throws IOException
     {
-        jgen.writeStartArray();
-        if (_serializer == null) {
-            serializeContents(value, jgen, provider);
-        } else {
-            serializeUsingCustom(value, jgen, provider);
+        final int len = value.size();
+        if (len == 1) {
+            if (((_unwrapSingle == null) &&
+                    provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED))
+                    || (_unwrapSingle == Boolean.TRUE)) {
+                serializeContents(value, g, provider, 1);
+                return;
+            }
         }
-        jgen.writeEndArray();
+        g.writeStartArray(value, len);
+        serializeContents(value, g, provider, len);
+        g.writeEndArray();
     }
-    
+
     @Override
-    public void serializeWithType(List<String> value, JsonGenerator jgen, SerializerProvider provider,
+    public void serializeWithType(List<String> value, JsonGenerator g, SerializerProvider provider,
             TypeSerializer typeSer)
-        throws IOException, JsonGenerationException
+        throws IOException
     {
-        typeSer.writeTypePrefixForArray(value, jgen);
-        if (_serializer == null) {
-            serializeContents(value, jgen, provider);
-        } else {
-            serializeUsingCustom(value, jgen, provider);
-        }
-        typeSer.writeTypeSuffixForArray(value, jgen);
+        WritableTypeId typeIdDef = typeSer.writeTypePrefix(g,
+                typeSer.typeId(value, JsonToken.START_ARRAY));
+        g.setCurrentValue(value);
+        serializeContents(value, g, provider, value.size());
+        typeSer.writeTypeSuffix(g, typeIdDef);
     }
-    
-    private final void serializeContents(List<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+
+    private final void serializeContents(List<String> value, JsonGenerator g,
+            SerializerProvider provider, int len) throws IOException
     {
         int i = 0;
         try {
-            final int len = value.size();
             for (; i < len; ++i) {
                 String str = value.get(i);
                 if (str == null) {
-                    provider.defaultSerializeNull(jgen);
+                    provider.defaultSerializeNull(g);
                 } else {
-                    jgen.writeString(str);
-                }
-            }
-        } catch (Exception e) {
-            wrapAndThrow(provider, e, value, i);
-        }
-    }
-
-    private final void serializeUsingCustom(List<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
-    {
-        int i = 0;
-        try {
-            final int len = value.size();
-            final JsonSerializer<String> ser = _serializer;
-            for (i = 0; i < len; ++i) {
-                String str = value.get(i);
-                if (str == null) {
-                    provider.defaultSerializeNull(jgen);
-                } else {
-                    ser.serialize(str, jgen, provider);
+                    g.writeString(str);
                 }
             }
         } catch (Exception e) {

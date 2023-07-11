@@ -9,16 +9,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Testing to verify that {@link JsonTypeInfo} works
- * for properties as well as types (see [JACKSON-280] for details)
+ * for properties as well as types.
  */
 @SuppressWarnings("serial")
 public class TestPropertyTypeInfo extends BaseMapTest
 {
-    /*
-    /**********************************************************
-    /* Helper types
-    /**********************************************************
-     */
+    protected static class BooleanValue {
+        public Boolean b;
+
+        @JsonCreator
+        public BooleanValue(Boolean value) { b = value; }
+
+        @JsonValue public Boolean value() { return b; }
+    }
 
     static class FieldWrapperBean
     {
@@ -38,21 +41,21 @@ public class TestPropertyTypeInfo extends BaseMapTest
         public FieldWrapperBeanArray() { }
         public FieldWrapperBeanArray(FieldWrapperBean[] beans) { this.beans = beans; }
     }
-    
+
     static class MethodWrapperBean
     {
-        private Object value;
-        
+        protected Object value;
+
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.WRAPPER_ARRAY)
         public Object getValue() { return value; }
 
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.WRAPPER_ARRAY)
         public void setValue(Object v) { value = v; }
-        
+
         public MethodWrapperBean() { }
         public MethodWrapperBean(Object o) { value = o; }
     }
-    
+
     static class MethodWrapperBeanList extends ArrayList<MethodWrapperBean> { }
     static class MethodWrapperBeanMap extends HashMap<String,MethodWrapperBean> { }
     static class MethodWrapperBeanArray {
@@ -63,7 +66,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
 
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.WRAPPER_ARRAY)
         public void setValue(MethodWrapperBean[] v) { beans = v; }
-        
+
         public MethodWrapperBeanArray() { }
         public MethodWrapperBeanArray(MethodWrapperBean[] beans) { this.beans = beans; }
     }
@@ -71,7 +74,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
     static class OtherBean {
         public int x = 1, y = 1;
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests
@@ -120,7 +123,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
     {
         ObjectMapper mapper = new ObjectMapper();
         MethodWrapperBeanList list = new MethodWrapperBeanList();
-        list.add(new MethodWrapperBean(new BooleanWrapper(true)));
+        list.add(new MethodWrapperBean(new BooleanValue(true)));
         list.add(new MethodWrapperBean(new StringWrapper("x")));
         list.add(new MethodWrapperBean(new OtherBean()));
         String json = mapper.writeValueAsString(list);
@@ -128,8 +131,8 @@ public class TestPropertyTypeInfo extends BaseMapTest
         assertNotNull(result);
         assertEquals(3, result.size());
         MethodWrapperBean bean = result.get(0);
-        assertEquals(BooleanWrapper.class, bean.value.getClass());
-        assertEquals(((BooleanWrapper) bean.value).b, Boolean.TRUE);
+        assertEquals(BooleanValue.class, bean.value.getClass());
+        assertEquals(((BooleanValue) bean.value).b, Boolean.TRUE);
         bean = result.get(1);
         assertEquals(StringWrapper.class, bean.value.getClass());
         assertEquals(((StringWrapper) bean.value).str, "x");
@@ -141,15 +144,15 @@ public class TestPropertyTypeInfo extends BaseMapTest
     {
         ObjectMapper mapper = new ObjectMapper();
         FieldWrapperBeanArray array = new FieldWrapperBeanArray(new
-                FieldWrapperBean[] { new FieldWrapperBean(new BooleanWrapper(true)) });
+                FieldWrapperBean[] { new FieldWrapperBean(new BooleanValue(true)) });
         String json = mapper.writeValueAsString(array);
         FieldWrapperBeanArray result = mapper.readValue(json, FieldWrapperBeanArray.class);
         assertNotNull(result);
         FieldWrapperBean[] beans = result.beans;
         assertEquals(1, beans.length);
         FieldWrapperBean bean = beans[0];
-        assertEquals(BooleanWrapper.class, bean.value.getClass());
-        assertEquals(((BooleanWrapper) bean.value).b, Boolean.TRUE);
+        assertEquals(BooleanValue.class, bean.value.getClass());
+        assertEquals(((BooleanValue) bean.value).b, Boolean.TRUE);
     }
 
     public void testSimpleArrayMethod() throws Exception
@@ -166,7 +169,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
         assertEquals(StringWrapper.class, bean.value.getClass());
         assertEquals(((StringWrapper) bean.value).str, "A");
     }
-    
+
     public void testSimpleMapField() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -187,7 +190,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
     {
         ObjectMapper mapper = new ObjectMapper();
         MethodWrapperBeanMap map = new MethodWrapperBeanMap();
-        map.put("xyz", new MethodWrapperBean(new BooleanWrapper(true)));
+        map.put("xyz", new MethodWrapperBean(new BooleanValue(true)));
         String json = mapper.writeValueAsString(map);
         MethodWrapperBeanMap result = mapper.readValue(json, MethodWrapperBeanMap.class);
         assertNotNull(result);
@@ -195,7 +198,7 @@ public class TestPropertyTypeInfo extends BaseMapTest
         MethodWrapperBean bean = result.get("xyz");
         assertNotNull(bean);
         Object ob = bean.value;
-        assertEquals(BooleanWrapper.class, ob.getClass());
-        assertEquals(((BooleanWrapper) ob).b, Boolean.TRUE);
+        assertEquals(BooleanValue.class, ob.getClass());
+        assertEquals(((BooleanValue) ob).b, Boolean.TRUE);
     }
 }

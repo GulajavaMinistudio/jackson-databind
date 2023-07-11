@@ -1,17 +1,3 @@
-/* Jackson JSON-processor.
- *
- * Copyright (c) 2007- Tatu Saloranta, tatu.saloranta@iki.fi
- *
- * Licensed under the License specified in file LICENSE, included with
- * the source code and binary code bundles.
- * You may not use this file except in compliance with the License.
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.fasterxml.jackson.databind;
 
 import java.io.IOException;
@@ -22,8 +8,8 @@ import com.fasterxml.jackson.core.format.MatchStrength;
 
 /**
  * Sub-class of {@link JsonFactory} that will create a proper
- * {@link ObjectCodec} to allow seamless conversions between
- * Json content and Java objects (POJOs).
+ * {@link ObjectCodec} to allow seam-less conversions between
+ * JSON content and Java objects (POJOs).
  * The only addition to regular {@link JsonFactory} currently
  * is that {@link ObjectMapper} is constructed and passed as
  * the codec to use.
@@ -31,6 +17,8 @@ import com.fasterxml.jackson.core.format.MatchStrength;
 public class MappingJsonFactory
     extends JsonFactory
 {
+    private static final long serialVersionUID = -1; // since 2.7
+
     public MappingJsonFactory()
     {
         this(null);
@@ -44,6 +32,14 @@ public class MappingJsonFactory
         }
     }
 
+    public MappingJsonFactory(JsonFactory src, ObjectMapper mapper)
+    {
+        super(src, mapper);
+        if (mapper == null) {
+            setCodec(new ObjectMapper(this));
+        }
+    }
+
     /**
      * We'll override the method to return more specific type; co-variance
      * helps here
@@ -51,14 +47,23 @@ public class MappingJsonFactory
     @Override
     public final ObjectMapper getCodec() { return (ObjectMapper) _objectCodec; }
 
+    // @since 2.1
+    @Override
+    public JsonFactory copy()
+    {
+        _checkInvalidCopy(MappingJsonFactory.class);
+        // note: as with base class, must NOT copy mapper reference
+        return new MappingJsonFactory(this, null);
+    }
+
     /*
     /**********************************************************
     /* Format detection functionality (since 1.8)
     /**********************************************************
      */
-    
+
     /**
-     * Sub-classes need to override this method (as of 1.8)
+     * Sub-classes need to override this method
      */
     @Override
     public String getFormatName()
@@ -70,11 +75,14 @@ public class MappingJsonFactory
     }
 
     /**
-     * Sub-classes need to override this method (as of 1.8)
+     * Sub-classes need to override this method
      */
     @Override
     public MatchStrength hasFormat(InputAccessor acc) throws IOException
     {
-        return hasJSONFormat(acc);
+        if (getClass() == MappingJsonFactory.class) {
+            return hasJSONFormat(acc);
+        }
+        return null;
     }
 }

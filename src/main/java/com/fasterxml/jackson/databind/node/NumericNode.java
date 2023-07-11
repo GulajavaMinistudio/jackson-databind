@@ -11,10 +11,15 @@ import com.fasterxml.jackson.core.JsonParser;
 public abstract class NumericNode
     extends ValueNode
 {
+    private static final long serialVersionUID = 1L;
+
     protected NumericNode() { }
 
     @Override
-    public final boolean isNumber() { return true; }
+    public final JsonNodeType getNodeType()
+    {
+        return JsonNodeType.NUMBER;
+    }
 
     // // // Let's re-abstract so sub-classes handle them
 
@@ -30,40 +35,61 @@ public abstract class NumericNode
 
     @Override public abstract boolean canConvertToInt();
     @Override public abstract boolean canConvertToLong();
-    
-    /* 
+
+    /*
     /**********************************************************
     /* General type coercions
     /**********************************************************
      */
-    
+
     @Override
     public abstract String asText();
 
     @Override
-    public int asInt() {
-        return intValue();
-    }
-    @Override
-    public int asInt(int defaultValue) {
+    public final int asInt() {
         return intValue();
     }
 
     @Override
-    public long asLong() {
+    public final int asInt(int defaultValue) {
+        return intValue();
+    }
+
+    @Override
+    public final long asLong() {
         return longValue();
     }
+
     @Override
-    public long asLong(long defaultValue) {
+    public final long asLong(long defaultValue) {
         return longValue();
     }
-    
+
     @Override
-    public double asDouble() {
+    public final double asDouble() {
         return doubleValue();
     }
+
     @Override
-    public double asDouble(double defaultValue) {
+    public final double asDouble(double defaultValue) {
         return doubleValue();
     }
+
+    /*
+    /**********************************************************
+    /* Other
+    /**********************************************************
+     */
+
+    /**
+     * Convenience method for checking whether this node is a
+     * {@link FloatNode} or {@link DoubleNode} that contains
+     * "not-a-number" (NaN) value.
+     *
+     * @since 2.9
+     */
+    public boolean isNaN() {
+        return false;
+    }
+
 }

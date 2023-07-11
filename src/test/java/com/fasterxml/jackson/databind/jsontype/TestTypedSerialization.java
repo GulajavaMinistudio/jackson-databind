@@ -24,7 +24,7 @@ public class TestTypedSerialization
     @JsonTypeInfo(use=Id.CLASS, include=As.PROPERTY)
     static abstract class Animal {
         public String name;
-        
+
         protected Animal(String n)  { name = n; }
     }
 
@@ -32,19 +32,19 @@ public class TestTypedSerialization
     static class Dog extends Animal
     {
         public int boneCount;
-        
+
         private Dog() { super(null); }
         public Dog(String name, int b) {
             super(name);
             boneCount = b;
         }
     }
-    
+
     @JsonTypeName("kitty")
     static class Cat extends Animal
     {
         public String furColor;
-        
+
         private Cat() { super(null); }
         public Cat(String name, String c) {
             super(name);
@@ -54,7 +54,7 @@ public class TestTypedSerialization
 
     public class AnimalWrapper {
         public Animal animal;
-        
+
         public AnimalWrapper(Animal a) { animal = a; }
     }
 
@@ -80,7 +80,7 @@ public class TestTypedSerialization
      */
 
     private final ObjectMapper MAPPER = new ObjectMapper();
-    
+
     /**
      * First things first, let's ensure we can serialize using
      * class name, written as main-level property name
@@ -102,7 +102,7 @@ public class TestTypedSerialization
     public void testTypeAsWrapper() throws Exception
     {
         ObjectMapper m = new ObjectMapper();
-        m.addMixInAnnotations(Animal.class, TypeWithWrapper.class);
+        m.addMixIn(Animal.class, TypeWithWrapper.class);
         Map<String,Object> result = writeAndMap(m, new Cat("Venla", "black"));
         // should get a wrapper; keyed by minimal class name ("Cat" here)
         assertEquals(1, result.size());
@@ -120,7 +120,7 @@ public class TestTypedSerialization
     public void testTypeAsArray() throws Exception
     {
         ObjectMapper m = new ObjectMapper();
-        m.addMixInAnnotations(Animal.class, TypeWithArray.class);
+        m.addMixIn(Animal.class, TypeWithArray.class);
         // hmmh. Not good idea to rely on exact output, order may change. But...
         Map<String,Object> result = writeAndMap(m, new AnimalWrapper(new Dog("Amadeus", 7)));
         // First level, wrapper
@@ -141,7 +141,7 @@ public class TestTypedSerialization
      *    being added to Animal entries, because Object.class has no type.
      *    If type information is included, it will not be useful for deserialization,
      *    since static type does not carry through (unlike in serialization).
-     *    
+     *
      *    But it is not quite clear how type information should be pushed through
      *    array types...
      */
@@ -151,8 +151,8 @@ public class TestTypedSerialization
         // ensure we'll use mapper with default configs
         ObjectMapper m = new ObjectMapper();
         // ... so this should NOT be needed...
-        m.disableDefaultTyping();
-        
+        m.deactivateDefaultTyping();
+
         Animal[] animals = new Animal[] { new Cat("Miuku", "white"), new Dog("Murre", 9) };
         Map<String,Object> map = new HashMap<String,Object>();
         map.put("a", animals);
@@ -197,7 +197,7 @@ public class TestTypedSerialization
         List<Super> list = new ArrayList<Super>();
         list.add(new A());
         map.put(1L, list);
-        String json = mapper.writerWithType(new TypeReference<Map<Long, Collection<Super>>>() {}).writeValueAsString(map);
+        String json = mapper.writerFor(new TypeReference<Map<Long, Collection<Super>>>() {}).writeValueAsString(map);
         assertTrue("JSON does not contain '@class': "+json, json.contains("@class"));
     }
 }

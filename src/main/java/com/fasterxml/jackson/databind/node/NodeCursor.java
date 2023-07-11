@@ -3,7 +3,6 @@ package com.fasterxml.jackson.databind.node;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
-
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
@@ -23,7 +22,12 @@ abstract class NodeCursor
      * Current field name
      */
     protected String _currentName;
-    
+
+    /**
+     * @since 2.5
+     */
+    protected java.lang.Object _currentValue;
+
     public NodeCursor(int contextType, NodeCursor p)
     {
         super();
@@ -53,7 +57,17 @@ abstract class NodeCursor
     public void overrideCurrentName(String name) {
         _currentName = name;
     }
-    
+
+    @Override
+    public java.lang.Object getCurrentValue() {
+        return _currentValue;
+    }
+
+    @Override
+    public void setCurrentValue(java.lang.Object v) {
+        _currentValue = v;
+    }
+
     /*
     /**********************************************************
     /* Extended API
@@ -61,12 +75,11 @@ abstract class NodeCursor
      */
 
     public abstract JsonToken nextToken();
-    public abstract JsonToken nextValue();
-    public abstract JsonToken endToken();
-
     public abstract JsonNode currentNode();
-    public abstract boolean currentHasChildren();
-    
+
+    public abstract NodeCursor startObject();
+    public abstract NodeCursor startArray();
+
     /**
      * Method called to create a new context for iterating all
      * contents of the current structured value (JSON array or object)
@@ -75,10 +88,10 @@ abstract class NodeCursor
         JsonNode n = currentNode();
         if (n == null) throw new IllegalStateException("No current node");
         if (n.isArray()) { // false since we have already returned START_ARRAY
-            return new Array(n, this);
+            return new ArrayCursor(n, this);
         }
         if (n.isObject()) {
-            return new Object(n, this);
+            return new ObjectCursor(n, this);
         }
         throw new IllegalStateException("Current node of type "+n.getClass().getName());
     }
@@ -90,58 +103,60 @@ abstract class NodeCursor
      */
 
     /**
-     * Context matching root-level value nodes (i.e. anything other
-     * than JSON Object and Array).
-     * Note that context is NOT created for leaf values.
+     * Context for all root-level value nodes (including Arrays and Objects):
+     * only context for scalar values.
      */
-    protected final static class RootValue
+    protected final static class RootCursor
         extends NodeCursor
     {
         protected JsonNode _node;
 
         protected boolean _done = false;
 
-        public RootValue(JsonNode n, NodeCursor p) {
+        public RootCursor(JsonNode n, NodeCursor p) {
             super(JsonStreamContext.TYPE_ROOT, p);
             _node = n;
         }
 
         @Override
         public void overrideCurrentName(String name) {
-            
+
         }
-        
+
         @Override
         public JsonToken nextToken() {
             if (!_done) {
+                ++_index;
                 _done = true;
                 return _node.asToken();
             }
             _node = null;
             return null;
         }
-        
+
         @Override
-        public JsonToken nextValue() { return nextToken(); }
+        public JsonNode currentNode() {
+            // May look weird, but is necessary so as not to expose current node
+            // before it has been traversed
+            return _done ? _node : null;
+        }
+
         @Override
-        public JsonToken endToken() { return null; }
+        public NodeCursor startArray() { return new ArrayCursor(_node, this); }
+
         @Override
-        public JsonNode currentNode() { return _node; }
-        @Override
-        public boolean currentHasChildren() { return false; }
+        public NodeCursor startObject() { return new ObjectCursor(_node, this); }
     }
 
-    /**
-     * Cursor used for traversing non-empty JSON Array nodes
-     */
-    protected final static class Array
+    // Cursor used for traversing JSON Array nodes
+    protected final static class ArrayCursor
         extends NodeCursor
     {
         protected Iterator<JsonNode> _contents;
 
-        protected JsonNode _currentNode;
+        protected JsonNode _currentElement;
 
-        public Array(JsonNode n, NodeCursor p) {
+        public ArrayCursor(JsonNode n, NodeCursor p) {
             super(JsonStreamContext.TYPE_ARRAY, p);
             _contents = n.elements();
         }
@@ -150,42 +165,37 @@ abstract class NodeCursor
         public JsonToken nextToken()
         {
             if (!_contents.hasNext()) {
-                _currentNode = null;
-                return null;
+                _currentElement = null;
+                return JsonToken.END_ARRAY;
             }
-            _currentNode = _contents.next();
-            return _currentNode.asToken();
+            ++_index;
+            _currentElement = _contents.next();
+            return _currentElement.asToken();
         }
 
         @Override
-        public JsonToken nextValue() { return nextToken(); }
-        @Override
-        public JsonToken endToken() { return JsonToken.END_ARRAY; }
+        public JsonNode currentNode() { return _currentElement; }
 
         @Override
-        public JsonNode currentNode() { return _currentNode; }
+        public NodeCursor startArray() { return new ArrayCursor(_currentElement, this); }
+
         @Override
-        public boolean currentHasChildren() {
-            // note: ONLY to be called for container nodes
-            return ((ContainerNode<?>) currentNode()).size() > 0;
-        }
+        public NodeCursor startObject() { return new ObjectCursor(_currentElement, this); }
     }
 
-    /**
-     * Cursor used for traversing non-empty JSON Object nodes
-     */
-    protected final static class Object
+    // Cursor used for traversing JSON Object nodes
+    protected final static class ObjectCursor
         extends NodeCursor
     {
         protected Iterator<Map.Entry<String, JsonNode>> _contents;
         protected Map.Entry<String, JsonNode> _current;
 
         protected boolean _needEntry;
-        
-        public Object(JsonNode n, NodeCursor p)
+
+        public ObjectCursor(JsonNode n, NodeCursor p)
         {
             super(JsonStreamContext.TYPE_OBJECT, p);
-            _contents = ((ObjectNode) n).fields();
+            _contents = n.fields();
             _needEntry = true;
         }
 
@@ -197,8 +207,9 @@ abstract class NodeCursor
                 if (!_contents.hasNext()) {
                     _currentName = null;
                     _current = null;
-                    return null;
+                    return JsonToken.END_OBJECT;
                 }
+                ++_index;
                 _needEntry = false;
                 _current = _contents.next();
                 _currentName = (_current == null) ? null : _current.getKey();
@@ -209,26 +220,14 @@ abstract class NodeCursor
         }
 
         @Override
-        public JsonToken nextValue()
-        {
-            JsonToken t = nextToken();
-            if (t == JsonToken.FIELD_NAME) {
-                t = nextToken();
-            }
-            return t;
-        }
-
-        @Override
-        public JsonToken endToken() { return JsonToken.END_OBJECT; }
-
-        @Override
         public JsonNode currentNode() {
             return (_current == null) ? null : _current.getValue();
         }
+
         @Override
-        public boolean currentHasChildren() {
-            // note: ONLY to be called for container nodes
-            return ((ContainerNode<?>) currentNode()).size() > 0;
-        }
+        public NodeCursor startArray() { return new ArrayCursor(currentNode(), this); }
+
+        @Override
+        public NodeCursor startObject() { return new ObjectCursor(currentNode(), this); }
     }
 }

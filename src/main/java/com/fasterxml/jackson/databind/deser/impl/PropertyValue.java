@@ -2,8 +2,6 @@ package com.fasterxml.jackson.databind.deser.impl;
 
 import java.io.IOException;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-
 import com.fasterxml.jackson.databind.deser.SettableAnyProperty;
 import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
 
@@ -19,7 +17,7 @@ public abstract class PropertyValue
      * Value to assign when POJO has been instantiated.
      */
     public final Object value;
-    
+
     protected PropertyValue(PropertyValue next, Object value)
     {
         this.next = next;
@@ -31,7 +29,7 @@ public abstract class PropertyValue
      * bean instance
      */
     public abstract void assign(Object bean)
-        throws IOException, JsonProcessingException;
+        throws IOException;
 
     /*
     /**********************************************************
@@ -47,7 +45,7 @@ public abstract class PropertyValue
         extends PropertyValue
     {
         final SettableBeanProperty _property;
-        
+
         public Regular(PropertyValue next, Object value,
                        SettableBeanProperty prop)
         {
@@ -57,12 +55,12 @@ public abstract class PropertyValue
 
         @Override
         public void assign(Object bean)
-            throws IOException, JsonProcessingException
+            throws IOException
         {
             _property.set(bean, value);
         }
     }
-    
+
     /**
      * Property value type used when storing entries to be added
      * to a POJO using "any setter" (method that takes name and
@@ -74,7 +72,7 @@ public abstract class PropertyValue
     {
         final SettableAnyProperty _property;
         final String _propertyName;
-        
+
         public Any(PropertyValue next, Object value,
                    SettableAnyProperty prop,
                    String propName)
@@ -86,7 +84,7 @@ public abstract class PropertyValue
 
         @Override
         public void assign(Object bean)
-            throws IOException, JsonProcessingException
+            throws IOException
         {
             _property.set(bean, _propertyName, value);
         }
@@ -100,17 +98,17 @@ public abstract class PropertyValue
         extends PropertyValue
     {
         final Object _key;
-        
+
         public Map(PropertyValue next, Object value, Object key)
         {
             super(next, value);
             _key = key;
         }
 
-        @SuppressWarnings("unchecked") 
+        @SuppressWarnings("unchecked")
         @Override
         public void assign(Object bean)
-            throws IOException, JsonProcessingException
+            throws IOException
         {
             ((java.util.Map<Object,Object>) bean).put(_key, value);
         }

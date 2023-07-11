@@ -1,53 +1,48 @@
 package com.fasterxml.jackson.databind.introspect;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Member;
-import java.lang.reflect.Type;
-
+import java.lang.reflect.*;
 
 import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
  * Object that represents method parameters, mostly so that associated
  * annotations can be processed conveniently. Note that many of accessors
- * can not return meaningful values since parameters do not have stand-alone
+ * cannot return meaningful values since parameters do not have stand-alone
  * JDK objects associated; so access should mostly be limited to checking
  * annotation values which are properly aggregated and included.
- *<p>
- * Note: as of version 1.7, this type extends {@link AnnotatedMember}, since
- * it behaves like a member for the most part, but earlier it just extended
- * {@link Annotated}
  */
 public final class AnnotatedParameter
     extends AnnotatedMember
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Member (method, constructor) that this parameter belongs to
      */
     protected final AnnotatedWithParams _owner;
-    
+
     /**
      * JDK type of the parameter, possibly contains generic type information
      */
-    protected final Type _type;
-    
+    protected final JavaType _type;
+
     /**
      * Index of the parameter within argument list
      */
     protected final int _index;
-    
+
     /*
     /**********************************************************
     /* Life-cycle
     /**********************************************************
      */
 
-    public AnnotatedParameter(AnnotatedWithParams owner, Type type,  AnnotationMap annotations,
-            int index)
+    public AnnotatedParameter(AnnotatedWithParams owner, JavaType type,
+            TypeResolutionContext typeContext,
+            AnnotationMap annotations, int index)
     {
-        super(annotations);
+        super(typeContext, annotations);
         _owner = owner;
         _type = type;
         _index = index;
@@ -88,30 +83,14 @@ public final class AnnotatedParameter
     @Override
     public String getName() { return ""; }
 
-    /**
-     * Accessor for annotations; all annotations associated with parameters
-     * are properly passed and accessible.
-     */
     @Override
-    public <A extends Annotation> A getAnnotation(Class<A> acls)
-    {
-        return (_annotations == null) ? null : _annotations.get(acls);
+    public Class<?> getRawType() {
+        return _type.getRawClass();
     }
 
     @Override
-    public Type getGenericType() {
+    public JavaType getType() {
         return _type;
-    }
-
-    @Override
-    public Class<?> getRawType()
-    {
-        if (_type instanceof Class<?>) {
-            return (Class<?>) _type;
-        }
-        // 14-Mar-2011, tatu: Not optimal, but has to do for now...
-        JavaType t = TypeFactory.defaultInstance().constructType(_type);
-        return t.getRawClass();
     }
 
     /*
@@ -127,9 +106,8 @@ public final class AnnotatedParameter
 
     @Override
     public Member getMember() {
-        /* This is bit tricky: since there is no JDK equivalent; can either
-         * return null or owner... let's do latter, for now.
-         */
+        // This is bit tricky: since there is no JDK equivalent; can either
+        // return null or owner... let's do latter, for now.
         return _owner.getMember();
     }
 
@@ -146,7 +124,7 @@ public final class AnnotatedParameter
         throw new UnsupportedOperationException("Cannot call getValue() on constructor parameter of "
                 +getDeclaringClass().getName());
     }
-    
+
     /*
     /**********************************************************
     /* Extended API
@@ -158,14 +136,14 @@ public final class AnnotatedParameter
     /**
      * Accessor for 'owner' of this parameter; method or constructor that
      * has this parameter as member of its argument list.
-     * 
+     *
      * @return Owner (member or creator) object of this parameter
      */
     public AnnotatedWithParams getOwner() { return _owner; }
-    
+
     /**
      * Accessor for index of this parameter within argument list
-     * 
+     *
      * @return Index of this parameter within argument list
      */
     public int getIndex() { return _index; }
@@ -175,10 +153,24 @@ public final class AnnotatedParameter
     /* Other
     /********************************************************
      */
-    
+
     @Override
-    public String toString()
-    {
+    public int hashCode() {
+        return _owner.hashCode() + _index;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!ClassUtil.hasClass(o, getClass())) {
+            return false;
+        }
+        AnnotatedParameter other = (AnnotatedParameter) o;
+        return other._owner.equals(_owner) && (other._index == _index);
+    }
+
+    @Override
+    public String toString() {
         return "[parameter #"+getIndex()+", annotations: "+_annotations+"]";
     }
 }

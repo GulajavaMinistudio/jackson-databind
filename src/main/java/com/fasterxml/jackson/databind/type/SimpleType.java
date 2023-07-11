@@ -10,134 +10,179 @@ import com.fasterxml.jackson.databind.JavaType;
  * need not know anything further, since we have no way of dealing
  * with generic types other than Collections and Maps.
  */
-public final class SimpleType
+public class SimpleType // note: until 2.6 was final
     extends TypeBase
 {
-    /**
-     * Generic type arguments for this type.
-     */
-    protected final JavaType[] _typeParameters;
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * Names of generic type arguments for this type; will
-     * match values in {@link #_typeParameters}
-     */
-    protected final String[] _typeNames;
-    
     /*
     /**********************************************************
     /* Life-cycle
     /**********************************************************
      */
 
+    /**
+     * Constructor only used by core Jackson databind functionality;
+     * should never be called by application code.
+     *<p>
+     * As with other direct construction that by-passes {@link TypeFactory},
+     * no introspection occurs with respect to super-types; caller must be
+     * aware of consequences if using this method.
+     */
     protected SimpleType(Class<?> cls) {
-        this(cls, null, null, null, null);
+        this(cls, TypeBindings.emptyBindings(), null, null);
     }
 
-    protected SimpleType(Class<?> cls, String[] typeNames, JavaType[] typeParams,
-            Object valueHandler, Object typeHandler)
-    {
-        super(cls, 0, valueHandler, typeHandler);
-        if (typeNames == null || typeNames.length == 0) {
-            _typeNames = null;
-            _typeParameters = null;
-        } else {
-            _typeNames = typeNames;
-            _typeParameters = typeParams;
-        }
+    protected SimpleType(Class<?> cls, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts) {
+        this(cls, bindings, superClass, superInts, null, null, false);
     }
 
     /**
-     * Method used by core Jackson classes: NOT to be used by application code.
+     * Simple copy-constructor, usually used when upgrading/refining a simple type
+     * into more specialized type.
+     *
+     * @since 2.7
+     */
+    protected SimpleType(TypeBase base) {
+        super(base);
+    }
+
+    protected SimpleType(Class<?> cls, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts,
+            Object valueHandler, Object typeHandler, boolean asStatic)
+    {
+        super(cls, bindings,
+                superClass, superInts,
+                // TypeBase normalizes null bindings to the singleton returned by TypeBindings.emptyBindings()
+                // so we must compute the same hashCode in both cases.
+                (bindings == null ? TypeBindings.emptyBindings() : bindings).hashCode(),
+                valueHandler, typeHandler, asStatic);
+    }
+
+    /**
+     * Pass-through constructor used by {@link ReferenceType}.
+     *
+     * @since 2.6
+     */
+    protected SimpleType(Class<?> cls, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts, int extraHash,
+            Object valueHandler, Object typeHandler, boolean asStatic)
+    {
+        super(cls, bindings, superClass, superInts,
+                extraHash, valueHandler, typeHandler, asStatic);
+    }
+
+    /**
+     * Method used by core Jackson classes: NOT to be used by application code:
+     * it does NOT properly handle inspection of super-types, so neither parent
+     * Classes nor implemented Interfaces are accessible with resulting type
+     * instance.
      *<p>
      * NOTE: public only because it is called by <code>ObjectMapper</code> which is
      * not in same package
      */
     public static SimpleType constructUnsafe(Class<?> raw) {
-        return new SimpleType(raw, null, null, null, null);
-    }
-    
-    @Override
-    protected JavaType _narrow(Class<?> subclass)
-    {
-        // Should we check that there is a sub-class relationship?
-        return new SimpleType(subclass, _typeNames, _typeParameters, _valueHandler, _typeHandler);
+        return new SimpleType(raw, null,
+                // 18-Oct-2015, tatu: Should be ok to omit possible super-types, right?
+                null, null, null, null, false);
     }
 
-    @Override
-    public JavaType narrowContentsBy(Class<?> subclass)
-    {
-        // should never get called
-        throw new IllegalArgumentException("Internal error: SimpleType.narrowContentsBy() should never be called");
-    }
-
-    @Override
-    public JavaType widenContentsBy(Class<?> subclass)
-    {
-        // should never get called
-        throw new IllegalArgumentException("Internal error: SimpleType.widenContentsBy() should never be called");
-    }
-    
+    /**
+     * Method that should NOT to be used by application code:
+     * it does NOT properly handle inspection of super-types, so neither parent
+     * Classes nor implemented Interfaces are accessible with resulting type
+     * instance. Instead, please use {@link TypeFactory}'s <code>constructType</code>
+     * methods which handle introspection appropriately.
+     *<p>
+     * Note that prior to 2.7, method usage was not limited and would typically
+     * have worked acceptably: the problem comes from inability to resolve super-type
+     * information, for which {@link TypeFactory} is needed.
+     *
+     * @deprecated Since 2.7
+     */
+    @Deprecated
     public static SimpleType construct(Class<?> cls)
     {
         /* Let's add sanity checks, just to ensure no
          * Map/Collection entries are constructed
          */
         if (Map.class.isAssignableFrom(cls)) {
-            throw new IllegalArgumentException("Can not construct SimpleType for a Map (class: "+cls.getName()+")");
+            throw new IllegalArgumentException("Cannot construct SimpleType for a Map (class: "+cls.getName()+")");
         }
         if (Collection.class.isAssignableFrom(cls)) {
-            throw new IllegalArgumentException("Can not construct SimpleType for a Collection (class: "+cls.getName()+")");
+            throw new IllegalArgumentException("Cannot construct SimpleType for a Collection (class: "+cls.getName()+")");
         }
         // ... and while we are at it, not array types either
         if (cls.isArray()) {
-            throw new IllegalArgumentException("Can not construct SimpleType for an array (class: "+cls.getName()+")");
+            throw new IllegalArgumentException("Cannot construct SimpleType for an array (class: "+cls.getName()+")");
         }
-        return new SimpleType(cls);
+        TypeBindings b = TypeBindings.emptyBindings();
+        return new SimpleType(cls, b,
+                _buildSuperClass(cls.getSuperclass(), b), null, null, null, false);
     }
 
-    // Since 1.7:
     @Override
-    public SimpleType withTypeHandler(Object h)
-    {
-        return new SimpleType(_class, _typeNames, _typeParameters, _valueHandler, h);
+    public JavaType withContentType(JavaType contentType) {
+        throw new IllegalArgumentException("Simple types have no content types; cannot call withContentType()");
     }
 
-    // Since 1.7:
+    @Override
+    public SimpleType withTypeHandler(Object h) {
+        if (_typeHandler == h) {
+            return this;
+        }
+        return new SimpleType(_class, _bindings, _superClass, _superInterfaces, _valueHandler, h, _asStatic);
+    }
+
     @Override
     public JavaType withContentTypeHandler(Object h) {
         // no content type, so:
-        throw new IllegalArgumentException("Simple types have no content types; can not call withContenTypeHandler()");
+        throw new IllegalArgumentException("Simple types have no content types; cannot call withContenTypeHandler()");
     }
 
-    // Since 1.9:
     @Override
     public SimpleType withValueHandler(Object h) {
         if (h == _valueHandler) {
             return this;
         }
-        return new SimpleType(_class, _typeNames, _typeParameters, h, _typeHandler);
+        return new SimpleType(_class, _bindings, _superClass, _superInterfaces, h, _typeHandler, _asStatic);
     }
-    
-    // Since 1.9:
+
     @Override
     public  SimpleType withContentValueHandler(Object h) {
         // no content type, so:
-        throw new IllegalArgumentException("Simple types have no content types; can not call withContenValueHandler()");
+        throw new IllegalArgumentException("Simple types have no content types; cannot call withContenValueHandler()");
     }
-    
+
+    @Override
+    public SimpleType withStaticTyping() {
+        return _asStatic ? this : new SimpleType(_class, _bindings,
+                _superClass, _superInterfaces, _valueHandler, _typeHandler, true);
+    }
+
+    @Override
+    public JavaType refine(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInterfaces) {
+        // SimpleType means something not-specialized, so:
+        return null;
+    }
+
     @Override
     protected String buildCanonicalName()
     {
         StringBuilder sb = new StringBuilder();
         sb.append(_class.getName());
-        if (_typeParameters != null && _typeParameters.length > 0) {
+
+        final int count = _bindings.size();
+
+        // 10-Apr-2021, tatu: [databind#3108] Ensure we have at least nominally
+        //   compatible type declaration (weak guarantee but better than nothing)
+        if ((count > 0) && _hasNTypeParameters(count)) {
             sb.append('<');
-            boolean first = true;
-            for (JavaType t : _typeParameters) {
-                if (first) {
-                    first = false;
-                } else {
+            for (int i = 0; i < count; ++i) {
+                JavaType t = containedType(i);
+                if (i > 0) {
                     sb.append(',');
                 }
                 sb.append(t.toCanonical());
@@ -146,7 +191,7 @@ public final class SimpleType
         }
         return sb.toString();
     }
-    
+
     /*
     /**********************************************************
     /* Public API
@@ -155,50 +200,57 @@ public final class SimpleType
 
     @Override
     public boolean isContainerType() { return false; }
-    
-    @Override
-    public int containedTypeCount() {
-        return (_typeParameters == null) ? 0 : _typeParameters.length;
-    }
 
     @Override
-    public JavaType containedType(int index)
-    {
-        if (index < 0 || _typeParameters == null || index >= _typeParameters.length) {
-            return null;
-        }
-        return _typeParameters[index];
-    }
+    public boolean hasContentType() { return false; }
 
-    @Override
-    public String containedTypeName(int index)
-    {
-        if (index < 0 || _typeNames == null || index >= _typeNames.length) {
-            return null;
-        }
-        return _typeNames[index];
-    }
-    
     @Override
     public StringBuilder getErasedSignature(StringBuilder sb) {
         return _classSignature(_class, sb, true);
     }
-    
+
     @Override
     public StringBuilder getGenericSignature(StringBuilder sb)
     {
         _classSignature(_class, sb, false);
-        if (_typeParameters != null) {
+
+        final int count = _bindings.size();
+        if (count > 0) {
             sb.append('<');
-            for (JavaType param : _typeParameters) {
-                sb = param.getGenericSignature(sb);
+            for (int i = 0; i < count; ++i) {
+                sb = containedType(i).getGenericSignature(sb);
             }
             sb.append('>');
         }
         sb.append(';');
         return sb;
     }
-    
+
+    /*
+    /**********************************************************
+    /* Internal methods
+    /**********************************************************
+     */
+
+    /**
+     * Helper method we need to recursively build skeletal representations
+     * of superclasses.
+     *
+     * @since 2.7 -- remove when not needed (2.8?)
+     */
+    private static JavaType _buildSuperClass(Class<?> superClass, TypeBindings b)
+    {
+        if (superClass == null) {
+            return null;
+        }
+        if (superClass == Object.class) {
+            return TypeFactory.unknownType();
+        }
+        JavaType superSuper = _buildSuperClass(superClass.getSuperclass(), b);
+        return new SimpleType(superClass, b,
+                superSuper, null, null, null, false);
+    }
+
     /*
     /**********************************************************
     /* Standard methods
@@ -222,23 +274,12 @@ public final class SimpleType
 
         SimpleType other = (SimpleType) o;
 
-        // Classes must be identical... 
+        // Classes must be identical...
         if (other._class != this._class) return false;
 
         // And finally, generic bindings, if any
-        JavaType[] p1 = _typeParameters;
-        JavaType[] p2 = other._typeParameters;
-        if (p1 == null) {
-            return (p2 == null) || p2.length == 0;
-        }
-        if (p2 == null) return false;
-
-        if (p1.length != p2.length) return false;
-        for (int i = 0, len = p1.length; i < len; ++i) {
-            if (!p1[i].equals(p2[i])) {
-                return false;
-            }
-        }
-        return true;
+        TypeBindings b1 = _bindings;
+        TypeBindings b2 = other._bindings;
+        return b1.equals(b2);
     }
 }

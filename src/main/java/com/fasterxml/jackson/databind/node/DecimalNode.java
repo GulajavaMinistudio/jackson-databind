@@ -5,16 +5,18 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.databind.SerializerProvider;
-
+import com.fasterxml.jackson.databind.*;
 
 /**
  * Numeric node that contains values that do not fit in simple
  * integer (int, long) or floating point (double) values.
  */
-public final class DecimalNode
+@SuppressWarnings("serial")
+public class DecimalNode
     extends NumericNode
 {
+    public static final DecimalNode ZERO = new DecimalNode(BigDecimal.ZERO);
+
     private final static BigDecimal MIN_INTEGER = BigDecimal.valueOf(Integer.MIN_VALUE);
     private final static BigDecimal MAX_INTEGER = BigDecimal.valueOf(Integer.MAX_VALUE);
     private final static BigDecimal MIN_LONG = BigDecimal.valueOf(Long.MIN_VALUE);
@@ -22,7 +24,7 @@ public final class DecimalNode
 
     final protected BigDecimal _value;
 
-    /* 
+    /*
     /**********************************************************
     /* Construction
     /**********************************************************
@@ -32,7 +34,7 @@ public final class DecimalNode
 
     public static DecimalNode valueOf(BigDecimal d) { return new DecimalNode(d); }
 
-    /* 
+    /*
     /**********************************************************
     /* BaseJsonNode extended API
     /**********************************************************
@@ -43,7 +45,7 @@ public final class DecimalNode
     @Override
     public JsonParser.NumberType numberType() { return JsonParser.NumberType.BIG_DECIMAL; }
 
-    /* 
+    /*
     /**********************************************************
     /* Overrridden JsonNode methods
     /**********************************************************
@@ -51,7 +53,7 @@ public final class DecimalNode
 
     @Override
     public boolean isFloatingPointNumber() { return true; }
-    
+
     @Override
     public boolean isBigDecimal() { return true; }
 
@@ -61,9 +63,19 @@ public final class DecimalNode
     @Override public boolean canConvertToLong() {
         return (_value.compareTo(MIN_LONG) >= 0) && (_value.compareTo(MAX_LONG) <= 0);
     }
-    
+
+    @Override // since 2.12
+    public boolean canConvertToExactIntegral() {
+        return (_value.signum() == 0)
+                || (_value.scale() <= 0)
+                || (_value.stripTrailingZeros().scale() <= 0);
+    }
+
     @Override
     public Number numberValue() { return _value; }
+
+    @Override
+    public short shortValue() { return _value.shortValue(); }
 
     @Override
     public int intValue() { return _value.intValue(); }
@@ -73,7 +85,12 @@ public final class DecimalNode
 
 
     @Override
-    public BigInteger bigIntegerValue() { return _value.toBigInteger(); }
+    public BigInteger bigIntegerValue() {
+        return _bigIntFromBigDec(_value);
+    }
+
+    @Override
+    public float floatValue() { return _value.floatValue(); }
 
     @Override
     public double doubleValue() { return _value.doubleValue(); }
@@ -87,10 +104,20 @@ public final class DecimalNode
     }
 
     @Override
-    public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+    public final void serialize(JsonGenerator jgen, SerializerProvider provider)
+        throws IOException
     {
-        jg.writeNumber(_value);
+        // 07-Jul-2013, tatu: Should be handled by propagating setting to JsonGenerator
+        //    so this should not be needed:
+        /*
+        if (provider.isEnabled(SerializationFeature.WRITE_BIGDECIMAL_AS_PLAIN)) {
+            if (!(jgen instanceof TokenBuffer)) { // [Issue#232]
+                jgen.writeNumber(((BigDecimal) _value).toPlainString());
+                return;
+            }
+        }
+        */
+        jgen.writeNumber(_value);
     }
 
     @Override
@@ -98,12 +125,12 @@ public final class DecimalNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
-            return false;
+        if (o instanceof DecimalNode) {
+            return ((DecimalNode) o)._value.compareTo(_value) == 0;
         }
-        return ((DecimalNode) o)._value.equals(_value);
+        return false;
     }
 
     @Override
-    public int hashCode() { return _value.hashCode(); }
+    public int hashCode() { return Double.valueOf(doubleValue()).hashCode(); }
 }

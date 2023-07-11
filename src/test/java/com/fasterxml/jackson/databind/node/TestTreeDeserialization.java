@@ -1,8 +1,8 @@
 package com.fasterxml.jackson.databind.node;
 
-import java.io.*;
-
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.BaseMapTest;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * This unit test suite tries to verify that JsonNode-based trees
@@ -19,43 +19,11 @@ public class TestTreeDeserialization
         public void setNode(JsonNode n) { _node = n; }
     }
 
-    /**
-     * This test checks that is possible to mix "regular" Java objects
-     * and JsonNode.
+    /*
+    /**********************************************************
+    /* Unit tests
+    /**********************************************************
      */
-    public void testMixed() throws IOException
-    {
-        ObjectMapper om = new ObjectMapper();
-        String JSON = "{\"node\" : { \"a\" : 3 }, \"x\" : 9 }";
-        Bean bean = om.readValue(JSON, Bean.class);
-
-        assertEquals(9, bean._x);
-        JsonNode n = bean._node;
-        assertNotNull(n);
-        assertEquals(1, n.size());
-        ObjectNode on = (ObjectNode) n;
-        assertEquals(3, on.get("a").intValue());
-    }
-
-    /// Verifying [JACKSON-143]
-    public void testArrayNodeEquality()
-    {
-        ArrayNode n1 = new ArrayNode(null);
-        ArrayNode n2 = new ArrayNode(null);
-
-        assertTrue(n1.equals(n2));
-        assertTrue(n2.equals(n1));
-
-        n1.add(TextNode.valueOf("Test"));
-
-        assertFalse(n1.equals(n2));
-        assertFalse(n2.equals(n1));
-
-        n2.add(TextNode.valueOf("Test"));
-
-        assertTrue(n1.equals(n2));
-        assertTrue(n2.equals(n1));
-    }
 
     public void testObjectNodeEquality()
     {
@@ -65,14 +33,28 @@ public class TestTreeDeserialization
         assertTrue(n1.equals(n2));
         assertTrue(n2.equals(n1));
 
-        n1.put("x", TextNode.valueOf("Test"));
+        n1.set("x", TextNode.valueOf("Test"));
 
         assertFalse(n1.equals(n2));
         assertFalse(n2.equals(n1));
 
-        n2.put("x", TextNode.valueOf("Test"));
+        n2.set("x", TextNode.valueOf("Test"));
 
         assertTrue(n1.equals(n2));
         assertTrue(n2.equals(n1));
+    }
+
+    public void testReadFromString() throws Exception
+    {
+        String json = "{\"field\":\"{\\\"name\\\":\\\"John Smith\\\"}\"}";
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jNode = mapper.readValue(json, JsonNode.class);
+
+        String generated = mapper.writeValueAsString( jNode);  //back slashes are gone
+        JsonNode out = mapper.readValue( generated, JsonNode.class );   //crashes here
+        assertTrue(out.isObject());
+        assertEquals(1, out.size());
+        String value = out.path("field").asText();
+        assertNotNull(value);
     }
 }

@@ -4,8 +4,10 @@ import java.io.*;
 import java.util.*;
 
 import com.fasterxml.jackson.annotation.*;
-
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
+import com.fasterxml.jackson.databind.introspect.SimpleMixInResolver;
+import com.fasterxml.jackson.databind.introspect.ClassIntrospector.MixInResolver;
 
 public class TestMixinSerForMethods
     extends BaseMapTest
@@ -17,9 +19,10 @@ public class TestMixinSerForMethods
      */
 
     // base class: just one visible property ('b')
+    @SuppressWarnings("unused")
     static class BaseClass
     {
-        @SuppressWarnings("unused") private String a;
+        private String a;
         private String b;
 
         protected BaseClass() { }
@@ -44,8 +47,8 @@ public class TestMixinSerForMethods
         @JsonProperty String a;
 
         @Override
-            @JsonProperty("b2")
-            public abstract String takeB();
+        @JsonProperty("b2")
+        public abstract String takeB();
 
         // also: just for fun; add a "red herring"... unmatched method
         @JsonProperty abstract String getFoobar();
@@ -59,13 +62,6 @@ public class TestMixinSerForMethods
         @Override
         @JsonIgnore
         public String takeB() { return null; }
-    }
-               
-    interface ObjectMixIn
-    {
-        // and then ditto for hashCode..
-        @Override
-        @JsonProperty public int hashCode();
     }
 
     static class EmptyBean { }
@@ -92,13 +88,13 @@ public class TestMixinSerForMethods
     }
 
     /*
-    ///////////////////////////////////////////////////////////
-    // Unit tests
-    ///////////////////////////////////////////////////////////
+    /**********************************************************
+    /* Unit tests
+    /**********************************************************
      */
 
     /**
-     * Unit test for verifying that leaf-level mix-ins work ok; 
+     * Unit test for verifying that leaf-level mix-ins work ok;
      * that is, any annotations added properly override all annotations
      * that masked methods (fields etc) have.
      */
@@ -115,7 +111,7 @@ public class TestMixinSerForMethods
 
         // then with leaf-level mix-in
         mapper = new ObjectMapper();
-        mapper.addMixInAnnotations(BaseClass.class, MixIn.class);
+        mapper.addMixIn(BaseClass.class, MixIn.class);
         result = writeAndMap(mapper, bean);
         assertEquals(2, result.size());
         assertEquals("b2", result.get("b2"));
@@ -133,7 +129,7 @@ public class TestMixinSerForMethods
         Map<String,Object> result;
         LeafClass bean = new LeafClass("XXX", "b2");
 
-        mapper.addMixInAnnotations(BaseClass.class, MixIn.class);
+        mapper.addMixIn(BaseClass.class, MixIn.class);
         result = writeAndMap(mapper, bean);
         assertEquals(1, result.size());
         assertEquals("XXX", result.get("a"));
@@ -146,46 +142,43 @@ public class TestMixinSerForMethods
     public void testIntermediateMixin2() throws IOException
     {
         ObjectMapper mapper = new ObjectMapper();
-        mapper.addMixInAnnotations(EmptyBean.class, MixInForSimple.class);
+        mapper.addMixIn(EmptyBean.class, MixInForSimple.class);
         Map<String,Object> result = writeAndMap(mapper, new SimpleBean());
         assertEquals(1, result.size());
         assertEquals(Integer.valueOf(42), result.get("x"));
     }
 
-    /**
-     * Unit test for verifying that it is actually possible to attach
-     * mix-in annotations to basic <code>Object.class</code>. This
-     * will essentially apply to any and all Objects.
-     */
-    public void testObjectMixin() throws IOException
+    public void testSimpleMixInResolverHasMixins() {
+        SimpleMixInResolver simple = new SimpleMixInResolver(null);
+        assertFalse(simple.hasMixIns());
+        simple.addLocalDefinition(String.class, Number.class);
+        assertTrue(simple.hasMixIns());
+    }
+
+    // [databind#688]
+    public void testCustomResolver() throws IOException
     {
         ObjectMapper mapper = new ObjectMapper();
-        mapper.addMixInAnnotations(Object.class, ObjectMixIn.class);
+        MixInResolver res = new ClassIntrospector.MixInResolver() {
+            @Override
+            public Class<?> findMixInClassFor(Class<?> target) {
+                if (target == EmptyBean.class) {
+                    return MixInForSimple.class;
+                }
+                return null;
+            }
 
-        // First, with our bean...
-        Map<String,Object> result = writeAndMap(mapper, new BaseClass("a", "b"));
+            @Override
+            public MixInResolver copy() {
+                return this;
+            }
+        };
+        mapper.setMixInResolver(res);
+        Map<String,Object> result = writeAndMap(mapper, new SimpleBean());
+        assertEquals(1, result.size());
+        assertEquals(Integer.valueOf(42), result.get("x"));
 
-        assertEquals(2, result.size());
-        assertEquals("b", result.get("b"));
-        Object ob = result.get("hashCode");
-        assertNotNull(ob);
-        assertEquals(Integer.class, ob.getClass());
-
-        /* 15-Oct-2010, tatu: Actually, we now block serialization (attemps) of plain Objects, by default
-         *    (since generally that makes no sense -- may need to revisit). As such, need to comment out
-         *    this part of test
-         */
-        /* Hmmh. For plain Object.class... I suppose getClass() does
-         * get serialized (and can't really be blocked either).
-         * Fine.
-         */
-       /*
-        result = writeAndMap(mapper, new Object());
-        assertEquals(2, result.size());
-        ob = result.get("hashCode");
-        assertNotNull(ob);
-        assertEquals(Integer.class, ob.getClass());
-        assertEquals("java.lang.Object", result.get("class"));
-        */
+        SimpleMixInResolver simple = new SimpleMixInResolver(res);
+        assertTrue(simple.hasMixIns());
     }
 }

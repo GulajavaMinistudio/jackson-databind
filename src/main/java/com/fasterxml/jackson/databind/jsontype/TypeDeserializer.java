@@ -5,6 +5,7 @@ import java.io.IOException;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
@@ -34,11 +35,9 @@ public abstract class TypeDeserializer
      * (as is the case for bean properties), or values contained
      * (for {@link java.util.Collection} or {@link java.util.Map}
      * valued properties).
-     * 
-     * @since 2.0
      */
     public abstract TypeDeserializer forProperty(BeanProperty prop);
-    
+
     /*
     /**********************************************************
     /* Introspection
@@ -67,19 +66,24 @@ public abstract class TypeDeserializer
     /**
      * Accessor for "default implementation" type; optionally defined
      * class to use in cases where type id is not
-     * accessible for some reason (either missing, or can not be
+     * accessible for some reason (either missing, or cannot be
      * resolved)
      */
     public abstract Class<?> getDefaultImpl();
-    
+
+    /**
+     * @since 2.12
+     */
+    public boolean hasDefaultImpl() { return getDefaultImpl() != null; }
+
     /*
-    /*********************************************************
+    /**********************************************************
     /* Type deserialization methods
     /**********************************************************
      */
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as JSON Object (regardless of Java type).
      * Method needs to figure out intended
@@ -87,12 +91,10 @@ public abstract class TypeDeserializer
      * call it with JSON data to deserializer (which does not contain
      * type information).
      */
-    public abstract Object deserializeTypedFromObject(JsonParser jp,
-            DeserializationContext ctxt)
-        throws IOException, JsonProcessingException;
+    public abstract Object deserializeTypedFromObject(JsonParser p, DeserializationContext ctxt) throws IOException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as JSON Array (regardless of Java type).
      * Method needs to figure out intended
@@ -100,12 +102,10 @@ public abstract class TypeDeserializer
      * call it with JSON data to deserializer (which does not contain
      * type information).
      */
-    public abstract Object deserializeTypedFromArray(JsonParser jp,
-            DeserializationContext ctxt)
-        throws IOException, JsonProcessingException;
+    public abstract Object deserializeTypedFromArray(JsonParser p, DeserializationContext ctxt) throws IOException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as a scalar JSON value (something other
      * than Array or Object), regardless of Java type.
@@ -114,12 +114,10 @@ public abstract class TypeDeserializer
      * call it with JSON data to deserializer (which does not contain
      * type information).
      */
-    public abstract Object deserializeTypedFromScalar(JsonParser jp,
-            DeserializationContext ctxt)
-        throws IOException, JsonProcessingException;
+    public abstract Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt) throws IOException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * may have been serialized using any kind of JSON value
      * (Array, Object, scalar). Should only be called if JSON
@@ -127,9 +125,59 @@ public abstract class TypeDeserializer
      * using JSON node representation, or "untyped" Java object
      * (which may be Map, Collection, wrapper/primitive etc).
      */
-    public abstract Object deserializeTypedFromAny(JsonParser jp,
-            DeserializationContext ctxt)
-        throws IOException, JsonProcessingException;
+    public abstract Object deserializeTypedFromAny(JsonParser p, DeserializationContext ctxt) throws IOException;
 
+    /*
+    /**********************************************************
+    /* Shared helper methods
+    /**********************************************************
+     */
+
+    /**
+     * Helper method used to check if given parser might be pointing to
+     * a "natural" value, and one that would be acceptable as the
+     * result value (compatible with declared base type)
+     */
+    public static Object deserializeIfNatural(JsonParser p, DeserializationContext ctxt, JavaType baseType) throws IOException {
+        return deserializeIfNatural(p, ctxt, baseType.getRawClass());
+    }
+
+    @SuppressWarnings("incomplete-switch")
+    public static Object deserializeIfNatural(JsonParser p, DeserializationContext ctxt,
+            Class<?> base) throws IOException
+    {
+        final JsonToken t = p.currentToken();
+        if (t == null) {
+            return null;
+        }
+        switch (t) {
+        case VALUE_STRING:
+            if (base.isAssignableFrom(String.class)) {
+                return p.getText();
+            }
+            break;
+        case VALUE_NUMBER_INT:
+            if (base.isAssignableFrom(Integer.class)) {
+                return p.getIntValue();
+            }
+            break;
+
+        case VALUE_NUMBER_FLOAT:
+            if (base.isAssignableFrom(Double.class)) {
+                return Double.valueOf(p.getDoubleValue());
+            }
+            break;
+        case VALUE_TRUE:
+            if (base.isAssignableFrom(Boolean.class)) {
+                return Boolean.TRUE;
+            }
+            break;
+        case VALUE_FALSE:
+            if (base.isAssignableFrom(Boolean.class)) {
+                return Boolean.FALSE;
+            }
+            break;
+        }
+        return null;
+    }
 }
-    

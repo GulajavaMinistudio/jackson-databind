@@ -1,20 +1,30 @@
 package com.fasterxml.jackson.databind;
 
 import java.lang.reflect.Modifier;
+import java.util.List;
 
 import com.fasterxml.jackson.core.type.ResolvedType;
+import com.fasterxml.jackson.databind.type.TypeBindings;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.ClassUtil;
 
 /**
  * Base class for type token classes used both to contain information
  * and as keys for deserializers.
  *<p>
  * Instances can (only) be constructed by
- * <code>com.fasterxml.jackson.databind.TypeFactory</code>
- * (included in "jackson-databind")
+ * <code>com.fasterxml.jackson.databind.type.TypeFactory</code>.
+ *<p>
+ * Since 2.2 this implements {@link java.lang.reflect.Type} to allow
+ * it to be pushed through interfaces that only expose that type.
  */
 public abstract class JavaType
     extends ResolvedType
+    implements java.io.Serializable, // 2.1
+        java.lang.reflect.Type // 2.2
 {
+    private static final long serialVersionUID = 1;
+
     /**
      * This is the nominal type-erased Class that would be close to the
      * type represented (but not exactly type, due to type erasure: type
@@ -24,10 +34,10 @@ public abstract class JavaType
      */
     protected final Class<?> _class;
 
-    protected final int _hashCode;
+    protected final int _hash;
 
     /**
-     * Optional handler (codec) that can be attached to indicate 
+     * Optional handler (codec) that can be attached to indicate
      * what to use for handling (serializing, deserializing) values of
      * this specific type.
      *<p>
@@ -44,159 +54,214 @@ public abstract class JavaType
      * different kinds of handlers, with unrelated types.
      */
     protected final Object _typeHandler;
-    
+
+    /**
+     * Whether entities defined with this type should be handled using
+     * static typing (as opposed to dynamic runtime type) or not.
+     *
+     * @since 2.2
+     */
+    protected final boolean _asStatic;
+
     /*
-    /**********************************************************
-    /* Life-cycle
-    /**********************************************************
+    /**********************************************************************
+    /* Life-cycle: constructors, public mutant factory methods
+    /**********************************************************************
      */
 
     /**
+     * Main base constructor for sub-classes to use
+     *
      * @param raw "Raw" (type-erased) class for this type
      * @param additionalHash Additional hash code to use, in addition
-     *   to hash code of the class name 
+     *   to hash code of the class name
+     * @param valueHandler internal handler (serializer/deserializer)
+     *   to apply for this type
+     * @param typeHandler internal type handler (type serializer/deserializer)
+     *   to apply for this type
+     * @param asStatic Whether this type declaration will force specific type
+     *   as opposed to being a base type (usually for serialization typing)
      */
     protected JavaType(Class<?> raw, int additionalHash,
-            Object valueHandler, Object typeHandler)
+            Object valueHandler, Object typeHandler, boolean asStatic)
     {
         _class = raw;
-        _hashCode = raw.getName().hashCode() + additionalHash;
+        _hash =  31 * additionalHash + raw.hashCode();
         _valueHandler = valueHandler;
         _typeHandler = typeHandler;
+        _asStatic = asStatic;
     }
 
     /**
-     * Serialization method called when no additional type information is
-     * to be included in serialization.
+     * Copy-constructor used when refining/upgrading type instances.
+     *
+     * @since 2.7
      */
-    
+    protected JavaType(JavaType base)
+    {
+        _class = base._class;
+        _hash = base._hash;
+        _valueHandler = base._valueHandler;
+        _typeHandler = base._typeHandler;
+        _asStatic = base._asStatic;
+    }
+
     /**
-     * "Copy method" that will construct a new instance that is identical to
-     * this instance, except that it will have specified type handler assigned.
-     * 
+     * Mutant factory method that may be called on structured types
+     * that have a so-called content type (element of arrays, value type
+     * of Maps, referenced type of referential types),
+     * and will construct a new instance that is identical to
+     * this instance, except that it has specified content type, instead of current
+     * one. If content type is already set to given type, <code>this</code> is returned.
+     * If type does not have a content type (which is the case with
+     * <code>SimpleType</code>), {@link IllegalArgumentException}
+     * will be thrown.
+     *
      * @return Newly created type instance
+     *
+     * @since 2.7
+     */
+    public abstract JavaType withContentType(JavaType contentType);
+
+    /**
+     * Method that can be called to get a type instance that indicates
+     * that values of the type should be handled using "static typing" for purposes
+     * of serialization (as opposed to "dynamic" aka runtime typing):
+     * meaning that no runtime information is needed for determining serializers to use.
+     * The main use case is to allow forcing of specific root value serialization type,
+     * and specifically in resolving serializers for contained types (element types
+     * for arrays, Collections and Maps).
+     *
+     * @since 2.2
+     */
+    public abstract JavaType withStaticTyping();
+
+    /*
+    /**********************************************************************
+    /* Internal factory methods for Jackson-databind (not for users)
+    /**********************************************************************
+     */
+
+    /**
+     * Internal method that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *<p>
+     * This mutant factory method will construct a new instance that is identical to
+     * this instance, except that it will have specified type handler assigned.
+     *
+     * @param h Handler to pass to new instance created
+     * @return Newly created type instance with same type information, specified handler
      */
     public abstract JavaType withTypeHandler(Object h);
 
     /**
-     * "Copy method" that will construct a new instance that is identical to
-     * this instance, except that its content type will have specified
-     * type handler assigned.
-     * 
-     * @return Newly created type instance
+     * Internal method that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *<p>
+     * This mutant factory method will construct a new instance that is identical to
+     * this instance, except that it will have specified content type (element type
+     * for arrays, value type for Maps and so forth) handler assigned.
+     *
+     * @param h Handler to pass to new instance created
+     * @return Newly created type instance with same type information, specified handler
      */
     public abstract JavaType withContentTypeHandler(Object h);
 
     /**
-     * "Copy method" that will construct a new instance that is identical to
+     * Internal method that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *<p>
+     * This mutant factory method will construct a new instance that is identical to
      * this instance, except that it will have specified value handler assigned.
-     * 
-     * @return Newly created type instance
+     *
+     * @param h Handler to pass to new instance created
+     * @return Newly created type instance with same type information, specified handler
      */
     public abstract JavaType withValueHandler(Object h);
 
     /**
-     * "Copy method" that will construct a new instance that is identical to
+     * Internal method that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *<p>
+     * Mutant factory method that will construct a new instance that is identical to
      * this instance, except that it will have specified content value handler assigned.
-     * 
-     * @return Newly created type instance
+     *
+     * @param h Handler to pass to new instance created
+     * @return Newly created type instance with same type information, specified handler
      */
     public abstract JavaType withContentValueHandler(Object h);
-    
-    /*
-    /**********************************************************
-    /* Type coercion fluent factory methods
-    /**********************************************************
-     */
-    
-    /**
-     * Method that can be called to do a "narrowing" conversions; that is,
-     * to return a type with a raw class that is assignable to the raw
-     * class of this type. If this is not possible, an
-     * {@link IllegalArgumentException} is thrown.
-     * If class is same as the current raw class, instance itself is
-     * returned.
-     */
-    public JavaType narrowBy(Class<?> subclass)
-    {
-        // First: if same raw class, just return this instance
-        if (subclass == _class) {
-            return this;
-        }
-        // Otherwise, ensure compatibility
-        _assertSubclass(subclass, _class);
-        JavaType result = _narrow(subclass);
 
-        // TODO: these checks should NOT actually be needed; above should suffice:
-        if (_valueHandler != result.getValueHandler()) {
-            result = result.withValueHandler(_valueHandler);
+    /**
+     * Internal method that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *<p>
+     * Mutant factory method that will try to copy handlers that the specified
+     * source type instance had, if any; this must be done recursively where
+     * necessary (as content types may be structured).
+     *
+     * @since 2.8.4
+     */
+    public JavaType withHandlersFrom(JavaType src) {
+        JavaType type = this;
+        Object h = src.getTypeHandler();
+        if (h != _typeHandler) {
+            type = type.withTypeHandler(h);
         }
-        if (_typeHandler != result.getTypeHandler()) {
-            result = result.withTypeHandler(_typeHandler);
+        h = src.getValueHandler();
+        if (h != _valueHandler) {
+            type = type.withValueHandler(h);
         }
-        return result;
+        return type;
     }
 
-    /**
-     * More efficient version of {@link #narrowBy}, called by
-     * internal framework in cases where compatibility checks
-     * are to be skipped.
+    /*
+    /**********************************************************************
+    /* Type coercion fluent factory methods
+    /**********************************************************************
      */
+
+    /**
+     * Mutant factory method that will try to create and return a sub-type instance
+     * for known parameterized types; for other types will return `null` to indicate
+     * that no just refinement makes necessary sense, without trying to detect
+     * special status through implemented interfaces.
+     *
+     * @since 2.7
+     */
+    public abstract JavaType refine(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInterfaces);
+
+    /**
+     * Legacy method used for forcing sub-typing of this type into
+     * type specified by specific type erasure.
+     * Deprecated as of 2.7 as such specializations really ought to
+     * go through {@link TypeFactory}, not directly via {@link JavaType}.
+     *
+     * @since 2.7
+     */
+    @Deprecated
     public JavaType forcedNarrowBy(Class<?> subclass)
     {
         if (subclass == _class) { // can still optimize for simple case
             return this;
         }
-        JavaType result = _narrow(subclass);
-        // TODO: these checks should NOT actually be needed; above should suffice:
-        if (_valueHandler != result.getValueHandler()) {
-            result = result.withValueHandler(_valueHandler);
-        }
-        if (_typeHandler != result.getTypeHandler()) {
-            result = result.withTypeHandler(_typeHandler);
-        }
-        return result;
+        return  _narrow(subclass);
     }
 
-    /**
-     * Method that can be called to do a "widening" conversions; that is,
-     * to return a type with a raw class that could be assigned from this
-     * type.
-     * If such conversion is not possible, an
-     * {@link IllegalArgumentException} is thrown.
-     * If class is same as the current raw class, instance itself is
-     * returned.
-     */
-    public JavaType widenBy(Class<?> superclass)
-    {
-        // First: if same raw class, just return this instance
-        if (superclass == _class) {
-            return this;
-        }
-        // Otherwise, ensure compatibility
-        _assertSubclass(_class, superclass);
-        return _widen(superclass);
+    @Deprecated // since 2.7
+    protected JavaType _narrow(Class<?> subclass) {
+        return this;
     }
 
-    protected abstract JavaType _narrow(Class<?> subclass);
-
-    /**
-     *<p>
-     * Default implementation is just to call {@link #_narrow}, since
-     * underlying type construction is usually identical
-     */
-    protected JavaType _widen(Class<?> superclass) {
-        return _narrow(superclass);
-    }
-
-    public abstract JavaType narrowContentsBy(Class<?> contentClass);
-
-    public abstract JavaType widenContentsBy(Class<?> contentClass);
-    
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Implementation of ResolvedType API
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -208,8 +273,31 @@ public abstract class JavaType
      * true if instantiation of this Type is given (type-erased) Class.
      */
     @Override
-    public final boolean hasRawClass(Class<?> clz) {
-        return _class == clz;
+    public final boolean hasRawClass(Class<?> clz) { return _class == clz; }
+
+    /**
+     * Accessor that allows determining whether {@link #getContentType()} should
+     * return a non-null value (that is, there is a "content type") or not.
+     * True if {@link #isContainerType()} or {@link #isReferenceType()} return true.
+     *
+     * @since 2.8
+     */
+    public boolean hasContentType() {
+        return true;
+    }
+
+    /**
+     * @since 2.6
+     */
+    public final boolean isTypeOrSubTypeOf(Class<?> clz) {
+        return (_class == clz) || clz.isAssignableFrom(_class);
+    }
+
+    /**
+     * @since 2.9
+     */
+    public final boolean isTypeOrSuperTypeOf(Class<?> clz) {
+        return (_class == clz) || _class.isAssignableFrom(clz);
     }
 
     @Override
@@ -231,22 +319,57 @@ public abstract class JavaType
         /* 19-Feb-2010, tatus: Holy mackarel; primitive types
          *    have 'abstract' flag set...
          */
-        if (_class.isPrimitive()) {
-            return true;
-        }
-        return false;
+        return _class.isPrimitive();
     }
 
     @Override
-    public boolean isThrowable() {
-        return Throwable.class.isAssignableFrom(_class);
-    }
+    public boolean isThrowable() { return Throwable.class.isAssignableFrom(_class); }
 
     @Override
     public boolean isArrayType() { return false; }
 
+    /**
+     * Method that basically does equivalent of:
+     *<pre>
+     *  Enum.class.isAssignableFrom(getRawClass())
+     *</pre>
+     * that is, return {@code true} if the underlying type erased class is {@code Enum}
+     * or one its subtypes (Enum implementations).
+     */
     @Override
-    public final boolean isEnumType() { return _class.isEnum(); }
+    public final boolean isEnumType() {
+        // 29-Sep-2019, tatu: `Class.isEnum()` not enough to detect custom subtypes.
+        return ClassUtil.isEnumType(_class);
+    }
+
+    /**
+     * Similar to {@link #isEnumType} except does NOT return {@code true}
+     * for {@link java.lang.Enum} (since that is not Enum implementation type).
+     *
+     * @since 2.11
+     */
+    public final boolean isEnumImplType() {
+        return ClassUtil.isEnumType(_class) && (_class != Enum.class);
+    }
+
+    /**
+     * @since 2.12
+     */
+    public final boolean isRecordType() {
+        return ClassUtil.isRecordType(_class);
+    }
+
+    /**
+     * Method that returns true if this instance is of type
+     * {@code IterationType}.
+     *
+     * @since 2.16
+     *
+     * @return True if this type is considered "iteration type"
+     */
+    public boolean isIterationType() {
+        return false;
+    }
 
     @Override
     public final boolean isInterface() { return _class.isInterface(); }
@@ -279,18 +402,36 @@ public abstract class JavaType
      */
     @Override
     public boolean isMapLikeType() { return false; }
-    
+
+    /**
+     * Convenience method, short-hand for
+     *<code>
+     *   getRawClass() == Object.class
+     *</code>
+     * and used to figure if we basically have "untyped" type object.
+     *
+     * @since 2.5
+     */
+    public final boolean isJavaLangObject() { return _class == Object.class; }
+
+    /**
+     * Accessor for checking whether handlers for dealing with values of
+     * this type should use static typing (as opposed to dynamic typing).
+     * Note that while value of 'true' does mean that static typing is to
+     * be used, value of 'false' may still be overridden by other settings.
+     *
+     * @since 2.2
+     */
+    public final boolean useStaticType() { return _asStatic; }
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Public API, type parameter access; pass-through
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
-    public boolean hasGenericTypes()
-    {
-        return containedTypeCount() > 0;
-    }
+    public boolean hasGenericTypes() { return containedTypeCount() > 0; }
 
     @Override
     public JavaType getKeyType() { return null; }
@@ -298,39 +439,163 @@ public abstract class JavaType
     @Override
     public JavaType getContentType() { return null; }
 
-    @Override
-    public int containedTypeCount() { return 0; }
+    @Override // since 2.6
+    public JavaType getReferencedType() { return null; }
 
     @Override
-    public JavaType containedType(int index) { return null; }
+    public abstract int containedTypeCount();
 
     @Override
-    public String containedTypeName(int index) { return null; }
+    public abstract JavaType containedType(int index);
+
+    @Deprecated // since 2.7
+    @Override
+    public abstract String containedTypeName(int index);
+
+    @Deprecated // since 2.7
+    @Override
+    public Class<?> getParameterSource() {
+        return null;
+    }
 
     /*
-    /**********************************************************
-    /* Semi-public API, accessing handlers
-    /**********************************************************
+    /**********************************************************************
+    /* Extended API beyond ResolvedType
+    /**********************************************************************
      */
-    
+
+    // NOTE: not defined in Resolved type
     /**
-     * Method for accessing value handler associated with this type, if any
+     * Convenience method that is functionally same as:
+     *<code>
+     * JavaType t = containedType(index);
+     * if (t == null) {
+     *    t = TypeFactory.unknownType();
+     * }
+     *</code>
+     * and typically used to eliminate need for null checks for common case
+     * where we just want to check if containedType is available first; and
+     * if not, use "unknown type" (which translates to <code>java.lang.Object</code>
+     * basically).
+     *
+     * @since 2.5
+     */
+    public JavaType containedTypeOrUnknown(int index) {
+        JavaType t = containedType(index);
+        return (t == null)  ? TypeFactory.unknownType() : t;
+    }
+
+    /**
+     * @since 2.7
+     */
+    public abstract TypeBindings getBindings();
+
+    /**
+     * Method that may be called to find representation of given type
+     * within type hierarchy of this type: either this type (if this
+     * type has given erased type), one of its supertypes that has the
+     * erased types, or null if target is neither this type or any of its
+     * supertypes.
+     *
+     * @since 2.7
+     */
+    public abstract JavaType findSuperType(Class<?> erasedTarget);
+
+    /**
+     * Accessor for finding fully resolved parent class of this type,
+     * if it has one; null if not.
+     *
+     * @since 2.7
+     */
+    public abstract JavaType getSuperClass();
+
+    /**
+     * Accessor for finding fully resolved interfaces this type implements,
+     * if any; empty array if none.
+     *
+     * @since 2.7
+     */
+    public abstract List<JavaType> getInterfaces();
+
+    /**
+     * Method that may be used to find paramaterization this type has for
+     * given type-erased generic target type.
+     *
+     * @since 2.7
+     */
+    public abstract JavaType[] findTypeParameters(Class<?> expType);
+
+    /*
+    /**********************************************************************
+    /* Internal accessors API, accessing handlers
+    /**********************************************************************
+     */
+
+    /**
+     * Internal accessor that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *
+     * @return Value handler associated with this type, if any.
      */
     @SuppressWarnings("unchecked")
     public <T> T getValueHandler() { return (T) _valueHandler; }
 
     /**
-     * Method for accessing type handler associated with this type, if any
+     * Internal accessor that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *
+     * @return Type handler associated with this type, if any.
      */
     @SuppressWarnings("unchecked")
     public <T> T getTypeHandler() { return (T) _typeHandler; }
 
-    /*
-    /**********************************************************
-    /* Support for producing signatures
-    /**********************************************************
+    /**
+     * Internal accessor that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *
+     * @return Content value handler associated with this type, if any.
+     *
+     * @since 2.7
      */
-    
+    public Object getContentValueHandler() { return null; }
+
+    /**
+     * Internal accessor that <b>should not be used by any code outside of
+     * jackson-databind</b>: only used internally by databind.
+     * May be removed from Jackson 3.0.
+     *
+     * @return Content type handler associated with this type, if any.
+     *
+     * @since 2.7
+     */
+    public Object getContentTypeHandler() { return null; }
+
+    /**
+     * @since 2.6
+     */
+    public boolean hasValueHandler() { return _valueHandler != null; }
+
+    /**
+     * Helper method that checks whether this type, or its (optional) key
+     * or content type has {@link #getValueHandler} or {@link #getTypeHandler()};
+     * that is, are there any non-standard handlers associated with this
+     * type object.
+     *
+     * @since 2.8
+     */
+    public boolean hasHandlers() {
+        return (_typeHandler != null) || (_valueHandler != null);
+    }
+
+    /*
+    /**********************************************************************
+    /* Support for producing signatures
+    /**********************************************************************
+     */
+
     //public abstract String toCanonical();
 
     /**
@@ -344,18 +609,18 @@ public abstract class JavaType
     public String getGenericSignature() {
         StringBuilder sb = new StringBuilder(40);
         getGenericSignature(sb);
-        return sb.toString();        
+        return sb.toString();
     }
 
     /**
-     * 
+     *
      * @param sb StringBuilder to append signature to
-     * 
+     *
      * @return StringBuilder that was passed in; returned to allow
      * call chaining
      */
     public abstract StringBuilder getGenericSignature(StringBuilder sb);
-    
+
     /**
      * Method for accessing signature without generic
      * type information, in form compatible with all versions
@@ -373,31 +638,18 @@ public abstract class JavaType
      * type information, in form compatible with all versions
      * of JVM, and specifically used for type descriptions
      * when generating byte code.
-     * 
+     *
      * @param sb StringBuilder to append signature to
-     * 
+     *
      * @return StringBuilder that was passed in; returned to allow
      * call chaining
      */
     public abstract StringBuilder getErasedSignature(StringBuilder sb);
-    
-    /*
-    /**********************************************************
-    /* Helper methods
-    /**********************************************************
-     */
-
-    protected void _assertSubclass(Class<?> subclass, Class<?> superClass)
-    {
-        if (!_class.isAssignableFrom(subclass)) {
-            throw new IllegalArgumentException("Class "+subclass.getName()+" is not assignable to "+_class.getName());
-        }
-    }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Standard methods; let's make them abstract to force override
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
@@ -407,5 +659,5 @@ public abstract class JavaType
     public abstract boolean equals(Object o);
 
     @Override
-    public final int hashCode() { return _hashCode; }
+    public int hashCode() { return _hash; }
 }

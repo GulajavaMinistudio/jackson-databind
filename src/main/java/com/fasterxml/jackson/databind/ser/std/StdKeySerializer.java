@@ -1,43 +1,25 @@
 package com.fasterxml.jackson.databind.ser.std;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.Date;
 
 import com.fasterxml.jackson.core.*;
-
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
+import com.fasterxml.jackson.databind.*;
 
 /**
- * Specialized serializer that can be used as the generic key
- * serializer, when serializing {@link java.util.Map}s to JSON
- * Objects.
+ * Specialized serializer that can be used as the generic key serializer,
+ * when serializing {@link java.util.Map}s to JSON Objects.
+ *
+ * @deprecated Since 2.8, use {@link StdKeySerializers.Default} instead.
  */
-public class StdKeySerializer
-    extends StdSerializer<Object>
+@SuppressWarnings("serial")
+@Deprecated // since 2.8,
+public class StdKeySerializer extends StdSerializer<Object>
 {
-    final static StdKeySerializer instace = new StdKeySerializer();
-
     public StdKeySerializer() { super(Object.class); }
-    
-    @Override
-    public void serialize(Object value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
-    {
-        if (value instanceof Date) {
-            provider.defaultSerializeDateKey((Date) value, jgen);
-        } else {
-            jgen.writeFieldName(value.toString());
-        }
-    }
 
     @Override
-    public JsonNode getSchema(SerializerProvider provider, Type typeHint)
-        throws JsonMappingException
-    {
-        return createSchemaNode("string");
+    public void serialize(Object value, JsonGenerator g, SerializerProvider provider) throws IOException {
+        // 19-Oct-2016, tatu: Simplified to bare essentials since this is deprecated
+        g.writeFieldName(value.toString());
     }
 }

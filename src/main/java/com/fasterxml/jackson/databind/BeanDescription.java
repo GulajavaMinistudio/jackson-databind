@@ -4,17 +4,14 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
-import com.fasterxml.jackson.databind.introspect.AnnotatedConstructor;
-import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
-import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
-import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
-import com.fasterxml.jackson.databind.introspect.ClassIntrospector;
-import com.fasterxml.jackson.databind.introspect.ObjectIdInfo;
+import com.fasterxml.jackson.databind.introspect.*;
 import com.fasterxml.jackson.databind.type.TypeBindings;
 import com.fasterxml.jackson.databind.util.Annotations;
+import com.fasterxml.jackson.databind.util.Converter;
 
 /**
  * Basic container for information gathered by {@link ClassIntrospector} to
@@ -22,20 +19,12 @@ import com.fasterxml.jackson.databind.util.Annotations;
  * Note that the main implementation type is
  * {@link com.fasterxml.jackson.databind.introspect.BasicBeanDescription},
  * meaning that it is safe to upcast to this type.
- * 
- * @author tatu
  */
 public abstract class BeanDescription
 {
-    /*
-    /**********************************************************
-    /* Configuration
-    /**********************************************************
-     */
-
     /**
      * Bean type information, including raw class and possible
-     * * generics information
+     * generics information
      */
     protected final JavaType _type;
 
@@ -45,14 +34,13 @@ public abstract class BeanDescription
     /**********************************************************
      */
 
-    protected BeanDescription(JavaType type)
-    {
-    	_type = type;
+    protected BeanDescription(JavaType type) {
+        _type = type;
     }
 
     /*
     /**********************************************************
-    /* Simple accesors
+    /* Simple accessors
     /**********************************************************
      */
 
@@ -65,6 +53,18 @@ public abstract class BeanDescription
     public Class<?> getBeanClass() { return _type.getRawClass(); }
 
     /**
+     * @since 2.15
+     */
+    public boolean isRecordType() { return _type.isRecordType(); }
+
+    /**
+     * @since 2.9
+     */
+    public boolean isNonStaticInnerClass() {
+        return getClassInfo().isNonStaticInnerClass();
+    }
+
+    /**
      * Method for accessing low-level information about Class this
      * item describes.
      */
@@ -75,7 +75,7 @@ public abstract class BeanDescription
      * be used for this POJO type, if any.
      */
     public abstract ObjectIdInfo getObjectIdInfo();
-    
+
     /**
      * Method for checking whether class being described has any
      * annotations recognized by registered annotation introspector.
@@ -86,50 +86,109 @@ public abstract class BeanDescription
      * Accessor for type bindings that may be needed to fully resolve
      * types of member object, such as return and argument types of
      * methods and constructors, and types of fields.
+     *
+     * @deprecated Since 2.7, should not need to access bindings directly
      */
+    @Deprecated
     public abstract TypeBindings bindingsForBeanType();
 
     /**
      * Method for resolving given JDK type, using this bean as the
      * generic type resolution context.
+     *
+     * @deprecated Since 2.8, should simply call <code>getType</code> of
+     *    property accessor directly.
      */
+    @Deprecated
     public abstract JavaType resolveType(java.lang.reflect.Type jdkType);
-    
+
     /**
      * Method for accessing collection of annotations the bean
      * class has.
      */
     public abstract Annotations getClassAnnotations();
-   
+
     /*
     /**********************************************************
     /* Basic API for finding properties
     /**********************************************************
      */
-    
+
     /**
      * @return Ordered Map with logical property name as key, and
      *    matching getter method as value.
      */
     public abstract List<BeanPropertyDefinition> findProperties();
-    
-    /**
-     * Method for locating all back-reference properties (setters, fields) bean has
-     */
-    public abstract Map<String,AnnotatedMember> findBackReferenceProperties();
 
     public abstract Set<String> getIgnoredPropertyNames();
-    
+
+    /**
+     * Method for locating all back-reference properties (setters, fields) bean has
+     *
+     * @since 2.9
+     */
+    public abstract List<BeanPropertyDefinition> findBackReferences();
+
+    /**
+     * Method for locating all back-reference properties (setters, fields) bean has
+     *
+     * @deprecated Since 2.9 use {@link #findBackReferences()} instead
+     */
+    @Deprecated
+    public abstract Map<String,AnnotatedMember> findBackReferenceProperties();
+
     /*
     /**********************************************************
     /* Basic API for finding creator members
     /**********************************************************
      */
-    
+
+    /**
+     * Helper method that will return all non-default constructors (that is,
+     * constructors that take one or more arguments) this class has.
+     */
     public abstract List<AnnotatedConstructor> getConstructors();
-    
+
+    /**
+     * Method similar to {@link #getConstructors()} except will also introspect
+     * {@code JsonCreator.Mode} and filter out ones marked as not applicable and
+     * include mode (or lack thereof) for remaining constructors.
+     *<p>
+     * Note that no other filtering (regarding visibility or other annotations)
+     * is performed
+     *
+     * @since 2.13
+     */
+    public abstract List<AnnotatedAndMetadata<AnnotatedConstructor, JsonCreator.Mode>> getConstructorsWithMode();
+
+    /**
+     * Helper method that will check all static methods of the bean class
+     * that seem like factory methods eligible to be used as Creators.
+     * This requires that the static method:
+     *<ol>
+     * <li>Returns type compatible with bean type (same or subtype)
+     *  </li>
+     * <li>Is recognized from either explicit annotation (usually {@code @JsonCreator}
+     *   OR naming:
+     *   names {@code valueOf()} and {@code fromString()} are recognized but
+     *   only for 1-argument factory methods, and in case of {@code fromString()}
+     *   argument type must further be either {@code String} or {@code CharSequence}.
+     *  </li>
+     *</ol>
+     * Note that caller typically applies further checks for things like visibility.
+     *
+     * @return List of static methods considered as possible Factory methods
+     */
     public abstract List<AnnotatedMethod> getFactoryMethods();
-    
+
+    /**
+     * Method similar to {@link #getFactoryMethods()} but will return {@code JsonCreator.Mode}
+     * metadata along with qualifying factory method candidates.
+     *
+     * @since 2.13
+     */
+    public abstract List<AnnotatedAndMetadata<AnnotatedMethod, JsonCreator.Mode>> getFactoryMethodsWithMode();
+
     /**
      * Method that will locate the no-arg constructor for this class,
      * if it has one, and that constructor has not been marked as
@@ -138,22 +197,15 @@ public abstract class BeanDescription
     public abstract AnnotatedConstructor findDefaultConstructor();
 
     /**
-     * Method that can be called to locate a single-arg constructor that
-     * takes specified exact type (will not accept supertype constructors)
-     *
-     * @param argTypes Type(s) of the argument that we are looking for
+     * @deprecated Since 2.13: instead use {@link #getConstructors()}, filter.
      */
+    @Deprecated
     public abstract Constructor<?> findSingleArgConstructor(Class<?>... argTypes);
 
     /**
-     * Method that can be called to find if introspected class declares
-     * a static "valueOf" factory method that returns an instance of
-     * introspected type, given one of acceptable types.
-     *
-     * @param expArgTypes Types that the matching single argument factory
-     *   method can take: will also accept super types of these types
-     *   (ie. arg just has to be assignable from expArgType)
+     * @deprecated Since 2.13: instead use {@link #getFactoryMethods()}, filter.
      */
+    @Deprecated
     public abstract Method findFactoryMethod(Class<?>... expArgTypes);
 
     /*
@@ -161,30 +213,126 @@ public abstract class BeanDescription
     /* Basic API for finding property accessors
     /**********************************************************
      */
-    
-    public abstract AnnotatedMember findAnyGetter();
 
     /**
-     * Method used to locate the method of introspected class that
-     * implements {@link com.fasterxml.jackson.annotation.JsonAnySetter}. If no such method exists
-     * null is returned. If more than one are found, an exception
-     * is thrown.
-     * Additional checks are also made to see that method signature
-     * is acceptable: needs to take 2 arguments, first one String or
-     * Object; second any can be any type.
+     * Method for locating accessor (readable field, or "getter" method)
+     * that has
+     * {@link com.fasterxml.jackson.annotation.JsonKey} annotation,
+     * if any. If multiple ones are found,
+     * an error is reported by throwing {@link IllegalArgumentException}
+     *
+     * @since 2.12
      */
-    public abstract AnnotatedMethod findAnySetter();
+    public AnnotatedMember findJsonKeyAccessor() {
+        return null;
+    }
 
     /**
-     * Method for locating the getter method that is annotated with
+     * Method for locating accessor (readable field, or "getter" method)
+     * that has
      * {@link com.fasterxml.jackson.annotation.JsonValue} annotation,
      * if any. If multiple ones are found,
      * an error is reported by throwing {@link IllegalArgumentException}
+     *
+     * @since 2.9
      */
-    public abstract AnnotatedMethod findJsonValueMethod();
+    public abstract AnnotatedMember findJsonValueAccessor();
+
+    public abstract AnnotatedMember findAnyGetter();
+
+    /**
+     * Method used to locate a mutator (settable field, or 2-argument set method)
+     * of introspected class that
+     * implements {@link com.fasterxml.jackson.annotation.JsonAnySetter}.
+     * If no such mutator exists null is returned. If more than one are found,
+     * an exception is thrown.
+     * Additional checks are also made to see that method signature
+     * is acceptable: needs to take 2 arguments, first one String or
+     * Object; second any can be any type.
+     *
+     * @since 2.9
+     */
+    public abstract AnnotatedMember findAnySetterAccessor();
 
     public abstract AnnotatedMethod findMethod(String name, Class<?>[] paramTypes);
-    
+
+    @Deprecated // since 2.9
+    public abstract AnnotatedMethod findJsonValueMethod();
+
+    /**
+     * @deprecated Since 2.9: use {@link #findAnySetterAccessor} instead
+     */
+    @Deprecated
+    public AnnotatedMethod findAnySetter() {
+        AnnotatedMember m = findAnySetterAccessor();
+        if (m instanceof AnnotatedMethod) {
+            return (AnnotatedMethod) m;
+        }
+        return null;
+    }
+
+    /**
+     * @deprecated Since 2.9: use {@link #findAnySetterAccessor} instead
+     */
+    @Deprecated
+    public AnnotatedMember findAnySetterField() {
+        AnnotatedMember m = findAnySetterAccessor();
+        if (m instanceof AnnotatedField) {
+            return m;
+        }
+        return null;
+    }
+
+    /*
+    /**********************************************************
+    /* Basic API, class configuration
+    /**********************************************************
+     */
+
+    /**
+     * Method for finding annotation-indicated inclusion definition (if any);
+     * possibly overriding given default value.
+     *<p>
+     * NOTE: does NOT use global inclusion default settings as the base, unless
+     * passed as `defValue`.
+     *
+     * @since 2.7
+     */
+    public abstract JsonInclude.Value findPropertyInclusion(JsonInclude.Value defValue);
+
+    /**
+     * Method for checking what is the expected format for POJO, as
+     * defined by defaults and possible annotations.
+     * Note that this may be further refined by per-property annotations.
+     *
+     * @since 2.1
+     */
+    public abstract JsonFormat.Value findExpectedFormat(JsonFormat.Value defValue);
+
+    /**
+     * Method for finding {@link Converter} used for serializing instances
+     * of this class.
+     *
+     * @since 2.2
+     */
+    public abstract Converter<Object,Object> findSerializationConverter();
+
+    /**
+     * Method for finding {@link Converter} used for serializing instances
+     * of this class.
+     *
+     * @since 2.2
+     */
+    public abstract Converter<Object,Object> findDeserializationConverter();
+
+    /**
+     * Accessor for possible description for the bean type, used for constructing
+     * documentation.
+     *
+     * @since 2.7
+     */
+    public String findClassDescription() { return null; }
+
     /*
     /**********************************************************
     /* Basic API, other
@@ -192,8 +340,6 @@ public abstract class BeanDescription
      */
 
     public abstract Map<Object, AnnotatedMember> findInjectables();
-
-    public abstract JsonInclude.Include findSerializationInclusion(JsonInclude.Include defValue);
 
     /**
      * Method for checking if the POJO type has annotations to
@@ -207,12 +353,12 @@ public abstract class BeanDescription
      * Method for finding configuration for POJO Builder class.
      */
     public abstract JsonPOJOBuilder.Value findPOJOBuilderConfig();
-    
+
     /**
      * Method called to create a "default instance" of the bean, currently
      * only needed for obtaining default field values which may be used for
      * suppressing serialization of fields that have "not changed".
-     * 
+     *
      * @param fixAccess If true, method is allowed to fix access to the
      *   default constructor (to be able to call non-public constructor);
      *   if false, has to use constructor as is.
@@ -221,4 +367,13 @@ public abstract class BeanDescription
      *   suitable default constructor was found; null otherwise.
      */
     public abstract Object instantiateBean(boolean fixAccess);
+
+    /**
+     * Method for finding out if the POJO specifies default view(s) to
+     * use for properties, considering both per-type annotations and
+     * global default settings.
+     *
+     * @since 2.9
+     */
+    public abstract Class<?>[] findDefaultViews();
 }

@@ -5,9 +5,13 @@ import java.lang.reflect.Type;
 
 import com.fasterxml.jackson.core.*;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
+import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 
 /**
  * This is the special serializer for regular {@link java.lang.String}s.
@@ -17,28 +21,45 @@ import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
  */
 @JacksonStdImpl
 public final class StringSerializer
-    extends NonTypedScalarSerializerBase<String>
+// NOTE: generic parameter changed from String to Object in 2.6, to avoid
+//   use of bridge methods
+// In 2.9, removed use of intermediate type `NonTypedScalarSerializerBase`
+    extends StdScalarSerializer<Object>
 {
-    public StringSerializer() { super(String.class); }
+    private static final long serialVersionUID = 1L;
+
+    public StringSerializer() { super(String.class, false); }
+
+    @Override
+    public boolean isEmpty(SerializerProvider prov, Object value) {
+        String str = (String) value;
+        return str.isEmpty();
+    }
+
+    @Override
+    public void serialize(Object value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+        gen.writeString((String) value);
+    }
+
+    @Override
+    public final void serializeWithType(Object value, JsonGenerator gen, SerializerProvider provider,
+            TypeSerializer typeSer) throws IOException
+    {
+        // no type info, just regular serialization
+        gen.writeString((String) value);
+    }
 
     /**
-     * For Strings, both null and Empty String qualify for emptiness.
+     * @deprecated Since 2.15
      */
+    @Deprecated
     @Override
-    public boolean isEmpty(String value) {
-        return (value == null) || (value.length() == 0);
-    }
-    
-    @Override
-    public void serialize(String value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
-    {
-        jgen.writeString(value);
+    public JsonNode getSchema(SerializerProvider provider, Type typeHint) {
+        return createSchemaNode("string", true);
     }
 
     @Override
-    public JsonNode getSchema(SerializerProvider provider, Type typeHint)
-    {
-        return createSchemaNode("string", true);
+    public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint) throws JsonMappingException {
+        visitStringFormat(visitor, typeHint);
     }
 }

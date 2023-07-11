@@ -3,27 +3,21 @@ package com.fasterxml.jackson.databind.ext;
 import java.io.IOException;
 import java.util.*;
 
-import javax.xml.datatype.DatatypeConfigurationException;
-import javax.xml.datatype.DatatypeFactory;
-import javax.xml.datatype.Duration;
-import javax.xml.datatype.XMLGregorianCalendar;
+import javax.xml.datatype.*;
 import javax.xml.namespace.QName;
 
 import com.fasterxml.jackson.core.*;
 
-import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
-import com.fasterxml.jackson.databind.util.Provider;
 
 /**
  * Container deserializers that handle "core" XML types: ones included in standard
- * JDK 1.5. Types are directly needed by JAXB, and are thus supported within core
- * mapper package, not in "xc" package.
+ * JDK 1.5. Types are directly needed by JAXB, but may be unavailable on some
+ * limited platforms; hence separate out from basic deserializer factory.
  */
-public class CoreXMLDeserializers
-    implements Provider<StdDeserializer<?>>
+public class CoreXMLDeserializers extends Deserializers.Base
 {
     /**
      * Data type factories are thread-safe after instantiation (and
@@ -38,75 +32,112 @@ public class CoreXMLDeserializers
             throw new RuntimeException(e);
         }
     }
-    
-    /*
-    /**********************************************************
-    /* Provider implementation
-    /**********************************************************
-     */
 
-    /**
-     * Method called by {@link com.fasterxml.jackson.databind.deser.BasicDeserializerFactory}
-     * to register deserializers this class provides.
-     */
     @Override
-    public Collection<StdDeserializer<?>> provide()
+    public JsonDeserializer<?> findBeanDeserializer(JavaType type,
+        DeserializationConfig config, BeanDescription beanDesc)
     {
-        return Arrays.asList(new StdDeserializer<?>[] {
-            new DurationDeserializer()
-            ,new GregorianCalendarDeserializer()
-            ,new QNameDeserializer()
-        });
+        Class<?> raw = type.getRawClass();
+        if (raw == QName.class) {
+            return new Std(raw, TYPE_QNAME);
+        }
+        if (raw == XMLGregorianCalendar.class) {
+            return new Std(raw, TYPE_G_CALENDAR);
+        }
+        if (raw == Duration.class) {
+            return new Std(raw, TYPE_DURATION);
+        }
+        return null;
     }
-    
+
+    @Override // since 2.11
+    public boolean hasDeserializerFor(DeserializationConfig config, Class<?> valueType) {
+        return (valueType == QName.class)
+                || (valueType == XMLGregorianCalendar.class)
+                || (valueType == Duration.class)
+                ;
+    }
+
     /*
     /**********************************************************
     /* Concrete deserializers
     /**********************************************************
      */
 
-    public static class DurationDeserializer
-        extends FromStringDeserializer<Duration>
-    {
-        public DurationDeserializer() { super(Duration.class); }
-    
-        @Override
-        protected Duration _deserialize(String value, DeserializationContext ctxt)
-            throws IllegalArgumentException
-        {
-            return _dataTypeFactory.newDuration(value);
-        }
-    }
+    protected final static int TYPE_DURATION = 1;
+    protected final static int TYPE_G_CALENDAR = 2;
+    protected final static int TYPE_QNAME = 3;
 
-    public static class GregorianCalendarDeserializer
-        extends StdScalarDeserializer<XMLGregorianCalendar>
+    /**
+     * Combo-deserializer that supports deserialization of somewhat optional
+     * javax.xml types {@link QName}, {@link Duration} and {@link XMLGregorianCalendar}.
+     * Combined into a single class to eliminate bunch of one-off implementation
+     * classes, to reduce resulting jar size (mostly).
+     *
+     * @since 2.4
+     */
+    public static class Std extends FromStringDeserializer<Object>
     {
-        public GregorianCalendarDeserializer() { super(XMLGregorianCalendar.class); }
-        
+        private static final long serialVersionUID = 1L;
+
+        protected final int _kind;
+
+        public Std(Class<?> raw, int kind) {
+            super(raw);
+            _kind = kind;
+        }
+
         @Override
-        public XMLGregorianCalendar deserialize(JsonParser jp, DeserializationContext ctxt)
-            throws IOException, JsonProcessingException
+        public Object deserialize(JsonParser p, DeserializationContext ctxt)
+            throws IOException
         {
-            Date d = _parseDate(jp, ctxt);
+            // For most types, use super impl; but GregorianCalendar also allows
+            // integer value (timestamp), which needs separate handling
+            if (_kind == TYPE_G_CALENDAR) {
+                if (p.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+                    return _gregorianFromDate(ctxt, _parseDate(p, ctxt));
+                }
+            }
+            return super.deserialize(p, ctxt);
+        }
+
+        @Override
+        protected Object _deserialize(String value, DeserializationContext ctxt)
+            throws IOException
+        {
+            switch (_kind) {
+            case TYPE_DURATION:
+                return _dataTypeFactory.newDuration(value);
+            case TYPE_QNAME:
+                return QName.valueOf(value);
+            case TYPE_G_CALENDAR:
+                Date d;
+                try {
+                    d = _parseDate(value, ctxt);
+                }
+                catch (JsonMappingException e) {
+                    // try to parse from native XML Schema 1.0 lexical representation String,
+                    // which includes time-only formats not handled by parseXMLGregorianCalendarFromJacksonFormat(...)
+                    return _dataTypeFactory.newXMLGregorianCalendar(value);
+                }
+                return _gregorianFromDate(ctxt, d);
+            }
+            throw new IllegalStateException();
+        }
+
+        protected XMLGregorianCalendar _gregorianFromDate(DeserializationContext ctxt,
+                Date d)
+        {
             if (d == null) {
                 return null;
             }
             GregorianCalendar calendar = new GregorianCalendar();
             calendar.setTime(d);
+            TimeZone tz = ctxt.getTimeZone();
+            if (tz != null) {
+                calendar.setTimeZone(tz);
+            }
             return _dataTypeFactory.newXMLGregorianCalendar(calendar);
-        }
-    }
-
-    public static class QNameDeserializer
-        extends FromStringDeserializer<QName>
-    {
-        public QNameDeserializer() { super(QName.class); }
-        
-        @Override
-        protected QName _deserialize(String value, DeserializationContext ctxt)
-            throws IllegalArgumentException
-        {
-            return QName.valueOf(value);
         }
     }
 }

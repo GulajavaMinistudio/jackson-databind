@@ -9,20 +9,22 @@ import java.util.*;
  * reuse scheme, which assumes that caller knows not to use instances
  * concurrently (which works ok with primitive arrays since they can
  * not contain other non-primitive types).
+ * Also note that instances are not thread safe; the intent is that
+ * a builder is constructed on per-call (deserialization) basis.
  */
 public final class ArrayBuilders
 {
-    BooleanBuilder _booleanBuilder = null;
+    private BooleanBuilder _booleanBuilder = null;
 
     // note: no need for char[] builder, assume they are Strings
 
-    ByteBuilder _byteBuilder = null;
-    ShortBuilder _shortBuilder = null;
-    IntBuilder _intBuilder = null;
-    LongBuilder _longBuilder = null;
-    
-    FloatBuilder _floatBuilder = null;
-    DoubleBuilder _doubleBuilder = null;
+    private ByteBuilder _byteBuilder = null;
+    private ShortBuilder _shortBuilder = null;
+    private IntBuilder _intBuilder = null;
+    private LongBuilder _longBuilder = null;
+
+    private FloatBuilder _floatBuilder = null;
+    private DoubleBuilder _doubleBuilder = null;
 
     public ArrayBuilders() { }
 
@@ -135,85 +137,62 @@ public final class ArrayBuilders
         @Override
         public final double[] _constructArray(int len) { return new double[len]; }
     }
-    
+
     /*
     /**********************************************************
     /* Static helper methods
     /**********************************************************
      */
 
+    /**
+     * Helper method used for constructing simple value comparator used for
+     * comparing arrays for content equality.
+     *<p>
+     * Note: current implementation is not optimized for speed; if performance
+     * ever becomes an issue, it is possible to construct much more efficient
+     * typed instances (one for Object[] and sub-types; one per primitive type).
+     *
+     * @since 2.2 Moved from earlier <code>Comparators</code> class
+     */
+    public static Object getArrayComparator(final Object defaultValue)
+    {
+        final int length = Array.getLength(defaultValue);
+        final Class<?> defaultValueType = defaultValue.getClass();
+        return new Object() {
+            @Override
+            public boolean equals(Object other) {
+                if (other == this) return true;
+                if (!ClassUtil.hasClass(other, defaultValueType)) {
+                    return false;
+                }
+                if (Array.getLength(other) != length) return false;
+                // so far so good: compare actual equality; but only shallow one
+                for (int i = 0; i < length; ++i) {
+                    Object value1 = Array.get(defaultValue, i);
+                    Object value2 = Array.get(other, i);
+                    if (value1 == value2) continue;
+                    if (value1 != null) {
+                        if (!value1.equals(value2)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+        };
+    }
+
     public static <T> HashSet<T> arrayToSet(T[] elements)
     {
-        HashSet<T> result = new HashSet<T>();
         if (elements != null) {
-            for (T elem : elements) {
-                result.add(elem);
+            int len = elements.length;
+            HashSet<T> result = new HashSet<T>(len);
+            for (int i = 0; i < len; ++i) {
+                result.add(elements[i]);
             }
+            return result;
         }
-        return result;
-    }
-
-    public static <T> ArrayList<T> arrayToList(T[] elements)
-    {
-        ArrayList<T> result = new ArrayList<T>();
-        if (elements != null) {
-            for (T elem : elements) {
-                result.add(elem);
-            }
-        }
-        return result;
-    }
-
-    public static <T> HashSet<T> setAndArray(Set<T> set, T[] elements)
-    {
-        HashSet<T> result = new HashSet<T>();
-        if (set != null) {
-            result.addAll(set);
-        }
-        if (elements != null) {
-            for (T value : elements) {
-                result.add(value);
-            }
-        }
-        return result;
-    }
-    
-    /**
-     * Helper method for adding specified element to a List, but also
-     * considering case where the List may not have been yet constructed
-     * (that is, null is passed instead).
-     * 
-     * @param list List to add to; may be null to indicate that a new
-     *    List is to be constructed
-     * @param element Element to add to list
-     * 
-     * @return List in which element was added; either <code>list</code>
-     *   (if it was not null), or a newly constructed List.
-     */
-    public static <T> List<T> addToList(List<T> list, T element)
-    {
-        if (list == null) {
-            list = new ArrayList<T>();
-        }
-        list.add(element);
-        return list;
-    }
-
-    /**
-     * Helper method for constructing a new array that contains specified
-     * element followed by contents of the given array. No checking is done
-     * to see if element being inserted is duplicate.
-     */
-    public static <T> T[] insertInList(T[] array, T element)
-    {
-        int len = array.length;
-        @SuppressWarnings("unchecked")
-        T[] result = (T[]) Array.newInstance(array.getClass().getComponentType(), len+1);
-        if (len > 0) {
-            System.arraycopy(array, 0, result, 1, len);
-        }
-        result[0] = element;
-        return result;
+        return new HashSet<T>();
     }
 
     /**
@@ -228,7 +207,7 @@ public final class ArrayBuilders
     public static <T> T[] insertInListNoDup(T[] array, T element)
     {
         final int len = array.length;
-        
+
         // First: see if the element already exists
         for (int ix = 0; ix < len; ++ix) {
             if (array[ix] == element) {
@@ -239,7 +218,12 @@ public final class ArrayBuilders
                 // otherwise move things around
                 T[] result = (T[]) Array.newInstance(array.getClass().getComponentType(), len);
                 System.arraycopy(array, 0, result, 1, ix);
-                array[0] = element;
+                result[0] = element;
+                ++ix;
+                int left = len - ix;
+                if (left > 0) {
+                	System.arraycopy(array, ix, result, ix, left);
+                }
                 return result;
             }
         }
@@ -251,63 +235,5 @@ public final class ArrayBuilders
         }
         result[0] = element;
         return result;
-    }
-    
-    /**
-     * Helper method for exposing contents of arrays using a read-only iterator
-     */
-    public static <T> Iterator<T> arrayAsIterator(T[] array)
-    {
-        return new ArrayIterator<T>(array);
-    }
-
-    public static <T> Iterable<T> arrayAsIterable(T[] array)
-    {
-        return new ArrayIterator<T>(array);
-    }
-
-    /*
-    /**********************************************************
-    /* Helper classes
-    /**********************************************************
-     */
-
-    /**
-     * Iterator implementation used to efficiently expose contents of an
-     * Array as read-only iterator.
-     */
-    private final static class ArrayIterator<T>
-        implements Iterator<T>, Iterable<T>
-    {
-        private final T[] _array;
-        
-        private int _index;
-
-        public ArrayIterator(T[] array) {
-            _array = array;
-            _index = 0;
-        }
-        
-        @Override public boolean hasNext() {
-            return _index < _array.length;
-        }
-
-        @Override
-        public T next()
-        {
-            if (_index >= _array.length) {
-                throw new NoSuchElementException();
-            }
-            return _array[_index++];
-        }
-
-        @Override public void remove() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Iterator<T> iterator() {
-            return this;
-        }
     }
 }

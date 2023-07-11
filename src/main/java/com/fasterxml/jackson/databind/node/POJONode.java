@@ -3,17 +3,19 @@ package com.fasterxml.jackson.databind.node;
 import java.io.IOException;
 
 import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.JsonSerializable;
 import com.fasterxml.jackson.databind.SerializerProvider;
-
 
 /**
  * Value node that contains a wrapped POJO, to be serialized as
  * a JSON constructed through data mapping (usually done by
  * calling {@link com.fasterxml.jackson.databind.ObjectMapper}).
  */
-public final class POJONode
+public class POJONode
     extends ValueNode
 {
+    private static final long serialVersionUID = 2L;
+
     protected final Object _value;
 
     public POJONode(Object v) { _value = v; }
@@ -24,10 +26,12 @@ public final class POJONode
     /**********************************************************
      */
 
-    @Override public JsonToken asToken() { return JsonToken.VALUE_EMBEDDED_OBJECT; }
-
     @Override
-    public boolean isPojo() { return true; }
+    public JsonNodeType getNodeType() {
+        return JsonNodeType.POJO;
+    }
+
+    @Override public JsonToken asToken() { return JsonToken.VALUE_EMBEDDED_OBJECT; }
 
     /**
      * As it is possible that some implementations embed byte[] as POJONode
@@ -42,16 +46,18 @@ public final class POJONode
         }
         return super.binaryValue();
     }
-    
-    /* 
+
+    /*
     /**********************************************************
     /* General type coercions
     /**********************************************************
      */
 
     @Override
-    public String asText() {
-        return (_value == null) ? "null" : _value.toString();
+    public String asText() { return (_value == null) ? "null" : _value.toString(); }
+
+    @Override public String asText(String defaultValue) {
+        return (_value == null) ? defaultValue : _value.toString();
     }
 
     @Override
@@ -62,7 +68,7 @@ public final class POJONode
         }
         return defaultValue;
     }
-    
+
     @Override
     public int asInt(int defaultValue)
     {
@@ -80,7 +86,7 @@ public final class POJONode
         }
         return defaultValue;
     }
-    
+
     @Override
     public double asDouble(double defaultValue)
     {
@@ -89,7 +95,7 @@ public final class POJONode
         }
         return defaultValue;
     }
-    
+
     /*
     /**********************************************************
     /* Public API, serialization
@@ -97,13 +103,16 @@ public final class POJONode
      */
 
     @Override
-    public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+    public final void serialize(JsonGenerator gen, SerializerProvider ctxt) throws IOException
     {
         if (_value == null) {
-            jg.writeNull();
+            ctxt.defaultSerializeNull(gen);
+        } else if (_value instanceof JsonSerializable) {
+            ((JsonSerializable) _value).serialize(gen, ctxt);
         } else {
-            jg.writeObject(_value);
+            // 25-May-2018, tatu: [databind#1991] do not call via generator but through context;
+            //    this to preserve contextual information
+            ctxt.defaultSerializeValue(_value, gen);
         }
     }
 
@@ -129,10 +138,17 @@ public final class POJONode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
-            return false;
+        if (o instanceof POJONode) {
+            return _pojoEquals((POJONode) o);
         }
-        POJONode other = (POJONode) o;
+        return false;
+    }
+
+    /**
+     * @since 2.3
+     */
+    protected boolean _pojoEquals(POJONode other)
+    {
         if (_value == null) {
             return other._value == null;
         }
@@ -141,10 +157,4 @@ public final class POJONode
 
     @Override
     public int hashCode() { return _value.hashCode(); }
-
-    @Override
-    public String toString()
-    {
-        return String.valueOf(_value);
-    }
 }

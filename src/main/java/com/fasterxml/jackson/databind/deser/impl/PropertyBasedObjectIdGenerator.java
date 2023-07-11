@@ -7,10 +7,12 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 public class PropertyBasedObjectIdGenerator
 	extends ObjectIdGenerators.PropertyGenerator
 {
+    private static final long serialVersionUID = 1L;
+
     public PropertyBasedObjectIdGenerator(Class<?> scope) {
         super(scope);
     }
-    
+
     @Override
     public Object generateId(Object forPojo) {
     	throw new UnsupportedOperationException();
@@ -28,6 +30,9 @@ public class PropertyBasedObjectIdGenerator
 
     @Override
     public com.fasterxml.jackson.annotation.ObjectIdGenerator.IdKey key(Object key) {
+        if (key == null) {
+            return null;
+        }
         // should we use general type for all; or type of property itself?
         return new IdKey(getClass(), _scope, key);
     }

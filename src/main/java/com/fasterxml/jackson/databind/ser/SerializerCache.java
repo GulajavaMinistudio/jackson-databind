@@ -1,9 +1,11 @@
 package com.fasterxml.jackson.databind.ser;
 
-import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.ser.impl.ReadOnlyClassToSerializerMap;
+import com.fasterxml.jackson.databind.util.LRUMap;
+import com.fasterxml.jackson.databind.util.TypeKey;
 
 /**
  * Simple cache object that allows for doing 2-level lookups: first level is
@@ -15,7 +17,7 @@ import com.fasterxml.jackson.databind.ser.impl.ReadOnlyClassToSerializerMap;
  * number of distinct read-only maps constructed, and number of
  * serializers constructed.
  *<p>
- * Since version 1.5 cache will actually contain three kinds of entries,
+ * Cache contains three kinds of entries,
  * based on combination of class pair key. First class in key is for the
  * type to serialize, and second one is type used for determining how
  * to resolve value type. One (but not both) of entries can be null.
@@ -23,19 +25,33 @@ import com.fasterxml.jackson.databind.ser.impl.ReadOnlyClassToSerializerMap;
 public final class SerializerCache
 {
     /**
+     * By default, allow caching of up to 4000 serializer entries (for possibly up to
+     * 1000 types; but depending access patterns may be as few as half of that).
+     */
+    public final static int DEFAULT_MAX_CACHED = 4000;
+
+    /**
      * Shared, modifiable map; all access needs to be through synchronized blocks.
      *<p>
      * NOTE: keys are of various types (see below for key types), in addition to
      * basic {@link JavaType} used for "untyped" serializers.
      */
-    private HashMap<TypeKey, JsonSerializer<Object>> _sharedMap = new HashMap<TypeKey, JsonSerializer<Object>>(64);
+    private final LRUMap<TypeKey, JsonSerializer<Object>> _sharedMap;
 
     /**
      * Most recent read-only instance, created from _sharedMap, if any.
      */
-    private ReadOnlyClassToSerializerMap _readOnlyMap = null;
+    private final AtomicReference<ReadOnlyClassToSerializerMap> _readOnlyMap;
 
-    public SerializerCache() { }
+    public SerializerCache() {
+        this(DEFAULT_MAX_CACHED);
+    }
+
+    public SerializerCache(int maxCached) {
+        int initial = Math.min(64, maxCached>>2);
+        _sharedMap = new LRUMap<TypeKey, JsonSerializer<Object>>(initial, maxCached);
+        _readOnlyMap = new AtomicReference<ReadOnlyClassToSerializerMap>();
+    }
 
     /**
      * Method that can be called to get a read-only instance populated from the
@@ -43,14 +59,22 @@ public final class SerializerCache
      */
     public ReadOnlyClassToSerializerMap getReadOnlyLookupMap()
     {
-        ReadOnlyClassToSerializerMap m;
-        synchronized (this) {
-            m = _readOnlyMap;
-            if (m == null) {
-                _readOnlyMap = m = ReadOnlyClassToSerializerMap.from(_sharedMap);
-            }
+        ReadOnlyClassToSerializerMap m = _readOnlyMap.get();
+        if (m != null) {
+            return m;
         }
-        return m.instance();
+        return _makeReadOnlyLookupMap();
+    }
+
+    private final synchronized ReadOnlyClassToSerializerMap _makeReadOnlyLookupMap() {
+        // double-locking; safe, but is it really needed? Not doing that is only a perf problem,
+        // not correctness
+        ReadOnlyClassToSerializerMap m = _readOnlyMap.get();
+        if (m == null) {
+            m = ReadOnlyClassToSerializerMap.from(_sharedMap);
+            _readOnlyMap.set(m);
+        }
+        return m;
     }
 
     /*
@@ -62,7 +86,7 @@ public final class SerializerCache
     public synchronized int size() {
         return _sharedMap.size();
     }
-    
+
     /**
      * Method that checks if the shared (and hence, synchronized) lookup Map might have
      * untyped serializer for given type.
@@ -100,7 +124,7 @@ public final class SerializerCache
     /* Methods for adding shared serializer instances
     /**********************************************************
      */
-    
+
     /**
      * Method called if none of lookups succeeded, and caller had to construct
      * a serializer. If so, we will update the shared lookup map so that it
@@ -111,7 +135,7 @@ public final class SerializerCache
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(type, true), ser) == null) {
                 // let's invalidate the read-only copy, too, to get it updated
-                _readOnlyMap = null;
+                _readOnlyMap.set(null);
             }
         }
     }
@@ -121,26 +145,23 @@ public final class SerializerCache
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(cls, true), ser) == null) {
                 // let's invalidate the read-only copy, too, to get it updated
-                _readOnlyMap = null;
+                _readOnlyMap.set(null);
             }
         }
     }
-    
+
     public void addAndResolveNonTypedSerializer(Class<?> type, JsonSerializer<Object> ser,
             SerializerProvider provider)
         throws JsonMappingException
     {
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(type, false), ser) == null) {
-                // let's invalidate the read-only copy, too, to get it updated
-                _readOnlyMap = null;
+                _readOnlyMap.set(null);
             }
-            /* Finally: some serializers want to do post-processing, after
-             * getting registered (to handle cyclic deps).
-             */
-            /* 14-May-2011, tatu: As per [JACKSON-570], resolving needs to be done
-             *   in synchronized manner; this because while we do need to register
-             *   instance first, we also must keep lock until resolution is complete
+            // Need resolution to handle cyclic POJO type dependencies
+            /* 14-May-2011, tatu: Resolving needs to be done in synchronized manner;
+             *   this because while we do need to register instance first, we also must
+             *   keep lock until resolution is complete.
              */
             if (ser instanceof ResolvableSerializer) {
                 ((ResolvableSerializer) ser).resolve(provider);
@@ -154,16 +175,36 @@ public final class SerializerCache
     {
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(type, false), ser) == null) {
-                // let's invalidate the read-only copy, too, to get it updated
-                _readOnlyMap = null;
+                _readOnlyMap.set(null);
             }
-            /* Finally: some serializers want to do post-processing, after
-             * getting registered (to handle cyclic deps).
+            // Need resolution to handle cyclic POJO type dependencies
+            /* 14-May-2011, tatu: Resolving needs to be done in synchronized manner;
+             *   this because while we do need to register instance first, we also must
+             *   keep lock until resolution is complete.
              */
-            /* 14-May-2011, tatu: As per [JACKSON-570], resolving needs to be done
-             *   in synchronized manner; this because while we do need to register
-             *   instance first, we also must keep lock until resolution is complete
-             */
+            if (ser instanceof ResolvableSerializer) {
+                ((ResolvableSerializer) ser).resolve(provider);
+            }
+        }
+    }
+
+    /**
+     * Another alternative that will cover both access via raw type and matching
+     * fully resolved type, in one fell swoop.
+     *
+     * @since 2.7
+     */
+    public void addAndResolveNonTypedSerializer(Class<?> rawType, JavaType fullType,
+            JsonSerializer<Object> ser,
+            SerializerProvider provider)
+        throws JsonMappingException
+    {
+        synchronized (this) {
+            Object ob1 = _sharedMap.put(new TypeKey(rawType, false), ser);
+            Object ob2 = _sharedMap.put(new TypeKey(fullType, false), ser);
+            if ((ob1 == null) || (ob2 == null)) {
+                _readOnlyMap.set(null);
+            }
             if (ser instanceof ResolvableSerializer) {
                 ((ResolvableSerializer) ser).resolve(provider);
             }
@@ -176,113 +217,6 @@ public final class SerializerCache
      */
     public synchronized void flush() {
         _sharedMap.clear();
-    }
-
-    /*
-    /**************************************************************
-    /* Helper class(es)
-    /**************************************************************
-     */
-
-    /**
-     * Key that offers two "modes"; one with raw class, as used for
-     * cases were raw class type is available (for example, when using
-     * runtime type); and one with full generics-including.
-     */
-    public final static class TypeKey
-    {
-        protected int _hashCode;
-
-        protected Class<?> _class;
-
-        protected JavaType _type;
-
-        /**
-         * Indicator of whether serializer stored has a type serializer
-         * wrapper around it or not; if not, it is "untyped" serializer;
-         * if it has, it is "typed"
-         */
-        protected boolean _isTyped;
-        
-        public TypeKey(Class<?> key, boolean typed) {
-            _class = key;
-            _type = null;
-            _isTyped = typed;
-            _hashCode = hash(key, typed);
-        }
-
-        public TypeKey(JavaType key, boolean typed) {
-            _type = key;
-            _class = null;
-            _isTyped = typed;
-            _hashCode = hash(key, typed);
-        }
-
-        private final static int hash(Class<?> cls, boolean typed) {
-            int hash = cls.getName().hashCode();
-            if (typed) {
-                ++hash;
-            }
-            return hash;
-        }
-
-        private final static int hash(JavaType type, boolean typed) {
-            int hash = type.hashCode() - 1;
-            if (typed) {
-                --hash;
-            }
-            return hash;
-        }
-        
-        public void resetTyped(Class<?> cls) {
-            _type = null;
-            _class = cls;
-            _isTyped = true;
-            _hashCode = hash(cls, true);
-        }
-
-        public void resetUntyped(Class<?> cls) {
-            _type = null;
-            _class = cls;
-            _isTyped = false;
-            _hashCode = hash(cls, false);
-        }
-        
-        public void resetTyped(JavaType type) {
-            _type = type;
-            _class = null;
-            _isTyped = true;
-            _hashCode = hash(type, true);
-        }
-
-        public void resetUntyped(JavaType type) {
-            _type = type;
-            _class = null;
-            _isTyped = false;
-            _hashCode = hash(type, false);
-        }
-        
-        @Override public final int hashCode() { return _hashCode; }
-
-        @Override public final String toString() {
-            if (_class != null) {
-                return "{class: "+_class.getName()+", typed? "+_isTyped+"}";
-            }
-            return "{type: "+_type+", typed? "+_isTyped+"}";
-        }
-        
-        // note: we assume key is never used for anything other than as map key, so:
-        @Override public final boolean equals(Object o)
-        {
-            if (o == this) return true;
-            TypeKey other = (TypeKey) o;
-            if (other._isTyped == _isTyped) {
-                if (_class != null) {
-                    return other._class == _class;
-                }
-                return _type.equals(other._type);
-            }
-            return false;
-        } 
+        _readOnlyMap.set(null);
     }
 }

@@ -4,11 +4,12 @@ import java.io.IOException;
 import java.util.*;
 
 import com.fasterxml.jackson.core.*;
-
+import com.fasterxml.jackson.core.type.WritableTypeId;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JacksonStdImpl;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonArrayFormatVisitor;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatTypes;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.ContextualSerializer;
 import com.fasterxml.jackson.databind.ser.std.StaticListSerializerBase;
 
 /**
@@ -19,61 +20,41 @@ import com.fasterxml.jackson.databind.ser.std.StaticListSerializerBase;
  * String serializer.
  */
 @JacksonStdImpl
+@SuppressWarnings("serial")
 public class StringCollectionSerializer
     extends StaticListSerializerBase<Collection<String>>
-    implements ContextualSerializer
 {
     public final static StringCollectionSerializer instance = new StringCollectionSerializer();
-    
-    protected final JsonSerializer<String> _serializer;
-    
+
     /*
     /**********************************************************
     /* Life-cycle
     /**********************************************************
      */
-    
+
     protected StringCollectionSerializer() {
-        this(null);
+        super(Collection.class);
     }
 
-    @SuppressWarnings("unchecked")
-    protected StringCollectionSerializer(JsonSerializer<?> ser)
+    protected StringCollectionSerializer(StringCollectionSerializer src,
+            Boolean unwrapSingle)
     {
-        super(Collection.class);
-        _serializer = (JsonSerializer<String>) ser;
-    }        
-    
+        super(src, unwrapSingle);
+    }
+
+    @Override
+    public JsonSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
+        return new StringCollectionSerializer(this, unwrapSingle);
+    }
+
     @Override protected JsonNode contentSchema() {
         return createSchemaNode("string", true);
     }
 
-    /*
-    /**********************************************************
-    /* Post-processing
-    /**********************************************************
-     */
-    
     @Override
-    public JsonSerializer<?> createContextual(SerializerProvider provider,
-            BeanProperty property)
-        throws JsonMappingException
+    protected void acceptContentVisitor(JsonArrayFormatVisitor visitor) throws JsonMappingException
     {
-        JsonSerializer<?> ser = _serializer;
-        if (ser == null) {
-            ser = provider.findValueSerializer(String.class, property);
-        } else if (ser instanceof ContextualSerializer) {
-            ser = ((ContextualSerializer) ser).createContextual(provider, property);
-        }
-        // Optimization: default serializer just writes String, so we can avoid a call:
-        if (isDefaultSerializer(ser)) {
-            ser = null;
-        }
-        // note: will never have TypeSerializer, because Strings are "natural" type
-        if (ser == _serializer) {
-            return this;
-        }
-        return new StringCollectionSerializer(ser);
+        visitor.itemsFormat(JsonFormatTypes.STRING);
     }
 
     /*
@@ -81,71 +62,54 @@ public class StringCollectionSerializer
     /* Actual serialization
     /**********************************************************
      */
-    
+
     @Override
-    public void serialize(Collection<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+    public void serialize(Collection<String> value, JsonGenerator g,
+            SerializerProvider provider) throws IOException
     {
-        jgen.writeStartArray();
-        if (_serializer == null) {
-            serializeContents(value, jgen, provider);
-        } else {
-            serializeUsingCustom(value, jgen, provider);
-        }
-        jgen.writeEndArray();
-    }
-    
-    @Override
-    public void serializeWithType(Collection<String> value, JsonGenerator jgen, SerializerProvider provider,
-            TypeSerializer typeSer)
-        throws IOException, JsonGenerationException
-    {
-        typeSer.writeTypePrefixForArray(value, jgen);
-        if (_serializer == null) {
-            serializeContents(value, jgen, provider);
-        } else {
-            serializeUsingCustom(value, jgen, provider);
-        }
-        typeSer.writeTypeSuffixForArray(value, jgen);
-    }
-    
-    private final void serializeContents(Collection<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
-    {
-        if (_serializer != null) {
-            serializeUsingCustom(value, jgen, provider);
-            return;
-        }
-        int i = 0;
-        for (String str : value) {
-            try {
-                if (str == null) {
-                    provider.defaultSerializeNull(jgen);
-                } else {
-                    jgen.writeString(str);
-                }
-                ++i;
-            } catch (Exception e) {
-                wrapAndThrow(provider, e, value, i);
+        final int len = value.size();
+        if (len == 1) {
+            if (((_unwrapSingle == null) &&
+                    provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED))
+                    || (_unwrapSingle == Boolean.TRUE)) {
+                serializeContents(value, g, provider);
+                return;
             }
         }
+        g.writeStartArray(value, len);
+        serializeContents(value, g, provider);
+        g.writeEndArray();
     }
 
-    private void serializeUsingCustom(Collection<String> value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+    @Override
+    public void serializeWithType(Collection<String> value, JsonGenerator g,
+            SerializerProvider provider, TypeSerializer typeSer)
+        throws IOException
     {
-        final JsonSerializer<String> ser = _serializer;
+        WritableTypeId typeIdDef = typeSer.writeTypePrefix(g,
+                typeSer.typeId(value, JsonToken.START_ARRAY));
+        g.setCurrentValue(value);
+        serializeContents(value, g, provider);
+        typeSer.writeTypeSuffix(g, typeIdDef);
+    }
+
+    private final void serializeContents(Collection<String> value, JsonGenerator g,
+            SerializerProvider provider)
+        throws IOException
+    {
         int i = 0;
-        for (String str : value) {
-            try {
+
+        try {
+            for (String str : value) {
                 if (str == null) {
-                    provider.defaultSerializeNull(jgen);
+                    provider.defaultSerializeNull(g);
                 } else {
-                    ser.serialize(str, jgen, provider);
+                    g.writeString(str);
                 }
-            } catch (Exception e) {
-                wrapAndThrow(provider, e, value, i);
+                ++i;
             }
-       }
+        } catch (Exception e) {
+            wrapAndThrow(provider, e, value, i);
+        }
     }
 }

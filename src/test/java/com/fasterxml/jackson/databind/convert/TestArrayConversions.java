@@ -12,18 +12,21 @@ public class TestArrayConversions
     extends com.fasterxml.jackson.databind.BaseMapTest
 {
     final static String OVERFLOW_MSG_BYTE = "out of range of Java byte";
-    final static String OVERFLOW_MSG = "overflow";
+    final static String OVERFLOW_MSG_SHORT = "out of range of Java short";
 
-    final ObjectMapper mapper = new ObjectMapper();
+    final static String OVERFLOW_MSG_INT = "out of range of int";
+    final static String OVERFLOW_MSG_LONG = "out of range of long";
+
+    final ObjectMapper MAPPER = new ObjectMapper();
 
     public void testNullXform() throws Exception
     {
         /* when given null, null should be returned without conversion
          * (Java null has no type)
          */
-        assertNull(mapper.convertValue(null, Integer.class));
-        assertNull(mapper.convertValue(null, String.class));
-        assertNull(mapper.convertValue(null, byte[].class));
+        assertNull(MAPPER.convertValue(null, Integer.class));
+        assertNull(MAPPER.convertValue(null, String.class));
+        assertNull(MAPPER.convertValue(null, byte[].class));
     }
 
     /**
@@ -54,7 +57,7 @@ public class TestArrayConversions
         byte[] exp = "sure.".getBytes("Ascii");
         verifyIntegralArrays(exp, data, exp.length);
     }
-    
+
     public void testShortArrayToX() throws Exception
     {
         short[] data = shorts();
@@ -72,7 +75,7 @@ public class TestArrayConversions
 
         List<Number> expNums = _numberList(data, data.length);
         // Alas, due to type erasure, need to use TypeRef, not just class
-        List<Integer> actNums = mapper.convertValue(data, new TypeReference<List<Integer>>() {});
+        List<Integer> actNums = MAPPER.convertValue(data, new TypeReference<List<Integer>>() {});
         assertEquals(expNums, actNums);
     }
 
@@ -82,53 +85,55 @@ public class TestArrayConversions
         verifyLongArrayConversion(data, byte[].class);
         verifyLongArrayConversion(data, short[].class);
         verifyLongArrayConversion(data, int[].class);
- 
+
         List<Number> expNums = _numberList(data, data.length);
-        List<Long> actNums = mapper.convertValue(data, new TypeReference<List<Long>>() {});
-        assertEquals(expNums, actNums);        
+        List<Long> actNums = MAPPER.convertValue(data, new TypeReference<List<Long>>() {});
+        assertEquals(expNums, actNums);
     }
 
     public void testOverflows()
     {
         // Byte overflow
         try {
-            mapper.convertValue(new int[] { 1000 }, byte[].class);
+            MAPPER.convertValue(new int[] { 1000 }, byte[].class);
+            fail("Expected an exception");
         } catch (IllegalArgumentException e) {
             verifyException(e, OVERFLOW_MSG_BYTE);
         }
         // Short overflow
         try {
-            mapper.convertValue(new int[] { -99999 }, short[].class);
+            MAPPER.convertValue(new int[] { -99999 }, short[].class);
+            fail("Expected an exception");
         } catch (IllegalArgumentException e) {
-            verifyException(e, OVERFLOW_MSG);
+            verifyException(e, OVERFLOW_MSG_SHORT);
         }
         // Int overflow
         try {
-            mapper.convertValue(new long[] { Long.MAX_VALUE }, int[].class);
+            MAPPER.convertValue(new long[] { Long.MAX_VALUE }, int[].class);
+            fail("Expected an exception");
         } catch (IllegalArgumentException e) {
-            verifyException(e, OVERFLOW_MSG);
+            verifyException(e, OVERFLOW_MSG_INT);
         }
         // Longs need help of BigInteger...
-        BigInteger biggie = BigInteger.valueOf(Long.MAX_VALUE);
-        biggie.add(BigInteger.ONE);
+        BigInteger biggie = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);;
         List<BigInteger> l = new ArrayList<BigInteger>();
         l.add(biggie);
         try {
-            mapper.convertValue(l, int[].class);
+            MAPPER.convertValue(l, long[].class);
+            fail("Expected an exception");
         } catch (IllegalArgumentException e) {
-            verifyException(e, OVERFLOW_MSG);
+            verifyException(e, OVERFLOW_MSG_LONG);
         }
-        
     }
-    
+
     /*
-     ********************************************************
-     * Helper methods
-     ********************************************************
+    /********************************************************
+    /* Helper methods
+    /********************************************************
      */
 
     // note: all value need to be within byte range
-    
+
     private byte[] bytes() { return new byte[] { 1, -1, 0, 98, 127 }; }
     private short[] shorts() { return new short[] { 1, -1, 0, 98, 127 }; }
     private int[] ints() { return new int[] { 1, -1, 0, 98, 127 }; }
@@ -165,13 +170,13 @@ public class TestArrayConversions
         T result = _convert(data, arrayType);
         verifyDoubleArrays(data, result, data.length);
     }
-    
+
     private <T> T _convert(Object input, Class<T> outputType)
     {
         // must be a primitive array, like "int[].class"
         if (!outputType.isArray()) throw new IllegalArgumentException();
         if (!outputType.getComponentType().isPrimitive()) throw new IllegalArgumentException();
-        T result = mapper.convertValue(input, outputType);
+        T result = MAPPER.convertValue(input, outputType);
         // sanity check first:
         assertNotNull(result);
         assertEquals(outputType, result.getClass());
@@ -186,7 +191,7 @@ public class TestArrayConversions
         }
         return result;
     }
-    
+
     /**
      * Helper method for checking that given collections contain integral Numbers
      * that essentially contain same values in same order
@@ -196,10 +201,10 @@ public class TestArrayConversions
         for (int i = 0; i < size; ++i) {
             Number n1 = (Number) Array.get(inputArray, i);
             Number n2 = (Number) Array.get(outputArray, i);
-            double value1 = ((Number) n1).longValue();
-            double value2 = ((Number) n2).longValue();
+            double value1 = n1.longValue();
+            double value2 = n2.longValue();
             assertEquals("Entry #"+i+"/"+size+" not equal", value1, value2);
-        }        
+        }
     }
 
     private void verifyDoubleArrays(Object inputArray, Object outputArray, int size)
@@ -207,10 +212,9 @@ public class TestArrayConversions
         for (int i = 0; i < size; ++i) {
             Number n1 = (Number) Array.get(inputArray, i);
             Number n2 = (Number) Array.get(outputArray, i);
-            double value1 = ((Number) n1).doubleValue();
-            double value2 = ((Number) n2).doubleValue();
+            double value1 = n1.doubleValue();
+            double value2 = n2.doubleValue();
             assertEquals("Entry #"+i+"/"+size+" not equal", value1, value2);
-        }        
+        }
     }
-
 }

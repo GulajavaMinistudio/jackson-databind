@@ -1,5 +1,6 @@
 # use glob syntax.
 syntax: glob
+
 *.class
 *~
 *.bak
@@ -16,6 +17,8 @@ target
 .settings
 
 # IDEA
+.idea
 *.iml
 *.ipr
 *.iws
+/target

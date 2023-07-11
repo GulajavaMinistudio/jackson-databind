@@ -1,13 +1,12 @@
 package com.fasterxml.jackson.databind.node;
 
 import java.math.BigDecimal;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.math.BigInteger;
 
 import com.fasterxml.jackson.core.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.util.RawValue;
 
 /**
  * This intermediate base class is used for all container nodes,
@@ -15,7 +14,10 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 public abstract class ContainerNode<T extends ContainerNode<T>>
     extends BaseJsonNode
+    implements JsonNodeCreator
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * We will keep a reference to the Object (usually TreeMapper)
      * that can construct instances of nodes to add to this container
@@ -23,44 +25,21 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
      */
     protected final JsonNodeFactory _nodeFactory;
 
-    protected ContainerNode(JsonNodeFactory nc)
-    {
+    protected ContainerNode(JsonNodeFactory nc) {
         _nodeFactory = nc;
     }
 
+    protected ContainerNode() { _nodeFactory = null; } // only for JDK ser
+
     // all containers are mutable: can't define:
 //    @Override public abstract <T extends JsonNode> T deepCopy();
-    
-    @Override
-    public boolean isContainerNode() { return true; }
 
     @Override
     public abstract JsonToken asToken();
-    
+
     @Override
     public String asText() { return ""; }
 
-    /*
-    /**********************************************************
-    /* Find methods; made abstract again to ensure implementation
-    /**********************************************************
-     */
-
-    @Override
-    public abstract JsonNode findValue(String fieldName);
-    
-    @Override
-    public abstract ObjectNode findParent(String fieldName);
-
-    @Override
-    public abstract List<JsonNode> findValues(String fieldName, List<JsonNode> foundSoFar);
-    
-    @Override
-    public abstract List<JsonNode> findParents(String fieldName, List<JsonNode> foundSoFar);
-
-    @Override
-    public abstract List<String> findValuesAsText(String fieldName, List<String> foundSoFar);
-    
     /*
     /**********************************************************
     /* Methods reset as abstract to force real implementation
@@ -76,10 +55,30 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
     @Override
     public abstract JsonNode get(String fieldName);
 
+    @Override
+    protected abstract ObjectNode _withObject(JsonPointer origPtr,
+            JsonPointer currentPtr,
+            OverwriteMode overwriteMode, boolean preferIndex);
+
     /*
     /**********************************************************
-    /* NodeCreator implementation, just dispatch to
-    /* the real creator
+    /* JsonNodeCreator implementation, Enumerated/singleton types
+    /**********************************************************
+     */
+
+    @Override
+    public final BooleanNode booleanNode(boolean v) { return _nodeFactory.booleanNode(v); }
+
+    public JsonNode missingNode() {
+        return _nodeFactory.missingNode();
+    }
+
+    @Override
+    public final NullNode nullNode() { return _nodeFactory.nullNode(); }
+
+    /*
+    /**********************************************************
+    /* JsonNodeCreator implementation, just dispatch to real creator
     /**********************************************************
      */
 
@@ -87,32 +86,72 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
      * Factory method that constructs and returns an empty {@link ArrayNode}
      * Construction is done using registered {@link JsonNodeFactory}.
      */
+    @Override
     public final ArrayNode arrayNode() { return _nodeFactory.arrayNode(); }
+
+    /**
+     * Factory method that constructs and returns an {@link ArrayNode} with an initial capacity
+     * Construction is done using registered {@link JsonNodeFactory}
+     * @param capacity the initial capacity of the ArrayNode
+     */
+    @Override
+    public final ArrayNode arrayNode(int capacity) { return _nodeFactory.arrayNode(capacity); }
 
     /**
      * Factory method that constructs and returns an empty {@link ObjectNode}
      * Construction is done using registered {@link JsonNodeFactory}.
      */
+    @Override
     public final ObjectNode objectNode() { return _nodeFactory.objectNode(); }
 
-    public final NullNode nullNode() { return _nodeFactory.nullNode(); }
-
-    public final BooleanNode booleanNode(boolean v) { return _nodeFactory.booleanNode(v); }
-
+    @Override
     public final NumericNode numberNode(byte v) { return _nodeFactory.numberNode(v); }
+    @Override
     public final NumericNode numberNode(short v) { return _nodeFactory.numberNode(v); }
+    @Override
     public final NumericNode numberNode(int v) { return _nodeFactory.numberNode(v); }
-    public final NumericNode numberNode(long v) { return _nodeFactory.numberNode(v); }
-    public final NumericNode numberNode(float v) { return _nodeFactory.numberNode(v); }
-    public final NumericNode numberNode(double v) { return _nodeFactory.numberNode(v); }
-    public final NumericNode numberNode(BigDecimal v) { return (_nodeFactory.numberNode(v)); }
+    @Override
+    public final NumericNode numberNode(long v) {
+        return _nodeFactory.numberNode(v);
+    }
 
+    @Override
+    public final NumericNode numberNode(float v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final NumericNode numberNode(double v) { return _nodeFactory.numberNode(v); }
+
+    @Override
+    public final ValueNode numberNode(BigInteger v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final ValueNode numberNode(BigDecimal v) { return (_nodeFactory.numberNode(v)); }
+
+    @Override
+    public final ValueNode numberNode(Byte v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final ValueNode numberNode(Short v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final ValueNode numberNode(Integer v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final ValueNode numberNode(Long v) { return _nodeFactory.numberNode(v); }
+
+    @Override
+    public final ValueNode numberNode(Float v) { return _nodeFactory.numberNode(v); }
+    @Override
+    public final ValueNode numberNode(Double v) { return _nodeFactory.numberNode(v); }
+
+    @Override
     public final TextNode textNode(String text) { return _nodeFactory.textNode(text); }
 
+    @Override
     public final BinaryNode binaryNode(byte[] data) { return _nodeFactory.binaryNode(data); }
+    @Override
     public final BinaryNode binaryNode(byte[] data, int offset, int length) { return _nodeFactory.binaryNode(data, offset, length); }
 
-    public final POJONode POJONode(Object pojo) { return _nodeFactory.POJONode(pojo); }
+    @Override
+    public final ValueNode pojoNode(Object pojo) { return _nodeFactory.pojoNode(pojo); }
+
+    @Override
+    public final ValueNode rawValueNode(RawValue value) { return _nodeFactory.rawValueNode(value); }
 
     /*
     /**********************************************************
@@ -126,52 +165,4 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
      * @return Container node itself (to allow method call chaining)
      */
     public abstract T removeAll();
-
-    /*
-    /**********************************************************
-    /* Helper classes
-    /**********************************************************
-     */
-
-    protected static class NoNodesIterator
-        implements Iterator<JsonNode>
-    {
-        final static NoNodesIterator instance = new NoNodesIterator();
-
-        private NoNodesIterator() { }
-
-        public static NoNodesIterator instance() { return instance; }
-
-        @Override
-        public boolean hasNext() { return false; }
-        @Override
-        public JsonNode next() { throw new NoSuchElementException(); }
-
-        @Override
-        public void remove() {
-            // could as well throw IllegalOperationException?
-            throw new IllegalStateException();
-        }
-    }
-
-    protected static class NoStringsIterator
-        implements Iterator<String>
-    {
-        final static NoStringsIterator instance = new NoStringsIterator();
-
-        private NoStringsIterator() { }
-
-        public static NoStringsIterator instance() { return instance; }
-
-        @Override
-        public boolean hasNext() { return false; }
-        @Override
-        public String next() { throw new NoSuchElementException(); }
-
-        @Override
-        public void remove() {
-            // could as well throw IllegalOperationException?
-            throw new IllegalStateException();
-        }
-    }
 }

@@ -10,16 +10,17 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 /**
  * Numeric node that contains simple 64-bit integer values.
  */
-public final class BigIntegerNode
+@SuppressWarnings("serial")
+public class BigIntegerNode
     extends NumericNode
 {
     private final static BigInteger MIN_INTEGER = BigInteger.valueOf(Integer.MIN_VALUE);
     private final static BigInteger MAX_INTEGER = BigInteger.valueOf(Integer.MAX_VALUE);
     private final static BigInteger MIN_LONG = BigInteger.valueOf(Long.MIN_VALUE);
     private final static BigInteger MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
-    
+
     final protected BigInteger _value;
-    
+
     /*
     /**********************************************************
     /* Construction
@@ -30,9 +31,9 @@ public final class BigIntegerNode
 
     public static BigIntegerNode valueOf(BigInteger v) { return new BigIntegerNode(v); }
 
-    /* 
+    /*
     /**********************************************************
-    /* Overrridden JsonNode methods
+    /* Overridden JsonNode methods
     /**********************************************************
      */
 
@@ -54,11 +55,14 @@ public final class BigIntegerNode
     @Override public boolean canConvertToLong() {
         return (_value.compareTo(MIN_LONG) >= 0) && (_value.compareTo(MAX_LONG) <= 0);
     }
-    
+
     @Override
     public Number numberValue() {
         return _value;
     }
+
+    @Override
+    public short shortValue() { return _value.shortValue(); }
 
     @Override
     public int intValue() { return _value.intValue(); }
@@ -70,17 +74,20 @@ public final class BigIntegerNode
     public BigInteger bigIntegerValue() { return _value; }
 
     @Override
+    public float floatValue() { return _value.floatValue(); }
+
+    @Override
     public double doubleValue() { return _value.doubleValue(); }
 
     @Override
     public BigDecimal decimalValue() { return new BigDecimal(_value); }
 
-    /* 
+    /*
     /**********************************************************
     /* General type coercions
     /**********************************************************
      */
-    
+
     @Override
     public String asText() {
         return _value.toString();
@@ -90,12 +97,12 @@ public final class BigIntegerNode
     public boolean asBoolean(boolean defaultValue) {
         return !BigInteger.ZERO.equals(_value);
     }
-    
+
     @Override
-    public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+    public final void serialize(JsonGenerator g, SerializerProvider provider)
+        throws IOException
     {
-        jg.writeNumber(_value);
+        g.writeNumber(_value);
     }
 
     @Override
@@ -103,7 +110,7 @@ public final class BigIntegerNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
+        if (!(o instanceof BigIntegerNode)) {
             return false;
         }
         return ((BigIntegerNode) o)._value.equals(_value);

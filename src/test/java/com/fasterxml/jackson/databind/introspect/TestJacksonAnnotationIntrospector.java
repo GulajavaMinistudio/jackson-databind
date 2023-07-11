@@ -3,25 +3,23 @@ package com.fasterxml.jackson.databind.introspect;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
+
 import javax.xml.namespace.QName;
 
 import com.fasterxml.jackson.annotation.*;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
+
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.*;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
-import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
 import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
 import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
-/**
- * @author Ryan Heaton
- */
+@SuppressWarnings("serial")
 public class TestJacksonAnnotationIntrospector
     extends BaseMapTest
 {
@@ -31,11 +29,11 @@ public class TestJacksonAnnotationIntrospector
 
     public static class JacksonExample
     {
-        private String attributeProperty;
-        private String elementProperty;
-        private List<String> wrappedElementProperty;
-        private EnumExample enumProperty;
-        private QName qname;
+        protected String attributeProperty;
+        protected String elementProperty;
+        protected List<String> wrappedElementProperty;
+        protected EnumExample enumProperty;
+        protected QName qname;
 
         @JsonSerialize(using=QNameSerializer.class)
         public QName getQname()
@@ -100,7 +98,7 @@ public class TestJacksonAnnotationIntrospector
 
         @Override
         public void serialize(QName value, JsonGenerator jgen, SerializerProvider provider)
-                throws IOException, JsonProcessingException
+                throws IOException
         {
             jgen.writeString(value.toString());
         }
@@ -112,7 +110,7 @@ public class TestJacksonAnnotationIntrospector
         public QNameDeserializer() { super(QName.class); }
         @Override
         public QName deserialize(JsonParser jp, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
+                throws IOException
         {
             return QName.valueOf(jp.readValueAs(String.class));
         }
@@ -136,19 +134,34 @@ public class TestJacksonAnnotationIntrospector
     // Test to ensure we can override enum settings
     static class LcEnumIntrospector extends JacksonAnnotationIntrospector
     {
+        private static final long serialVersionUID = 1L;
+
         @Override
-        public String findEnumValue(Enum<?> value)
-        {
-            return value.name().toLowerCase();
+        public  String[] findEnumValues(Class<?> enumType, Enum<?>[] enumValues, String[] names) {
+            // kinda sorta wrong, but for testing's sake...
+            for (int i = 0, len = enumValues.length; i < len; ++i) {
+                names[i] = enumValues[i].name().toLowerCase();
+            }
+            return names;
+        }
+
+        @Override
+        public String[] findEnumValues(MapperConfig<?> config, AnnotatedClass annotatedClass,
+                Enum<?>[] enumValues, String[] names) {
+            // kinda sorta wrong, but for testing's sake...
+            for (int i = 0, len = enumValues.length; i < len; ++i) {
+                names[i] = enumValues[i].name().toLowerCase();
+            }
+            return names;
         }
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests
     /**********************************************************
      */
-    
+
     /**
      * tests getting serializer/deserializer instances.
      */
@@ -180,30 +193,14 @@ public class TestJacksonAnnotationIntrospector
 
     public void testJsonTypeResolver() throws Exception
     {
-        JacksonAnnotationIntrospector ai = new JacksonAnnotationIntrospector();
-        AnnotatedClass ac = AnnotatedClass.constructWithoutSuperTypes(TypeResolverBean.class, ai, null);
-        JavaType baseType = TypeFactory.defaultInstance().constructType(TypeResolverBean.class);
         ObjectMapper mapper = new ObjectMapper();
+        JacksonAnnotationIntrospector ai = new JacksonAnnotationIntrospector();
+        AnnotatedClass ac = AnnotatedClassResolver.resolveWithoutSuperTypes(mapper.getSerializationConfig(),
+                TypeResolverBean.class);
+        JavaType baseType = TypeFactory.defaultInstance().constructType(TypeResolverBean.class);
         TypeResolverBuilder<?> rb = ai.findTypeResolver(mapper.getDeserializationConfig(), ac, baseType);
         assertNotNull(rb);
         assertSame(DummyBuilder.class, rb.getClass());
-    }    
-
-    /**
-     * Tests to ensure that {@link JsonIgnoreType} is detected as expected
-     * by the standard introspector.
-     * 
-     * @since 1.7
-     */
-    public void testIgnoredType() throws Exception
-    {
-        JacksonAnnotationIntrospector ai = new JacksonAnnotationIntrospector();
-        AnnotatedClass ac = AnnotatedClass.construct(IgnoredType.class, ai, null);
-        assertEquals(Boolean.TRUE, ai.isIgnorableType(ac));
-
-        // also, should inherit as expected
-        ac = AnnotatedClass.construct(IgnoredSubType.class, ai, null);
-        assertEquals(Boolean.TRUE, ai.isIgnorableType(ac));
     }
 
     public void testEnumHandling() throws Exception
@@ -211,7 +208,7 @@ public class TestJacksonAnnotationIntrospector
         ObjectMapper mapper = new ObjectMapper();
         mapper.setAnnotationIntrospector(new LcEnumIntrospector());
         assertEquals("\"value1\"", mapper.writeValueAsString(EnumExample.VALUE1));
-        EnumExample result = mapper.readValue(quote("value1"), EnumExample.class);
+        EnumExample result = mapper.readValue(q("value1"), EnumExample.class);
         assertEquals(EnumExample.VALUE1, result);
     }
 }

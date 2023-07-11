@@ -12,12 +12,13 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 /**
  * Numeric node that contains simple 64-bit integer values.
  */
-public final class LongNode
+@SuppressWarnings("serial")
+public class LongNode
     extends NumericNode
 {
-    final long _value;
+    protected final long _value;
 
-    /* 
+    /*
     ************************************************
     * Construction
     ************************************************
@@ -27,7 +28,7 @@ public final class LongNode
 
     public static LongNode valueOf(long l) { return new LongNode(l); }
 
-    /* 
+    /*
     ************************************************
     * Overrridden JsonNode methods
     ************************************************
@@ -49,11 +50,14 @@ public final class LongNode
         return (_value >= Integer.MIN_VALUE && _value <= Integer.MAX_VALUE);
     }
     @Override public boolean canConvertToLong() { return true; }
-    
+
     @Override
     public Number numberValue() {
         return Long.valueOf(_value);
     }
+
+    @Override
+    public short shortValue() { return (short) _value; }
 
     @Override
     public int intValue() { return (int) _value; }
@@ -62,7 +66,10 @@ public final class LongNode
     public long longValue() { return _value; }
 
     @Override
-    public double doubleValue() { return (double) _value; }
+    public float floatValue() { return _value; }
+
+    @Override
+    public double doubleValue() { return _value; }
 
     @Override
     public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
@@ -79,12 +86,12 @@ public final class LongNode
     public boolean asBoolean(boolean defaultValue) {
         return _value != 0;
     }
-    
+
     @Override
-    public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+    public final void serialize(JsonGenerator g, SerializerProvider provider)
+        throws IOException
     {
-        jg.writeNumber(_value);
+        g.writeNumber(_value);
     }
 
     @Override
@@ -92,10 +99,10 @@ public final class LongNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
-            return false;
+        if (o instanceof LongNode) {
+            return ((LongNode) o)._value == _value;
         }
-        return ((LongNode) o)._value == _value;
+        return false;
     }
 
     @Override

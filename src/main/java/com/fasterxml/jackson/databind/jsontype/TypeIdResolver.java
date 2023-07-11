@@ -1,6 +1,9 @@
 package com.fasterxml.jackson.databind.jsontype;
 
+import java.io.IOException;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 
 /**
@@ -10,6 +13,12 @@ import com.fasterxml.jackson.databind.JavaType;
  * {@link com.fasterxml.jackson.databind.jsontype.TypeDeserializer}) for converting
  * between type and matching id; id is stored in JSON and needed for
  * creating instances of proper subtypes when deserializing values.
+ *<p>
+ * NOTE: it is <b>strongly</b> recommended that developers always extend
+ * abstract base class {@link com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase}
+ * instead of directly implementing this interface; this helps prevent
+ * breakage in case new methds need to be added in this interface (something
+ * we try to avoid doing; but which may be necessary in some cases).
  */
 public interface TypeIdResolver
 {
@@ -24,7 +33,7 @@ public interface TypeIdResolver
      * used to initialize instance with configuration. This is necessary
      * since instances may be created via reflection, without ability to
      * call specific constructor to pass in configuration settings.
-     * 
+     *
      * @param baseType Base type for which this id resolver instance is
      *   used
      */
@@ -35,7 +44,7 @@ public interface TypeIdResolver
     /* Conversions between types and type ids
     /**********************************************************
      */
-    
+
     /**
      * Method called to serialize type of the type of given value
      * as a String to include in serialized JSON content.
@@ -57,11 +66,20 @@ public interface TypeIdResolver
      * available for some reason.
      */
     public String idFromBaseType();
-    
+
     /**
      * Method called to resolve type from given type identifier.
+     *
+     * @since 2.5 (throws clause added in 2.8)
      */
-    public JavaType typeFromId(String id);
+    public JavaType typeFromId(DatabindContext context, String id) throws IOException;
+
+    /**
+     * Method called for error-reporting and diagnostics purposes.
+     *
+     * @since 2.7 -- but since 2.5 has existed in {@link com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase}
+     */
+    public String getDescForKnownTypeIds();
 
     /*
     /**********************************************************

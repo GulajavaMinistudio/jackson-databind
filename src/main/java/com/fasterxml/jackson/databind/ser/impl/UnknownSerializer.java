@@ -1,53 +1,58 @@
 package com.fasterxml.jackson.databind.ser.impl;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 
 import com.fasterxml.jackson.core.*;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
+import com.fasterxml.jackson.databind.ser.std.ToEmptyObjectSerializer;
+import com.fasterxml.jackson.databind.util.NativeImageUtil;
 
+@SuppressWarnings("serial")
 public class UnknownSerializer
-    extends StdSerializer<Object>
+    extends ToEmptyObjectSerializer // since 2.13
 {
     public UnknownSerializer() {
         super(Object.class);
     }
-    
+
+    // @since 2.6
+    public UnknownSerializer(Class<?> cls) {
+        super(cls);
+    }
+
     @Override
-    public void serialize(Object value, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonMappingException
+    public void serialize(Object value, JsonGenerator gen, SerializerProvider ctxt) throws IOException
     {
         // 27-Nov-2009, tatu: As per [JACKSON-201] may or may not fail...
-        if (provider.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS)) {
-            failForEmpty(value);
+        if (ctxt.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS)) {
+            failForEmpty(ctxt, value);
         }
-        // But if it's fine, we'll just output empty JSON Object:
-        jgen.writeStartObject();
-        jgen.writeEndObject();
+        super.serialize(value, gen, ctxt);
     }
 
     @Override
-    public final void serializeWithType(Object value, JsonGenerator jgen, SerializerProvider provider,
-            TypeSerializer typeSer)
-        throws IOException, JsonGenerationException
+    public void serializeWithType(Object value, JsonGenerator gen, SerializerProvider ctxt,
+            TypeSerializer typeSer) throws IOException
     {
-        if (provider.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS)) {
-            failForEmpty(value);
+        if (ctxt.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS)) {
+            failForEmpty(ctxt, value);
         }
-        typeSer.writeTypePrefixForObject(value, jgen);
-        typeSer.writeTypeSuffixForObject(value, jgen);
-    }
-    
-    @Override
-    public JsonNode getSchema(SerializerProvider provider, Type typeHint) throws JsonMappingException {
-        return null;
+        super.serializeWithType(value, gen, ctxt, typeSer);
     }
 
-    protected void failForEmpty(Object value) throws JsonMappingException
-    {
-        throw new JsonMappingException("No serializer found for class "+value.getClass().getName()+" and no properties discovered to create BeanSerializer (to avoid exception, disable SerializationConfig.SerializationFeature.FAIL_ON_EMPTY_BEANS) )");
+    protected void failForEmpty(SerializerProvider prov, Object value)
+            throws JsonMappingException {
+        Class<?> cl = value.getClass();
+        if (NativeImageUtil.needsReflectionConfiguration(cl)) {
+            prov.reportBadDefinition(handledType(), String.format(
+                    "No serializer found for class %s and no properties discovered to create BeanSerializer (to avoid exception, disable SerializationFeature.FAIL_ON_EMPTY_BEANS). This appears to be a native image, in which case you may need to configure reflection for the class that is to be serialized",
+                    cl.getName()));
+        } else {
+            prov.reportBadDefinition(handledType(), String.format(
+                    "No serializer found for class %s and no properties discovered to create BeanSerializer (to avoid exception, disable SerializationFeature.FAIL_ON_EMPTY_BEANS)",
+                    cl.getName()));
+        }
     }
 }

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
  * Unit test suite that tests "usingXxx" properties of
  * {@link JsonDeserialize} annotation.
  */
+@SuppressWarnings("serial")
 public class TestAnnotationUsing
     extends BaseMapTest
 {
@@ -29,7 +30,7 @@ public class TestAnnotationUsing
     @JsonDeserialize(using=ValueDeserializer.class)
     final static class ValueClass {
         int _a;
-        
+
         /* we'll test it by not having default no-arg ctor, and leaving
          * out single-int-arg ctor (because deserializer would use that too)
          */
@@ -61,7 +62,6 @@ public class TestAnnotationUsing
         public Object[] values;
     }
 
-
     static class ListBean {
         @JsonDeserialize(contentUsing=ValueDeserializer.class)
         public List<Object> values;
@@ -77,10 +77,9 @@ public class TestAnnotationUsing
         public Map<Object,Object> values;
     }
 
-    @SuppressWarnings("serial")
     @JsonDeserialize(keyUsing=MapKeyDeserializer.class, contentUsing=ValueDeserializer.class)
     static class MapKeyMap extends HashMap<Object,Object> { }
-    
+
     /*
     /**********************************************************************
     /* Deserializers
@@ -92,7 +91,7 @@ public class TestAnnotationUsing
         public ValueDeserializer() { super(ValueClass.class); }
         @Override
         public ValueClass deserialize(JsonParser jp, DeserializationContext ctxt)
-            throws IOException, JsonProcessingException
+            throws IOException
         {
             int i = jp.getIntValue();
             return new ValueClass(i, i);
@@ -104,7 +103,7 @@ public class TestAnnotationUsing
         public IntsDeserializer() { super(int[].class); }
         @Override
         public int[] deserialize(JsonParser jp, DeserializationContext ctxt)
-            throws IOException, JsonProcessingException
+            throws IOException
         {
             return new int[] { jp.getIntValue() };
         }
@@ -212,7 +211,7 @@ public class TestAnnotationUsing
         assertEquals(String[].class, en.getKey().getClass());
         assertEquals(Boolean.TRUE, en.getValue());
     }
-    
+
     // @since 1.8
     public void testRootValueWithCustomKey() throws Exception
     {

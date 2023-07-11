@@ -1,8 +1,12 @@
 package com.fasterxml.jackson.databind.jsontype.impl;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.io.IOException;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 public class MinimalClassNameIdResolver
@@ -19,10 +23,11 @@ public class MinimalClassNameIdResolver
      * Same as {@link #_basePackageName}, but includes trailing dot.
      */
     protected final String _basePackagePrefix;
-    
-    protected MinimalClassNameIdResolver(JavaType baseType, TypeFactory typeFactory)
+
+    protected MinimalClassNameIdResolver(JavaType baseType, TypeFactory typeFactory,
+            PolymorphicTypeValidator ptv)
     {
-        super(baseType, typeFactory);
+        super(baseType, typeFactory, ptv);
         String base = baseType.getRawClass().getName();
         int ix = base.lastIndexOf('.');
         if (ix < 0) { // can this ever occur?
@@ -34,9 +39,14 @@ public class MinimalClassNameIdResolver
         }
     }
 
+    public static MinimalClassNameIdResolver construct(JavaType baseType, MapperConfig<?> config,
+            PolymorphicTypeValidator ptv) {
+        return new MinimalClassNameIdResolver(baseType, config.getTypeFactory(), ptv);
+    }
+
     @Override
     public JsonTypeInfo.Id getMechanism() { return JsonTypeInfo.Id.MINIMAL_CLASS; }
-    
+
     @Override
     public String idFromValue(Object value)
     {
@@ -49,11 +59,11 @@ public class MinimalClassNameIdResolver
     }
 
     @Override
-    public JavaType typeFromId(String id)
+    protected JavaType _typeFromId(String id, DatabindContext ctxt) throws IOException
     {
         if (id.startsWith(".")) {
             StringBuilder sb = new StringBuilder(id.length() + _basePackageName.length());
-            if  (_basePackageName.length() == 0) {
+            if  (_basePackageName.isEmpty()) {
                 // no package; must remove leading '.' from id
                 sb.append(id.substring(1));
             } else {
@@ -62,6 +72,6 @@ public class MinimalClassNameIdResolver
             }
             id = sb.toString();
         }
-        return super.typeFromId(id);
+        return super._typeFromId(id, ctxt);
     }
 }

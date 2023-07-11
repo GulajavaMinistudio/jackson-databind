@@ -5,6 +5,7 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Unit tests for verifying that feature requested
@@ -15,12 +16,6 @@ import com.fasterxml.jackson.databind.*;
 public class TestSetterlessProperties
     extends BaseMapTest
 {
-    /*
-    /**********************************************************
-    /* Helper beans
-    /**********************************************************
-     */
-
     static class CollectionBean
     {
         List<String> _values = new ArrayList<String>();
@@ -41,7 +36,7 @@ public class TestSetterlessProperties
         @JsonProperty("list") protected List<Integer> values = new ArrayList<Integer>();
 
         public Dual() { }
-        
+
         public List<Integer> getList() {
             throw new IllegalStateException("Should not get called");
         }
@@ -74,7 +69,9 @@ public class TestSetterlessProperties
         ObjectMapper m = new ObjectMapper();
         // by default, it should be enabled
         assertTrue(m.isEnabled(MapperFeature.USE_GETTERS_AS_SETTERS));
-        m.configure(MapperFeature.USE_GETTERS_AS_SETTERS, false);
+        m = jsonMapperBuilder()
+                .configure(MapperFeature.USE_GETTERS_AS_SETTERS, false)
+                .build();
         assertFalse(m.isEnabled(MapperFeature.USE_GETTERS_AS_SETTERS));
 
         // and now this should fail
@@ -82,10 +79,9 @@ public class TestSetterlessProperties
             m.readValue
                 ("{\"values\":[ \"abc\", \"def\" ]}", CollectionBean.class);
             fail("Expected an exception");
-        } catch (JsonMappingException e) {
-            /* Not a good exception, ideally could suggest a need for
-             * a setter...?
-             */
+        } catch (MismatchedInputException e) {
+            // Not a good exception, ideally could suggest a need for
+            // a setter...?
             verifyException(e, "Unrecognized field");
         }
     }
@@ -104,25 +100,27 @@ public class TestSetterlessProperties
     public void testSimpleSetterlessMapFailure()
         throws Exception
     {
-        ObjectMapper m = new ObjectMapper();
-        m.configure(MapperFeature.USE_GETTERS_AS_SETTERS, false);
+        ObjectMapper m = jsonMapperBuilder()
+                .configure(MapperFeature.USE_GETTERS_AS_SETTERS, false)
+                .build();
         // so this should fail now without a setter
         try {
             m.readValue
                 ("{\"values\":{ \"a\":3 }}", MapBean.class);
             fail("Expected an exception");
-        } catch (JsonMappingException e) {
+        } catch (MismatchedInputException e) {
             verifyException(e, "Unrecognized field");
         }
     }
 
-    /* Test for [JACKSON-328], precedence of "getter-as-setter" (for Lists) versus
+    /* Test precedence of "getter-as-setter" (for Lists) versus
      * field for same property.
      */
     public void testSetterlessPrecedence() throws Exception
     {
-        ObjectMapper m = new ObjectMapper();
-        m.configure(MapperFeature.USE_GETTERS_AS_SETTERS, true);
+        ObjectMapper m = jsonMapperBuilder()
+                .configure(MapperFeature.USE_GETTERS_AS_SETTERS, true)
+                .build();
         Dual value = m.readValue("{\"list\":[1,2,3]}, valueType)", Dual.class);
         assertNotNull(value);
         assertEquals(3, value.values.size());

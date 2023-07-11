@@ -11,12 +11,14 @@ import com.fasterxml.jackson.databind.SerializerProvider;
  * Value node that contains Base64 encoded binary value, which will be
  * output and stored as Json String value.
  */
-public final class BinaryNode
+public class BinaryNode
     extends ValueNode
 {
+    private static final long serialVersionUID = 2L;
+
     final static BinaryNode EMPTY_BINARY_NODE = new BinaryNode(new byte[0]);
 
-    final byte[] _data;
+    protected final byte[] _data;
 
     public BinaryNode(byte[] data)
     {
@@ -56,6 +58,12 @@ public final class BinaryNode
     }
 
     @Override
+    public JsonNodeType getNodeType()
+    {
+        return JsonNodeType.BINARY;
+    }
+
+    @Override
     public JsonToken asToken() {
         /* No distinct type; could use one for textual values,
          * but given that it's not in text form at this point,
@@ -63,9 +71,6 @@ public final class BinaryNode
          */
         return JsonToken.VALUE_EMBEDDED_OBJECT;
     }
-
-    @Override
-    public boolean isBinary() { return true; }
 
     /**
      *<p>
@@ -86,9 +91,10 @@ public final class BinaryNode
 
     @Override
     public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
-        jg.writeBinary(_data);
+        jg.writeBinary(provider.getConfig().getBase64Variant(),
+                _data, 0, _data.length);
     }
 
     @Override
@@ -96,7 +102,7 @@ public final class BinaryNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
+        if (!(o instanceof BinaryNode)) {
             return false;
         }
         return Arrays.equals(((BinaryNode) o)._data, _data);
@@ -105,15 +111,5 @@ public final class BinaryNode
     @Override
     public int hashCode() {
         return (_data == null) ? -1 : _data.length;
-    }
-
-    /**
-     * Different from other values, since contents need to be surrounded
-     * by (double) quotes.
-     */
-    @Override
-    public String toString()
-    {
-        return Base64Variants.getDefaultVariant().encode(_data, true);
     }
 }

@@ -24,8 +24,12 @@ import com.fasterxml.jackson.databind.type.MapType;
  * is found first. As an example, handler for {@link CharSequence} would also be used
  * serializing {@link StringBuilder} instances, unless a direct mapping was found.
  */
-public class SimpleSerializers extends Serializers.Base
+public class SimpleSerializers
+    extends Serializers.Base
+    implements java.io.Serializable
 {
+    private static final long serialVersionUID = 3L;
+
     /**
      * Class-based mappings that are used both for exact and
      * sub-class matches.
@@ -37,13 +41,27 @@ public class SimpleSerializers extends Serializers.Base
      */
     protected HashMap<ClassKey,JsonSerializer<?>> _interfaceMappings = null;
 
+    /**
+     * Flag to help find "generic" enum serializer, if one has been registered.
+     *
+     * @since 2.3
+     */
+    protected boolean _hasEnumSerializer = false;
+
     /*
     /**********************************************************
     /* Life-cycle, construction and configuring
     /**********************************************************
      */
-    
+
     public SimpleSerializers() { }
+
+    /**
+     * @since 2.1
+     */
+    public SimpleSerializers(List<JsonSerializer<?>> sers) {
+        addSerializers(sers);
+    }
 
     /**
      * Method for adding given serializer for type that {@link JsonSerializer#handledType}
@@ -51,7 +69,7 @@ public class SimpleSerializers extends Serializers.Base
      * sanity check).
      * For serializers that do not declare handled type, use the variant that takes
      * two arguments.
-     * 
+     *
      * @param ser
      */
     public void addSerializer(JsonSerializer<?> ser)
@@ -61,7 +79,7 @@ public class SimpleSerializers extends Serializers.Base
         if (cls == null || cls == Object.class) {
             throw new IllegalArgumentException("JsonSerializer of type "+ser.getClass().getName()
                     +" does not define valid handledType() -- must either register with method that takes type argument "
-                    +" or make serializer extend 'com.fasterxml.jackson.databind.ser.std.SerializerBase'"); 
+                    +" or make serializer extend 'com.fasterxml.jackson.databind.ser.std.StdSerializer'");
         }
         _addSerializer(cls, ser);
     }
@@ -70,30 +88,22 @@ public class SimpleSerializers extends Serializers.Base
     {
         _addSerializer(type, ser);
     }
-    
-    private void _addSerializer(Class<?> cls, JsonSerializer<?> ser)
-    {
-        ClassKey key = new ClassKey(cls);
-        // Interface or class type?
-        if (cls.isInterface()) {
-            if (_interfaceMappings == null) {
-                _interfaceMappings = new HashMap<ClassKey,JsonSerializer<?>>();
-            }
-            _interfaceMappings.put(key, ser);
-        } else { // nope, class:
-            if (_classMappings == null) {
-                _classMappings = new HashMap<ClassKey,JsonSerializer<?>>();
-            }
-            _classMappings.put(key, ser);
+
+    /**
+     * @since 2.1
+     */
+    public void addSerializers(List<JsonSerializer<?>> sers) {
+        for (JsonSerializer<?> ser : sers) {
+            addSerializer(ser);
         }
     }
-    
+
     /*
     /**********************************************************
     /* Serializers implementation
     /**********************************************************
      */
-    
+
     @Override
     public JsonSerializer<?> findSerializer(SerializationConfig config,
             JavaType type, BeanDescription beanDesc)
@@ -116,6 +126,16 @@ public class SimpleSerializers extends Serializers.Base
                 if (ser != null) {
                     return ser;
                 }
+
+                // [Issue#227]: Handle registration of plain `Enum` serializer
+                if (_hasEnumSerializer && type.isEnumType()) {
+                    key.reset(Enum.class);
+                    ser = _classMappings.get(key);
+                    if (ser != null) {
+                        return ser;
+                    }
+                }
+
                 // If not direct match, maybe super-class match?
                 for (Class<?> curr = cls; (curr != null); curr = curr.getSuperclass()) {
                     key.reset(curr);
@@ -165,7 +185,7 @@ public class SimpleSerializers extends Serializers.Base
             TypeSerializer elementTypeSerializer, JsonSerializer<Object> elementValueSerializer) {
         return findSerializer(config, type, beanDesc);
     }
-        
+
     @Override
     public JsonSerializer<?> findMapSerializer(SerializationConfig config,
             MapType type, BeanDescription beanDesc,
@@ -181,13 +201,13 @@ public class SimpleSerializers extends Serializers.Base
             TypeSerializer elementTypeSerializer, JsonSerializer<Object> elementValueSerializer) {
         return findSerializer(config, type, beanDesc);
     }
-    
+
     /*
     /**********************************************************
     /* Internal methods
     /**********************************************************
      */
-    
+
     protected JsonSerializer<?> _findInterfaceMapping(Class<?> cls, ClassKey key)
     {
         for (Class<?> iface : cls.getInterfaces()) {
@@ -202,5 +222,25 @@ public class SimpleSerializers extends Serializers.Base
             }
         }
         return null;
+    }
+
+    protected void _addSerializer(Class<?> cls, JsonSerializer<?> ser)
+    {
+        ClassKey key = new ClassKey(cls);
+        // Interface or class type?
+        if (cls.isInterface()) {
+            if (_interfaceMappings == null) {
+                _interfaceMappings = new HashMap<ClassKey,JsonSerializer<?>>();
+            }
+            _interfaceMappings.put(key, ser);
+        } else { // nope, class:
+            if (_classMappings == null) {
+                _classMappings = new HashMap<ClassKey,JsonSerializer<?>>();
+            }
+            _classMappings.put(key, ser);
+            if (cls == Enum.class) {
+                _hasEnumSerializer = true;
+            }
+        }
     }
 }

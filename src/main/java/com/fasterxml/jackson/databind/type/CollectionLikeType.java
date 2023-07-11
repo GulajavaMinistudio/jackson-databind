@@ -1,5 +1,6 @@
 package com.fasterxml.jackson.databind.type;
 
+import java.lang.reflect.TypeVariable;
 import java.util.Collection;
 
 import com.fasterxml.jackson.databind.JavaType;
@@ -13,6 +14,8 @@ import com.fasterxml.jackson.databind.JavaType;
  */
 public class CollectionLikeType extends TypeBase
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Type of elements in collection
      */
@@ -24,70 +27,135 @@ public class CollectionLikeType extends TypeBase
     /**********************************************************
      */
 
-    protected CollectionLikeType(Class<?> collT, JavaType elemT,
-            Object valueHandler, Object typeHandler)
+    protected CollectionLikeType(Class<?> collT, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts, JavaType elemT,
+            Object valueHandler, Object typeHandler, boolean asStatic)
     {
-        super(collT, elemT.hashCode(), valueHandler, typeHandler);
+        super(collT, bindings, superClass, superInts,
+                elemT.hashCode(), valueHandler, typeHandler, asStatic);
         _elementType = elemT;
     }
-    
-    @Override
-    protected JavaType _narrow(Class<?> subclass) {
-        return new CollectionLikeType(subclass, _elementType,
-                _valueHandler, _typeHandler);
+
+    /**
+     * @since 2.7
+     */
+    protected CollectionLikeType(TypeBase base, JavaType elemT)
+    {
+        super(base);
+        _elementType = elemT;
+    }
+
+    /**
+     * @since 2.7
+     */
+    public static CollectionLikeType construct(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts, JavaType elemT) {
+        return new CollectionLikeType(rawType, bindings, superClass, superInts, elemT,
+                null, null, false);
+    }
+
+    /**
+     * @deprecated Since 2.7, use {@link #upgradeFrom} for constructing instances, given
+     *    pre-resolved {@link SimpleType}.
+     */
+    @Deprecated // since 2.7
+    public static CollectionLikeType construct(Class<?> rawType, JavaType elemT) {
+        // First: may need to fabricate TypeBindings (needed for refining into
+        // concrete collection types, as per [databind#1102])
+        TypeVariable<?>[] vars = rawType.getTypeParameters();
+        TypeBindings bindings;
+        if ((vars == null) || (vars.length != 1)) {
+            bindings = TypeBindings.emptyBindings();
+        } else {
+            bindings = TypeBindings.create(rawType, elemT);
+        }
+        return new CollectionLikeType(rawType, bindings,
+                _bogusSuperClass(rawType), null,
+                elemT, null, null, false);
+    }
+
+    /**
+     * Factory method that can be used to "upgrade" a basic type into collection-like
+     * one; usually done via {@link TypeModifier}
+     *
+     * @since 2.7
+     */
+    public static CollectionLikeType upgradeFrom(JavaType baseType, JavaType elementType) {
+        // 19-Oct-2015, tatu: Not sure if and how other types could be used as base;
+        //    will cross that bridge if and when need be
+        if (baseType instanceof TypeBase) {
+            return new CollectionLikeType((TypeBase) baseType, elementType);
+        }
+        throw new IllegalArgumentException("Cannot upgrade from an instance of "+baseType.getClass());
     }
 
     @Override
-    public JavaType narrowContentsBy(Class<?> contentClass)
-    {
-        // Can do a quick check first:
-        if (contentClass == _elementType.getRawClass()) {
+    public JavaType withContentType(JavaType contentType) {
+        if (_elementType == contentType) {
             return this;
         }
-        return new CollectionLikeType(_class, _elementType.narrowBy(contentClass),
-                _valueHandler, _typeHandler);    }
-
-    @Override
-    public JavaType widenContentsBy(Class<?> contentClass)
-    {
-        // Can do a quick check first:
-        if (contentClass == _elementType.getRawClass()) {
-            return this;
-        }
-        return new CollectionLikeType(_class, _elementType.widenBy(contentClass),
-                _valueHandler, _typeHandler);
-    }
-    
-    public static CollectionLikeType construct(Class<?> rawType, JavaType elemT)
-    {
-        // nominally component types will be just Object.class
-        return new CollectionLikeType(rawType, elemT, null, null);
+        return new CollectionLikeType(_class, _bindings, _superClass, _superInterfaces,
+                contentType, _valueHandler, _typeHandler, _asStatic);
     }
 
     @Override
-    public CollectionLikeType withTypeHandler(Object h)
-    {
-        return new CollectionLikeType(_class, _elementType, _valueHandler, h);
+    public CollectionLikeType withTypeHandler(Object h) {
+        return new CollectionLikeType(_class, _bindings,
+                _superClass, _superInterfaces, _elementType, _valueHandler, h, _asStatic);
     }
 
     @Override
     public CollectionLikeType withContentTypeHandler(Object h)
     {
-        return new CollectionLikeType(_class, _elementType.withTypeHandler(h),
-                _valueHandler, _typeHandler);
+        return new CollectionLikeType(_class, _bindings,
+                _superClass, _superInterfaces, _elementType.withTypeHandler(h),
+                _valueHandler, _typeHandler, _asStatic);
     }
 
     @Override
     public CollectionLikeType withValueHandler(Object h) {
-        return new CollectionLikeType(_class, _elementType, h, _typeHandler);
+        return new CollectionLikeType(_class, _bindings,
+                _superClass, _superInterfaces, _elementType, h, _typeHandler, _asStatic);
     }
 
     @Override
     public CollectionLikeType withContentValueHandler(Object h) {
-        return new CollectionLikeType(_class, _elementType.withValueHandler(h),
-                _valueHandler, _typeHandler);
+        return new CollectionLikeType(_class, _bindings,
+                _superClass, _superInterfaces, _elementType.withValueHandler(h),
+                _valueHandler, _typeHandler, _asStatic);
     }
-    
+
+    @Override
+    public JavaType withHandlersFrom(JavaType src) {
+        JavaType type = super.withHandlersFrom(src);
+        JavaType srcCt = src.getContentType();
+        if (srcCt != null) {
+            JavaType ct = _elementType.withHandlersFrom(srcCt);
+            if (ct != _elementType) {
+                type = type.withContentType(ct);
+            }
+        }
+        return type;
+    }
+
+    @Override
+    public CollectionLikeType withStaticTyping() {
+        if (_asStatic) {
+            return this;
+        }
+        return new CollectionLikeType(_class, _bindings,
+                _superClass, _superInterfaces, _elementType.withStaticTyping(),
+                _valueHandler, _typeHandler, true);
+    }
+
+    @Override
+    public JavaType refine(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInterfaces) {
+        return new CollectionLikeType(rawType, bindings,
+                superClass, superInterfaces, _elementType,
+                _valueHandler, _typeHandler, _asStatic);
+    }
+
     /*
     /**********************************************************
     /* Public API
@@ -99,33 +167,30 @@ public class CollectionLikeType extends TypeBase
 
     @Override
     public boolean isCollectionLikeType() { return true; }
-    
+
     @Override
     public JavaType getContentType() { return _elementType; }
 
     @Override
-    public int containedTypeCount() { return 1; }
-
-    @Override
-    public JavaType containedType(int index) {
-            return (index == 0) ? _elementType : null;
+    public Object getContentValueHandler() {
+        return _elementType.getValueHandler();
     }
 
-    /**
-     * Not sure if we should count on this, but type names
-     * for core interfaces use "E" for element type
-     */
     @Override
-    public String containedTypeName(int index) {
-        if (index == 0) return "E";
-        return null;
+    public Object getContentTypeHandler() {
+        return _elementType.getTypeHandler();
+    }
+
+    @Override
+    public boolean hasHandlers() {
+        return super.hasHandlers() || _elementType.hasHandlers();
     }
 
     @Override
     public StringBuilder getErasedSignature(StringBuilder sb) {
         return _classSignature(_class, sb, true);
     }
-    
+
     @Override
     public StringBuilder getGenericSignature(StringBuilder sb) {
         _classSignature(_class, sb, false);
@@ -134,12 +199,14 @@ public class CollectionLikeType extends TypeBase
         sb.append(">;");
         return sb;
     }
-    
+
     @Override
     protected String buildCanonicalName() {
         StringBuilder sb = new StringBuilder();
         sb.append(_class.getName());
-        if (_elementType != null) {
+        // 10-Apr-2021, tatu: [databind#3108] Ensure we have at least nominally
+        //   compatible type declaration (weak guarantee but better than nothing)
+        if ((_elementType != null) && _hasNTypeParameters(1)) {
             sb.append('<');
             sb.append(_elementType.toCanonical());
             sb.append('>');
@@ -158,7 +225,10 @@ public class CollectionLikeType extends TypeBase
      * "real" Collection type; meaning whether it represents a parameterized
      * subtype of {@link java.util.Collection} or just something that acts
      * like one.
+     *
+     * @deprecated Since 2.12 just use instanceof
      */
+    @Deprecated // since 2.12 use assignment checks
     public boolean isTrueCollectionType() {
         return Collection.class.isAssignableFrom(_class);
     }

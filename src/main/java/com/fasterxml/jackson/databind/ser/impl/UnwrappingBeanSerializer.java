@@ -1,23 +1,28 @@
 package com.fasterxml.jackson.databind.ser.impl;
 
-import java.io.IOException;
+import com.fasterxml.jackson.core.JsonGenerator;
 
-import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.ser.*;
+import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 
+import java.io.IOException;
+import java.util.Set;
+
 public class UnwrappingBeanSerializer
     extends BeanSerializerBase
+    implements java.io.Serializable
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Transformer used to add prefix and/or suffix for properties
      * of unwrapped POJO.
      */
     protected final NameTransformer _nameTransformer;
-    
+
     /*
     /**********************************************************
     /* Life-cycle: constructors
@@ -33,16 +38,34 @@ public class UnwrappingBeanSerializer
         _nameTransformer = transformer;
     }
 
-    public UnwrappingBeanSerializer(UnwrappingBeanSerializer src, ObjectIdWriter objectIdWriter) {    
+    public UnwrappingBeanSerializer(UnwrappingBeanSerializer src,
+            ObjectIdWriter objectIdWriter) {
         super(src, objectIdWriter);
         _nameTransformer = src._nameTransformer;
     }
 
-    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src, String[] toIgnore) {
-        super(src, toIgnore);
+    public UnwrappingBeanSerializer(UnwrappingBeanSerializer src,
+            ObjectIdWriter objectIdWriter, Object filterId) {
+        super(src, objectIdWriter, filterId);
         _nameTransformer = src._nameTransformer;
     }
-    
+
+    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src, Set<String> toIgnore) {
+        this(src, toIgnore, null);
+    }
+
+    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src, Set<String> toIgnore, Set<String> toInclude) {
+        super(src, toIgnore, toInclude);
+        _nameTransformer = src._nameTransformer;
+    }
+
+    // @since 2.11.1
+    protected UnwrappingBeanSerializer(UnwrappingBeanSerializer src,
+            BeanPropertyWriter[] properties, BeanPropertyWriter[] filteredProperties) {
+        super(src, properties, filteredProperties);
+        _nameTransformer = src._nameTransformer;
+    }
+
     /*
     /**********************************************************
     /* Life-cycle: factory methods, fluent factories
@@ -61,15 +84,35 @@ public class UnwrappingBeanSerializer
     }
 
     @Override
-    protected UnwrappingBeanSerializer withObjectIdWriter(ObjectIdWriter objectIdWriter) {
+    public BeanSerializerBase withObjectIdWriter(ObjectIdWriter objectIdWriter) {
         return new UnwrappingBeanSerializer(this, objectIdWriter);
     }
 
     @Override
-    protected UnwrappingBeanSerializer withIgnorals(String[] toIgnore) {
-        return new UnwrappingBeanSerializer(this, toIgnore);
+    public BeanSerializerBase withFilterId(Object filterId) {
+        return new UnwrappingBeanSerializer(this, _objectIdWriter, filterId);
     }
-    
+
+    @Override // @since 2.12
+    protected BeanSerializerBase withByNameInclusion(Set<String> toIgnore, Set<String> toInclude) {
+        return new UnwrappingBeanSerializer(this, toIgnore, toInclude);
+    }
+
+    @Override // @since 2.11.1
+    protected BeanSerializerBase withProperties(BeanPropertyWriter[] properties,
+            BeanPropertyWriter[] filteredProperties) {
+        return new UnwrappingBeanSerializer(this, properties, filteredProperties);
+    }
+
+    /**
+     * JSON Array output cannot be done if unwrapping operation is
+     * requested; so implementation will simply return 'this'.
+     */
+    @Override
+    protected BeanSerializerBase asArraySerializer() {
+        return this;
+    }
+
     /*
     /**********************************************************
     /* JsonSerializer implementation that differs between impls
@@ -82,49 +125,40 @@ public class UnwrappingBeanSerializer
      * {@link BeanPropertyWriter} instances.
      */
     @Override
-    public final void serialize(Object bean, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+    public final void serialize(Object bean, JsonGenerator gen, SerializerProvider provider) throws IOException
     {
+        gen.setCurrentValue(bean); // [databind#631]
         if (_objectIdWriter != null) {
-            serializeWithObjectId(bean, jgen, provider);
+            _serializeWithObjectId(bean, gen, provider, false);
             return;
         }
         if (_propertyFilterId != null) {
-            serializeFieldsFiltered(bean, jgen, provider);
+            serializeFieldsFiltered(bean, gen, provider);
         } else {
-            serializeFields(bean, jgen, provider);
+            serializeFields(bean, gen, provider);
         }
     }
 
-    private final void serializeWithObjectId(Object bean, JsonGenerator jgen, SerializerProvider provider)
-        throws IOException, JsonGenerationException
+    @Override
+    public void serializeWithType(Object bean, JsonGenerator gen, SerializerProvider provider,
+    		TypeSerializer typeSer) throws IOException
     {
-        final ObjectIdWriter w = _objectIdWriter;
-        WritableObjectId oid = provider.findObjectId(bean, w.generator);
-        Object id = oid.id;
-        
-        if (id != null) { // have seen before; serialize just id
-            oid.serializer.serialize(id, jgen, provider);
+        if (provider.isEnabled(SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS)) {
+            provider.reportBadDefinition(handledType(),
+                    "Unwrapped property requires use of type information: cannot serialize without disabling `SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS`");
+        }
+        gen.setCurrentValue(bean); // [databind#631]
+        if (_objectIdWriter != null) {
+            _serializeWithObjectId(bean, gen, provider, typeSer);
             return;
         }
-        // if not, bit more work:
-        oid.serializer = w.serializer;
-        oid.id = id = oid.generator.generateId(bean);
-        // If not, need to inject the id:
-        jgen.writeStartObject();
-        SerializedString name = w.propertyName;
-        if (name != null) {
-            jgen.writeFieldName(name);
-            w.serializer.serialize(id, jgen, provider);
-        }
         if (_propertyFilterId != null) {
-            serializeFieldsFiltered(bean, jgen, provider);
+            serializeFieldsFiltered(bean, gen, provider);
         } else {
-            serializeFields(bean, jgen, provider);
+            serializeFields(bean, gen, provider);
         }
-        jgen.writeEndObject();
     }
-    
+
     /*
     /**********************************************************
     /* Standard methods

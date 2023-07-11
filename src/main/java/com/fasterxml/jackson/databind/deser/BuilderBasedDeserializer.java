@@ -5,8 +5,10 @@ import java.util.*;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.deser.impl.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
+import com.fasterxml.jackson.databind.util.IgnorePropertiesUtil;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 
@@ -21,10 +23,20 @@ import com.fasterxml.jackson.databind.util.TokenBuffer;
  * refactor this in future.
  */
 public class BuilderBasedDeserializer
-	extends BeanDeserializerBase
+    extends BeanDeserializerBase
 {
+    private static final long serialVersionUID = 1L;
+
     protected final AnnotatedMethod _buildMethod;
-	
+
+    /**
+     * Type that the builder will produce, target type; as opposed to
+     * `handledType()` which refers to Builder class.
+     *
+     * @since 2.9
+     */
+    protected final JavaType _targetType;
+
     /*
     /**********************************************************
     /* Life-cycle, construction, initialization
@@ -35,19 +47,47 @@ public class BuilderBasedDeserializer
      * Constructor used by {@link BeanDeserializerBuilder}.
      */
     public BuilderBasedDeserializer(BeanDeserializerBuilder builder,
-            BeanDescription beanDesc,
+            BeanDescription beanDesc, JavaType targetType,
             BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
-            HashSet<String> ignorableProps, boolean ignoreAllUnknown,
+            Set<String> ignorableProps, boolean ignoreAllUnknown,
             boolean hasViews)
     {
-    	super(builder, beanDesc, properties, backRefs,
-    			ignorableProps, ignoreAllUnknown, hasViews);
-    	_buildMethod = builder.getBuildMethod();
-    	// 05-Mar-2012, tatu: Can not really make Object Ids work with builders, not yet anyway
-    	if (_objectIdReader != null) {
-    	    throw new IllegalArgumentException("Can not use Object Id with Builder-based deserialization (type "
-    	            +beanDesc.getType()+")");
-    	}
+        this(builder, beanDesc, targetType, properties, backRefs, ignorableProps, ignoreAllUnknown, null, hasViews);
+    }
+
+    /**
+     * @since 2.12
+     */
+    public BuilderBasedDeserializer(BeanDeserializerBuilder builder,
+                                    BeanDescription beanDesc, JavaType targetType,
+                                    BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
+                                    Set<String> ignorableProps, boolean ignoreAllUnknown, Set<String> includableProps,
+                                    boolean hasViews)
+    {
+        super(builder, beanDesc, properties, backRefs,
+                ignorableProps, ignoreAllUnknown, includableProps, hasViews);
+        _targetType = targetType;
+        _buildMethod = builder.getBuildMethod();
+        // 05-Mar-2012, tatu: Cannot really make Object Ids work with builders, not yet anyway
+        if (_objectIdReader != null) {
+            throw new IllegalArgumentException("Cannot use Object Id with Builder-based deserialization (type "
+                    +beanDesc.getType()+")");
+        }
+    }
+
+    /**
+     * @deprecated Since 2.9
+     */
+    @Deprecated
+    public BuilderBasedDeserializer(BeanDeserializerBuilder builder,
+            BeanDescription beanDesc,
+            BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
+            Set<String> ignorableProps, boolean ignoreAllUnknown,
+            boolean hasViews)
+    {
+        this(builder, beanDesc,
+                beanDesc.getType(), // Wrong! But got no access via `BeanDeserializerBuilder`
+                properties, backRefs, ignorableProps, ignoreAllUnknown, hasViews);
     }
 
     /**
@@ -63,23 +103,37 @@ public class BuilderBasedDeserializer
     {
         super(src, ignoreAllUnknown);
         _buildMethod = src._buildMethod;
+        _targetType = src._targetType;
     }
-    
+
     protected BuilderBasedDeserializer(BuilderBasedDeserializer src, NameTransformer unwrapper) {
-    	super(src, unwrapper);
+        super(src, unwrapper);
         _buildMethod = src._buildMethod;
+        _targetType = src._targetType;
     }
 
     public BuilderBasedDeserializer(BuilderBasedDeserializer src, ObjectIdReader oir) {
         super(src, oir);
         _buildMethod = src._buildMethod;
+        _targetType = src._targetType;
     }
 
-    public BuilderBasedDeserializer(BuilderBasedDeserializer src, HashSet<String> ignorableProps) {
-        super(src, ignorableProps);
-        _buildMethod = src._buildMethod;
+    public BuilderBasedDeserializer(BuilderBasedDeserializer src, Set<String> ignorableProps) {
+        this(src, ignorableProps, src._includableProps);
     }
-    
+
+    public BuilderBasedDeserializer(BuilderBasedDeserializer src, Set<String> ignorableProps, Set<String> includableProps) {
+        super(src, ignorableProps, includableProps);
+        _buildMethod = src._buildMethod;
+        _targetType = src._targetType;
+    }
+
+    public BuilderBasedDeserializer(BuilderBasedDeserializer src, BeanPropertyMap props) {
+        super(src, props);
+        _buildMethod = src._buildMethod;
+        _targetType = src._targetType;
+    }
+
     @Override
     public JsonDeserializer<Object> unwrappingDeserializer(NameTransformer unwrapper)
     {
@@ -91,71 +145,102 @@ public class BuilderBasedDeserializer
     }
 
     @Override
-    public BuilderBasedDeserializer withObjectIdReader(ObjectIdReader oir) {
+    public BeanDeserializerBase withObjectIdReader(ObjectIdReader oir) {
         return new BuilderBasedDeserializer(this, oir);
     }
 
     @Override
-    public BuilderBasedDeserializer withIgnorableProperties(HashSet<String> ignorableProps) {
-        return new BuilderBasedDeserializer(this, ignorableProps);
+    public BeanDeserializerBase withByNameInclusion(Set<String> ignorableProps,
+            Set<String> includableProps) {
+        return new BuilderBasedDeserializer(this, ignorableProps, includableProps);
     }
-    
+
+    @Override
+    public BeanDeserializerBase withIgnoreAllUnknown(boolean ignoreUnknown) {
+        return new BuilderBasedDeserializer(this, ignoreUnknown);
+    }
+
+    @Override
+    public BeanDeserializerBase withBeanProperties(BeanPropertyMap props) {
+        return new BuilderBasedDeserializer(this, props);
+    }
+
+    @Override
+    protected BeanDeserializerBase asArrayDeserializer() {
+        SettableBeanProperty[] props = _beanProperties.getPropertiesInInsertionOrder();
+        return new BeanAsArrayBuilderDeserializer(this, _targetType, props, _buildMethod);
+    }
+
     /*
     /**********************************************************
     /* JsonDeserializer implementation
     /**********************************************************
      */
-    
-    protected final Object finishBuild(DeserializationContext ctxt, Object builder)
-    		throws IOException
-    {
-        try {
-    		return _buildMethod.getMember().invoke(builder);
-    	} catch (Exception e) {
-    		wrapInstantiationProblem(e, ctxt);
-    		return null;
-		}
+
+    @Override // since 2.9
+    public Boolean supportsUpdate(DeserializationConfig config) {
+        // 26-Oct-2016, tatu: No, we can't merge Builder-based POJOs as of now
+        return Boolean.FALSE;
     }
-    
+
+    /*
+    /**********************************************************
+    /* JsonDeserializer implementation
+    /**********************************************************
+     */
+
+    protected Object finishBuild(DeserializationContext ctxt, Object builder)
+            throws IOException
+    {
+        // As per [databind#777], allow returning builder itself
+        if (null == _buildMethod) {
+            return builder;
+        }
+        try {
+            return _buildMethod.getMember().invoke(builder, (Object[]) null);
+        } catch (Exception e) {
+            return wrapInstantiationProblem(e, ctxt);
+        }
+    }
+
     /**
      * Main deserialization method for bean-based objects (POJOs).
      */
     @Override
-    public final Object deserialize(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+    public Object deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException
     {
-        JsonToken t = jp.getCurrentToken();
-        
         // common case first:
-        if (t == JsonToken.START_OBJECT) {
-            t = jp.nextToken();
+        if (p.isExpectedStartObjectToken()) {
+            JsonToken t = p.nextToken();
             if (_vanillaProcessing) {
-            	return finishBuild(ctxt, vanillaDeserialize(jp, ctxt, t));
+                return finishBuild(ctxt, vanillaDeserialize(p, ctxt, t));
             }
-            Object builder = deserializeFromObject(jp, ctxt);
-            return finishBuild(ctxt, builder);
+            return finishBuild(ctxt, deserializeFromObject(p, ctxt));
         }
         // and then others, generally requiring use of @JsonCreator
-        switch (t) {
-        case VALUE_STRING:
-            return finishBuild(ctxt, deserializeFromString(jp, ctxt));
-        case VALUE_NUMBER_INT:
-            return finishBuild(ctxt, deserializeFromNumber(jp, ctxt));
-        case VALUE_NUMBER_FLOAT:
-        	return finishBuild(ctxt, deserializeFromDouble(jp, ctxt));
-        case VALUE_EMBEDDED_OBJECT:
-            return jp.getEmbeddedObject();
-        case VALUE_TRUE:
-        case VALUE_FALSE:
-            return finishBuild(ctxt, deserializeFromBoolean(jp, ctxt));
-        case START_ARRAY:
-            // these only work if there's a (delegating) creator...
-            return finishBuild(ctxt, deserializeFromArray(jp, ctxt));
-        case FIELD_NAME:
-        case END_OBJECT: // added to resolve [JACKSON-319], possible related issues
-            return finishBuild(ctxt, deserializeFromObject(jp, ctxt));
-		}
-        throw ctxt.mappingException(getBeanClass());
+        switch (p.currentTokenId()) {
+        case JsonTokenId.ID_STRING:
+            return finishBuild(ctxt, deserializeFromString(p, ctxt));
+        case JsonTokenId.ID_NUMBER_INT:
+            return finishBuild(ctxt, deserializeFromNumber(p, ctxt));
+        case JsonTokenId.ID_NUMBER_FLOAT:
+            return finishBuild(ctxt, deserializeFromDouble(p, ctxt));
+        case JsonTokenId.ID_EMBEDDED_OBJECT:
+            return p.getEmbeddedObject();
+        case JsonTokenId.ID_TRUE:
+        case JsonTokenId.ID_FALSE:
+            return finishBuild(ctxt, deserializeFromBoolean(p, ctxt));
+        case JsonTokenId.ID_START_ARRAY:
+            // these only work if there's a (delegating) creator, or UNWRAP_SINGLE_ARRAY
+            // [databind#2608]: Do NOT call `finishBuild()` as method implements it
+            return _deserializeFromArray(p, ctxt);
+        case JsonTokenId.ID_FIELD_NAME:
+        case JsonTokenId.ID_END_OBJECT:
+            return finishBuild(ctxt, deserializeFromObject(p, ctxt));
+        default:
+        }
+        return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }
 
     /**
@@ -164,139 +249,74 @@ public class BuilderBasedDeserializer
      * after collecting some or all of the properties to set.
      */
     @Override
-    public Object deserialize(JsonParser jp, DeserializationContext ctxt,
-    		Object builder)
-        throws IOException, JsonProcessingException
+    public Object deserialize(JsonParser p, DeserializationContext ctxt,
+    		Object value) throws IOException
     {
-        /* Important: we call separate method which does NOT call
-         * 'finishBuild()', to avoid problems with recursion
-         */
-        return finishBuild(ctxt, _deserialize(jp, ctxt, builder));
+        // 26-Oct-2016, tatu: I cannot see any of making this actually
+        //    work correctly, so let's indicate problem right away
+        JavaType valueType = _targetType;
+        // Did they try to give us builder?
+        Class<?> builderRawType = handledType();
+        Class<?> instRawType = value.getClass();
+        if (builderRawType.isAssignableFrom(instRawType)) {
+            return ctxt.reportBadDefinition(valueType, String.format(
+                    "Deserialization of %s by passing existing Builder (%s) instance not supported",
+                    valueType, builderRawType.getName()));
+        }
+        return ctxt.reportBadDefinition(valueType, String.format(
+                "Deserialization of %s by passing existing instance (of %s) not supported",
+                valueType, instRawType.getName()));
     }
-    
+
     /*
     /**********************************************************
     /* Concrete deserialization methods
     /**********************************************************
      */
 
-    protected final Object _deserialize(JsonParser jp,
-            DeserializationContext ctxt, Object builder)
-        throws IOException, JsonProcessingException
-    {        
-        if (_injectables != null) {
-            injectValues(ctxt, builder);
-        }
-        if (_unwrappedPropertyHandler != null) {
-            return deserializeWithUnwrapped(jp, ctxt, builder);
-        }
-        if (_externalTypeIdHandler != null) {
-            return deserializeWithExternalTypeId(jp, ctxt, builder);
-        }
-        if (_needViewProcesing) {
-            Class<?> view = ctxt.getActiveView();
-            if (view != null) {
-                return deserializeWithView(jp, ctxt, builder, view);
-            }
-        }
-        JsonToken t = jp.getCurrentToken();
-        // 23-Mar-2010, tatu: In some cases, we start with full JSON object too...
-        if (t == JsonToken.START_OBJECT) {
-            t = jp.nextToken();
-        }
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            // Skip field name:
-            jp.nextToken();
-            SettableBeanProperty prop = _beanProperties.find(propName);
-            
-            if (prop != null) { // normal case
-                try {
-                    builder = prop.deserializeSetAndReturn(jp, ctxt, builder);
-                } catch (Exception e) {
-                    wrapAndThrow(e, builder, propName, ctxt);
-                }
-                continue;
-            }
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
-            } else if (_anySetter != null) {
-                // should we try to get return value of any setter too?
-                _anySetter.deserializeAndSet(jp, ctxt, builder, propName);
-                continue;
-            } else {
-                // Unknown: let's call handler method
-                handleUnknownProperty(jp, ctxt, builder, propName);
-            }
-        }
-        return builder;
-    }
-    
     /**
      * Streamlined version that is only used when no "special"
      * features are enabled.
      */
-    private final Object vanillaDeserialize(JsonParser jp,
+    private final Object vanillaDeserialize(JsonParser p,
     		DeserializationContext ctxt, JsonToken t)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
         Object bean = _valueInstantiator.createUsingDefault(ctxt);
-        for (; jp.getCurrentToken() != JsonToken.END_OBJECT; jp.nextToken()) {
-            String propName = jp.getCurrentName();
+        for (; p.currentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
+            String propName = p.currentName();
             // Skip field name:
-            jp.nextToken();
+            p.nextToken();
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) { // normal case
                 try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
+                    bean = prop.deserializeSetAndReturn(p, ctxt, bean);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
             } else {
-                _vanillaDeserializeHandleUnknown(jp, ctxt, bean, propName);
+                handleUnknownVanilla(p, ctxt, bean, propName);
             }
         }
         return bean;
     }
 
     /**
-     * Helper method called for an unknown property, when using "vanilla"
-     * processing.
-     */
-    private final void _vanillaDeserializeHandleUnknown(JsonParser jp, DeserializationContext ctxt,
-            Object bean, String propName)
-        throws IOException, JsonProcessingException
-    {
-        if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-            jp.skipChildren();
-        } else if (_anySetter != null) {
-            try {
-            	// should we consider return type of any setter?
-                _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
-            } catch (Exception e) {
-                wrapAndThrow(e, bean, propName, ctxt);
-            }
-        } else {
-            // Unknown: let's call handler method
-            handleUnknownProperty(jp, ctxt, bean, propName);         
-        }
-    }
-
-    /**
      * General version used when handling needs more advanced
      * features.
      */
-    public Object deserializeFromObject(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+    @Override
+    public Object deserializeFromObject(JsonParser p, DeserializationContext ctxt)
+        throws IOException
     {
         if (_nonStandardCreation) {
             if (_unwrappedPropertyHandler != null) {
-                return deserializeWithUnwrapped(jp, ctxt);
+                return deserializeWithUnwrapped(p, ctxt);
             }
             if (_externalTypeIdHandler != null) {
-                return deserializeWithExternalTypeId(jp, ctxt);
+                return deserializeWithExternalTypeId(p, ctxt);
             }
-            return deserializeFromObjectUsingNonDefault(jp, ctxt);
+            return deserializeFromObjectUsingNonDefault(p, ctxt);
         }
         Object bean = _valueInstantiator.createUsingDefault(ctxt);
         if (_injectables != null) {
@@ -305,371 +325,250 @@ public class BuilderBasedDeserializer
         if (_needViewProcesing) {
             Class<?> view = ctxt.getActiveView();
             if (view != null) {
-                return deserializeWithView(jp, ctxt, bean, view);
+                return deserializeWithView(p, ctxt, bean, view);
             }
         }
-        for (; jp.getCurrentToken() != JsonToken.END_OBJECT; jp.nextToken()) {
-            String propName = jp.getCurrentName();
+        for (; p.currentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
+            String propName = p.currentName();
             // Skip field name:
-            jp.nextToken();
+            p.nextToken();
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) { // normal case
                 try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
+                    bean = prop.deserializeSetAndReturn(p, ctxt, bean);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
                 continue;
             }
-            /* As per [JACKSON-313], things marked as ignorable should not be
-             * passed to any setter
-             */
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
-            } else if (_anySetter != null) {
-                try {
-                    _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
-                } catch (Exception e) {
-                    wrapAndThrow(e, bean, propName, ctxt);
-                }
-                continue;
-            } else {
-                // Unknown: let's call handler method
-                handleUnknownProperty(jp, ctxt, bean, propName);         
-            }
+            handleUnknownVanilla(p, ctxt, bean, propName);
         }
         return bean;
-    }
-
-    protected Object deserializeFromObjectUsingNonDefault(JsonParser jp,
-            DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {        
-        if (_delegateDeserializer != null) {
-            return _valueInstantiator.createUsingDelegate(ctxt,
-                    _delegateDeserializer.deserialize(jp, ctxt));
-        }
-        if (_propertyBasedCreator != null) {
-            return _deserializeUsingPropertyBased(jp, ctxt);
-        }
-        // should only occur for abstract types...
-        if (_beanType.isAbstract()) {
-            throw JsonMappingException.from(jp, "Can not instantiate abstract type "+_beanType
-                    +" (need to add/enable type information?)");
-        }
-        throw JsonMappingException.from(jp, "No suitable constructor found for type "
-                +_beanType+": can not instantiate from JSON object (need to add/enable type information?)");
-    }
-    
-    public Object deserializeFromString(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {
-        // First things first: id Object Id is used, most likely that's it
-        if (_objectIdReader != null) {
-            return deserializeFromObjectId(jp, ctxt);
-        }
-        
-        /* Bit complicated if we have delegating creator; may need to use it,
-         * or might not...
-         */
-        if (_delegateDeserializer != null) {
-            if (!_valueInstantiator.canCreateFromString()) {
-                Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-                if (_injectables != null) {
-                    injectValues(ctxt, bean);
-                }
-                return bean;
-            }
-        }
-        return _valueInstantiator.createFromString(ctxt, jp.getText());
-    }
-
-    public Object deserializeFromNumber(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {
-        // First things first: id Object Id is used, most likely that's it
-        if (_objectIdReader != null) {
-            return deserializeFromObjectId(jp, ctxt);
-        }
-
-        switch (jp.getNumberType()) {
-        case INT:
-            if (_delegateDeserializer != null) {
-                if (!_valueInstantiator.canCreateFromInt()) {
-                    Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-                    if (_injectables != null) {
-                        injectValues(ctxt, bean);
-                    }
-                    return bean;
-                }
-            }
-            return _valueInstantiator.createFromInt(ctxt, jp.getIntValue());
-        case LONG:
-            if (_delegateDeserializer != null) {
-                if (!_valueInstantiator.canCreateFromInt()) {
-                    Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-                    if (_injectables != null) {
-                        injectValues(ctxt, bean);
-                    }
-                    return bean;
-                }
-            }
-            return _valueInstantiator.createFromLong(ctxt, jp.getLongValue());
-    	}
-        // actually, could also be BigInteger, so:
-        if (_delegateDeserializer != null) {
-            Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-            if (_injectables != null) {
-                injectValues(ctxt, bean);
-            }
-            return bean;
-        }
-        throw ctxt.instantiationException(getBeanClass(), "no suitable creator method found to deserialize from JSON integer number");
-    }
-
-    /**
-     * Method called to deserialize POJO value from a JSON floating-point
-     * number.
-     */
-    public Object deserializeFromDouble(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {
-        switch (jp.getNumberType()) {
-        case FLOAT: // no separate methods for taking float...
-        case DOUBLE:
-            if (_delegateDeserializer != null) {
-                if (!_valueInstantiator.canCreateFromDouble()) {
-                    Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-                    if (_injectables != null) {
-                        injectValues(ctxt, bean);
-                    }
-                    return bean;
-                }
-            }
-            return _valueInstantiator.createFromDouble(ctxt, jp.getDoubleValue());
-        }
-        // actually, could also be BigDecimal, so:
-        if (_delegateDeserializer != null) {
-            return _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-        }
-        throw ctxt.instantiationException(getBeanClass(), "no suitable creator method found to deserialize from JSON floating-point number");
-    }
-
-    /**
-     * Method called to deserialize POJO value from a JSON boolean value (true, false)
-     */
-    public Object deserializeFromBoolean(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {
-        if (_delegateDeserializer != null) {
-            if (!_valueInstantiator.canCreateFromBoolean()) {
-                Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-                if (_injectables != null) {
-                    injectValues(ctxt, bean);
-                }
-                return bean;
-            }
-        }
-        boolean value = (jp.getCurrentToken() == JsonToken.VALUE_TRUE);
-        return _valueInstantiator.createFromBoolean(ctxt, value);
-    }
-
-    public Object deserializeFromArray(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    {
-    	if (_delegateDeserializer != null) {
-    	    try {
-    	        Object bean = _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
-    	        if (_injectables != null) {
-    	            injectValues(ctxt, bean);
-    	        }
-    	        return bean;
-            } catch (Exception e) {
-                wrapInstantiationProblem(e, ctxt);
-            }
-    	}
-    	throw ctxt.mappingException(getBeanClass());
     }
 
     /**
      * Method called to deserialize bean using "property-based creator":
      * this means that a non-default constructor or factory method is
      * called, and then possibly other setters. The trick is that
-     * values for creator method need to be buffered, first; and 
+     * values for creator method need to be buffered, first; and
      * due to non-guaranteed ordering possibly some other properties
      * as well.
+     *
+     * @return Builder instance constructed
      */
-    protected final Object _deserializeUsingPropertyBased(final JsonParser jp,
+    @Override
+    protected Object _deserializeUsingPropertyBased(final JsonParser p,
             final DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
-    { 
+        throws IOException
+    {
         final PropertyBasedCreator creator = _propertyBasedCreator;
-        PropertyValueBuffer buffer = creator.startBuilding(jp, ctxt);
+        PropertyValueBuffer buffer = creator.startBuilding(p, ctxt, _objectIdReader);
+        final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
 
         // 04-Jan-2010, tatu: May need to collect unknown properties for polymorphic cases
         TokenBuffer unknown = null;
 
-        JsonToken t = jp.getCurrentToken();
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            jp.nextToken(); // to point to value
+        JsonToken t = p.currentToken();
+        for (; t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
+            p.nextToken(); // to point to value
             // creator property?
-            SettableBeanProperty creatorProp = creator.findCreatorProperty(propName);
+            final SettableBeanProperty creatorProp = creator.findCreatorProperty(propName);
+            // Object Id property?
+            if (buffer.readIdProperty(propName) && creatorProp == null) {
+                continue;
+            }
             if (creatorProp != null) {
+                if ((activeView != null) && !creatorProp.visibleInView(activeView)) {
+                    p.skipChildren();
+                    continue;
+                }
                 // Last creator property to set?
-                Object value = creatorProp.deserialize(jp, ctxt);
-                if (buffer.assignParameter(creatorProp.getPropertyIndex(), value)) {
-                    jp.nextToken(); // to move to following FIELD_NAME/END_OBJECT
-                    Object bean;
+                if (buffer.assignParameter(creatorProp, creatorProp.deserialize(p, ctxt))) {
+                    p.nextToken(); // to move to following FIELD_NAME/END_OBJECT
+                    Object builder;
                     try {
-                        bean = creator.build(ctxt, buffer);
+                        builder = creator.build(ctxt, buffer);
                     } catch (Exception e) {
                         wrapAndThrow(e, _beanType.getRawClass(), propName, ctxt);
                         continue; // never gets here
                     }
                     //  polymorphic?
-        		    if (bean.getClass() != _beanType.getRawClass()) {
-        		        return handlePolymorphic(jp, ctxt, bean, unknown);
-        		    }
-        		    if (unknown != null) { // nope, just extra unknown stuff...
-        		        bean = handleUnknownProperties(ctxt, bean, unknown);
-        		    }
-        		    // or just clean?
-        		    return _deserialize(jp, ctxt, bean);
+                    if (builder.getClass() != _beanType.getRawClass()) {
+                        return handlePolymorphic(p, ctxt, p.streamReadConstraints(), builder, unknown);
+                    }
+                    if (unknown != null) { // nope, just extra unknown stuff...
+                        builder = handleUnknownProperties(ctxt, builder, unknown);
+                    }
+                    // or just clean?
+                    return _deserialize(p, ctxt, builder);
                 }
                 continue;
             }
             // regular property? needs buffering
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) {
-                buffer.bufferProperty(prop, prop.deserialize(jp, ctxt));
+                buffer.bufferProperty(prop, prop.deserialize(p, ctxt));
                 continue;
             }
-            /* As per [JACKSON-313], things marked as ignorable should not be
-             * passed to any setter
-             */
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
+            // As per [JACKSON-313], things marked as ignorable should not be
+            // passed to any setter
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
+                handleIgnoredProperty(p, ctxt, handledType(), propName);
                 continue;
             }
             // "any property"?
             if (_anySetter != null) {
-                buffer.bufferAnyProperty(_anySetter, propName, _anySetter.deserialize(jp, ctxt));
+                buffer.bufferAnyProperty(_anySetter, propName, _anySetter.deserialize(p, ctxt));
                 continue;
             }
             // Ok then, let's collect the whole field; name and value
             if (unknown == null) {
-                unknown = new TokenBuffer(jp.getCodec());
+                unknown = ctxt.bufferForInputBuffering(p);
             }
             unknown.writeFieldName(propName);
-            unknown.copyCurrentStructure(jp);
+            unknown.copyCurrentStructure(p);
         }
 
         // We hit END_OBJECT, so:
-        Object bean;
+        Object builder;
         try {
-            bean =  creator.build(ctxt, buffer);
+            builder = creator.build(ctxt, buffer);
         } catch (Exception e) {
-            wrapInstantiationProblem(e, ctxt);
-            return null; // never gets here
+            builder = wrapInstantiationProblem(e, ctxt);
         }
         if (unknown != null) {
             // polymorphic?
-            if (bean.getClass() != _beanType.getRawClass()) {
-                return handlePolymorphic(null, ctxt, bean, unknown);
+            if (builder.getClass() != _beanType.getRawClass()) {
+                return handlePolymorphic(null, ctxt, p.streamReadConstraints(), builder, unknown);
             }
             // no, just some extra unknown properties
-            return handleUnknownProperties(ctxt, bean, unknown);
+            return handleUnknownProperties(ctxt, builder, unknown);
         }
-        return bean;
+        return builder;
     }
 
-    /**
-     * Method called in cases where we may have polymorphic deserialization
-     * case: that is, type of Creator-constructed bean is not the type
-     * of deserializer itself. It should be a sub-class or implementation
-     * class; either way, we may have more specific deserializer to use
-     * for handling it.
-     *
-     * @param jp (optional) If not null, parser that has more properties to handle
-     *   (in addition to buffered properties); if null, all properties are passed
-     *   in buffer
-     */
-    protected Object handlePolymorphic(JsonParser jp, DeserializationContext ctxt,                                          
-            Object bean, TokenBuffer unknownTokens)
-        throws IOException, JsonProcessingException
-    {  
-        // First things first: maybe there is a more specific deserializer available?
-        JsonDeserializer<Object> subDeser = _findSubclassDeserializer(ctxt, bean, unknownTokens);
-        if (subDeser != null) {
-            if (unknownTokens != null) {
-                // need to add END_OBJECT marker first
-                unknownTokens.writeEndObject();
-                JsonParser p2 = unknownTokens.asParser();
-                p2.nextToken(); // to get to first data field
-                bean = subDeser.deserialize(p2, ctxt, bean);
+    protected final Object _deserialize(JsonParser p,
+            DeserializationContext ctxt, Object builder) throws IOException
+    {
+        if (_injectables != null) {
+            injectValues(ctxt, builder);
+        }
+        if (_unwrappedPropertyHandler != null) {
+            if (p.hasToken(JsonToken.START_OBJECT)) {
+                p.nextToken();
             }
-            // Original parser may also have some leftovers
-            if (jp != null) {
-                bean = subDeser.deserialize(jp, ctxt, bean);
+            TokenBuffer tokens = ctxt.bufferForInputBuffering(p);
+            tokens.writeStartObject();
+            return deserializeWithUnwrapped(p, ctxt, builder, tokens);
+        }
+        if (_externalTypeIdHandler != null) {
+            return deserializeWithExternalTypeId(p, ctxt, builder);
+        }
+        if (_needViewProcesing) {
+            Class<?> view = ctxt.getActiveView();
+            if (view != null) {
+                return deserializeWithView(p, ctxt, builder, view);
             }
-            return bean;
         }
-        // nope; need to use this deserializer. Unknowns we've seen so far?
-        if (unknownTokens != null) {
-            bean = handleUnknownProperties(ctxt, bean, unknownTokens);
+        JsonToken t = p.currentToken();
+        // 23-Mar-2010, tatu: In some cases, we start with full JSON object too...
+        if (t == JsonToken.START_OBJECT) {
+            t = p.nextToken();
         }
-        // and/or things left to process via main parser?
-        if (jp != null) {
-            bean = deserialize(jp, ctxt, bean);
+        for (; t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
+            // Skip field name:
+            p.nextToken();
+            SettableBeanProperty prop = _beanProperties.find(propName);
+
+            if (prop != null) { // normal case
+                try {
+                    builder = prop.deserializeSetAndReturn(p, ctxt, builder);
+                } catch (Exception e) {
+                    wrapAndThrow(e, builder, propName, ctxt);
+                }
+                continue;
+            }
+            handleUnknownVanilla(p, ctxt, builder, propName);
         }
-        return bean;
+        return builder;
     }
-    
+
+    @Override // since 2.11, custom implementation
+    protected Object _deserializeFromArray(JsonParser p, DeserializationContext ctxt) throws IOException
+    {
+        // note: cannot call `_delegateDeserializer()` since order reversed here:
+        JsonDeserializer<Object> delegateDeser = _arrayDelegateDeserializer;
+        // fallback to non-array delegate
+        if ((delegateDeser != null) || ((delegateDeser = _delegateDeserializer) != null)) {
+            Object builder = _valueInstantiator.createUsingArrayDelegate(ctxt,
+                    delegateDeser.deserialize(p, ctxt));
+            if (_injectables != null) {
+                injectValues(ctxt, builder);
+            }
+            return finishBuild(ctxt, builder);
+        }
+        final CoercionAction act = _findCoercionFromEmptyArray(ctxt);
+        final boolean unwrap = ctxt.isEnabled(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS);
+
+        if (unwrap || (act != CoercionAction.Fail)) {
+            JsonToken t = p.nextToken();
+            if (t == JsonToken.END_ARRAY) {
+                switch (act) {
+                case AsEmpty:
+                    return getEmptyValue(ctxt);
+                case AsNull:
+                case TryConvert:
+                    return getNullValue(ctxt);
+                default:
+                }
+                return ctxt.handleUnexpectedToken(getValueType(ctxt), JsonToken.START_ARRAY, p, null);
+            }
+            if (unwrap) {
+                final Object value = deserialize(p, ctxt);
+                if (p.nextToken() != JsonToken.END_ARRAY) {
+                    handleMissingEndArrayForSingle(p, ctxt);
+                }
+                return value;
+            }
+        }
+        return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
+    }
+
     /*
     /**********************************************************
     /* Deserializing when we have to consider an active View
     /**********************************************************
      */
-    
-    protected final Object deserializeWithView(JsonParser jp, DeserializationContext ctxt,
+
+    protected final Object deserializeWithView(JsonParser p, DeserializationContext ctxt,
             Object bean, Class<?> activeView)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
-        JsonToken t = jp.getCurrentToken();
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String propName = jp.getCurrentName();
+        JsonToken t = p.currentToken();
+        for (; t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
             // Skip field name:
-            jp.nextToken();
+            p.nextToken();
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) {
                 if (!prop.visibleInView(activeView)) {
-                    jp.skipChildren();
+                    p.skipChildren();
                     continue;
                 }
                 try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
+                    bean = prop.deserializeSetAndReturn(p, ctxt, bean);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
                 continue;
             }
-            /* As per [JACKSON-313], things marked as ignorable should not be
-             * passed to any setter
-             */
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
-            } else if (_anySetter != null) {
-                _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
-                continue;
-            } else {
-                // Unknown: let's call handler method
-                handleUnknownProperty(jp, ctxt, bean, propName);
-            }
+            handleUnknownVanilla(p, ctxt, bean, propName);
         }
         return bean;
     }
-    
+
     /*
     /**********************************************************
     /* Handling for cases where we have "unwrapped" values
@@ -680,16 +579,17 @@ public class BuilderBasedDeserializer
      * Method called when there are declared "unwrapped" properties
      * which need special handling
      */
-    protected Object deserializeWithUnwrapped(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+    @SuppressWarnings("resource")
+    protected Object deserializeWithUnwrapped(JsonParser p, DeserializationContext ctxt)
+        throws IOException
     {
         if (_delegateDeserializer != null) {
-            return _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(jp, ctxt));
+            return _valueInstantiator.createUsingDelegate(ctxt, _delegateDeserializer.deserialize(p, ctxt));
         }
         if (_propertyBasedCreator != null) {
-            return deserializeUsingPropertyBasedWithUnwrapped(jp, ctxt);
+            return deserializeUsingPropertyBasedWithUnwrapped(p, ctxt);
         }
-        TokenBuffer tokens = new TokenBuffer(jp.getCodec());
+        TokenBuffer tokens = ctxt.bufferForInputBuffering(p);
         tokens.writeStartObject();
         Object bean = _valueInstantiator.createUsingDefault(ctxt);
 
@@ -698,35 +598,34 @@ public class BuilderBasedDeserializer
         }
 
         final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
-        
-        for (; jp.getCurrentToken() != JsonToken.END_OBJECT; jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            jp.nextToken();
+        for (; p.currentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
+            String propName = p.currentName();
+            p.nextToken();
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) { // normal case
                 if (activeView != null && !prop.visibleInView(activeView)) {
-                    jp.skipChildren();
+                    p.skipChildren();
                     continue;
                 }
                 try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
+                    bean = prop.deserializeSetAndReturn(p, ctxt, bean);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
                 continue;
             }
             // ignorable things should be ignored
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
+                handleIgnoredProperty(p, ctxt, bean, propName);
                 continue;
             }
             // but... others should be passed to unwrapped property deserializers
             tokens.writeFieldName(propName);
-            tokens.copyCurrentStructure(jp);
+            tokens.copyCurrentStructure(p);
             // how about any setter? We'll get copies but...
             if (_anySetter != null) {
                 try {
-                    _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
+                    _anySetter.deserializeAndSet(p, ctxt, bean, propName);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
@@ -734,129 +633,113 @@ public class BuilderBasedDeserializer
             }
         }
         tokens.writeEndObject();
-        _unwrappedPropertyHandler.processUnwrapped(jp, ctxt, bean, tokens);
-        return bean;
-    }    
-
-    protected Object deserializeWithUnwrapped(JsonParser jp,
-    		DeserializationContext ctxt, Object bean)
-        throws IOException, JsonProcessingException
-    {
-        JsonToken t = jp.getCurrentToken();
-        if (t == JsonToken.START_OBJECT) {
-            t = jp.nextToken();
-        }
-        TokenBuffer tokens = new TokenBuffer(jp.getCodec());
-        tokens.writeStartObject();
-        final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            SettableBeanProperty prop = _beanProperties.find(propName);
-            jp.nextToken();
-            if (prop != null) { // normal case
-                if (activeView != null && !prop.visibleInView(activeView)) {
-                    jp.skipChildren();
-                    continue;
-                }
-                try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
-                } catch (Exception e) {
-                    wrapAndThrow(e, bean, propName, ctxt);
-                }
-                continue;
-            }
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
-                continue;
-            }
-            // but... others should be passed to unwrapped property deserializers
-            tokens.writeFieldName(propName);
-            tokens.copyCurrentStructure(jp);
-            // how about any setter? We'll get copies but...
-            if (_anySetter != null) {
-                _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
-            }
-        }
-        tokens.writeEndObject();
-        _unwrappedPropertyHandler.processUnwrapped(jp, ctxt, bean, tokens);
-        return bean;
+        return _unwrappedPropertyHandler.processUnwrapped(p, ctxt, bean, tokens);
     }
 
-    protected Object deserializeUsingPropertyBasedWithUnwrapped(JsonParser jp,
+    @SuppressWarnings("resource")
+    protected Object deserializeUsingPropertyBasedWithUnwrapped(JsonParser p,
     		DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
         final PropertyBasedCreator creator = _propertyBasedCreator;
-        PropertyValueBuffer buffer = creator.startBuilding(jp, ctxt);
+        PropertyValueBuffer buffer = creator.startBuilding(p, ctxt, _objectIdReader);
 
-        TokenBuffer tokens = new TokenBuffer(jp.getCodec());
+        TokenBuffer tokens = ctxt.bufferForInputBuffering(p);
         tokens.writeStartObject();
+        Object builder = null;
 
-        JsonToken t = jp.getCurrentToken();
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            jp.nextToken(); // to point to value
+        JsonToken t = p.currentToken();
+        for (; t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
+            p.nextToken(); // to point to value
             // creator property?
-            SettableBeanProperty creatorProp = creator.findCreatorProperty(propName);
+            final SettableBeanProperty creatorProp = creator.findCreatorProperty(propName);
+            // Object Id property?
+            if (buffer.readIdProperty(propName) && creatorProp == null) {
+                continue;
+            }
             if (creatorProp != null) {
                 // Last creator property to set?
-                Object value = creatorProp.deserialize(jp, ctxt);
-                if (buffer.assignParameter(creatorProp.getPropertyIndex(), value)) {
-                    t = jp.nextToken(); // to move to following FIELD_NAME/END_OBJECT
-                    Object bean;
+                if (buffer.assignParameter(creatorProp, creatorProp.deserialize(p, ctxt))) {
+                    t = p.nextToken(); // to move to following FIELD_NAME/END_OBJECT
                     try {
-                        bean = creator.build(ctxt, buffer);
+                        builder = creator.build(ctxt, buffer);
                     } catch (Exception e) {
                         wrapAndThrow(e, _beanType.getRawClass(), propName, ctxt);
                         continue; // never gets here
                     }
-                    // if so, need to copy all remaining tokens into buffer
-                    while (t == JsonToken.FIELD_NAME) {
-                        jp.nextToken(); // to skip name
-                        tokens.copyCurrentStructure(jp);
-                        t = jp.nextToken();
+                    if (builder.getClass() != _beanType.getRawClass()) {
+                        return handlePolymorphic(p, ctxt, p.streamReadConstraints(), builder, tokens);
                     }
-                    tokens.writeEndObject();
-                    if (bean.getClass() != _beanType.getRawClass()) {
-                        // !!! 08-Jul-2011, tatu: Could probably support; but for now
-                        //   it's too complicated, so bail out
-                        throw ctxt.mappingException("Can not create polymorphic instances with unwrapped values");
-                    }
-                    return _unwrappedPropertyHandler.processUnwrapped(jp, ctxt, bean, tokens);
+                    return deserializeWithUnwrapped(p, ctxt, builder, tokens);
                 }
                 continue;
             }
             // regular property? needs buffering
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) {
-                buffer.bufferProperty(prop, prop.deserialize(jp, ctxt));
+                buffer.bufferProperty(prop, prop.deserialize(p, ctxt));
                 continue;
             }
-            /* As per [JACKSON-313], things marked as ignorable should not be
-             * passed to any setter
-             */
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
+                handleIgnoredProperty(p, ctxt, handledType(), propName);
                 continue;
             }
             tokens.writeFieldName(propName);
-            tokens.copyCurrentStructure(jp);
+            tokens.copyCurrentStructure(p);
             // "any property"?
             if (_anySetter != null) {
-                buffer.bufferAnyProperty(_anySetter, propName, _anySetter.deserialize(jp, ctxt));
+                buffer.bufferAnyProperty(_anySetter, propName, _anySetter.deserialize(p, ctxt));
             }
         }
+        tokens.writeEndObject();
 
         // We hit END_OBJECT, so:
-        Object bean;
-        // !!! 15-Feb-2012, tatu: Need to modify creator to use Builder!
-        try {
-            bean = creator.build(ctxt, buffer);
-        } catch (Exception e) {
-            wrapInstantiationProblem(e, ctxt);
-            return null; // never gets here
+        if (builder == null) {
+            try {
+                builder = creator.build(ctxt, buffer);
+            } catch (Exception e) {
+                return wrapInstantiationProblem(e, ctxt);
+            }
         }
-        return _unwrappedPropertyHandler.processUnwrapped(jp, ctxt, bean, tokens);
+        return _unwrappedPropertyHandler.processUnwrapped(p, ctxt, builder, tokens);
+    }
+
+    protected Object deserializeWithUnwrapped(JsonParser p,
+            DeserializationContext ctxt, Object builder, TokenBuffer tokens)
+        throws IOException
+    {
+        final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
+        for (JsonToken t = p.currentToken(); t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
+            SettableBeanProperty prop = _beanProperties.find(propName);
+            p.nextToken();
+            if (prop != null) { // normal case
+                if (activeView != null && !prop.visibleInView(activeView)) {
+                    p.skipChildren();
+                    continue;
+                }
+                try {
+                    builder = prop.deserializeSetAndReturn(p, ctxt, builder);
+                } catch (Exception e) {
+                    wrapAndThrow(e, builder, propName, ctxt);
+                }
+                continue;
+            }
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
+                handleIgnoredProperty(p, ctxt, builder, propName);
+                continue;
+            }
+            // but... others should be passed to unwrapped property deserializers
+            tokens.writeFieldName(propName);
+            tokens.copyCurrentStructure(p);
+            // how about any setter? We'll get copies but...
+            if (_anySetter != null) {
+                _anySetter.deserializeAndSet(p, ctxt, builder, propName);
+            }
+        }
+        tokens.writeEndObject();
+        return _unwrappedPropertyHandler.processUnwrapped(p, ctxt, builder, tokens);
     }
 
     /*
@@ -865,69 +748,77 @@ public class BuilderBasedDeserializer
     /* external type id
     /**********************************************************
      */
-    
-    protected Object deserializeWithExternalTypeId(JsonParser jp, DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+
+    protected Object deserializeWithExternalTypeId(JsonParser p, DeserializationContext ctxt)
+        throws IOException
     {
         if (_propertyBasedCreator != null) {
-            return deserializeUsingPropertyBasedWithExternalTypeId(jp, ctxt);
+            return deserializeUsingPropertyBasedWithExternalTypeId(p, ctxt);
         }
-        return deserializeWithExternalTypeId(jp, ctxt, _valueInstantiator.createUsingDefault(ctxt));
+        return deserializeWithExternalTypeId(p, ctxt, _valueInstantiator.createUsingDefault(ctxt));
     }
 
-    protected Object deserializeWithExternalTypeId(JsonParser jp,
+    protected Object deserializeWithExternalTypeId(JsonParser p,
     		DeserializationContext ctxt, Object bean)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
         final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
         final ExternalTypeHandler ext = _externalTypeIdHandler.start();
-        for (; jp.getCurrentToken() != JsonToken.END_OBJECT; jp.nextToken()) {
-            String propName = jp.getCurrentName();
-            jp.nextToken();
+
+        for (JsonToken t = p.currentToken(); t == JsonToken.FIELD_NAME; t = p.nextToken()) {
+            String propName = p.currentName();
+            t = p.nextToken();
             SettableBeanProperty prop = _beanProperties.find(propName);
             if (prop != null) { // normal case
+                // May have property AND be used as external type id:
+                if (t.isScalarValue()) {
+                    ext.handleTypePropertyValue(p, ctxt, propName, bean);
+                }
                 if (activeView != null && !prop.visibleInView(activeView)) {
-                    jp.skipChildren();
+                    p.skipChildren();
                     continue;
                 }
                 try {
-                    bean = prop.deserializeSetAndReturn(jp, ctxt, bean);
+                    bean = prop.deserializeSetAndReturn(p, ctxt, bean);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
                 continue;
             }
             // ignorable things should be ignored
-            if (_ignorableProps != null && _ignorableProps.contains(propName)) {
-                jp.skipChildren();
+            if (IgnorePropertiesUtil.shouldIgnore(propName, _ignorableProps, _includableProps)) {
+                handleIgnoredProperty(p, ctxt, bean, propName);
                 continue;
             }
             // but others are likely to be part of external type id thingy...
-            if (ext.handlePropertyValue(jp, ctxt, propName, bean)) {
+            if (ext.handlePropertyValue(p, ctxt, propName, bean)) {
                 continue;
             }
             // if not, the usual fallback handling:
             if (_anySetter != null) {
                 try {
-                    _anySetter.deserializeAndSet(jp, ctxt, bean, propName);
+                    _anySetter.deserializeAndSet(p, ctxt, bean, propName);
                 } catch (Exception e) {
                     wrapAndThrow(e, bean, propName, ctxt);
                 }
                 continue;
             } else {
                 // Unknown: let's call handler method
-                handleUnknownProperty(jp, ctxt, bean, propName);         
+                handleUnknownProperty(p, ctxt, bean, propName);
             }
         }
         // and when we get this far, let's try finalizing the deal:
-        return ext.complete(jp, ctxt, bean);
-    }        
+        return ext.complete(p, ctxt, bean);
+    }
 
-    protected Object deserializeUsingPropertyBasedWithExternalTypeId(JsonParser jp,
+    protected Object deserializeUsingPropertyBasedWithExternalTypeId(JsonParser p,
     		DeserializationContext ctxt)
-        throws IOException, JsonProcessingException
+        throws IOException
     {
         // !!! 04-Mar-2012, TODO: Need to fix -- will not work as is...
-        throw new IllegalStateException("Deserialization with Builder, External type id, @JsonCreator not yet implemented");
+        JavaType t = _targetType;
+        return ctxt.reportBadDefinition(t, String.format(
+                "Deserialization (of %s) with Builder, External type id, @JsonCreator not yet implemented",
+                t));
     }
 }

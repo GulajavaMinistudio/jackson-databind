@@ -12,7 +12,8 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 /**
  * Numeric node that contains simple 32-bit integer values.
  */
-public final class IntNode
+@SuppressWarnings("serial")
+public class IntNode
     extends NumericNode
 {
     // // // Let's cache small set of common value
@@ -32,9 +33,9 @@ public final class IntNode
     /**
      * Integer value this node contains
      */
-    final int _value;
+    protected final int _value;
 
-    /* 
+    /*
     ************************************************
     * Construction
     ************************************************
@@ -47,7 +48,7 @@ public final class IntNode
         return CANONICALS[i - MIN_CANONICAL];
     }
 
-    /* 
+    /*
     /**********************************************************
     /* BaseJsonNode extended API
     /**********************************************************
@@ -58,7 +59,7 @@ public final class IntNode
     @Override
     public JsonParser.NumberType numberType() { return JsonParser.NumberType.INT; }
 
-    /* 
+    /*
     /**********************************************************
     /* Overrridden JsonNode methods
     /**********************************************************
@@ -72,11 +73,14 @@ public final class IntNode
 
     @Override public boolean canConvertToInt() { return true; }
     @Override public boolean canConvertToLong() { return true; }
-    
+
     @Override
     public Number numberValue() {
         return Integer.valueOf(_value);
     }
+
+    @Override
+    public short shortValue() { return (short) _value; }
 
     @Override
     public int intValue() { return _value; }
@@ -85,7 +89,11 @@ public final class IntNode
     public long longValue() { return (long) _value; }
 
     @Override
+    public float floatValue() { return (float) _value; }
+
+    @Override
     public double doubleValue() { return (double) _value; }
+
 
     @Override
     public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
@@ -102,12 +110,12 @@ public final class IntNode
     public boolean asBoolean(boolean defaultValue) {
         return _value != 0;
     }
-    
+
     @Override
-    public final void serialize(JsonGenerator jg, SerializerProvider provider)
-        throws IOException, JsonProcessingException
+    public final void serialize(JsonGenerator g, SerializerProvider provider)
+        throws IOException
     {
-        jg.writeNumber(_value);
+        g.writeNumber(_value);
     }
 
     @Override
@@ -115,12 +123,12 @@ public final class IntNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (o.getClass() != getClass()) { // final class, can do this
-            return false;
+        if (o instanceof IntNode) {
+            return ((IntNode) o)._value == _value;
         }
-        return ((IntNode) o)._value == _value;
+        return false;
     }
 
     @Override
-        public int hashCode() { return _value; }
+    public int hashCode() { return _value; }
 }

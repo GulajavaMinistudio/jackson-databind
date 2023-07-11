@@ -6,6 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.util.Converter;
 
 /**
  * Annotation used for configuring serialization aspects, by attaching
@@ -37,28 +38,48 @@ public @interface JsonSerialize
      * serializing associated value. Depending on what is annotated,
      * value is either an instance of annotated class (used globablly
      * anywhere where class serializer is needed); or only used for
-     * serializing property access via a getter method.
+     * serializing the value of the property annotated.
      */
-    public Class<? extends JsonSerializer<?>> using() default JsonSerializer.None.class;
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends JsonSerializer> using() default JsonSerializer.None.class;
 
     /**
      * Serializer class to use for serializing contents (elements
      * of a Collection/array, values of Maps) of annotated property.
-     * Can only be used on properties (methods, fields, constructors),
-     * and not value classes themselves (as they are typically generic)
+     * Can only be used on accessors (methods, fields, constructors), to
+     * apply to values of {@link java.util.Map}-valued properties; not
+     * applicable for value types used as Array elements
+     * or {@link java.util.Collection} and {@link java.util.Map} values.
      */
-    public Class<? extends JsonSerializer<?>> contentUsing()
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends JsonSerializer> contentUsing()
         default JsonSerializer.None.class;
 
     /**
-     * Serializer class to use for serializing Map keys
-     * of annotated property.
-     * Can only be used on properties (methods, fields, constructors),
-     * and not value classes themselves.
+     * Serializer class to use for deserializing Map keys
+     * of annotated property or Map keys of value type so annotated.
+     * Can be used both on accessors (methods, fields, constructors), to
+     * apply to values of {@link java.util.Map}-valued properties, and
+     * on "key" classes, to apply to use of annotated type as
+     * {@link java.util.Map} keys (latter starting with Jackson 2.11).
      */
-    public Class<? extends JsonSerializer<?>> keyUsing()
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends JsonSerializer> keyUsing()
         default JsonSerializer.None.class;
-    
+
+    /**
+     * Serializer class to use for serializing nulls for properties that
+     * are annotated, instead of the
+     * default null serializer.
+     * Note that using this property when annotation types (classes) has
+     * no effect currently (it is possible this could be improved in future).
+     *
+     * @since 2.3
+     */
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends JsonSerializer> nullsUsing()
+        default JsonSerializer.None.class;
+
     // // // Annotations for type handling, explicit declaration
     // // // (type used for choosing deserializer, if not explicitly
     // // // specified)
@@ -67,7 +88,7 @@ public @interface JsonSerialize
      * Supertype (of declared type, which itself is supertype of runtime type)
      * to use as type when locating serializer to use.
      *<p>
-     * Bogus type {@link NoClass} can be used to indicate that declared
+     * Bogus type {@link Void} can be used to indicate that declared
      * type is used as is (i.e. this annotation property has no setting);
      * this since annotation properties are not allowed to have null value.
      *<p>
@@ -77,7 +98,7 @@ public @interface JsonSerialize
      * serializer)
      * and value of this annotation property is ignored.
      */
-    public Class<?> as() default NoClass.class;
+    public Class<?> as() default Void.class;
 
     /**
      * Concrete type to serialize keys of {@link java.util.Map} as,
@@ -85,7 +106,7 @@ public @interface JsonSerialize
      * Must be a supertype of declared type; otherwise an exception may be
      * thrown by serializer.
      */
-    public Class<?> keyAs() default NoClass.class;
+    public Class<?> keyAs() default Void.class;
 
     /**
      * Concrete type to serialize content value (elements
@@ -94,14 +115,44 @@ public @interface JsonSerialize
      * Must be a supertype of declared type; otherwise an exception may be
      * thrown by serializer.
      */
-    public Class<?> contentAs() default NoClass.class;
-    
+    public Class<?> contentAs() default Void.class;
+
     /**
      * Whether type detection used is dynamic or static: that is,
      * whether actual runtime type is used (dynamic), or just the
      * declared type (static).
+     *<p>
+     * Note that Jackson 2.3 changed default to <code>DEFAULT_TYPING</code>,
+     * which is roughly same as saying "whatever".
+     * This is important as it allows avoiding accidental overrides
+     * at property level.
      */
-    public Typing typing() default Typing.DYNAMIC;
+    public Typing typing() default Typing.DEFAULT_TYPING;
+
+    // // // Annotations for specifying intermediate Converters (2.2+)
+
+    /**
+     * Which helper object is to be used to convert type into something
+     * that Jackson knows how to serialize; either because base type
+     * cannot be serialized easily, or just to alter serialization.
+     *
+     * @since 2.2
+     */
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends Converter> converter() default Converter.None.class;
+
+    /**
+     * Similar to {@link #converter}, but used for values of structures types
+     * (List, arrays, Maps).
+     * Note that this property does NOT have effect when used as Class annotation;
+     * it can only be used as property annotation: this because association between
+     * container and value types is loose and as such converters seldom make sense
+     * for such usage.
+     *
+     * @since 2.2
+     */
+    @SuppressWarnings("rawtypes") // to work around JDK8 bug wrt Class-valued annotation properties
+    public Class<? extends Converter> contentConverter() default Converter.None.class;
 
     // // // Annotation(s) for inclusion criteria
 
@@ -113,13 +164,20 @@ public @interface JsonSerialize
      * and "properties that have non-default value" (i.e. default value
      * being property setting for a Bean constructed with default no-arg
      * constructor, often null).
+     *<p>
+     * This property has been replaced by special-purpose {@link com.fasterxml.jackson.annotation.JsonInclude}
+     * annotation, introduced in Jackson 2.0.
+     *<p>
+     * Note that Jackson 2.3 changed default to <code>DEFAULT_INCLUSION</code>,
+     * which is roughly same as saying "whatever". This is important because
+     * it allows hierarchic default values to be used.
      *
      * @deprecated As of Jackson 2.0, this annotation has been replaced
      *    by {@link com.fasterxml.jackson.annotation.JsonInclude}
      */
     @Deprecated
-    public Inclusion include() default Inclusion.ALWAYS;
-    
+    public Inclusion include() default Inclusion.DEFAULT_INCLUSION;
+
     /*
     /**********************************************************
     /* Value enumerations needed
@@ -131,6 +189,7 @@ public @interface JsonSerialize
      * to define which properties
      * of Java Beans are to be included in serialization
      */
+    @Deprecated // since 2.0, marked deprecated in 2.6
     public enum Inclusion
     {
         /**
@@ -167,13 +226,20 @@ public @interface JsonSerialize
          * <li>For Java arrays, empty arrays are ones with length of 0
          *   </li>
          * <li>For Java {@link java.lang.String}s, <code>length()</code> is called,
-         *   and return value of 0 indicates empty String (note that <code>String.isEmpty()</code>
-         *   was added in Java 1.6 and as such can not be used by Jackson
+         *   and return value of 0 indicates empty String
          *   </li>
-         * <ul>
+         * </ul>
          *  For other types, non-null values are to be included.
          */
-        NON_EMPTY
+        NON_EMPTY,
+
+        /**
+         * Pseudo-value that is used to indicate
+         * "use whatever is default used at higher level".
+         *
+         * @since 2.3
+         */
+        DEFAULT_INCLUSION
         ;
     }
 
@@ -194,7 +260,15 @@ public @interface JsonSerialize
          * Value that indicates that the static declared type is to
          * be used.
          */
-        STATIC
+        STATIC,
+
+        /**
+         * Pseudo-value that is used to indicate
+         * "use whatever is default used at higher level".
+         *
+         * @since 2.3
+         */
+        DEFAULT_TYPING
         ;
     }
 }

@@ -3,9 +3,7 @@ package com.fasterxml.jackson.databind.contextual;
 import java.io.IOException;
 import java.util.*;
 
-
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.ContextualKeyDeserializer;
@@ -30,7 +28,7 @@ public class TestContextualKeyTypes extends BaseMapTest
         implements ContextualSerializer
     {
         protected final String _prefix;
-    
+
         public ContextualKeySerializer() { this(""); }
         public ContextualKeySerializer(String p) {
             _prefix = p;
@@ -44,10 +42,9 @@ public class TestContextualKeyTypes extends BaseMapTest
             }
             jgen.writeFieldName(value);
         }
-    
+
         @Override
         public JsonSerializer<?> createContextual(SerializerProvider prov, BeanProperty property)
-            throws JsonMappingException
         {
             return new ContextualKeySerializer(_prefix+":");
         }
@@ -58,21 +55,21 @@ public class TestContextualKeyTypes extends BaseMapTest
         implements ContextualKeyDeserializer
     {
         protected final String _prefix;
-        
+
         protected ContextualDeser(String p) {
             _prefix = p;
-        }        
+        }
 
         @Override
         public Object deserializeKey(String key, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException
+                throws IOException
         {
             return _prefix + ":" + key;
         }
 
         @Override
         public KeyDeserializer createContextual(DeserializationContext ctxt,
-                BeanProperty property) throws JsonMappingException
+                BeanProperty property)
         {
             return new ContextualDeser((property == null) ? "ROOT" : property.getName());
         }
@@ -81,7 +78,7 @@ public class TestContextualKeyTypes extends BaseMapTest
     static class MapBean {
         public Map<String, Integer> map;
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests, serialization
@@ -96,11 +93,11 @@ public class TestContextualKeyTypes extends BaseMapTest
         mapper.registerModule(module);
         Map<String,Object> input = new HashMap<String,Object>();
         input.put("a", Integer.valueOf(3));
-        String json = mapper.writerWithType(TypeFactory.defaultInstance().constructMapType(HashMap.class, String.class, Object.class))
+        String json = mapper.writerFor(TypeFactory.defaultInstance().constructMapType(HashMap.class, String.class, Object.class))
             .writeValueAsString(input);
         assertEquals("{\"prefix:a\":3}", json);
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests, deserialization

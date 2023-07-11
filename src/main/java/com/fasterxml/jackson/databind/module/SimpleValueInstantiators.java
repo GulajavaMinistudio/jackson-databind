@@ -10,7 +10,10 @@ import com.fasterxml.jackson.databind.type.ClassKey;
 
 public class SimpleValueInstantiators
     extends ValueInstantiators.Base
+    implements java.io.Serializable
 {
+    private static final long serialVersionUID = -8929386427526115130L;
+
     /**
      * Mappings from raw (type-erased, i.e. non-generic) types
      * to matching {@link ValueInstantiator} instances.
@@ -25,16 +28,16 @@ public class SimpleValueInstantiators
 
     public SimpleValueInstantiators()
     {
-        _classMappings = new HashMap<ClassKey,ValueInstantiator>();        
+        _classMappings = new HashMap<ClassKey,ValueInstantiator>();
     }
-    
+
     public SimpleValueInstantiators addValueInstantiator(Class<?> forType,
             ValueInstantiator inst)
     {
         _classMappings.put(new ClassKey(forType), inst);
         return this;
     }
-    
+
     @Override
     public ValueInstantiator findValueInstantiator(DeserializationConfig config,
             BeanDescription beanDesc, ValueInstantiator defaultInstantiator)

@@ -11,7 +11,14 @@ public abstract class NameTransformer
      * Singleton "no-operation" transformer which simply returns given
      * name as is. Used commonly as placeholder or marker.
      */
-    public final static NameTransformer NOP = new NameTransformer() {
+    public final static NameTransformer NOP = new NopTransformer();
+
+    protected final static class NopTransformer
+        extends NameTransformer
+        implements java.io.Serializable
+    {
+        private static final long serialVersionUID = 1L;
+
         @Override
         public String transform(String name) {
             return name;
@@ -21,18 +28,18 @@ public abstract class NameTransformer
             // identity transformation is always reversible:
             return transformed;
         }
-    };
+    }
 
     protected NameTransformer() { }
-    
+
     /**
      * Factory method for constructing a simple transformer based on
      * prefix and/or suffix.
      */
     public static NameTransformer simpleTransformer(final String prefix, final String suffix)
     {
-        boolean hasPrefix = (prefix != null) && (prefix.length() > 0);
-        boolean hasSuffix = (suffix != null) && (suffix.length() > 0);
+        boolean hasPrefix = (prefix != null) && !prefix.isEmpty();
+        boolean hasSuffix = (suffix != null) && !suffix.isEmpty();
 
         if (hasPrefix) {
             if (hasSuffix) {
@@ -93,7 +100,7 @@ public abstract class NameTransformer
     public static NameTransformer chainedTransformer(NameTransformer t1, NameTransformer t2) {
         return new Chained(t1, t2);
     }
-    
+
     /**
      * Method called when (forward) transformation is needed.
      */
@@ -101,15 +108,18 @@ public abstract class NameTransformer
 
     /**
      * Method called when reversal of transformation is needed; should return
-     * null if this is not possible, that is, given name can not have been
+     * null if this is not possible, that is, given name cannot have been
      * result of calling {@link #transform} of this object.
      */
     public abstract String reverse(String transformed);
 
     public static class Chained extends NameTransformer
+        implements java.io.Serializable
     {
+        private static final long serialVersionUID = 1L;
+
         protected final NameTransformer _t1, _t2;
-        
+
         public Chained(NameTransformer t1, NameTransformer t2) {
             _t1 = t1;
             _t2 = t2;

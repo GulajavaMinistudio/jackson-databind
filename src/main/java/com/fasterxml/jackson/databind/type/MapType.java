@@ -1,5 +1,7 @@
 package com.fasterxml.jackson.databind.type;
 
+import java.lang.reflect.TypeVariable;
+
 import com.fasterxml.jackson.databind.JavaType;
 
 /**
@@ -7,92 +9,115 @@ import com.fasterxml.jackson.databind.JavaType;
  */
 public final class MapType extends MapLikeType
 {
+    private static final long serialVersionUID = 1L;
+
     /*
     /**********************************************************
     /* Life-cycle
     /**********************************************************
      */
 
-    private MapType(Class<?> mapType, JavaType keyT, JavaType valueT,
-            Object valueHandler, Object typeHandler) {
-        super(mapType, keyT, valueT, valueHandler, typeHandler);
-    }
-    
-    public static MapType construct(Class<?> rawType, JavaType keyT, JavaType valueT) {
-        // nominally component types will be just Object.class
-        return new MapType(rawType, keyT, valueT, null, null);
+    private MapType(Class<?> mapType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts, JavaType keyT, JavaType valueT,
+            Object valueHandler, Object typeHandler, boolean asStatic) {
+        super(mapType, bindings, superClass, superInts,
+                keyT, valueT, valueHandler, typeHandler, asStatic);
     }
 
-    @Override
-    protected JavaType _narrow(Class<?> subclass) {
-        return new MapType(subclass, _keyType, _valueType,
-                _valueHandler, _typeHandler);
+    /**
+     * @since 2.7
+     */
+    protected MapType(TypeBase base, JavaType keyT, JavaType valueT) {
+        super(base, keyT, valueT);
     }
 
-    @Override
-    public JavaType narrowContentsBy(Class<?> contentClass)
-    {
-        // Can do a quick check first:
-        if (contentClass == _valueType.getRawClass()) {
-            return this;
-        }
-        return new MapType(_class, _keyType, _valueType.narrowBy(contentClass),
-                _valueHandler, _typeHandler);
+    /**
+     * @since 2.7
+     */
+    public static MapType construct(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInts,
+            JavaType keyT, JavaType valueT) {
+        return new MapType(rawType, bindings, superClass, superInts, keyT, valueT, null, null, false);
     }
 
-    @Override
-    public JavaType widenContentsBy(Class<?> contentClass)
+    @Deprecated // since 2.7
+    public static MapType construct(Class<?> rawType, JavaType keyT, JavaType valueT)
     {
-        if (contentClass == _valueType.getRawClass()) {
-            return this;
+        // First: may need to fabricate TypeBindings (needed for refining into
+        // concrete collection types, as per [databind#1102])
+        TypeVariable<?>[] vars = rawType.getTypeParameters();
+        TypeBindings bindings;
+        if ((vars == null) || (vars.length != 2)) {
+            bindings = TypeBindings.emptyBindings();
+        } else {
+            bindings = TypeBindings.create(rawType, keyT, valueT);
         }
-        return new MapType(_class, _keyType, _valueType.widenBy(contentClass),
-                _valueHandler, _typeHandler);
-    }
-    
-    @Override
-    public JavaType narrowKey(Class<?> keySubclass)
-    {
-        // Can do a quick check first:
-        if (keySubclass == _keyType.getRawClass()) {
-            return this;
-        }
-        return new MapType(_class, _keyType.narrowBy(keySubclass), _valueType,
-                _valueHandler, _typeHandler);
+        // !!! TODO: Wrong, does have supertypes
+        return new MapType(rawType, bindings, _bogusSuperClass(rawType), null,
+                keyT, valueT, null, null, false);
     }
 
-    @Override
-    public JavaType widenKey(Class<?> keySubclass)
-    {
-        // Can do a quick check first:
-        if (keySubclass == _keyType.getRawClass()) {
-            return this;
-        }
-        return new MapType(_class, _keyType.widenBy(keySubclass), _valueType,
-                _valueHandler, _typeHandler);
-    }
-    
     @Override
     public MapType withTypeHandler(Object h) {
-        return new MapType(_class, _keyType, _valueType, _valueHandler, h);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType, _valueType, _valueHandler, h, _asStatic);
     }
 
     @Override
     public MapType withContentTypeHandler(Object h)
     {
-        return new MapType(_class, _keyType, _valueType.withTypeHandler(h),
-                _valueHandler, _typeHandler);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType, _valueType.withTypeHandler(h),
+                _valueHandler, _typeHandler, _asStatic);
     }
-    
+
     @Override
     public MapType withValueHandler(Object h) {
-        return new MapType(_class, _keyType, _valueType, h, _typeHandler);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType, _valueType, h, _typeHandler, _asStatic);
     }
 
     @Override
     public MapType withContentValueHandler(Object h) {
-        return new MapType(_class, _keyType, _valueType.withValueHandler(h),
-                _valueHandler, _typeHandler);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType, _valueType.withValueHandler(h),
+                _valueHandler, _typeHandler, _asStatic);
+    }
+
+    @Override
+    public MapType withStaticTyping() {
+        if (_asStatic) {
+            return this;
+        }
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType.withStaticTyping(), _valueType.withStaticTyping(),
+                _valueHandler, _typeHandler, true);
+    }
+
+    @Override
+    public JavaType withContentType(JavaType contentType) {
+        if (_valueType == contentType) {
+            return this;
+        }
+        return new MapType(_class, _bindings, _superClass, _superInterfaces,
+                _keyType, contentType, _valueHandler, _typeHandler, _asStatic);
+    }
+
+    @Override
+    public MapType withKeyType(JavaType keyType) {
+        if (keyType == _keyType) {
+            return this;
+        }
+        return new MapType(_class, _bindings, _superClass, _superInterfaces,
+                keyType, _valueType, _valueHandler, _typeHandler, _asStatic);
+    }
+
+    @Override
+    public JavaType refine(Class<?> rawType, TypeBindings bindings,
+            JavaType superClass, JavaType[] superInterfaces) {
+        return new MapType(rawType, bindings,
+                superClass, superInterfaces, _keyType, _valueType,
+                _valueHandler, _typeHandler, _asStatic);
     }
 
     /*
@@ -100,20 +125,22 @@ public final class MapType extends MapLikeType
     /* Extended API
     /**********************************************************
      */
-    
+
     @Override
     public MapType withKeyTypeHandler(Object h)
     {
-        return new MapType(_class, _keyType.withTypeHandler(h), _valueType,
-                _valueHandler, _typeHandler);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType.withTypeHandler(h), _valueType,
+                _valueHandler, _typeHandler, _asStatic);
     }
 
     @Override
     public MapType withKeyValueHandler(Object h) {
-        return new MapType(_class, _keyType.withValueHandler(h), _valueType,
-                _valueHandler, _typeHandler);
+        return new MapType(_class, _bindings,
+                _superClass, _superInterfaces, _keyType.withValueHandler(h), _valueType,
+                _valueHandler, _typeHandler, _asStatic);
     }
-    
+
     /*
     /**********************************************************
     /* Standard methods
