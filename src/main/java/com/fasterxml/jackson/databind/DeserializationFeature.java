@@ -189,8 +189,9 @@ public enum DeserializationFeature implements ConfigFeature
     /**
      * Feature that determines what happens if an Object Id reference is encountered
      * that does not refer to an actual Object with that id ("unresolved Object Id"):
-     * either an exception is thrown (<code>true</code>), or a null object is used
-     * instead (<code>false</code>).
+     * either an exception {@link com.fasterxml.jackson.databind.deser.UnresolvedForwardReference}
+     * containing information about {@link com.fasterxml.jackson.databind.deser.UnresolvedId}
+     * is thrown (<code>true</code>), or a null object is used instead (<code>false</code>).
      * Note that if this is set to <code>false</code>, no further processing is done;
      * specifically, if reference is defined via setter method, that method will NOT
      * be called.
@@ -353,8 +354,9 @@ public enum DeserializationFeature implements ConfigFeature
      * kinds of JSON values); if enabled, empty JSON String can be taken
      * to be equivalent of JSON null.
      *<p>
-     * NOTE: this does NOT apply to scalar values such as booleans and numbers;
-     * whether they can be coerced depends on
+     * NOTE: this does NOT apply to scalar values such as booleans, numbers
+     * and date/time types;
+     * whether these can be coerced depends on
      * {@link MapperFeature#ALLOW_COERCION_OF_SCALARS}.
      *<p>
      * Feature is disabled by default.

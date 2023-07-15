@@ -4,26 +4,61 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-Not yet released
+2.16.0 (not yet released)
 
-#3566: Cannot use both `JsonCreator.Mode.DELEGATING` and `JsonCreator.Mode.PROPERTIES`
-  static creator factory methods for Enums
- (reported by @andrewbents)
-#3791: Flush readonly map together with shared on `SerializerCache.flush()`
- (suggested by @vdaniloff)
-#3814: Enhance `StdNodeBasedDeserializer` to support `readerForUpdating`
- (requested by Matt N)
- (contributed by Joo-Hyuk K)
-#3836: `Optional<Boolean>` is not recognized as boolean field
- (reported by @thnaeff)
+#2787: Mix-ins do not work for `Enum`s
  (fix contributed by Joo-Hyuk K)
-#3853: Add `MapperFeature.REQUIRE_TYPE_ID_FOR_SUBTYPES` to enable/disable
-  strict subtype Type Id handling
- (contributed by Steve S))
-#3876: `TypeFactory` cache performance degradation with `constructSpecializedType()`
- (contributed by Carter K)
+#3838: Difference in the handling of `ObjectId-property` in `JsonIdentityInfo`
+  depending on the deserialization route
+ (fix contributed by Joo-Hyuk K)
+#3877: Add new `OptBoolean` valued property in `@JsonTypeInfo`, handling,
+   to allow per-polymorphic type loose Type Id handling
+ (contributed by Joo-Hyuk K)
+#3924: Incorrect target type when disabling coercion, trying to deserialize
+  String from Array/Object
+ (reported by João G)
+ (fix contributed by Joo-Hyuk K)
+#3928: `@JsonProperty` on constructor parameter changes default field serialization order
+ (contributed by @pjfanning)
+#3950: Create new `JavaType` subtype `IterationType` (extending `SimpleType`)
+#3953: Use `JsonTypeInfo.Value` for annotation handling
+ (contributed by Joo-Hyuk K)
+#3965: Add `JsonNodeFeature.WRITE_PROPERTIES_SORTED` for sorting `ObjectNode` properties
+  on serialization
+#4008: Optimize `ObjectNode` findValue(s) and findParent(s) fast paths
+ (contributed by David S)
+#4009: Locale "" is deserialised as `null` if `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
+  is enabled
+ (reported by Philipp K)
+#4011: Add guardrail setting for `TypeParser` handling of type parameters
 
-2.15.0-rc2 (28-Mar-2023)
+2.15.3 (not yet released)
+
+#3968: Records with additional constructors failed to deserialize
+ (fix contributed by Sim Y-T)
+
+2.15.2 (30-May-2023)
+
+#3938: Record setter not included from interface (2.15 regression)
+
+2.15.1 (16-May-2023)
+
+#3882: Error in creating nested `ArrayNode`s with `JsonNode.withArray()`
+ (reported by @SaiKrishna369)
+#3894: Only avoid Records fields detection for deserialization
+ (contributed by Sim Y-T)
+#3895: 2.15.0 breaking behaviour change for records and Getter Visibility
+ (reported by Matteo B)
+#3897: 2.15.0 breaks deserialization when POJO/Record only has a single field
+  and is marked `Access.WRITE_ONLY`
+ (reported by Antti L)
+ (fix contributed by Sim Y-T)
+#3913: Issue with deserialization when there are unexpected properties (due
+  to null `StreamReadConstraints`)
+ (reported by @sbertault)
+#3914: Fix TypeId serialization for `JsonTypeInfo.Id.DEDUCTION`, native type ids
+
+2.15.0 (23-Apr-2023)
 
 #2536: Add `EnumFeature.READ_ENUM_KEYS_USING_INDEX` to work with
    existing "WRITE_ENUM_KEYS_USING_INDEX"#
@@ -49,6 +84,9 @@ Not yet released
 #3342: `JsonTypeInfo.As.EXTERNAL_PROPERTY` does not work with record wrappers
  (fix contributed by Sim Y-T)
 #3352: Do not require the usage of opens in a modular app when using records
+#3566: Cannot use both `JsonCreator.Mode.DELEGATING` and `JsonCreator.Mode.PROPERTIES`
+  static creator factory methods for Enums
+ (reported by @andrewbents)
 #3637: Add enum features into `@JsonFormat.Feature`
  (requested by @Anatoly4444)
  (fix contributed by Ajay S)
@@ -79,17 +117,30 @@ Not yet released
  (and couple of other methods)
 #3771: Classloader leak: DEFAULT_ANNOTATION_INTROSPECTOR holds annotation reference
  (reported by Christoph S)
+#3791: Flush readonly map together with shared on `SerializerCache.flush()`
+ (suggested by @vdaniloff)
 #3796: Enum Deserialisation Failing with Polymorphic type validator
  (reported by @sagarika4)
 #3809: Add Stream-friendly alternative to `ObjectNode.fields()`:
   `Set<Map.Entry<String, JsonNode>> properties()`
+#3814: Enhance `StdNodeBasedDeserializer` to support `readerForUpdating`
+ (requested by Matt N)
+ (contributed by Joo-Hyuk K)
 #3816: TokenBuffer does not implement writeString(Reader reader, int len)
  (reported by Patrick S)
 #3819: Add convenience method `SimpleBeanPropertyFilter.filterOutAll()` as
   counterpart of `serializeAll()`
  (contributed by Joo-Hyuk K)
+#3836: `Optional<Boolean>` is not recognized as boolean field
+ (reported by @thnaeff)
+ (fix contributed by Joo-Hyuk K)
+#3853: Add `MapperFeature.REQUIRE_TYPE_ID_FOR_SUBTYPES` to enable/disable
+  strict subtype Type Id handling
+ (contributed by Steve S))
+#3876: `TypeFactory` cache performance degradation with `constructSpecializedType()`
+ (contributed by Carter K)
 
-2.14.3 (not yet released)
+2.14.3 (05-May-2023)
 
 #3784: `PrimitiveArrayDeserializers$ByteDeser.deserialize` ignores
   `DeserializationProblemHandler` for invalid Base64 content
