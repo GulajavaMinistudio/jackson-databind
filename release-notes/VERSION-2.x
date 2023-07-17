@@ -31,6 +31,18 @@ Project: jackson-databind
   is enabled
  (reported by Philipp K)
 #4011: Add guardrail setting for `TypeParser` handling of type parameters
+#4036: Use `@JsonProperty` for Enum values also when `READ_ENUMS_USING_TO_STRING` enabled
+ (contributed by @iProdigy)
+#4037: Fix `Enum` deserialization to use `@JsonProperty`, `@JsonAlias` even if
+  `EnumNamingStrategy` used
+ (contributed by @iProdigy)
+#4039: Use `@JsonProperty` and lowercase feature when serializing Enums despite
+  using toString()
+ (contributed by @iProdigy)
+#4040: Use `@JsonProperty` over `EnumNamingStrategy` for Enum serialization
+ (contributed by @iProdigy)
+#4041: Actually cache EnumValues#internalMap
+ (contributed by @iProdigy)
 
 2.15.3 (not yet released)
 

@@ -1655,9 +1655,21 @@ David Schlosnagle (schlosna@github)
   (2.16.0)
 
 Philipp Kräutli (pkraeutli@github)
- * Reportedd #4009: Locale "" is deserialised as `null` if `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
+ * Reported #4009: Locale "" is deserialised as `null` if `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
    is enabled
   (2.16.0)
 
-
-
+iProdigy (iProdigy@github)
+ * Contributed #4036: Use `@JsonProperty` for Enum values also when `READ_ENUMS_USING_TO_STRING`
+   enabled
+  (2.16.0)
+ * Contributed #4037: Fix `Enum` deserialization to use `@JsonProperty`, `@JsonAlias` even if
+   `EnumNamingStrategy` used
+  (2.16.0)
+ * Contributed #4039: Use `@JsonProperty` and lowercase feature when serializing Enums despite
+   using toString()
+  (2.16.0)
+ * Contributed #4040: Use `@JsonProperty` over `EnumNamingStrategy` for Enum serialization
+  (2.16.0)
+ * Contributed fix #4041: Actually cache EnumValues#internalMap
+  (2.16.0)
