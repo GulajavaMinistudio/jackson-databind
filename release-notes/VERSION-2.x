@@ -14,6 +14,9 @@ Project: jackson-databind
 #3877: Add new `OptBoolean` valued property in `@JsonTypeInfo`, handling,
    to allow per-polymorphic type loose Type Id handling
  (contributed by Joo-Hyuk K)
+#3906: Regression: 2.15.0 breaks deserialization for records when
+   `mapper.setVisibility(PropertyAccessor.ALL, Visibility.NONE)`
+ (reported by Endre S)
 #3924: Incorrect target type when disabling coercion, trying to deserialize
   String from Array/Object
  (reported by João G)
@@ -27,6 +30,8 @@ Project: jackson-databind
  (contributed by Joo-Hyuk K)
 #3965: Add `JsonNodeFeature.WRITE_PROPERTIES_SORTED` for sorting `ObjectNode` properties
   on serialization
+#3992: `@JsonIgnore` on Record property ignored if there is getter override
+ (reported by @ennishol)
 #4008: Optimize `ObjectNode` findValue(s) and findParent(s) fast paths
  (contributed by David S)
 #4009: Locale "" is deserialised as `null` if `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
@@ -45,6 +50,11 @@ Project: jackson-databind
  (contributed by @iProdigy)
 #4041: Actually cache EnumValues#internalMap
  (contributed by @iProdigy)
+#4047: `ObjectMapper.valueToTree()` will ignore the configuration
+  `SerializationFeature.WRAP_ROOT_VALUE`
+ (contributed by Joo-Hyuk K)
+#4056: Provide the "ObjectMapper.treeToValue(TreeNode, TypeReference)" method
+ (contributed by @fantasy0v0)
 
 2.15.3 (not yet released)
 
