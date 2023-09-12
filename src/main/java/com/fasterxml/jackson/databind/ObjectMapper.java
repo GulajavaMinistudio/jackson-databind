@@ -9,6 +9,7 @@ import java.text.DateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.core.*;
@@ -389,7 +390,9 @@ public class ObjectMapper
             // Only for 2.x; 3.x will use more restrictive default
             LaissezFaireSubTypeValidator.instance,
             // Since 2.12:
-            new DefaultAccessorNamingStrategy.Provider()
+            new DefaultAccessorNamingStrategy.Provider(),
+            // Since 2.16: [databind#2502] Add a way to configure Caches Jackson uses
+            DefaultCacheProvider.defaultInstance()
     );
 
     /*
@@ -2148,6 +2151,10 @@ public class ObjectMapper
      * Note that such settings are only applied if more specific
      * (by logical and physical type) configuration have
      * not been defined.
+     * <p>
+     * NOTE: Preferred access method and point is through {@code Builder} style
+     * construction, see {@link com.fasterxml.jackson.databind.json.JsonMapper.Builder}
+     * and {@link MapperBuilder#withCoercionConfigDefaults(Consumer)}.
      *
      * @since 2.12
      */
@@ -2158,6 +2165,10 @@ public class ObjectMapper
     /**
      * Accessor for {@link MutableCoercionConfig} through which
      * coercion configuration for specified logical target type can be set.
+     * <p>
+     * NOTE: Preferred access method and point is through {@code Builder} style
+     * construction, see {@link com.fasterxml.jackson.databind.json.JsonMapper.Builder}
+     * and {@link MapperBuilder#withCoercionConfig(LogicalType, Consumer)}.
      *
      * @since 2.12
      */
@@ -2168,6 +2179,10 @@ public class ObjectMapper
     /**
      * Accessor for {@link MutableCoercionConfig} through which
      * coercion configuration for specified physical target type can be set.
+     * <p>
+     * NOTE: Preferred access method and point is through {@code Builder} style
+     * construction, see {@link com.fasterxml.jackson.databind.json.JsonMapper.Builder}
+     * and {@link MapperBuilder#withCoercionConfig(Class, Consumer)} (Consumer)}.
      *
      * @since 2.12
      */
@@ -2264,6 +2279,23 @@ public class ObjectMapper
      */
     public ObjectMapper setConstructorDetector(ConstructorDetector cd) {
         _deserializationConfig = _deserializationConfig.with(cd);
+        return this;
+    }
+
+    /**
+     * Method for specifying {@link CacheProvider} instance, to provide Cache instances to be used in components downstream.
+     *
+     * @cacheProvider Cache provider for this mapper to use
+     *
+     * @throws IllegalArgumentException if given provider is null
+     *
+     * @since 2.16
+     */
+    public ObjectMapper setCacheProvider(CacheProvider cacheProvider) {
+        _assertNotNull("cacheProvider", cacheProvider);
+        _deserializationConfig = _deserializationConfig.with(cacheProvider);
+        _serializationConfig = _serializationConfig.with(cacheProvider);
+        _deserializationContext = _deserializationContext.withCaches(cacheProvider);
         return this;
     }
 

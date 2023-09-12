@@ -9,8 +9,22 @@ package com.fasterxml.jackson.databind.util;
  *
  * @since 2.12 (for forwards-compatiblity with 3.0)
  */
-public interface LookupCache <K,V>
+public interface LookupCache<K,V>
 {
+    /**
+     * Method needed for creating clones but without contents.
+     *<p>
+     * Default implementation throws {@link UnsupportedOperationException}.
+     * Implementations are required to override this method.
+     * 
+     * @since 2.16
+     * @throws UnsupportedOperationException if implementation does not override this method.
+     */
+    default LookupCache<K,V> emptyCopy() {
+        throw new UnsupportedOperationException("LookupCache implementation "
+                +getClass().getName()+" does not implement `emptyCopy()`");
+    }
+
     /**
      * @return Number of entries currently in cache: may be approximate, only
      *    to be used for diagnostics, metrics reporting
