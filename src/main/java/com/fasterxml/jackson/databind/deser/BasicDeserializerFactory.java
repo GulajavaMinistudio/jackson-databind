@@ -1346,15 +1346,15 @@ paramIndex, candidate);
                 config, beanDesc, elemTypeDeser, contentDeser);
         if (deser == null) {
             if (contentDeser == null) {
-                Class<?> raw = elemType.getRawClass();
                 if (elemType.isPrimitive()) {
-                    return PrimitiveArrayDeserializers.forType(raw);
-                }
-                if (raw == String.class) {
-                    return StringArrayDeserializer.instance;
+                    deser = PrimitiveArrayDeserializers.forType(elemType.getRawClass());
+                } else if (elemType.hasRawClass(String.class)) {
+                    deser = StringArrayDeserializer.instance;
                 }
             }
-            deser = new ObjectArrayDeserializer(type, contentDeser, elemTypeDeser);
+            if (deser == null) {
+                deser = new ObjectArrayDeserializer(type, contentDeser, elemTypeDeser);
+            }
         }
         // and then new with 2.2: ability to post-process it too (databind#120)
         if (_factoryConfig.hasDeserializerModifiers()) {
@@ -1395,7 +1395,8 @@ paramIndex, candidate);
             if (contentDeser == null) { // not defined by annotation
                 // One special type: EnumSet:
                 if (EnumSet.class.isAssignableFrom(collectionClass)) {
-                    deser = new EnumSetDeserializer(contentType, null);
+                    deser = new EnumSetDeserializer(contentType, null,
+                            contentTypeDeser);
                 }
             }
         }

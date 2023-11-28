@@ -818,6 +818,9 @@ Freddy Boucher (freddyboucher@github)
 Ondrej Zizka (OndraZizk@github)
   * Reported #1999: "Duplicate property" issue should mention which class it complains about
    (2.9.6)
+  * Repoted #4145: NPE when transforming a tree to a model class object,
+    at `ArrayNode.elements()`
+   (2.16.0)
 
 Jakub Skierbiszewski (jskierbi@github)
   * Reported, contributed fix for #2001: Deserialization issue with `@JsonIgnore` and
@@ -1656,6 +1659,18 @@ Antti Lampinen (arlampin@github)
  * Reported #3897: 2.15.0 breaks deserialization when POJO/Record only has a single field
    and is marked `Access.WRITE_ONLY`
   (2.15.1)
+  * Reported #3897: 2.15.0 breaks deserialization when POJO/Record only has a single field
+    and is marked `Access.WRITE_ONLY`
+   (2.15.1)
+
+Dmitry Bolotin (dbolotin@github)
+  * Reported #1172: `@JsonView` doesn't work with `@JsonCreator`
+   (2.15.4)
+
+Kevin Baes (BaesKevin@github)
+ * Reported #3251: Generic class with generic field of runtime type `Double` is deserialized
+   as `BigDecimal` when used with `@JsonTypeInfo` and `JsonTypeInfo.As.EXISTING_PROPERTY`
+ (2.16.0)
 
 David Schlosnagle (schlosna@github)
  * Contributed #4008: Optimize `ObjectNode` findValue(s) and findParent(s) fast paths
@@ -1693,3 +1708,23 @@ Omar Aloraini (ooraini@github)
  * Requested #4061: Add JsonTypeInfo.Id.SIMPLE_NAME which defaults type id
    to `Class.getSimpleName()`
   (2.16.0)
+
+Naoki Takezoe (takezoe@github)
+ * Contributed #4144: Log WARN if deprecated subclasses of `PropertyNamingStrategy`
+   is used
+  (2.16.0)
+
+Garret Wilson (garretwilson@github)
+ * Reported #4153: Deprecated `ObjectReader.withType(Type)` has no direct
+   replacement; need `forType(Type)`
+  (2.16.0)
+
+Jan Pachol (janpacho@github)
+ * Reported #4175: Exception when deserialization of `private` record with
+   default constructor
+  (2.16.0)
+
+Muhammad Khalikov (mukham12@github)
+ * Contributed fix for #4209: Make `BeanDeserializerModifier`/`BeanSerializerModifier`
+  implement `java.io.Serializable`
+ (2.17.0)

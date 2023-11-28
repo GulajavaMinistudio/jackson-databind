@@ -4,11 +4,39 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.16.0 (not yet released)
+2.17.0 (not yet released)
 
+#4205: Consider types in `sun.*` package(s) to be JDK (platform) types
+  for purposes of handling
+#4209: Make `BeanDeserializerModifier`/`BeanSerializerModifier`
+  implement `java.io.Serializable`
+ (fix contributed by Muhammad K)
+#4214: `EnumSet` deserialization does not work when we activate
+  default typing in `ObjectMapper`
+ (reported by @dvhvsekhar)
+
+2.16.1 (not yet released)
+
+#4200: `JsonSetter(contentNulls = FAIL)` is ignored in delegating
+  `@JsonCreator` argument
+#4216: Primitive array deserializer cannot being captured by `DeserializerModifier`
+ (reported by @SakuraKoi)
+ (fix contributed by Joo-Hyuk K)
+
+2.16.0 (15-Nov-2023)
+
+#1770: Incorrect deserialization for `BigDecimal` numbers
+ (reported by @cristian-mocanu-mob)
+ (fix contributed by @pjfanning)
 #2502: Add a way to configure caches Jackson uses
  (contributed by Joo-Hyuk K)
 #2787: Mix-ins do not work for `Enum`s
+ (fix contributed by Joo-Hyuk K)
+#3251: Generic class with generic field of runtime type `Double` is deserialized
+  as `BigDecimal` when used with `@JsonTypeInfo` and `JsonTypeInfo.As.EXISTING_PROPERTY`
+ (reported by Kevin B)
+#3647: `@JsonIgnoreProperties` not working with `@JsonValue`
+ (reported by @ThatSneakyRaccoon)
  (fix contributed by Joo-Hyuk K)
 #3780: Deprecated JsonNode.with(String) suggests using JsonNode.withObject(String)
   but it is not the same thing
@@ -78,10 +106,34 @@ Project: jackson-databind
 #4095: Add `withObjectProperty(String)`, `withArrayProperty(String)` in `JsonNode`
 #4096: Change `JsonNode.withObject(String)` to work similar to `withArray()`
   wrt argument
-#4122: Do not resolve wildcards if upper bound is too non-specific
- (contributed by @yawkat)
+#4144: Log WARN if deprecated subclasses of `PropertyNamingStrategy` is used
+ (contributed by Naoki T)
+#4145: NPE when transforming a tree to a model class object, at `ArrayNode.elements()`
+ (reported by Ondrej Z)
+#4153: Deprecated `ObjectReader.withType(Type)` has no direct replacement;
+  need `forType(Type)`
+ (reported by Garren W)
+#4164: Do not rewind `position` when serializing direct `ByteBuffer`
+ (fix contributed by Jonas K)
+#4159: Add new `DefaultTyping.NON_FINAL_AND_ENUMS` to allow Default Typing for `Enum`s
+ (contributed by Joo-Hyuk K)
+#4175: Exception when deserialization of private record with default constructor
+ (reported by Jan P)
+ (contributed by Joo-Hyuk K)
+#4184: `BeanDeserializer` updates `currentValue` incorrectly when
+  deserialising empty Object
+ (reported by @nocny-x)
 
-2.15.3 (not yet released)
+2.15.4 (not yet released)
+
+#1172: `@JsonView` doesn't work with `@JsonCreator`
+ (reported by Dmitry B)
+#4185: `@JsonIgnoreProperties` with `@JsonTypeInfo(include = JsonTypeInfo.As.EXTERNAL_PROPERTY)`
+  does not work
+ (reported by @jonasho)
+ (fix contributed by Joo-Hyuk K)
+
+2.15.3 (12-Oct-2023)
 
 #3968: Records with additional constructors failed to deserialize
  (fix contributed by Sim Y-T)
