@@ -6,6 +6,9 @@ Project: jackson-databind
 
 2.17.0 (not yet released)
 
+#4194: Add `JsonNodeFeature.FAIL_ON_NAN_TO_BIG_DECIMAL_COERCION` option to
+  fail on attempting to coerce `NaN` into `BigDecimal`
+ (contributed by Joo-Hyuk K)
 #4205: Consider types in `sun.*` package(s) to be JDK (platform) types
   for purposes of handling
 #4209: Make `BeanDeserializerModifier`/`BeanSerializerModifier`
@@ -22,6 +25,9 @@ Project: jackson-databind
 #4216: Primitive array deserializer cannot being captured by `DeserializerModifier`
  (reported by @SakuraKoi)
  (fix contributed by Joo-Hyuk K)
+#4229 JsonNode findValues and findParents missing expected values in 2.16.0
+ (reported by @gcookemoto)
+ (fix contributed by Joo-Hyuk K)
 
 2.16.0 (15-Nov-2023)
 
@@ -32,6 +38,9 @@ Project: jackson-databind
  (contributed by Joo-Hyuk K)
 #2787: Mix-ins do not work for `Enum`s
  (fix contributed by Joo-Hyuk K)
+#3133: Map deserialization results in different numeric classes based on
+  json ordering (BigDecimal / Double) when used in combination with @JsonSubTypes
+ (reported by @mreiterer)
 #3251: Generic class with generic field of runtime type `Double` is deserialized
   as `BigDecimal` when used with `@JsonTypeInfo` and `JsonTypeInfo.As.EXISTING_PROPERTY`
  (reported by Kevin B)
