@@ -6,6 +6,14 @@ Project: jackson-databind
 
 2.17.0 (not yet released)
 
+#437: Support throwing `MismatchedInputException` when deserializing
+  properties that are not part of the view
+ (contributed by Joo-Hyuk K)
+#736: `MapperFeature.REQUIRE_SETTERS_FOR_GETTERS` has no effect
+ (reported by @migel)
+ (fix contributed by Joo-Hyuk K)
+#4160: Deprecate `DefaultTyping.EVERYTHING` in `2.x` and remove in `3.0`
+ (contributed by Joo-Hyuk K)
 #4194: Add `JsonNodeFeature.FAIL_ON_NAN_TO_BIG_DECIMAL_COERCION` option to
   fail on attempting to coerce `NaN` into `BigDecimal`
  (contributed by Joo-Hyuk K)
@@ -17,8 +25,33 @@ Project: jackson-databind
 #4214: `EnumSet` deserialization does not work when we activate
   default typing in `ObjectMapper`
  (reported by @dvhvsekhar)
+#4248: `ThrowableDeserializer` does not handle `null` well for `cause`
+#4250: Add input validation for `NumberDeserializers` deserializers
+ for "stringified" FP numbers
+#4262: Improve handling of `null` insertion failure for `TreeSet`
+#4263: Change `ObjectArrayDeserializer` to use "generic" type parameter
+  (`java.lang.Object`) to remove co-variant return type
+#4299: Some `Collection` and `Map` fallbacks don't work in GraalVM native image
+ (contributed by Eduard D)
+#4309: `@JsonSetter(nulls=...)` handling of `Collection` `null` values during
+  deserialization with `READ_UNKNOWN_ENUM_VALUES_AS_NULL` and `FAIL_ON_INVALID_SUBTYPE` wrong
+ (reported by @ivan-zaitsev)
+ (fix contributed by Joo-Hyuk K)
+#4337: `AtomicReference` serializer does not support `@JsonSerialize(contentConverter=...)`
 
-2.16.1 (not yet released)
+2.16.2 (not yet released)
+
+#4302: Problem deserializing some type of Enums when using `PropertyNamingStrategy`
+ (reported by Pieter D-S)
+ (fix contributed by Joo-Hyuk K)
+#4303: `ObjectReader` is not serializable if it's configured for polymorphism
+ (reported by @asardaes)
+ (fix contributed by Joo-Hyuk K)
+#4316: NPE when deserializing `JsonAnySetter` in `Throwable`
+ (reported by @jpraet)
+ (fix contributed by Joo-Hyuk K)
+
+2.16.1 (24-Dec-2023)
 
 #4200: `JsonSetter(contentNulls = FAIL)` is ignored in delegating
   `@JsonCreator` argument
@@ -41,6 +74,9 @@ Project: jackson-databind
 #3133: Map deserialization results in different numeric classes based on
   json ordering (BigDecimal / Double) when used in combination with @JsonSubTypes
  (reported by @mreiterer)
+#3277: Combination of `@JsonUnwrapped` and `@JsonAnySetter` results in `BigDecimal`
+  instead of `Double`
+ (reported John H)
 #3251: Generic class with generic field of runtime type `Double` is deserialized
   as `BigDecimal` when used with `@JsonTypeInfo` and `JsonTypeInfo.As.EXISTING_PROPERTY`
  (reported by Kevin B)
@@ -140,6 +176,9 @@ Project: jackson-databind
 #4185: `@JsonIgnoreProperties` with `@JsonTypeInfo(include = JsonTypeInfo.As.EXTERNAL_PROPERTY)`
   does not work
  (reported by @jonasho)
+ (fix contributed by Joo-Hyuk K)
+#4303: `ObjectReader` is not serializable if it's configured for polymorphism
+ (reported by @asardaes)
  (fix contributed by Joo-Hyuk K)
 
 2.15.3 (12-Oct-2023)

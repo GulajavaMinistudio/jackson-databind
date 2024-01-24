@@ -221,7 +221,9 @@ public class ObjectMapper
          * separately specified.
          *
          * @since 2.10
+         * @deprecated Since 2.17 and removed from 3.0 --see {@link #NON_FINAL_AND_ENUMS} for Enum-related usage.
          */
+        @Deprecated
         EVERYTHING
     }
 
@@ -4033,14 +4035,16 @@ public class ObjectMapper
         throws JsonProcessingException
     {
         // alas, we have to pull the recycler directly here...
-        SegmentedStringWriter sw = new SegmentedStringWriter(_jsonFactory._getBufferRecycler());
-        try {
+        final BufferRecycler br = _jsonFactory._getBufferRecycler();
+        try (SegmentedStringWriter sw = new SegmentedStringWriter(br)) {
             _writeValueAndClose(createGenerator(sw), value);
             return sw.getAndClear();
         } catch (JsonProcessingException e) {
             throw e;
         } catch (IOException e) { // shouldn't really happen, but is declared as possibility so:
             throw JsonMappingException.fromUnexpectedIOE(e);
+        } finally {
+            br.releaseToPool(); // since 2.17
         }
     }
 
@@ -4056,16 +4060,18 @@ public class ObjectMapper
     public byte[] writeValueAsBytes(Object value)
         throws JsonProcessingException
     {
-        // Although 'close()' is NOP, use auto-close to avoid lgtm complaints
-        try (ByteArrayBuilder bb = new ByteArrayBuilder(_jsonFactory._getBufferRecycler())) {
+        final BufferRecycler br = _jsonFactory._getBufferRecycler();
+        try (ByteArrayBuilder bb = new ByteArrayBuilder(br)) {
             _writeValueAndClose(createGenerator(bb, JsonEncoding.UTF8), value);
             final byte[] result = bb.toByteArray();
             bb.release();
             return result;
-        } catch (JsonProcessingException e) { // to support [JACKSON-758]
+        } catch (JsonProcessingException e) {
             throw e;
         } catch (IOException e) { // shouldn't really happen, but is declared as possibility so:
             throw JsonMappingException.fromUnexpectedIOE(e);
+        } finally {
+            br.releaseToPool(); // since 2.17
         }
     }
 
