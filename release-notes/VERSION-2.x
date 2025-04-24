@@ -4,6 +4,10 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+2.20.0 (not yet released)
+
+-
+
 2.19.0 (24-Apr-2025)
 
 #1467: Support `@JsonUnwrapped` with `@JsonCreator`
