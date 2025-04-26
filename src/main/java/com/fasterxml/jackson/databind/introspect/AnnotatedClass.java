@@ -6,7 +6,6 @@ import java.util.*;
 
 import com.fasterxml.jackson.databind.AnnotationIntrospector;
 import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.introspect.ClassIntrospector.MixInResolver;
 import com.fasterxml.jackson.databind.type.TypeBindings;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -152,15 +151,6 @@ public final class AnnotatedClass
         _collectAnnotations = collectAnnotations;
     }
 
-    @Deprecated // since 2.10
-    AnnotatedClass(JavaType type, Class<?> rawType, List<JavaType> superTypes,
-            Class<?> primaryMixIn, Annotations classAnnotations, TypeBindings bindings,
-            AnnotationIntrospector aintr, MixInResolver mir, TypeFactory tf)
-    {
-        this(type, rawType, superTypes, primaryMixIn, classAnnotations, bindings,
-                aintr, mir, tf, true);
-    }
-
     /**
      * Constructor (only) used for creating primordial simple types (during bootstrapping)
      * and array type placeholders where no fields or methods are needed.
@@ -178,46 +168,6 @@ public final class AnnotatedClass
         _mixInResolver = null;
         _typeFactory = null;
         _collectAnnotations = false;
-    }
-
-    /**
-     * @deprecated Since 2.9, use methods in {@link AnnotatedClassResolver} instead.
-     */
-    @Deprecated
-    public static AnnotatedClass construct(JavaType type, MapperConfig<?> config) {
-        return construct(type, config, (MixInResolver) config);
-    }
-
-    /**
-     * @deprecated Since 2.9, use methods in {@link AnnotatedClassResolver} instead.
-     */
-    @Deprecated
-    public static AnnotatedClass construct(JavaType type, MapperConfig<?> config,
-            MixInResolver mir)
-    {
-        return AnnotatedClassResolver.resolve(config, type, mir);
-    }
-
-    /**
-     * Method similar to {@link #construct}, but that will NOT include
-     * information from supertypes; only class itself and any direct
-     * mix-ins it may have.
-     * 
-     * @deprecated Since 2.9, use methods in {@link AnnotatedClassResolver} instead.
-     */
-    @Deprecated
-    public static AnnotatedClass constructWithoutSuperTypes(Class<?> raw, MapperConfig<?> config) {
-        return constructWithoutSuperTypes(raw, config, config);
-    }
-
-    /**
-     * @deprecated Since 2.9, use methods in {@link AnnotatedClassResolver} instead.
-     */
-    @Deprecated
-    public static AnnotatedClass constructWithoutSuperTypes(Class<?> raw, MapperConfig<?> config,
-            MixInResolver mir)
-    {
-        return AnnotatedClassResolver.resolveWithoutSuperTypes(config, raw, mir);
     }
 
     /*
@@ -312,14 +262,6 @@ public final class AnnotatedClass
      */
     public List<AnnotatedMethod> getFactoryMethods() {
         return _creators().creatorMethods;
-    }
-
-    /**
-     * @deprecated Since 2.9; use {@link #getFactoryMethods} instead.
-     */
-    @Deprecated
-    public List<AnnotatedMethod> getStaticMethods() {
-        return getFactoryMethods();
     }
 
     public Iterable<AnnotatedMethod> memberMethods() {
