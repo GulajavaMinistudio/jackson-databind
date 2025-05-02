@@ -225,14 +225,12 @@ public abstract class JDKValueInstantiators
     private static class PropertiesInstantiator
         extends JDKValueInstantiator
     {
-        private static final long serialVersionUID = 2L;
-
         public PropertiesInstantiator() {
             super(Properties.class);
         }
 
         @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
+        public Object createUsingDefault(DeserializationContext ctxt) {
             return new Properties();
         }
     }
