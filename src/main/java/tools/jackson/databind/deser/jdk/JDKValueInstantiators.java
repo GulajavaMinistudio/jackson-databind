@@ -149,14 +149,12 @@ public abstract class JDKValueInstantiators
     private static class LinkedHashSetInstantiator
         extends JDKValueInstantiator
     {
-        private static final long serialVersionUID = 2L;
-    
         public LinkedHashSetInstantiator() {
             super(LinkedHashSet.class);
         }
     
         @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
+        public Object createUsingDefault(DeserializationContext ctxt) {
             return new LinkedHashSet<>();
         }
     }
