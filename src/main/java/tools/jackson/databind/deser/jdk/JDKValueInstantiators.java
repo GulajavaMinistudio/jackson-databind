@@ -60,6 +60,10 @@ public abstract class JDKValueInstantiators
             if (raw == TreeMap.class) {
                 return new TreeMapInstantiator();
             }
+            // 01-May-2025, tatu: was missing
+            if (Properties.class.isAssignableFrom(raw)) {
+                return new PropertiesInstantiator();
+            }
             if (raw == Collections.emptyMap().getClass()) {
                 return new ConstantValueInstantiator(Collections.emptyMap());
             }
@@ -214,6 +218,22 @@ public abstract class JDKValueInstantiators
         @Override
         public Object createUsingDefault(DeserializationContext ctxt) {
             return new TreeMap<>();
+        }
+    }
+
+    // @since 2.19: was missing
+    private static class PropertiesInstantiator
+        extends JDKValueInstantiator
+    {
+        private static final long serialVersionUID = 2L;
+
+        public PropertiesInstantiator() {
+            super(Properties.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
+            return new Properties();
         }
     }
 
