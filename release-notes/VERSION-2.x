@@ -4,7 +4,7 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.18.4 (not yet released)
+2.18.4 (06-May-2025)
 
 #4628: `@JsonIgnore` and `@JsonProperty.access=READ_ONLY` on Record property
   ignored for deserialization
