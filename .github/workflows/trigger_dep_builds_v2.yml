@@ -4,6 +4,8 @@ on:
     secrets:
       token:
         required: true
+permissions:
+  contents: read
 
 jobs:
   trigger-dep-build-v2:
