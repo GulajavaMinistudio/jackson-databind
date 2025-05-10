@@ -53,3 +53,5 @@ Sébastien Deleuze (@sdeleuze)
 Yu Han (@hannyu)
  * Contributed #5138: add `asShort()`, `asFloat()` conversion methods
   [3.0.0]
+ * Contributed #5153: Improve error handling for numeric values in `POJONode`
+  [3.0.0]
