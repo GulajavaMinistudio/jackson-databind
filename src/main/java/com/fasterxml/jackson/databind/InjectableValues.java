@@ -26,8 +26,12 @@ public abstract class InjectableValues
      * @param optional Flag used for configuring the behavior when the value
      *    to inject is not found
      */
-    public abstract Object findInjectableValue(Object valueId, DeserializationContext ctxt,
-            BeanProperty forProperty, Object beanInstance, Boolean optional) throws JsonMappingException;
+    public Object findInjectableValue(Object valueId, DeserializationContext ctxt,
+            BeanProperty forProperty, Object beanInstance, Boolean optional) throws JsonMappingException
+    {
+        // For backwards-compatibility, must delegate to old method
+        return findInjectableValue(valueId, ctxt, forProperty, beanInstance);
+    }
 
     /**
      * @deprecated in 2.20
