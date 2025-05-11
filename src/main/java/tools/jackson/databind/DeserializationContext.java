@@ -479,7 +479,7 @@ public abstract class DeserializationContext
                     || (optional == null && !isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_INJECT_VALUE))) {
                 return JacksonInject.Value.empty();
             }
-            throw missingInjectValueException(String.format(
+            throw missingInjectableValueException(String.format(
 "No 'injectableValues' configured, cannot inject value with id '%s'", valueId),
                     valueId, forProperty, beanInstance);
         }
@@ -2100,11 +2100,11 @@ public abstract class DeserializationContext
         return InvalidTypeIdException.from(_parser, _colonConcat(msg, extraDesc), baseType, null);
     }
 
-    public DatabindException missingInjectValueException(String msg,
+    public DatabindException missingInjectableValueException(String msg,
             Object valueId,
             BeanProperty forProperty, Object beanInstance) {
-        return InvalidDefinitionException.from(_parser, msg,
-                constructType(ClassUtil.classOf(beanInstance)));
+        return MissingInjectableValueExcepion.from(_parser, msg,
+                valueId, forProperty, beanInstance);
     }
 
     /*

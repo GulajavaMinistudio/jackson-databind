@@ -82,10 +82,11 @@ public abstract class InjectableValues
                 BeanProperty forProperty, Object beanInstance, Boolean optional)
         {
             if (!(valueId instanceof String)) {
-                ctxt.reportBadDefinition(ClassUtil.classOf(valueId),
+                throw ctxt.missingInjectableValueException(
                         String.format(
-                        "Unrecognized inject value id type (%s), expecting String",
-                        ClassUtil.classNameOf(valueId)));
+                        "Unsupported injectable value id type (%s), expecting String",
+                        ClassUtil.classNameOf(valueId)),
+                        valueId, forProperty, beanInstance);
             }
             String key = (String) valueId;
             Object ob = _values.get(key);
@@ -93,7 +94,7 @@ public abstract class InjectableValues
                 if (Boolean.FALSE.equals(optional)
                         || ((optional == null)
                                 && ctxt.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_INJECT_VALUE))) {
-                    throw ctxt.missingInjectValueException(
+                    throw ctxt.missingInjectableValueException(
                             String.format("No injectable value with id '%s' found (for property '%s')",
                             key, forProperty.getName()),
                             valueId, forProperty, beanInstance);
