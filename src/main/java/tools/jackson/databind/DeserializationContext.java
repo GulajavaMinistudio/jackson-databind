@@ -2100,10 +2100,7 @@ public abstract class DeserializationContext
         return InvalidTypeIdException.from(_parser, _colonConcat(msg, extraDesc), baseType, null);
     }
 
-    /**
-     * @since 2.20
-     */
-    public JsonMappingException missingInjectValueException(String msg,
+    public DatabindException missingInjectValueException(String msg,
             Object valueId,
             BeanProperty forProperty, Object beanInstance) {
         return InvalidDefinitionException.from(_parser, msg,
