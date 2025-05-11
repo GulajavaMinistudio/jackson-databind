@@ -2,7 +2,6 @@ package tools.jackson.databind.node;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.OptionalDouble;
 
 import org.junit.jupiter.api.Test;
 
