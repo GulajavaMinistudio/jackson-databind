@@ -19,16 +19,17 @@ public abstract class InjectableValues
      * (will be available when injected via field or setter; not available
      * when injected via constructor or factory method argument).
      *
+     * @param ctxt Deserialization context
      * @param valueId Object that identifies value to inject; may be a simple
      *   name or more complex identifier object, whatever provider needs
-     * @param ctxt Deserialization context
      * @param forProperty Bean property in which value is to be injected
      * @param beanInstance Bean instance that contains property to inject,
      *    if available; null if bean has not yet been constructed.
      * @param optional Flag used for configuring the behavior when the value
      *    to inject is not found
      */
-    public abstract Object findInjectableValue(Object valueId, DeserializationContext ctxt,
+    public abstract Object findInjectableValue(DeserializationContext ctxt,
+            Object valueId, 
             BeanProperty forProperty, Object beanInstance, Boolean optional);
 
     /*
@@ -76,7 +77,8 @@ public abstract class InjectableValues
         }
 
         @Override
-        public Object findInjectableValue(Object valueId, DeserializationContext ctxt,
+        public Object findInjectableValue(DeserializationContext ctxt,
+                Object valueId,
                 BeanProperty forProperty, Object beanInstance, Boolean optional)
         {
             if (!(valueId instanceof String)) {
