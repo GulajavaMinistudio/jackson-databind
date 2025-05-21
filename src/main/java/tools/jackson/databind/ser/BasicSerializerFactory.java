@@ -520,7 +520,7 @@ public abstract class BasicSerializerFactory
                         beanDescRef, formatOverrides, staticTyping,
                         elementTypeSerializer, elementValueSerializer);
             }
-            // With Map-like, just 2 options: (1) Custom, (2) Annotations
+            // With Collection-like, just 2 options: (1) Custom, (2) Annotations
             ValueSerializer<?> ser = null;
             CollectionLikeType clType = (CollectionLikeType) type;
             for (Serializers serializers : customSerializers()) { // (1) Custom
@@ -574,18 +574,17 @@ public abstract class BasicSerializerFactory
             }
         }
 
-        JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
-                beanDescRef, Collection.class, formatOverrides);
         if (ser == null) {
             ser = findSerializerByAnnotations(ctxt, type, beanDescRef); // (2) Annotations
             if (ser == null) {
+                JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
+                        beanDescRef, Collection.class, formatOverrides);
                 // We may also want to use serialize Collections "as beans", if (and only if)
                 // shape specified as "POJO"
                 if (format.getShape() == JsonFormat.Shape.POJO) {
                     return null;
                 }
-                Class<?> raw = type.getRawClass();
-                if (EnumSet.class.isAssignableFrom(raw)) {
+                if (type.isTypeOrSubTypeOf(EnumSet.class)) {
                     // this may or may not be available (Class doesn't; type of field/method does)
                     JavaType enumType = type.getContentType();
                     // and even if nominally there is something, only use if it really is enum
@@ -595,7 +594,7 @@ public abstract class BasicSerializerFactory
                     ser = buildEnumSetSerializer(enumType);
                 } else {
                     Class<?> elementRaw = type.getContentType().getRawClass();
-                    if (isIndexedList(raw)) {
+                    if (isIndexedList(type.getRawClass())) {
                         if (elementRaw == String.class) {
                             // Only optimize if std implementation, not custom
                             if (ClassUtil.isJacksonStdImpl(elementValueSerializer)) {
@@ -667,14 +666,6 @@ public abstract class BasicSerializerFactory
             boolean staticTyping, ValueSerializer<Object> keySerializer,
             TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
     {
-        JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
-                beanDescRef, Map.class, formatOverrides);
-
-        // [databind#467]: This is where we could allow serialization "as POJO": But! It's
-        // nasty to undo, and does not apply on per-property basis. So, hardly optimal
-        if (format.getShape() == JsonFormat.Shape.POJO) {
-            return null;
-        }
         ValueSerializer<?> ser = null;
 
         // Order of lookups:
@@ -691,6 +682,15 @@ public abstract class BasicSerializerFactory
         if (ser == null) {
             ser = findSerializerByAnnotations(ctxt, type, beanDescRef); // (2) Annotations
             if (ser == null) {
+                JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
+                        beanDescRef, Map.class, formatOverrides);
+
+                // [databind#467]: This is where we could allow serialization "as POJO": But! It's
+                // nasty to undo, and does not apply on per-property basis. So, hardly optimal
+                if (format.getShape() == JsonFormat.Shape.POJO) {
+                    return null;
+                }
+
                 Object filterId = findFilterId(config, beanDescRef);
                 // 01-May-2016, tatu: Which base type to use here gets tricky, since
                 //   most often it ought to be `Map` or `EnumMap`, but due to abstract
@@ -897,9 +897,8 @@ public abstract class BasicSerializerFactory
         ValueSerializer<?> ser = null;
 
         for (Serializers serializers : customSerializers()) { // (1) Custom
-             ser = serializers.findArraySerializer(config, type, beanDescRef, formatOverrides,
-                     elementTypeSerializer, elementValueSerializer);
-             if (ser != null) {
+             if ((ser = serializers.findArraySerializer(config, type, beanDescRef, formatOverrides,
+                     elementTypeSerializer, elementValueSerializer)) != null) {
                  break;
              }
         }
