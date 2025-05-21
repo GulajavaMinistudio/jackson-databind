@@ -236,9 +236,8 @@ public class BeanSerializerFactory
         }
 
         if (ser == null) {
-            // Otherwise, we will check "primary types"; both marker types that
-            // indicate specific handling (JacksonSerializable), or main types that have
-            // precedence over container types
+            // Otherwise, we will check "primary types"; main types that have
+            // precedence over POJO handling
             ser = findSerializerByLookup(type, config, beanDescRef, formatOverrides, staticTyping);
             if (ser == null) {
                 ser = findSerializerByPrimaryType(ctxt, type, beanDescRef, formatOverrides, staticTyping);
