@@ -12,6 +12,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
+import tools.jackson.core.StreamReadFeature;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
@@ -58,6 +60,8 @@ public class CoerceToBooleanTest
 
     private final ObjectMapper LEGACY_NONCOERCING_MAPPER = jsonMapperBuilder()
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+            // 30-May-2025, tatu: Needed after [core#1438] (clear current token on close)
+            .disable(StreamReadFeature.CLEAR_CURRENT_TOKEN_ON_CLOSE)
             .build();
 
     private final ObjectMapper MAPPER_INT_TO_EMPTY = jsonMapperBuilder()
