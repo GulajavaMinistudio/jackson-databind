@@ -415,11 +415,11 @@ public class CoerceToBooleanTest
             JsonToken tokenType, String tokenValue) throws IOException
     {
         verifyException(e, "Cannot coerce ", "Cannot deserialize value of type ");
+        // 30-May-2025, tatu: [databind#5179] got access via exception now
+        assertToken(tokenType, e.getCurrentToken());
 
         JsonParser p = (JsonParser) e.processor();
         assertNotNull(p);
-
-        assertToken(tokenType, p.currentToken());
 
         final String text = p.getString();
         if (!tokenValue.equals(text)) {
