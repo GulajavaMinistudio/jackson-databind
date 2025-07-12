@@ -117,6 +117,7 @@ public class NumberSerTest extends DatabindTestUtil
         }
     }
 
+    @SuppressWarnings("serial")
     static class MyBigDecimal extends BigDecimal {
         public MyBigDecimal(String value) {
             super(value);
