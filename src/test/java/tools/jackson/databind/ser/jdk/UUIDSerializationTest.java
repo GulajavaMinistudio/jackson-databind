@@ -17,7 +17,7 @@ public class UUIDSerializationTest extends DatabindTestUtil
 {
     private final static String nullUUIDStr = "00000000-0000-0000-0000-000000000000";
     private final static UUID nullUUID = UUID.fromString(nullUUIDStr);
-    
+
     static class UUIDWrapperVanilla {
         public UUID uuid;
 
