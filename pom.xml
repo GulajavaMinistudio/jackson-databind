@@ -185,26 +185,6 @@
       <releases><enabled>false</enabled></releases>
       <snapshots><enabled>true</enabled></snapshots>
     </repository>
-
-    <!-- "Old new" for 3.x version pre-2025/05
-    <repository>
-      <id>sonatype-nexus-snapshots-new</id>
-      <name>Sonatype Nexus Snapshots (new)</name>
-      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-      <releases><enabled>false</enabled></releases>
-      <snapshots><enabled>true</enabled></snapshots>
-    </repository>
-    -->
-
-    <!-- and old repo for jackson-annotations -->
-    <repository>
-      <id>sonatype-nexus-snapshots-old</id>
-      <name>Sonatype Nexus Snapshots (old)</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      <releases><enabled>false</enabled></releases>
-      <snapshots><enabled>true</enabled></snapshots>
-    </repository>
-
   </repositories>
 
   <build>
