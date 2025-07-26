@@ -18,6 +18,8 @@ Project: jackson-databind
   serialization
 #5151: Add new exception type, `MissingInjectValueException`, to be used
   for failed `@JacksonInject`
+#5152: Support "iPhone" style capitalized properties (add
+  `MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX`)
 #5179: Add "current token" info into `MismatchedInputException`
 #5192: Record types are broken on Android when using R8
  (reported by @HelloOO7)
