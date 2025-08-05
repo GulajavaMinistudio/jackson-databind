@@ -2318,7 +2318,7 @@ public class ObjectMapper
     /**
      * Method for specifying {@link CacheProvider} instance, to provide Cache instances to be used in components downstream.
      *
-     * @cacheProvider Cache provider for this mapper to use
+     * @param cacheProvider Cache provider for this mapper to use
      *
      * @throws IllegalArgumentException if given provider is null
      *

@@ -453,7 +453,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      *
      * @return This Builder instance to allow call chaining
      *
-     * @seee ContextAttributes for details on constructing default attributes.
+     * @see ContextAttributes for details on constructing default attributes.
      */
     public B defaultAttributes(ContextAttributes attrs) {
         _mapper.setDefaultAttributes(attrs);
