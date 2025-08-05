@@ -4,7 +4,7 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.20.0 (not yet released)
+2.20.0-rc1 (04-Aug-2025)
 
 #3072: Allow specifying `@JacksonInject` does not fail when there's no
   corresponding value
