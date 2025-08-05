@@ -783,7 +783,7 @@ public abstract class StdDeserializer<T>
     {
         try {
             if (text.length() > 9) {
-                ctxt.getParser().streamReadConstraints().validateIntegerLength(text.length());
+                _streamReadConstraints(ctxt).validateIntegerLength(text.length());
                 long l = NumberInput.parseLong(text);
                 if (_intOverflow(l)) {
                     Number v = (Number) ctxt.handleWeirdStringValue(Integer.TYPE, text,
@@ -861,7 +861,7 @@ public abstract class StdDeserializer<T>
     {
         try {
             if (text.length() > 9) {
-                ctxt.getParser().streamReadConstraints().validateIntegerLength(text.length());
+                _streamReadConstraints(ctxt).validateIntegerLength(text.length());
                 long l = NumberInput.parseLong(text);
                 if (_intOverflow(l)) {
                     return (Integer) ctxt.handleWeirdStringValue(Integer.class, text,
@@ -944,7 +944,7 @@ public abstract class StdDeserializer<T>
      */
     protected final long _parseLongPrimitive(DeserializationContext ctxt, String text) throws IOException
     {
-        ctxt.getParser().streamReadConstraints().validateIntegerLength(text.length());
+        _streamReadConstraints(ctxt).validateIntegerLength(text.length());
         try {
             return NumberInput.parseLong(text);
         } catch (IllegalArgumentException iae) { }
@@ -1014,7 +1014,7 @@ public abstract class StdDeserializer<T>
      */
     protected final Long _parseLong(DeserializationContext ctxt, String text) throws IOException
     {
-        ctxt.getParser().streamReadConstraints().validateIntegerLength(text.length());
+        _streamReadConstraints(ctxt).validateIntegerLength(text.length());
         try {
             return NumberInput.parseLong(text);
         } catch (IllegalArgumentException iae) { }
@@ -1105,7 +1105,7 @@ public abstract class StdDeserializer<T>
     {
         // 09-Dec-2023, tatu: To avoid parser having to validate input, pre-validate:
         if (NumberInput.looksLikeValidNumber(text)) {
-            ctxt.getParser().streamReadConstraints().validateFPLength(text.length());
+            _streamReadConstraints(ctxt).validateFPLength(text.length());
             try {
                 return NumberInput.parseFloat(text, false);
             } catch (IllegalArgumentException iae) { }
@@ -1123,7 +1123,7 @@ public abstract class StdDeserializer<T>
     {
         // 09-Dec-2023, tatu: To avoid parser having to validate input, pre-validate:
         if (NumberInput.looksLikeValidNumber(text)) {
-            ctxt.getParser().streamReadConstraints().validateFPLength(text.length());
+            p.streamReadConstraints().validateFPLength(text.length());
             try {
                 return NumberInput.parseFloat(text, p.isEnabled(StreamReadFeature.USE_FAST_DOUBLE_PARSER));
             } catch (IllegalArgumentException iae) { }
@@ -2378,5 +2378,12 @@ handledType().getName());
             n = Integer.valueOf(0);
         }
         return n;
+    }
+
+    // @since 2.19.3: NPE check for older code that doesn't get JsonParser
+    protected StreamReadConstraints _streamReadConstraints(DeserializationContext ctxt) {
+        JsonParser p = ctxt.getParser();
+        // 29-Jun-2020, tatu: Should not be null, but let's be defensive
+        return (p == null) ? StreamReadConstraints.defaults() : p.streamReadConstraints();
     }
 }
