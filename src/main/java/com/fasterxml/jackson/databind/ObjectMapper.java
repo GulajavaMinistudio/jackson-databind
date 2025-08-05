@@ -2549,6 +2549,8 @@ public class ObjectMapper
      * construction, see {@link com.fasterxml.jackson.databind.json.JsonMapper#builder}
      * (and {@link MapperBuilder#defaultAttributes}).
      *
+     * @see ContextAttributes for details on setting default attributes.
+     *
      * @since 2.13
      */
     public ObjectMapper setDefaultAttributes(ContextAttributes attrs) {
