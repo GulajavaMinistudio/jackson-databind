@@ -290,7 +290,7 @@ public abstract class StdDeserializer<T>
             if (inst.canCreateFromLong()) {
                 if (ctxt.findCoercionAction(LogicalType.Integer, Long.class,
                         CoercionInputShape.String) == CoercionAction.TryConvert) {
-                    return (T) inst.createFromLong(ctxt, _parseLongPrimitive(ctxt, value));
+                    return (T) inst.createFromLong(ctxt, _parseLongPrimitive(p, ctxt, value));
                 }
             }
             if (inst.canCreateFromBoolean()) {
@@ -773,12 +773,39 @@ public abstract class StdDeserializer<T>
             _verifyNullForPrimitiveCoercion(ctxt, text);
             return 0;
         }
-        return _parseIntPrimitive(ctxt, text);
+        return _parseIntPrimitive(p, ctxt, text);
+    }
+
+    /**
+     * @since 2.20
+     */
+    protected int _parseIntPrimitive(JsonParser p, DeserializationContext ctxt,
+            String text) throws IOException
+    {
+        try {
+            if (text.length() > 9) {
+                p.streamReadConstraints().validateIntegerLength(text.length());
+                long l = NumberInput.parseLong(text);
+                if (_intOverflow(l)) {
+                    Number v = (Number) ctxt.handleWeirdStringValue(Integer.TYPE, text,
+                        "Overflow: numeric value (%s) out of range of int (%d -%d)",
+                        text, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                    return _nonNullNumber(v).intValue();
+                }
+                return (int) l;
+            }
+            return NumberInput.parseInt(text);
+        } catch (IllegalArgumentException iae) {
+            Number v = (Number) ctxt.handleWeirdStringValue(Integer.TYPE, text,
+                    "not a valid `int` value");
+            return _nonNullNumber(v).intValue();
+        }
     }
 
     /**
      * @since 2.9
      */
+    @Deprecated // since 2.20, use method variant that takes JsonParser
     protected final int _parseIntPrimitive(DeserializationContext ctxt, String text) throws IOException
     {
         try {
@@ -851,12 +878,37 @@ public abstract class StdDeserializer<T>
         if (_checkTextualNull(ctxt, text)) {
             return (Integer) getNullValue(ctxt);
         }
-        return _parseInteger(ctxt, text);
+        return _parseInteger(p, ctxt, text);
+    }
+
+    /**
+     * @since 2.20
+     */
+    protected Integer _parseInteger(JsonParser p, DeserializationContext ctxt,
+            String text) throws IOException
+    {
+        try {
+            if (text.length() > 9) {
+                p.streamReadConstraints().validateIntegerLength(text.length());
+                long l = NumberInput.parseLong(text);
+                if (_intOverflow(l)) {
+                    return (Integer) ctxt.handleWeirdStringValue(Integer.class, text,
+                        "Overflow: numeric value (%s) out of range of `java.lang.Integer` (%d -%d)",
+                        text, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                }
+                return Integer.valueOf((int) l);
+            }
+            return NumberInput.parseInt(text);
+        } catch (IllegalArgumentException iae) {
+            return(Integer) ctxt.handleWeirdStringValue(Integer.class, text,
+                    "not a valid `java.lang.Integer` value");
+        }
     }
 
     /**
      * @since 2.14
      */
+    @Deprecated // since 2.20, use method variant that takes JsonParser
     protected final Integer _parseInteger(DeserializationContext ctxt, String text) throws IOException
     {
         try {
@@ -936,12 +988,30 @@ public abstract class StdDeserializer<T>
             _verifyNullForPrimitiveCoercion(ctxt, text);
             return 0L;
         }
-        return _parseLongPrimitive(ctxt, text);
+        return _parseLongPrimitive(p, ctxt, text);
+    }
+
+    /**
+     * @since 2.20
+     */
+    protected long _parseLongPrimitive(JsonParser p, DeserializationContext ctxt,
+            String text) throws IOException
+    {
+        p.streamReadConstraints().validateIntegerLength(text.length());
+        try {
+            return NumberInput.parseLong(text);
+        } catch (IllegalArgumentException iae) { }
+        {
+            Number v = (Number) ctxt.handleWeirdStringValue(Long.TYPE, text,
+                    "not a valid `long` value");
+            return _nonNullNumber(v).longValue();
+        }
     }
 
     /**
      * @since 2.9
      */
+    @Deprecated // since 2.20, use method variant that takes JsonParser
     protected final long _parseLongPrimitive(DeserializationContext ctxt, String text) throws IOException
     {
         _streamReadConstraints(ctxt).validateIntegerLength(text.length());
@@ -1006,12 +1076,27 @@ public abstract class StdDeserializer<T>
             return (Long) getNullValue(ctxt);
         }
         // let's allow Strings to be converted too
-        return _parseLong(ctxt, text);
+        return _parseLong(p, ctxt, text);
+    }
+
+    /**
+     * @since 2.20
+     */
+    protected Long _parseLong(JsonParser p, DeserializationContext ctxt,
+            String text) throws IOException
+    {
+        p.streamReadConstraints().validateIntegerLength(text.length());
+        try {
+            return NumberInput.parseLong(text);
+        } catch (IllegalArgumentException iae) { }
+        return (Long) ctxt.handleWeirdStringValue(Long.class, text,
+                "not a valid `java.lang.Long` value");
     }
 
     /**
      * @since 2.14
      */
+    @Deprecated // since 2.20, use method variant that takes JsonParser
     protected final Long _parseLong(DeserializationContext ctxt, String text) throws IOException
     {
         _streamReadConstraints(ctxt).validateIntegerLength(text.length());
