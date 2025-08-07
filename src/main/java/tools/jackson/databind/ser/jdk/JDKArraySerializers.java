@@ -43,7 +43,17 @@ public class JDKArraySerializers
      * Accessor for checking to see if there is a standard serializer for
      * given primitive value type.
      */
-    public static ValueSerializer<?> findStandardImpl(Class<?> cls) {
+    public static ValueSerializer<?> findStandardImpl(SerializationContext ctxt,
+            Class<?> cls, JsonFormat.Value formatOverrides) {
+        if (formatOverrides != null && formatOverrides.getShape() == JsonFormat.Shape.BINARY) {
+            // Special handling for binary formats
+            if (cls == float[].class) {
+                return BinaryFloatArraySerializer.instance;
+            }
+            if (cls == double[].class) {
+                return BinaryDoubleArraySerializer.instance;
+            }
+        }
         return _arraySerializers.get(cls.getName());
     }
 
