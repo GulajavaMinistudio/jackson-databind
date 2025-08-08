@@ -9,7 +9,7 @@
   <parent>
     <groupId>tools.jackson</groupId>
     <artifactId>jackson-base</artifactId>
-    <version>3.0.0-rc7-SNAPSHOT</version>
+    <version>3.0.0-rc7</version>
   </parent>
 
   <groupId>tools.jackson.core</groupId>
@@ -218,7 +218,7 @@
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
           <links combine.children="append">
-	    <!-- 13-Feb-2025, tatu: Need to update on 3.0.0-rcX release? -->
+            <!-- 08-Aug-2025, tatu: 3.x retains dep to annotations 2.x -->
             <link>https://javadoc.io/doc/com.fasterxml.jackson.core/jackson-annotations/latest</link>
             <link>https://javadoc.io/doc/tools.jackson.core/jackson-core/latest</link>
           </links>
