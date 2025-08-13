@@ -11,7 +11,6 @@ import tools.jackson.databind.deser.ReadableObjectId.Referring;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.UnresolvedForwardReference;
 import tools.jackson.databind.deser.impl.ExternalTypeHandler;
-import tools.jackson.databind.deser.impl.MergingSettableBeanProperty;
 import tools.jackson.databind.deser.impl.MethodProperty;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.deser.impl.UnwrappedPropertyHandler;
@@ -633,7 +632,7 @@ public class BeanDeserializer
                     // 12-Aug-2025, tatu: [databind#5237] Mergeable properties need
                     //    special handling: must defer deserialization until POJO
                     //    is constructed.
-                    if (prop instanceof MergingSettableBeanProperty) {
+                    if (prop.isMerging()) {
                         TokenBuffer tb = ctxt.bufferForInputBuffering(p);
                         tb.copyCurrentStructure(p);
                         buffer.bufferMergingProperty(prop, tb);
