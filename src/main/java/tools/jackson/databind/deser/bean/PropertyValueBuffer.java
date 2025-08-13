@@ -4,12 +4,14 @@ import java.util.BitSet;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.ReadableObjectId;
 import tools.jackson.databind.deser.SettableAnyProperty;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.introspect.AnnotatedMember;
+import tools.jackson.databind.util.TokenBuffer;
 
 /**
  * Simple container used for temporarily buffering a set of
@@ -379,8 +381,11 @@ public class PropertyValueBuffer
         _buffered = new PropertyValue.Map(_buffered, value, key);
     }
 
-    // @since 2.18
     public void bufferAnyParameterProperty(SettableAnyProperty prop, String propName, Object value) {
         _anyParamBuffered = new PropertyValue.AnyParameter(_anyParamBuffered, value, prop, propName);
+    }
+
+    public void bufferMergingProperty(SettableBeanProperty prop, TokenBuffer buffered) {
+        _buffered = new PropertyValue.Merging(_buffered, buffered, prop);
     }
 }

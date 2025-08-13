@@ -11,6 +11,7 @@ import tools.jackson.databind.deser.ReadableObjectId.Referring;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.UnresolvedForwardReference;
 import tools.jackson.databind.deser.impl.ExternalTypeHandler;
+import tools.jackson.databind.deser.impl.MergingSettableBeanProperty;
 import tools.jackson.databind.deser.impl.MethodProperty;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.deser.impl.UnwrappedPropertyHandler;
@@ -629,6 +630,15 @@ public class BeanDeserializer
                 // props are removed)
                 // [databind#3938]: except if it's MethodProperty
                 if (!_beanType.isRecordType() || (prop instanceof MethodProperty)) {
+                    // 12-Aug-2025, tatu: [databind#5237] Mergeable properties need
+                    //    special handling: must defer deserialization until POJO
+                    //    is constructed.
+                    if (prop instanceof MergingSettableBeanProperty) {
+                        TokenBuffer tb = ctxt.bufferForInputBuffering(p);
+                        tb.copyCurrentStructure(p);
+                        buffer.bufferMergingProperty(prop, tb);
+                        continue;
+                    }
                     try {
                         buffer.bufferProperty(prop, _deserializeWithErrorWrapping(p, ctxt, prop));
                     } catch (UnresolvedForwardReference reference) {
@@ -638,7 +648,7 @@ public class BeanDeserializer
                         BeanReferring referring = handleUnresolvedReference(ctxt,
                                 prop, buffer, reference);
                         if (referrings == null) {
-                            referrings = new ArrayList<BeanReferring>();
+                            referrings = new ArrayList<>();
                         }
                         referrings.add(referring);
                     }
