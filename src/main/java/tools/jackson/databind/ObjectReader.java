@@ -839,7 +839,9 @@ public class ObjectReader
      * {@link TokenStreamFactory#createParser(ObjectReadContext,java.net.URL)}.
      *
      * @since 3.0
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     public JsonParser createParser(URL src) throws JacksonException {
         _assertNotNull("src", src);
         DeserializationContextExt ctxt = _deserializationContext();
@@ -1303,7 +1305,10 @@ public class ObjectReader
      * calls {@link java.net.URL#openStream()}, meaning no special handling
      * is done. If different HTTP connection options are needed you will need
      * to create {@link java.io.InputStream} separately.
+     *
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     @SuppressWarnings("unchecked")
     public <T> T readValue(URL url) throws JacksonException
     {
@@ -1597,7 +1602,10 @@ public class ObjectReader
      * to create {@link java.io.InputStream} separately.
      *
      * @param src URL to read to access JSON content to parse.
+     *
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     public <T> MappingIterator<T> readValues(URL src) throws JacksonException
     {
         _assertNotNull("src", src);

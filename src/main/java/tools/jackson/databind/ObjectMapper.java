@@ -613,8 +613,9 @@ public class ObjectMapper
      * constructs a {@link ObjectReadContext} and then calls
      * {@link TokenStreamFactory#createParser(ObjectReadContext,java.net.URL)}.
      *
-     * @since 3.0
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     public JsonParser createParser(URL src) throws JacksonException {
         _assertNotNull("src", src);
         DeserializationContextExt ctxt = _deserializationContext();
@@ -1221,7 +1222,10 @@ public class ObjectMapper
      * calls {@link java.net.URL#openStream()}, meaning no special handling
      * is done. If different HTTP connection options are needed you will need
      * to create {@link java.io.InputStream} separately.
+     *
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     public JsonNode readTree(URL src) throws JacksonException {
         _assertNotNull("src", src);
         DeserializationContextExt ctxt = _deserializationContext();
@@ -1545,7 +1549,10 @@ public class ObjectMapper
      *    of type {@link JsonParser} supports (JSON for default case)
      * @throws DatabindException if the input JSON structure does not match structure
      *   expected for result type (or has other mismatch issues)
+     *
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     @SuppressWarnings("unchecked")
     public <T> T readValue(URL src, Class<T> valueType) throws JacksonException
     {
@@ -1557,7 +1564,9 @@ public class ObjectMapper
 
     /**
      * Same as {@link #readValue(java.net.URL, Class)} except that target specified by {@link TypeReference}.
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     @SuppressWarnings({ "unchecked" })
     public <T> T readValue(URL src, TypeReference<T> valueTypeRef) throws JacksonException
     {
@@ -1569,7 +1578,9 @@ public class ObjectMapper
 
     /**
      * Same as {@link #readValue(java.net.URL, Class)} except that target specified by {@link JavaType}.
+     * @deprecated since 2.20 deprecated as it calls {@link TokenStreamFactory#createParser(URL)}.
      */
+    @Deprecated // @since 2.20
     @SuppressWarnings("unchecked")
     public <T> T readValue(URL src, JavaType valueType) throws JacksonException
     {
