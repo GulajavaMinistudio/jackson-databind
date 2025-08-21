@@ -10,13 +10,14 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import static tools.jackson.databind.testutil.DatabindTestUtil.*;
-
 public class ConstructorPropertiesAnnotationTest
+    extends DatabindTestUtil
 {
     static class Issue905Bean {
         // 08-Nov-2015, tatu: Note that in real code we would most likely use same
@@ -95,7 +96,7 @@ public class ConstructorPropertiesAnnotationTest
 
     // [databind#905]
     @Test
-    public void testCreatorPropertiesAnnotation() throws Exception
+    public void testConstructorPropertiesAnnotation() throws Exception
     {
         Issue905Bean b = MAPPER.readValue(a2q("{'y':3,'x':2}"),
                 Issue905Bean.class);
