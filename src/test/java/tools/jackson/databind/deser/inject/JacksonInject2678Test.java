@@ -1,4 +1,4 @@
-package tools.jackson.databind.tofix;
+package tools.jackson.databind.deser.inject;
 
 import java.util.Objects;
 
@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
-import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -40,7 +39,6 @@ class JacksonInject2678Test extends DatabindTestUtil {
     }
 
     // [databind#2678]
-    @JacksonTestFailureExpected
     @Test
     void readValueInjectables() throws Exception {
         final InjectableValues injectableValues =
