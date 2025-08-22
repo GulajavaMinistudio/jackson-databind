@@ -2,6 +2,7 @@ package tools.jackson.databind;
 
 import java.util.*;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.util.Snapshottable;
 import tools.jackson.databind.util.ClassUtil;
 
@@ -29,8 +30,9 @@ public abstract class InjectableValues
      *    to inject is not found
      */
     public abstract Object findInjectableValue(DeserializationContext ctxt,
-            Object valueId, 
-            BeanProperty forProperty, Object beanInstance, Boolean optional);
+            Object valueId, BeanProperty forProperty, Object beanInstance,
+            Boolean optional)
+        throws JacksonException;
 
     /*
     /**********************************************************
