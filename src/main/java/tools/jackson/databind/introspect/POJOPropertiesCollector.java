@@ -1242,7 +1242,7 @@ ctor.creator()));
         }
         Object id = injectable.getId();
         if (_injectables == null) {
-            _injectables = new LinkedHashMap<Object, AnnotatedMember>();
+            _injectables = new LinkedHashMap<>();
         }
         AnnotatedMember prev = _injectables.put(id, m);
         if (prev != null) {
