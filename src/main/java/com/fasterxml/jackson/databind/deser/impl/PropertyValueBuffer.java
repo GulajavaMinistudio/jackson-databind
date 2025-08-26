@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
-import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 
 /**
@@ -270,7 +269,7 @@ public class PropertyValueBuffer
         Object injectableValueId = prop.getInjectableValueId();
         if (injectableValueId != null) {
             return _context.findInjectableValue(prop.getInjectableValueId(),
-                    prop, null, null);
+                    prop, null, null, null);
         }
         // Second: required?
         if (prop.isRequired()) {
