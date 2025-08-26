@@ -823,7 +823,7 @@ ClassUtil.name(name), ((AnnotatedParameter) m).getIndex());
                 AnnotatedMember m = entry.getValue();
                 final JacksonInject.Value injectableValue = introspector.findInjectableValue(m);
                 final Boolean optional, useInput;
-                
+
                 if (injectableValue == null) {
                     optional = useInput = null;
                 } else {
