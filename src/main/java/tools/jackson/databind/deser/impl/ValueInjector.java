@@ -31,7 +31,7 @@ public class ValueInjector
      * Flag used for configuring the behavior when the input value should be preferred
      * over the value to inject.
      */
-    protected final Boolean _useInput;    
+    protected final Boolean _useInput;
 
     public ValueInjector(PropertyName propName, JavaType type,
             AnnotatedMember mutator, Object valueId, Boolean optional, Boolean useInput)
