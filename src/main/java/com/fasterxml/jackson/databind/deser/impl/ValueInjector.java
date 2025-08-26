@@ -35,7 +35,7 @@ public class ValueInjector
      *
      * @since 2.20
      */
-    protected final Boolean _useInput;    
+    protected final Boolean _useInput;
 
     /**
      * @since 2.20
