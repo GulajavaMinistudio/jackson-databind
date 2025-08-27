@@ -12,6 +12,7 @@ import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.testutil.DatabindTestUtil;
+import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -141,6 +142,7 @@ public class EnumAsMapKeyTest extends DatabindTestUtil
                 MAPPER.writeValueAsString(new MyStuff594("foo")));
     }
 
+    @JacksonTestFailureExpected // until [databind#5246] is fixed
     @Test
     public void testJsonValueForEnumMapKeyDeser() throws Exception {
         MyStuff594 result = MAPPER.readValue(a2q("{'stuff':{'longValue':'foo'}}"),
