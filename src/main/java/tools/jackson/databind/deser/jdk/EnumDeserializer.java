@@ -51,6 +51,14 @@ public class EnumDeserializer
     protected final boolean _isFromIntValue;
 
     /**
+     * Marker flag that indicates whether the Enum class has {@code @JsonValue}
+     * annotated accessor (or equivalent), used to populate {@link #_lookupByName}.
+     *
+     * @since 2.20
+     */
+    protected final boolean _hasAsValueAnnotation;
+
+    /**
      * Look up map with <b>key</b> as <code>Enum.name()</code> converted by
      * {@link EnumNamingStrategy#convertEnumToExternalName(MapperConfig, AnnotatedClass, String)}
      * and <b>value</b> as Enums.
@@ -58,6 +66,38 @@ public class EnumDeserializer
     protected final CompactStringObjectMap _lookupByEnumNaming;
 
     /**
+<<<<<<< HEAD:src/main/java/tools/jackson/databind/deser/jdk/EnumDeserializer.java
+=======
+     * @since 2.9
+     * @deprecated since 2.16
+     */
+    @Deprecated
+    public EnumDeserializer(EnumResolver byNameResolver, Boolean caseInsensitive)
+    {
+        this(byNameResolver, Boolean.TRUE.equals(caseInsensitive), null);
+    }
+
+    /**
+     * @since 2.15
+     * @deprecated since 2.16
+     */
+    @Deprecated
+    public EnumDeserializer(EnumResolver byNameResolver, boolean caseInsensitive,
+            EnumResolver byEnumNamingResolver)
+    {
+        super(byNameResolver.getEnumClass());
+        _lookupByName = byNameResolver.constructLookup();
+        _hasAsValueAnnotation = byNameResolver.hasAsValueAnnotation();
+        _enumsByIndex = byNameResolver.getRawEnums();
+        _enumDefaultValue = byNameResolver.getDefaultValue();
+        _caseInsensitive = caseInsensitive;
+        _isFromIntValue = byNameResolver.isFromIntValue();
+        _lookupByEnumNaming = byEnumNamingResolver == null ? null : byEnumNamingResolver.constructLookup();
+        _lookupByToString = null;
+    }
+
+    /**
+>>>>>>> 2.x:src/main/java/com/fasterxml/jackson/databind/deser/std/EnumDeserializer.java
      * @since 2.16
      */
     public EnumDeserializer(EnumResolver byNameResolver, boolean caseInsensitive,
@@ -65,6 +105,7 @@ public class EnumDeserializer
     {
         super(byNameResolver.getEnumClass());
         _lookupByName = byNameResolver.constructLookup();
+        _hasAsValueAnnotation = byNameResolver.hasAsValueAnnotation();
         _enumsByIndex = byNameResolver.getRawEnums();
         _enumDefaultValue = byNameResolver.getDefaultValue();
         _caseInsensitive = caseInsensitive;
@@ -78,6 +119,7 @@ public class EnumDeserializer
     {
         super(base);
         _lookupByName = base._lookupByName;
+        _hasAsValueAnnotation = base._hasAsValueAnnotation;
         _enumsByIndex = base._enumsByIndex;
         _enumDefaultValue = base._enumDefaultValue;
         _caseInsensitive = caseInsensitive;
@@ -224,9 +266,10 @@ public class EnumDeserializer
         if (_lookupByEnumNaming != null) {
             return _lookupByEnumNaming;
         }
-        return ctxt.isEnabled(EnumFeature.READ_ENUMS_USING_TO_STRING)
-            ? _lookupByToString
-            : _lookupByName;
+        if (_hasAsValueAnnotation || !ctxt.isEnabled(EnumFeature.READ_ENUMS_USING_TO_STRING)) {
+            return _lookupByName;
+        }
+        return _lookupByToString;
     }
 
     protected Object _fromInteger(JsonParser p, DeserializationContext ctxt,

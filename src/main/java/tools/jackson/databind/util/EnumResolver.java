@@ -38,6 +38,14 @@ public class EnumResolver implements java.io.Serializable
      */
     protected final boolean _isFromIntValue;
 
+    /**
+     * Marker for case where enum values to match are from {@code @JsonValue}-annotated
+     * method.
+     *
+     * @since 2.20
+     */
+    protected final boolean _hasAsValueAnnotation;
+
     /*
     /**********************************************************************
     /* Constructors
@@ -46,7 +54,8 @@ public class EnumResolver implements java.io.Serializable
 
     protected EnumResolver(Class<Enum<?>> enumClass, Enum<?>[] enums,
             HashMap<String, Enum<?>> enumsById, Enum<?> defaultValue,
-            boolean isIgnoreCase, boolean isFromIntValue)
+            boolean isIgnoreCase, boolean isFromIntValue,
+            boolean hasAsValueAnnotation)
     {
         _enumClass = enumClass;
         _enums = enums;
@@ -54,6 +63,7 @@ public class EnumResolver implements java.io.Serializable
         _defaultValue = defaultValue;
         _isIgnoreCase = isIgnoreCase;
         _isFromIntValue = isFromIntValue;
+        _hasAsValueAnnotation = hasAsValueAnnotation;
     }
 
     /*
@@ -87,7 +97,7 @@ public class EnumResolver implements java.io.Serializable
         ai.findEnumAliases(config, annotatedClass, enumConstants, allAliases);
 
         // finally, build
-        HashMap<String, Enum<?>> map = new HashMap<String, Enum<?>>();
+        HashMap<String, Enum<?>> map = new HashMap<>();
         for (int i = 0, len = enumConstants.length; i < len; ++i) {
             final Enum<?> enumValue = enumConstants[i];
             String name = names[i];
@@ -104,7 +114,7 @@ public class EnumResolver implements java.io.Serializable
             }
         }
         return new EnumResolver(enumCls, enumConstants, map,
-                defaultEnum, isIgnoreCase, false);
+                defaultEnum, isIgnoreCase, false, false);
     }
 
     /**
@@ -149,7 +159,7 @@ public class EnumResolver implements java.io.Serializable
             }
         }
         return new EnumResolver(enumCls, enumConstants, map,
-                defaultEnum, isIgnoreCase, false);
+                defaultEnum, isIgnoreCase, false, false);
     }
 
     /**
@@ -173,7 +183,7 @@ public class EnumResolver implements java.io.Serializable
             map.put(String.valueOf(i), enumValue);
         }
         return new EnumResolver(enumCls, enumConstants, map,
-                defaultEnum, isIgnoreCase, false);
+                defaultEnum, isIgnoreCase, false, false);
     }
 
     /**
@@ -222,14 +232,12 @@ public class EnumResolver implements java.io.Serializable
         }
 
         return new EnumResolver(enumCls, enumConstants, map,
-                defaultEnum, isIgnoreCase, false);
+                defaultEnum, isIgnoreCase, false, false);
     }
 
     /**
      * Method used when actual String serialization is indicated using @JsonValue
      * on a method in Enum class.
-     *
-     * @since 2.16
      */
     public static EnumResolver constructUsingMethod(DeserializationConfig config,
             AnnotatedClass annotatedClass, AnnotatedMember accessor)
@@ -258,7 +266,8 @@ public class EnumResolver implements java.io.Serializable
         return new EnumResolver(enumCls, enumConstants, map,
                 defaultEnum, isIgnoreCase,
                 // 26-Sep-2021, tatu: [databind#1850] Need to consider "from int" case
-                _isIntType(accessor.getRawType())
+                _isIntType(accessor.getRawType()),
+                true
         );
     }
 
@@ -364,5 +373,13 @@ public class EnumResolver implements java.io.Serializable
      */
     public boolean isFromIntValue() {
         return _isFromIntValue;
+    }
+
+    /**
+     * Accessor for checking whether {@code @JsonValue} annotated accessor is used
+     * to get enum values to use for deserialization.
+     */
+    public boolean hasAsValueAnnotation() {
+        return _hasAsValueAnnotation;
     }
 }

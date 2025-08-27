@@ -424,9 +424,11 @@ public class JDKKeyDeserializer extends KeyDeserializer
             if (_byEnumNamingResolver != null) {
                 return _byEnumNamingResolver;
             }
-            return ctxt.isEnabled(EnumFeature.READ_ENUMS_USING_TO_STRING)
-                ? _byToStringResolver
-                : _byNameResolver;
+            if (_byNameResolver.hasAsValueAnnotation()
+                    || !ctxt.isEnabled(EnumFeature.READ_ENUMS_USING_TO_STRING)) {
+                return _byNameResolver;
+            }
+            return  _byToStringResolver;
         }
     }
 
