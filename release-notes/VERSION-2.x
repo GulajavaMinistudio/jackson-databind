@@ -4,6 +4,10 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
+2.21.0 (not yet released)
+
+No change since 2.20
+
 2.20.0 (28-Aug-2025)
 
 #2678: `@JacksonInject` added to property overrides value from the JSON
