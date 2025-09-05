@@ -59,6 +59,19 @@ public class NullNode
         return "";
     }
 
+    // Explicit overrides for all overloads for documentation purposes
+
+    @Override
+    public String stringValue() { return null; }
+
+    @Override
+    public String stringValue(String defaultValue) { return defaultValue; }
+
+    @Override
+    public Optional<String> stringValueOpt() {
+        return Optional.empty();
+    }
+
     /*
     /**********************************************************************
     /* Overridden JsonNode methods, scalar access, numeric

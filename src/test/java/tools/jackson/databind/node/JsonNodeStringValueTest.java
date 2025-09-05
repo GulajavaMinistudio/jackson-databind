@@ -11,7 +11,7 @@ import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.util.RawValue;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -65,8 +65,18 @@ public class JsonNodeStringValueTest
     @Test
     public void stringValueFromNonNumberMisc()
     {
-        _assertStringValueFailForNonString(NODES.nullNode());
         _assertStringValueFailForNonString(NODES.missingNode());
+    }
+
+    @Test
+    public void stringValueFromNullNode()
+    {
+        JsonNode node = NODES.nullNode();
+        assertEquals(null, node.stringValue());
+
+        // But also check defaulting
+        assertEquals("foo", node.stringValue("foo"));
+        assertFalse(node.stringValueOpt().isPresent());
     }
 
     // // // asString() tests
