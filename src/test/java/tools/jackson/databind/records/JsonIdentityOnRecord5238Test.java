@@ -1,4 +1,4 @@
-package tools.jackson.databind.records.tofix;
+package tools.jackson.databind.records;
 
 import java.util.List;
 
@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
-import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,8 +49,6 @@ public class JsonIdentityOnRecord5238Test
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
-    // [databind#5262]: Regression in 3.0?
-    @JacksonTestFailureExpected
     @Test
     void testIdentityWithPojo() throws Exception {
         ThingPojo t1 = new ThingPojo(1, "a");
