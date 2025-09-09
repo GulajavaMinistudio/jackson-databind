@@ -40,10 +40,10 @@ public class MapInclusion2573Test extends DatabindTestUtil
         CAR.properties = CAR_PROPERTIES;
     }
 
-    private final JsonInclude.Value BOTH_NON_NULL = JsonInclude.Value.construct(JsonInclude.Include.NON_NULL,
-            JsonInclude.Include.NON_NULL);
+    private final JsonInclude.Value BOTH_NON_NULL = JsonInclude.Value.construct(
+            JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL);
 
-//    final private ObjectMapper MAPPER = newJsonMapper();
+    //    final private ObjectMapper MAPPER = newJsonMapper();
 
     // [databind#2572]
     @Test
