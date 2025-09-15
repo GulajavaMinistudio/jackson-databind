@@ -138,6 +138,8 @@ public class StdDelegatingSerializer
 
     /**
      * Accessor to the {@link Converter} used for conversion.
+     *<p>
+     * NOTE: {@code public} since 2.21; earlier was {@code protected}.
      *
      * @return {@link Converter} used for conversion
      *
