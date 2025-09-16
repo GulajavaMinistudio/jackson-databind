@@ -118,7 +118,7 @@ public class NumberSerializer
     }
 
     /**
-     * Method used to create a string serializer for a Number. If the number is an integer, and configuration is set properly,
+     * Method used to create a string serializer for a number. If the number is integral, and configuration is set properly,
      * we create an alternative radix serializer {@link NumberToStringWithRadixSerializer}.
      *
      * @since 2.21
@@ -137,7 +137,7 @@ public class NumberSerializer
     }
 
     /**
-     * Check if we have a proper {@link JsonFormat} annotation for serializing a Number
+     * Check if we have a proper {@link JsonFormat} annotation for serializing a number
      * using an alternative radix specified in the annotation.
      */
     private static boolean isSerializeWithRadixOverride(JsonFormat.Value format) {

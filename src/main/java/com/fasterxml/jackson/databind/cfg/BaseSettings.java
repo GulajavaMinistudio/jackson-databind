@@ -174,11 +174,11 @@ public final class BaseSettings
      * @since 2.21
      */
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
-                        PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
-                        TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
-                        Locale locale, TimeZone tz, Base64Variant defaultBase64,
-                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-                        CacheProvider cacheProvider, int defaultRadix)
+            PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
+            TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
+            Locale locale, TimeZone tz, Base64Variant defaultBase64,
+            PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
+            CacheProvider cacheProvider, int defaultRadix)
     {
         _classIntrospector = ci;
         _annotationIntrospector = ai;
@@ -546,7 +546,7 @@ public final class BaseSettings
     }
 
     /**
-     * Method indicating number base to use for serializing/deserializing an integral number as a string.
+     * Method indicating base to use for serializing/deserializing an integral number as a string.
      *
      * @since 2.21
      */

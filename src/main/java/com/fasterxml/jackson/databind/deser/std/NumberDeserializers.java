@@ -1125,7 +1125,7 @@ public class NumberDeserializers
     }
 
     /**
-     * Method used to create a string deserializer for a Number.
+     * Method used to create a string deserializer for a number.
      * If configuration is set properly, we create an alternative radix serializer {@link NumberToStringWithRadixSerializer}.
      *
      * @since 2.21
@@ -1151,7 +1151,7 @@ public class NumberDeserializers
     }
 
     /**
-     * Check if we have a proper {@link JsonFormat} annotation for serializing a Number
+     * Check if we have a proper {@link JsonFormat} annotation for serializing a number
      * using an alternative radix specified in the annotation.
      */
     private static boolean isSerializeWithRadixOverride(JsonFormat.Value format) {

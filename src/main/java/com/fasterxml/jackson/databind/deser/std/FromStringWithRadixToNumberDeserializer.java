@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 
 /**
- * Deserializer used ii a string that represents a number in specific radix (base).
+ * Deserializer used for a string that represents a number in specific radix (base).
  *
  * @since 2.21
  */
