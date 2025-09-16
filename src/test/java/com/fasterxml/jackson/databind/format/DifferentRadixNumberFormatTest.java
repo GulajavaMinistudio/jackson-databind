@@ -42,6 +42,21 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
         }
     }
 
+    private static class IncorrectlyAnnotatedMethodIntWrapper {
+        private int value;
+
+        public IncorrectlyAnnotatedMethodIntWrapper() {
+        }
+        public IncorrectlyAnnotatedMethodIntWrapper(int v) {
+            value = v;
+        }
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public int getValue() {
+            return value;
+        }
+    }
+
     private static class AllIntegralTypeWrapper {
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
         public byte byteValue;
@@ -136,6 +151,18 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
 
         assertNotNull(readBackIntWrapper);
         assertEquals(initialIntWrapper.value, readBackIntWrapper.value);
+    }
+
+    @Test
+    void testAnnotatedAccessorWithoutPatternDoesNotThrow()
+            throws JsonProcessingException {
+        ObjectMapper mapper = newJsonMapper();
+        IncorrectlyAnnotatedMethodIntWrapper initialIntWrapper = new IncorrectlyAnnotatedMethodIntWrapper(10);
+        String expectedJson = "{'value':'10'}";
+
+        String json = mapper.writeValueAsString(initialIntWrapper);
+
+        assertEquals(a2q(expectedJson), json);
     }
 
     @Test
