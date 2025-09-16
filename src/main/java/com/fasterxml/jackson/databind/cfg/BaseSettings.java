@@ -546,7 +546,7 @@ public final class BaseSettings
     }
 
     /**
-     * Method indicating base to use for serializing/deserializing an integral number as a string.
+     * Method indicating base to use for serializing/deserializing integer numbers as a string.
      *
      * @since 2.21
      */

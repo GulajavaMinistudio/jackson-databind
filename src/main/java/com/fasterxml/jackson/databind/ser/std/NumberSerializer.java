@@ -118,7 +118,7 @@ public class NumberSerializer
     }
 
     /**
-     * Method used to create a string serializer for a number. If the number is integral, and configuration is set properly,
+     * Method used to create a string serializer for a number. If the number is integer, and configuration is set properly,
      * we create an alternative radix serializer {@link NumberToStringWithRadixSerializer}.
      *
      * @since 2.21

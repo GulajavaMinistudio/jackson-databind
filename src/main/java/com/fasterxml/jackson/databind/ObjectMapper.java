@@ -2549,7 +2549,7 @@ public class ObjectMapper
     }
 
     /**
-     * Method for configuring the radix to use when serializing integral types
+     * Method for configuring the radix to use when serializing integer numbers
      * as strings.
      *
      * @since 2.21
