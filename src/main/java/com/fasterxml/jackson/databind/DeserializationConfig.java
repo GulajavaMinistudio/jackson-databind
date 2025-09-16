@@ -373,6 +373,7 @@ public final class DeserializationConfig
         return new DeserializationConfig(this, rootName);
     }
 
+    @Override
     public DeserializationConfig withRadix(int radix) {
         return _withBase(_base.withRadix(radix));
     }

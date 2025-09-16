@@ -52,7 +52,7 @@ public class NumberSerializer
     public JsonSerializer<?> createContextual(SerializerProvider prov,
             BeanProperty property) throws JsonMappingException
     {
-        JsonFormat.Value format = findFormatOverrides(prov, property, handledType());//this handles both the annotation and ConfigOverrides case.
+        JsonFormat.Value format = findFormatOverrides(prov, property, handledType());
         if (format != null) {
             switch (format.getShape()) {
             case STRING:
@@ -117,12 +117,18 @@ public class NumberSerializer
         }
     }
 
+    /**
+     * Method used to create a string serializer for a Number. If the number is an integer, and configuration is set properly,
+     * we create an alternative radix serializer {@link NumberToStringWithRadixSerializer}.
+     *
+     * @since 2.21
+     */
     public static ToStringSerializerBase createStringSerializer(SerializerProvider prov, JsonFormat.Value format, boolean isInt) {
         if (isInt) {
             if (isSerializeWithRadixOverride(format)) {
                 int radix = Integer.parseInt(format.getPattern());
                 return new NumberToStringWithRadixSerializer(radix);
-            } else if (isSerializeWithDefaultOverride(prov)) {
+            } else if (isSerializeWithDefaultConfigOverride(prov)) {
                 int radix = prov.getConfig().getRadix();
                 return new NumberToStringWithRadixSerializer(radix);
             }
@@ -130,6 +136,10 @@ public class NumberSerializer
         return ToStringSerializer.instance;
     }
 
+    /**
+     * Check if we have a proper {@link JsonFormat} annotation for serializing a Number
+     * using an alternative radix specified in the annotation.
+     */
     private static boolean isSerializeWithRadixOverride(JsonFormat.Value format) {
         String pattern = format.getPattern();
         boolean isInteger = pattern.chars().allMatch(Character::isDigit);
@@ -141,7 +151,11 @@ public class NumberSerializer
         return radix != DEFAULT_RADIX;
     }
 
-    private static boolean isSerializeWithDefaultOverride(SerializerProvider prov) {
+    /**
+     * Check if we have a non-default radix specified as part of {@link com.fasterxml.jackson.databind.cfg.BaseSettings} contained
+     * in {@link SerializationConfig}.
+     */
+    private static boolean isSerializeWithDefaultConfigOverride(SerializerProvider prov) {
         if (prov.getConfig() == null) {
             return false;
         }

@@ -159,6 +159,8 @@ public final class BaseSettings
 
     /**
      * Default radix to use when serializing/deserializing integers to string.
+     *
+     * @since 2.21
      */
     protected final int _defaultRadix;
 
@@ -197,30 +199,16 @@ public final class BaseSettings
 
     /**
      * @since 2.19
-     * @deprecated since 2.21, use variant that take defaultRadix
+     * @deprecated since 2.21, use variant that takes defaultRadix
      */
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
-                        PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
-                        TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
-                        Locale locale, TimeZone tz, Base64Variant defaultBase64,
-                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-                        CacheProvider cacheProvider)
+            PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
+            TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
+            Locale locale, TimeZone tz, Base64Variant defaultBase64,
+            PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
+            CacheProvider cacheProvider)
     {
-        this(ci,
-                ai,
-                pns,
-                ens,
-                tf,
-                typer,
-                dateFormat,
-                hi,
-                locale,
-                tz,
-                defaultBase64,
-                ptv,
-                accNaming,
-                cacheProvider,
-                DEFAULT_RADIX);
+        this(ci, ai, pns, ens, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, cacheProvider, DEFAULT_RADIX);
     }
 
     /**
@@ -229,11 +217,11 @@ public final class BaseSettings
      */
     @Deprecated
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
-                        PropertyNamingStrategy pns, TypeFactory tf,
-                        TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
-                        Locale locale, TimeZone tz, Base64Variant defaultBase64,
-                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-                        CacheProvider cacheProvider)
+            PropertyNamingStrategy pns, TypeFactory tf,
+            TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
+            Locale locale, TimeZone tz, Base64Variant defaultBase64,
+            PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
+            CacheProvider cacheProvider)
     {
         this(ci, ai, pns, null, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, cacheProvider);
     }
@@ -244,10 +232,10 @@ public final class BaseSettings
      */
     @Deprecated
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
-                        PropertyNamingStrategy pns, TypeFactory tf,
-                        TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
-                        Locale locale, TimeZone tz, Base64Variant defaultBase64,
-                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming)
+            PropertyNamingStrategy pns, TypeFactory tf,
+            TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
+            Locale locale, TimeZone tz, Base64Variant defaultBase64,
+            PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming)
     {
         this(ci, ai, pns, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, 
                 DefaultCacheProvider.defaultInstance());
@@ -558,6 +546,8 @@ public final class BaseSettings
     }
 
     /**
+     * Method indicating number base to use for serializing/deserializing an integral number as a string.
+     *
      * @since 2.21
      */
     public int getRadix() {

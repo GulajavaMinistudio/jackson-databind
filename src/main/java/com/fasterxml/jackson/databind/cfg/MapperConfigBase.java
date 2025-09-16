@@ -941,8 +941,8 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     public final Class<?> findMixInClassFor(Class<?> cls) {
         return _mixIns.findMixInClassFor(cls);
     }
-    // Not really relevant here (should not get called)
 
+    // Not really relevant here (should not get called)
     @Override
     public MixInResolver copy() {
         throw new UnsupportedOperationException();

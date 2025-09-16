@@ -420,7 +420,9 @@ public class ObjectMapper
             // Since 2.12:
             new DefaultAccessorNamingStrategy.Provider(),
             // Since 2.16: [databind#2502] Add a way to configure Caches Jackson uses
-            DefaultCacheProvider.defaultInstance(), DEFAULT_RADIX
+            DefaultCacheProvider.defaultInstance(),
+            //since 2.21: [databind#221] - support alternate radixes for numerical values serialized as strings
+            DEFAULT_RADIX
     );
 
     /*

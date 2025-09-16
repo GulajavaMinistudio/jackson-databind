@@ -159,29 +159,28 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
     }
 
     @Test
-    void testAllIntegralTypesGetSerializedWithRadix()
+    void testAllIntegralTypesGetSerializedAsBinary()
             throws JsonProcessingException {
         ObjectMapper mapper = newJsonMapper();
-        mapper.configOverride(Integer.class)
-              .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING));
-        mapper.setRadix(16);
-        AllIntegralTypeWrapper intialIntegralTypeWrapper = new AllIntegralTypeWrapper((byte) 1,
+        AllIntegralTypeWrapper initialIntegralTypeWrapper = new AllIntegralTypeWrapper((byte) 1,
                 (byte) 2, (short) 3, (short) 4, 5, 6, 7L, 8L, new BigInteger("9"));
         String expectedJson = "{'byteValue':'1','ByteValue':'10','shortValue':'11','ShortValue':'100','intValue':'101','IntegerValue':'110','longValue':'111','LongValue':'1000','bigInteger':'1001'}";
 
-        String json = mapper.writeValueAsString(intialIntegralTypeWrapper);
+        String json = mapper.writeValueAsString(initialIntegralTypeWrapper);
+
+        assertEquals(a2q(expectedJson), json);
 
         AllIntegralTypeWrapper readbackIntegralTypeWrapper = mapper.readValue(a2q(expectedJson), AllIntegralTypeWrapper.class);
 
         assertNotNull(readbackIntegralTypeWrapper);
-        assertEquals(intialIntegralTypeWrapper.byteValue, readbackIntegralTypeWrapper.byteValue);
-        assertEquals(intialIntegralTypeWrapper.ByteValue, readbackIntegralTypeWrapper.ByteValue);
-        assertEquals(intialIntegralTypeWrapper.shortValue, readbackIntegralTypeWrapper.shortValue);
-        assertEquals(intialIntegralTypeWrapper.ShortValue, readbackIntegralTypeWrapper.ShortValue);
-        assertEquals(intialIntegralTypeWrapper.intValue, readbackIntegralTypeWrapper.intValue);
-        assertEquals(intialIntegralTypeWrapper.IntegerValue, readbackIntegralTypeWrapper.IntegerValue);
-        assertEquals(intialIntegralTypeWrapper.longValue, readbackIntegralTypeWrapper.longValue);
-        assertEquals(intialIntegralTypeWrapper.LongValue, readbackIntegralTypeWrapper.LongValue);
-        assertEquals(intialIntegralTypeWrapper.bigInteger, readbackIntegralTypeWrapper.bigInteger);
+        assertEquals(initialIntegralTypeWrapper.byteValue, readbackIntegralTypeWrapper.byteValue);
+        assertEquals(initialIntegralTypeWrapper.ByteValue, readbackIntegralTypeWrapper.ByteValue);
+        assertEquals(initialIntegralTypeWrapper.shortValue, readbackIntegralTypeWrapper.shortValue);
+        assertEquals(initialIntegralTypeWrapper.ShortValue, readbackIntegralTypeWrapper.ShortValue);
+        assertEquals(initialIntegralTypeWrapper.intValue, readbackIntegralTypeWrapper.intValue);
+        assertEquals(initialIntegralTypeWrapper.IntegerValue, readbackIntegralTypeWrapper.IntegerValue);
+        assertEquals(initialIntegralTypeWrapper.longValue, readbackIntegralTypeWrapper.longValue);
+        assertEquals(initialIntegralTypeWrapper.LongValue, readbackIntegralTypeWrapper.LongValue);
+        assertEquals(initialIntegralTypeWrapper.bigInteger, readbackIntegralTypeWrapper.bigInteger);
     }
 }

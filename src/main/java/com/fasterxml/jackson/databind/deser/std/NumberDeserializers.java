@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
 import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.ser.std.NumberToStringWithRadixSerializer;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.databind.util.AccessPattern;
 import com.fasterxml.jackson.databind.util.ClassUtil;
@@ -1123,19 +1124,25 @@ public class NumberDeserializers
         }
     }
 
+    /**
+     * Method used to create a string deserializer for a Number.
+     * If configuration is set properly, we create an alternative radix serializer {@link NumberToStringWithRadixSerializer}.
+     *
+     * @since 2.21
+     */
     private static StdDeserializer<? extends Number> _createRadixStringDeserializer(StdScalarDeserializer<? extends  Number> initialDeser,
-                                                                                    DeserializationContext ctxt, BeanProperty property)
+                    DeserializationContext ctxt, BeanProperty property)
     {
         JsonFormat.Value format = initialDeser.findFormatOverrides(ctxt, property, initialDeser.handledType());
 
-        if (format == null) {
+        if (format == null || format.getShape() != JsonFormat.Shape.STRING) {
             return initialDeser;
         }
 
         if (isSerializeWithRadixOverride(format)) {
             int radix = Integer.parseInt(format.getPattern());
             return new FromStringWithRadixToNumberDeserializer(initialDeser, radix);
-        } else if (isSerializeWithDefaultOverride(ctxt)) {
+        } else if (isSerializeWithDefaultConfigOverride(ctxt)) {
             int radix = ctxt.getConfig().getRadix();
             return new FromStringWithRadixToNumberDeserializer(initialDeser, radix);
         }
@@ -1143,7 +1150,10 @@ public class NumberDeserializers
         return initialDeser;
     }
 
-
+    /**
+     * Check if we have a proper {@link JsonFormat} annotation for serializing a Number
+     * using an alternative radix specified in the annotation.
+     */
     private static boolean isSerializeWithRadixOverride(JsonFormat.Value format) {
         String pattern = format.getPattern();
         boolean isInteger = pattern.chars().allMatch(Character::isDigit);
@@ -1155,7 +1165,11 @@ public class NumberDeserializers
         return radix != DEFAULT_RADIX;
     }
 
-    private static boolean isSerializeWithDefaultOverride(DeserializationContext ctxt) {
+    /**
+     * Check if we have a non-default radix specified as part of {@link com.fasterxml.jackson.databind.cfg.BaseSettings} contained
+     * in {@link DeserializationConfig}.
+     */
+    private static boolean isSerializeWithDefaultConfigOverride(DeserializationContext ctxt) {
         if (ctxt.getConfig() == null) {
             return false;
         }
