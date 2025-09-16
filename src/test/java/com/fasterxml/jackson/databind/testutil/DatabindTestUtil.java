@@ -5,6 +5,8 @@ import java.lang.annotation.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
@@ -271,13 +273,14 @@ public class DatabindTestUtil
 
     public static enum ABC { A, B, C; }
 
+    @JsonPropertyOrder({"x", "y"})
     public static class Point {
         public int x, y;
 
         protected Point() { } // for deser
-        public Point(int x0, int y0) {
-            x = x0;
-            y = y0;
+        public Point(int x, int y) {
+            this.x = x;
+            this.y = y;
         }
 
         @Override
