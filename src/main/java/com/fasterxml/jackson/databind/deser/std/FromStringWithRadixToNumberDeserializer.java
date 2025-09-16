@@ -9,6 +9,8 @@ import java.math.BigInteger;
 
 /**
  * Deserializer used to deserialize string that represent number under in specific radix (base).
+ *
+ * @since 2.21
  */
 public class FromStringWithRadixToNumberDeserializer
         extends StdDeserializer<Number> {

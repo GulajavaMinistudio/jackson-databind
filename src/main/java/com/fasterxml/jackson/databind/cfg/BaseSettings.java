@@ -35,6 +35,8 @@ public final class BaseSettings
              */
             TimeZone.getTimeZone("UTC");
 
+    private static final int DEFAULT_RADIX = 10;
+
     /*
     /**********************************************************
     /* Configuration settings; introspection, related
@@ -167,7 +169,7 @@ public final class BaseSettings
      */
 
     /**
-     * @since 2.19
+     * @since 2.21
      */
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
                         PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
@@ -194,6 +196,34 @@ public final class BaseSettings
     }
 
     /**
+     * @since 2.19
+     * @deprecated since 2.21, use variant that take defaultRadix
+     */
+    public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
+                        PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
+                        TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
+                        Locale locale, TimeZone tz, Base64Variant defaultBase64,
+                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
+                        CacheProvider cacheProvider)
+    {
+        this(ci,
+                ai,
+                pns,
+                ens,
+                tf,
+                typer,
+                dateFormat,
+                hi,
+                locale,
+                tz,
+                defaultBase64,
+                ptv,
+                accNaming,
+                cacheProvider,
+                DEFAULT_RADIX);
+    }
+
+    /**
      * @since 2.16
      * @deprecated Since 2.19, use variant that takes {@link EnumNamingStrategy} instead.
      */
@@ -203,9 +233,9 @@ public final class BaseSettings
                         TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
                         Locale locale, TimeZone tz, Base64Variant defaultBase64,
                         PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-                        CacheProvider cacheProvider, int defaultRadix)
+                        CacheProvider cacheProvider)
     {
-        this(ci, ai, pns, null, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, cacheProvider, defaultRadix);
+        this(ci, ai, pns, null, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, cacheProvider);
     }
 
     /**
@@ -217,10 +247,10 @@ public final class BaseSettings
                         PropertyNamingStrategy pns, TypeFactory tf,
                         TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
                         Locale locale, TimeZone tz, Base64Variant defaultBase64,
-                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming, int defaultRadix)
+                        PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming)
     {
         this(ci, ai, pns, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, 
-                DefaultCacheProvider.defaultInstance(), defaultRadix);
+                DefaultCacheProvider.defaultInstance());
     }
 
     /**
@@ -527,6 +557,9 @@ public final class BaseSettings
         return _defaultBase64;
     }
 
+    /**
+     * @since 2.21
+     */
     public int getRadix() {
         return _defaultRadix;
     }

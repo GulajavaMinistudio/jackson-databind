@@ -2549,6 +2549,8 @@ public class ObjectMapper
     /**
      * Method for configuring the radix to use when serializing integral types
      * as strings.
+     *
+     * @since 2.21
      */
     public ObjectMapper setRadix(int radix)
     {

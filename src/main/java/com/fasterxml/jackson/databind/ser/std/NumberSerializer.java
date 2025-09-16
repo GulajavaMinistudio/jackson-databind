@@ -61,7 +61,8 @@ public class NumberSerializer
                     return bigDecimalAsStringSerializer();
                 }
                 return createStringSerializer(prov, format, _isInt);
-                default:
+
+            default:
             }
         }
         return this;

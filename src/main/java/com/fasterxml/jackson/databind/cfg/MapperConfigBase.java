@@ -685,6 +685,8 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     /**
      * Method for constructing and returning a new instance with different
      * radix to use.
+     *
+     * @since 2.21
      */
     public abstract T withRadix(int radix);
 

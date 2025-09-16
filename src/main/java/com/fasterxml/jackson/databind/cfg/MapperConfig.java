@@ -674,6 +674,8 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     /**
      * Method called during deserialization if a Number needs to be decoded from
      * String. Default version just returns radix 10.
+     *
+     * @since 2.21
      */
     public int getRadix() {
         return _base.getRadix();

@@ -10,6 +10,8 @@ import java.math.BigInteger;
 /**
  * Serializer used to convert numbers into a representation for a specified radix (base) and serialize
  * the representation as string.
+ *
+ * @since 2.21
  */
 @JacksonStdImpl
 public class NumberToStringWithRadixSerializer extends ToStringSerializerBase {
