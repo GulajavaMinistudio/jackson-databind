@@ -371,6 +371,10 @@ public final class SerializationConfig
         return (str == _subtypeResolver)? this : new SerializationConfig(this, str);
     }
 
+    public SerializationConfig withRadix(int radix) {
+        return _withBase(_base.withRadix(radix));
+    }
+
     @Override
     public SerializationConfig withView(Class<?> view) {
         return (_view == view) ? this : new SerializationConfig(this, view);

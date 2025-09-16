@@ -402,6 +402,7 @@ public class ObjectMapper
     // 16-May-2009, tatu: Ditto ^^^
     protected final static AnnotationIntrospector DEFAULT_ANNOTATION_INTROSPECTOR = new JacksonAnnotationIntrospector();
 
+    protected static final int DEFAULT_RADIX = 10;
     /**
      * Base settings contain defaults used for all {@link ObjectMapper}
      * instances.
@@ -419,7 +420,7 @@ public class ObjectMapper
             // Since 2.12:
             new DefaultAccessorNamingStrategy.Provider(),
             // Since 2.16: [databind#2502] Add a way to configure Caches Jackson uses
-            DefaultCacheProvider.defaultInstance()
+            DefaultCacheProvider.defaultInstance(), DEFAULT_RADIX
     );
 
     /*
@@ -2542,6 +2543,17 @@ public class ObjectMapper
     {
         _deserializationConfig = _deserializationConfig.with(dateFormat);
         _serializationConfig = _serializationConfig.with(dateFormat);
+        return this;
+    }
+
+    /**
+     * Method for configuring the radix to use when serializing integral types
+     * as strings.
+     */
+    public ObjectMapper setRadix(int radix)
+    {
+        _deserializationConfig = _deserializationConfig.withRadix(radix);
+        _serializationConfig = _serializationConfig.withRadix(radix);
         return this;
     }
 

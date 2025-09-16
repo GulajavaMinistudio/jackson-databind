@@ -672,6 +672,14 @@ public abstract class MapperConfig<T extends MapperConfig<T>>
     }
 
     /**
+     * Method called during deserialization if a Number needs to be decoded from
+     * String. Default version just returns radix 10.
+     */
+    public int getRadix() {
+        return _base.getRadix();
+    }
+
+    /**
      * Method for accessing per-instance shared (baseline/default)
      * attribute values; these are used as the basis for per-call
      * attributes.

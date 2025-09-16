@@ -37,6 +37,8 @@ public class NumberSerializer
 
     protected final boolean _isInt;
 
+    protected static final int DEFAULT_RADIX = 10;
+
     /**
      * @since 2.5
      */
@@ -50,7 +52,7 @@ public class NumberSerializer
     public JsonSerializer<?> createContextual(SerializerProvider prov,
             BeanProperty property) throws JsonMappingException
     {
-        JsonFormat.Value format = findFormatOverrides(prov, property, handledType());
+        JsonFormat.Value format = findFormatOverrides(prov, property, handledType());//this handles both the annotation and ConfigOverrides case.
         if (format != null) {
             switch (format.getShape()) {
             case STRING:
@@ -58,8 +60,8 @@ public class NumberSerializer
                 if (((Class<?>) handledType()) == BigDecimal.class) {
                     return bigDecimalAsStringSerializer();
                 }
-                return ToStringSerializer.instance;
-            default:
+                return createStringSerializer(prov, format, _isInt);
+                default:
             }
         }
         return this;
@@ -112,6 +114,37 @@ public class NumberSerializer
                 /*JsonNumberFormatVisitor v2 =*/ visitor.expectNumberFormat(typeHint);
             }
         }
+    }
+
+    public static ToStringSerializerBase createStringSerializer(SerializerProvider prov, JsonFormat.Value format, boolean isInt) {
+        if (isInt) {
+            if (isSerializeWithRadixOverride(format)) {
+                int radix = Integer.parseInt(format.getPattern());
+                return new NumberToStringWithRadixSerializer(radix);
+            } else if (isSerializeWithDefaultOverride(prov)) {
+                int radix = prov.getConfig().getRadix();
+                return new NumberToStringWithRadixSerializer(radix);
+            }
+        }
+        return ToStringSerializer.instance;
+    }
+
+    private static boolean isSerializeWithRadixOverride(JsonFormat.Value format) {
+        String pattern = format.getPattern();
+        boolean isInteger = pattern.chars().allMatch(Character::isDigit);
+        if (!isInteger || pattern.isEmpty()) {
+            return false;
+        }
+
+        int radix = Integer.parseInt(pattern);
+        return radix != DEFAULT_RADIX;
+    }
+
+    private static boolean isSerializeWithDefaultOverride(SerializerProvider prov) {
+        if (prov.getConfig() == null) {
+            return false;
+        }
+        return prov.getConfig().getRadix() != DEFAULT_RADIX;
     }
 
     /**

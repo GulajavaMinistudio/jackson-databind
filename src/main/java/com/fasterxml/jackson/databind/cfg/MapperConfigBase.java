@@ -684,6 +684,12 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
 
     /**
      * Method for constructing and returning a new instance with different
+     * radix to use.
+     */
+    public abstract T withRadix(int radix);
+
+    /**
+     * Method for constructing and returning a new instance with different
      * view to use.
      */
     public abstract T withView(Class<?> view);
@@ -933,8 +939,8 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     public final Class<?> findMixInClassFor(Class<?> cls) {
         return _mixIns.findMixInClassFor(cls);
     }
-
     // Not really relevant here (should not get called)
+
     @Override
     public MixInResolver copy() {
         throw new UnsupportedOperationException();
