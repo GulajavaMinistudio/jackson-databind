@@ -28,7 +28,7 @@ public class PojoAsArrayRoundtripTest extends DatabindTestUtil
 
         public MediaItemAsArray() { }
 
-        public MediaItemAsArray(Content c)
+        protected MediaItemAsArray(Content c)
         {
             _content = c;
         }
@@ -57,7 +57,7 @@ public class PojoAsArrayRoundtripTest extends DatabindTestUtil
             private Size _size;
 
             public Photo() {}
-            public Photo(String uri, String title, int w, int h, Size s)
+            protected Photo(String uri, String title, int w, int h, Size s)
             {
               _uri = uri;
               _title = title;
