@@ -719,8 +719,12 @@ public class POJOPropertiesCollector
                 && !ctorDetector.requireCtorAnnotation()) {
             // But only if no Default (0-params) constructor available OR if we are configured
             // to prefer properties-based Creators
-            if ((_classDef.getDefaultConstructor() == null)
-                    || ctorDetector.singleArgCreatorDefaultsToProperties()) {
+            // 19-Sep-2025, tatu: [databind#5318] Actually let's potentially allow
+            //  implicit constructor even if class also has 0-param ("default") constructor
+            //  (as long as it is not annotated)
+            if ((zeroParamsConstructor == null)
+                    || (!zeroParamsConstructor.isAnnotated()
+                            && ctorDetector.allowImplicitWithDefaultConstructor())) {
                 _addImplicitConstructor(creators, constructors, props);
             }
         }

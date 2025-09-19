@@ -99,7 +99,7 @@ public class PojoAsArrayRoundtripTest extends DatabindTestUtil
 
             public void addPerson(String p) {
                 if (_persons == null) {
-                    _persons = new ArrayList<String>();
+                    _persons = new ArrayList<>();
                 }
                 _persons.add(p);
             }
