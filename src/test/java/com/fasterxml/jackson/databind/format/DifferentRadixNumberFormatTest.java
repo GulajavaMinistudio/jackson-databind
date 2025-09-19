@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
 
+    private static final String HEX_RADIX = "16";
+    public static final String BINARY_RADIX = "2";
+
     private static class IntegerWrapper {
         public Integer value;
 
@@ -36,7 +39,7 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
             value = v;
         }
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "16")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = HEX_RADIX)
         public int getValue() {
             return value;
         }
@@ -58,27 +61,27 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
     }
 
     private static class AllIntegralTypeWrapper {
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public byte byteValue;
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public Byte ByteValue;
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public short shortValue;
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public Short ShortValue;
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public int intValue;
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public Integer IntegerValue;
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public long longValue;
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public Long LongValue;
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "2")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = BINARY_RADIX)
         public BigInteger bigInteger;
 
         public AllIntegralTypeWrapper() {
@@ -102,7 +105,7 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
     void testIntegerSerializedAsHexString()
             throws JsonProcessingException {
         ObjectMapper mapper = newJsonMapper();
-        mapper.configOverride(Integer.class).setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING).withPattern("16"));
+        mapper.configOverride(Integer.class).setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING).withPattern(HEX_RADIX));
         IntegerWrapper initialIntegerWrapper = new IntegerWrapper(10);
         String json = mapper.writeValueAsString(initialIntegerWrapper);
         String expectedJson = "{'value':'a'}";
@@ -121,7 +124,7 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
             throws JsonProcessingException {
         ObjectMapper mapper = newJsonMapper();
         mapper.configOverride(int.class)
-              .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING).withPattern("16"));
+              .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING).withPattern(HEX_RADIX));
         IntWrapper intialIntWrapper = new IntWrapper(10);
         String expectedJson = "{'value':'a'}";
 
@@ -166,12 +169,12 @@ public class DifferentRadixNumberFormatTest extends DatabindTestUtil {
     }
 
     @Test
-    void testUsingBaseSettingRadixToSerializeAsHexString()
+    void testUsingDefaultConfigOverrideRadixToSerializeAsHexString()
             throws JsonProcessingException {
         ObjectMapper mapper = newJsonMapper();
         mapper.configOverride(Integer.class)
               .setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING));
-        mapper.setRadix(16);
+        mapper.setDefaultFormat(HEX_RADIX);
         IntegerWrapper intialIntegerWrapper = new IntegerWrapper(10);
         String expectedJson = "{'value':'a'}";
 

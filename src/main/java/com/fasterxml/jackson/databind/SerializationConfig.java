@@ -372,11 +372,6 @@ public final class SerializationConfig
     }
 
     @Override
-    public SerializationConfig withRadix(int radix) {
-        return _withBase(_base.withRadix(radix));
-    }
-
-    @Override
     public SerializationConfig withView(Class<?> view) {
         return (_view == view) ? this : new SerializationConfig(this, view);
     }

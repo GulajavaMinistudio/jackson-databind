@@ -35,8 +35,6 @@ public final class BaseSettings
              */
             TimeZone.getTimeZone("UTC");
 
-    private static final int DEFAULT_RADIX = 10;
-
     /*
     /**********************************************************
     /* Configuration settings; introspection, related
@@ -157,13 +155,6 @@ public final class BaseSettings
      */
     protected final CacheProvider _cacheProvider;
 
-    /**
-     * Default radix to use when serializing/deserializing integers to string.
-     *
-     * @since 2.21
-     */
-    protected final int _defaultRadix;
-
     /*
     /**********************************************************
     /* Construction
@@ -171,14 +162,14 @@ public final class BaseSettings
      */
 
     /**
-     * @since 2.21
+     * @since 2.19
      */
     public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
             PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
             TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
             Locale locale, TimeZone tz, Base64Variant defaultBase64,
             PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-            CacheProvider cacheProvider, int defaultRadix)
+            CacheProvider cacheProvider)
     {
         _classIntrospector = ci;
         _annotationIntrospector = ai;
@@ -193,22 +184,7 @@ public final class BaseSettings
         _defaultBase64 = defaultBase64;
         _typeValidator = ptv;
         _accessorNaming = accNaming;
-        _cacheProvider = cacheProvider;
-        _defaultRadix = defaultRadix;
-    }
-
-    /**
-     * @since 2.19
-     * @deprecated since 2.21, use variant that takes defaultRadix
-     */
-    public BaseSettings(ClassIntrospector ci, AnnotationIntrospector ai,
-            PropertyNamingStrategy pns, EnumNamingStrategy ens, TypeFactory tf,
-            TypeResolverBuilder<?> typer, DateFormat dateFormat, HandlerInstantiator hi,
-            Locale locale, TimeZone tz, Base64Variant defaultBase64,
-            PolymorphicTypeValidator ptv, AccessorNamingStrategy.Provider accNaming,
-            CacheProvider cacheProvider)
-    {
-        this(ci, ai, pns, ens, tf, typer, dateFormat, hi, locale, tz, defaultBase64, ptv, accNaming, cacheProvider, DEFAULT_RADIX);
+        _cacheProvider = cacheProvider;;
     }
 
     /**
@@ -261,8 +237,7 @@ public final class BaseSettings
             _defaultBase64,
             _typeValidator,
             _accessorNaming,
-            _cacheProvider,
-            _defaultRadix);
+            _cacheProvider);
     }
 
     /*
@@ -277,7 +252,7 @@ public final class BaseSettings
         }
         return new BaseSettings(ci, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings withAnnotationIntrospector(AnnotationIntrospector ai) {
@@ -286,7 +261,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, ai, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings withInsertedAnnotationIntrospector(AnnotationIntrospector ai) {
@@ -313,7 +288,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, pns, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     /**
@@ -325,7 +300,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, ens,
                 _typeFactory, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     // @since 2.12
@@ -335,7 +310,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, p, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, p, _cacheProvider);
     }
 
     public BaseSettings withTypeFactory(TypeFactory tf) {
@@ -344,7 +319,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 tf, _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings withTypeResolverBuilder(TypeResolverBuilder<?> typer) {
@@ -353,7 +328,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, typer, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings withDateFormat(DateFormat df) {
@@ -367,7 +342,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, df, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings withHandlerInstantiator(HandlerInstantiator hi) {
@@ -376,7 +351,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory, _typeResolverBuilder, _dateFormat, hi, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     public BaseSettings with(Locale l) {
@@ -385,7 +360,7 @@ public final class BaseSettings
         }
         return new BaseSettings(_classIntrospector, _annotationIntrospector, _propertyNamingStrategy, _enumNamingStrategy,
                 _typeFactory,_typeResolverBuilder, _dateFormat, _handlerInstantiator, l,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     /**
@@ -408,7 +383,7 @@ public final class BaseSettings
         return new BaseSettings(_classIntrospector, _annotationIntrospector,
                 _propertyNamingStrategy, _enumNamingStrategy, _typeFactory,
                 _typeResolverBuilder, df, _handlerInstantiator, _locale,
-                tz, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                tz, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     /**
@@ -421,7 +396,7 @@ public final class BaseSettings
         return new BaseSettings(_classIntrospector, _annotationIntrospector,
                 _propertyNamingStrategy, _enumNamingStrategy, _typeFactory,
                 _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, base64, _typeValidator, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, base64, _typeValidator, _accessorNaming, _cacheProvider);
     }
 
     /**
@@ -434,7 +409,7 @@ public final class BaseSettings
         return new BaseSettings(_classIntrospector, _annotationIntrospector,
                 _propertyNamingStrategy, _enumNamingStrategy, _typeFactory,
                 _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, v, _accessorNaming, _cacheProvider, _defaultRadix);
+                _timeZone, _defaultBase64, v, _accessorNaming, _cacheProvider);
     }
 
     /**
@@ -450,23 +425,7 @@ public final class BaseSettings
         return new BaseSettings(_classIntrospector, _annotationIntrospector,
                 _propertyNamingStrategy, _enumNamingStrategy, _typeFactory,
                 _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, cacheProvider, _defaultRadix);
-    }
-
-    /**
-     * Fluent factory for constructing a new instance with provided default radix.
-     *
-     * @return a new instance with provided defaultRadix.
-     * @since 2.21
-     */
-    public BaseSettings withRadix(int defaultRadix) {
-        if (defaultRadix == _defaultRadix) {
-            return this;
-        }
-        return new BaseSettings(_classIntrospector, _annotationIntrospector,
-                _propertyNamingStrategy, _enumNamingStrategy, _typeFactory,
-                _typeResolverBuilder, _dateFormat, _handlerInstantiator, _locale,
-                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, _cacheProvider, defaultRadix);
+                _timeZone, _defaultBase64, _typeValidator, _accessorNaming, cacheProvider);
     }
 
     /*
@@ -543,15 +502,6 @@ public final class BaseSettings
 
     public Base64Variant getBase64Variant() {
         return _defaultBase64;
-    }
-
-    /**
-     * Method indicating base to use for serializing/deserializing integer numbers as a string.
-     *
-     * @since 2.21
-     */
-    public int getRadix() {
-        return _defaultRadix;
     }
     
     /**

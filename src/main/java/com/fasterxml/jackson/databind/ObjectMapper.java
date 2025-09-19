@@ -402,7 +402,6 @@ public class ObjectMapper
     // 16-May-2009, tatu: Ditto ^^^
     protected final static AnnotationIntrospector DEFAULT_ANNOTATION_INTROSPECTOR = new JacksonAnnotationIntrospector();
 
-    protected static final int DEFAULT_RADIX = 10;
     /**
      * Base settings contain defaults used for all {@link ObjectMapper}
      * instances.
@@ -420,9 +419,7 @@ public class ObjectMapper
             // Since 2.12:
             new DefaultAccessorNamingStrategy.Provider(),
             // Since 2.16: [databind#2502] Add a way to configure Caches Jackson uses
-            DefaultCacheProvider.defaultInstance(),
-            //since 2.21: [databind#221] - support alternate radixes for numerical values serialized as strings
-            DEFAULT_RADIX
+            DefaultCacheProvider.defaultInstance()
     );
 
     /*
@@ -1900,6 +1897,24 @@ public class ObjectMapper
     }
 
     /**
+     * Method for setting default alternative radix that applies to integral types for serialization
+     * and deserialization of such types as strings.
+     * This configuration override is applied for all integral properties for which there are no per-type
+     * or per-property overrides (via annotations or config overrides).
+     *<p>
+     * NOTE: in Jackson 3.x all configuration goes through {@code ObjectMapper} builders,
+     * see {@link com.fasterxml.jackson.databind.cfg.MapperBuilder},
+     * and this method will be removed from 3.0.
+     *
+     * @since 2.21
+     */
+    public ObjectMapper setDefaultFormat(String radix) {
+        _configOverrides.setDefaultRadix(radix);
+        return this;
+    }
+
+
+    /**
      * Short-cut for:
      *<pre>
      *  setDefaultPropertyInclusion(JsonInclude.Value.construct(incl, incl));
@@ -2545,19 +2560,6 @@ public class ObjectMapper
     {
         _deserializationConfig = _deserializationConfig.with(dateFormat);
         _serializationConfig = _serializationConfig.with(dateFormat);
-        return this;
-    }
-
-    /**
-     * Method for configuring the radix to use when serializing integer numbers
-     * as strings.
-     *
-     * @since 2.21
-     */
-    public ObjectMapper setRadix(int radix)
-    {
-        _deserializationConfig = _deserializationConfig.withRadix(radix);
-        _serializationConfig = _serializationConfig.withRadix(radix);
         return this;
     }
 

@@ -124,14 +124,9 @@ public class NumberSerializer
      * @since 2.21
      */
     public static ToStringSerializerBase createStringSerializer(SerializerProvider prov, JsonFormat.Value format, boolean isInt) {
-        if (isInt) {
-            if (isSerializeWithRadixOverride(format)) {
-                int radix = Integer.parseInt(format.getPattern());
-                return new NumberToStringWithRadixSerializer(radix);
-            } else if (isSerializeWithDefaultConfigOverride(prov)) {
-                int radix = prov.getConfig().getRadix();
-                return new NumberToStringWithRadixSerializer(radix);
-            }
+        if (isInt && isSerializeWithRadixOverride(format)) {
+            int radix = Integer.parseInt(format.getPattern());
+            return new NumberToStringWithRadixSerializer(radix);
         }
         return ToStringSerializer.instance;
     }
@@ -149,17 +144,6 @@ public class NumberSerializer
 
         int radix = Integer.parseInt(pattern);
         return radix != DEFAULT_RADIX;
-    }
-
-    /**
-     * Check if we have a non-default radix specified as part of {@link com.fasterxml.jackson.databind.cfg.BaseSettings} contained
-     * in {@link SerializationConfig}.
-     */
-    private static boolean isSerializeWithDefaultConfigOverride(SerializerProvider prov) {
-        if (prov.getConfig() == null) {
-            return false;
-        }
-        return prov.getConfig().getRadix() != DEFAULT_RADIX;
     }
 
     /**

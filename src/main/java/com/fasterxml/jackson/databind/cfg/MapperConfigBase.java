@@ -684,14 +684,6 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
 
     /**
      * Method for constructing and returning a new instance with different
-     * radix to use.
-     *
-     * @since 2.21
-     */
-    public abstract T withRadix(int radix);
-
-    /**
-     * Method for constructing and returning a new instance with different
      * view to use.
      */
     public abstract T withView(Class<?> view);
@@ -783,6 +775,11 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
             return v;
         }
         return def.withOverrides(v);
+    }
+
+    @Override
+    public String getDefaultRadix() {
+        return _configOverrides.getDefaultRadix();
     }
 
     @Override

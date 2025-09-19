@@ -374,11 +374,6 @@ public final class DeserializationConfig
     }
 
     @Override
-    public DeserializationConfig withRadix(int radix) {
-        return _withBase(_base.withRadix(radix));
-    }
-
-    @Override
     public DeserializationConfig withView(Class<?> view) {
         return (_view == view) ? this : new DeserializationConfig(this, view);
     }

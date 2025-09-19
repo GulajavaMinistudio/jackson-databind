@@ -41,8 +41,9 @@ public class NumberToStringWithRadixSerializer extends ToStringSerializerBase {
         }
 
         String text = "";
-        if (value instanceof BigInteger bigInt) {
-            text = bigInt.toString(radix);
+        if (value instanceof BigInteger) {
+            BigInteger bigIntegerValue = (BigInteger) value;
+            text = bigIntegerValue.toString(radix);
         } else if (value instanceof Byte
                 || value instanceof Short
                 || value instanceof Integer

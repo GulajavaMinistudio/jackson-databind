@@ -1142,9 +1142,6 @@ public class NumberDeserializers
         if (isSerializeWithRadixOverride(format)) {
             int radix = Integer.parseInt(format.getPattern());
             return new FromStringWithRadixToNumberDeserializer(initialDeser, radix);
-        } else if (isSerializeWithDefaultConfigOverride(ctxt)) {
-            int radix = ctxt.getConfig().getRadix();
-            return new FromStringWithRadixToNumberDeserializer(initialDeser, radix);
         }
 
         return initialDeser;
@@ -1163,16 +1160,5 @@ public class NumberDeserializers
 
         int radix = Integer.parseInt(pattern);
         return radix != DEFAULT_RADIX;
-    }
-
-    /**
-     * Check if we have a non-default radix specified as part of {@link com.fasterxml.jackson.databind.cfg.BaseSettings} contained
-     * in {@link DeserializationConfig}.
-     */
-    private static boolean isSerializeWithDefaultConfigOverride(DeserializationContext ctxt) {
-        if (ctxt.getConfig() == null) {
-            return false;
-        }
-        return ctxt.getConfig().getRadix() != DEFAULT_RADIX;
     }
 }
