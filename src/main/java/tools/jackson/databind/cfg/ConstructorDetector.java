@@ -4,7 +4,7 @@ import tools.jackson.databind.util.ClassUtil;
 
 /**
  * Configurable handler used to select aspects of selecting
- * constructor to use as "Creator" for POJOs.
+ * constructor(s) to use as "Creators" for POJOs.
  * Defines the API for handlers, a pre-defined set of standard instances
  * and methods for constructing alternative configurations.
  *
@@ -132,6 +132,8 @@ public final class ConstructorDetector
     /**
      * Whether implicit detection of Properties-based Constructors is allowed
      * when there is the default (no-parameter) constructor available.
+     *
+     * @since 3.0
      */
     protected final boolean _allowImplicitWithDefaultConstructor;
 
