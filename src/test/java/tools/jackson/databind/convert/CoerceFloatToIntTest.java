@@ -1,5 +1,6 @@
 package tools.jackson.databind.convert;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -7,11 +8,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 import tools.jackson.databind.type.LogicalType;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,6 +81,41 @@ public class CoerceFloatToIntTest
 
         BigInteger biggie = DEFAULT_MAPPER.readValue("95.3", BigInteger.class);
         assertEquals(95L, biggie.longValue());
+    }
+
+    // [databind#5319]
+    @JacksonTestFailureExpected
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNode() throws Exception
+    {
+        final ObjectMapper mapperAllow = jsonMapperBuilder()
+                .enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+                .build();
+        final JsonNodeFactory nodeF = mapperAllow.getNodeFactory();
+
+        // First Integer
+        assertEquals(1,
+                mapperAllow.treeToValue(nodeF.numberNode(1.25), Integer.class));
+        assertEquals(-2,
+                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), Integer.class));
+        assertEquals(3,
+                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Integer.class));
+
+        // Second Long
+        assertEquals(1L,
+                mapperAllow.treeToValue(nodeF.numberNode(1.25), Long.class));
+        assertEquals(-2L,
+                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), Long.class));
+        assertEquals(3L,
+                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Long.class));
+
+        // Last BigInteger
+        assertEquals(BigInteger.valueOf(1L),
+                mapperAllow.treeToValue(nodeF.numberNode(1.25), BigInteger.class));
+        assertEquals(BigInteger.valueOf(-2L),
+                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), BigInteger.class));
+        assertEquals(BigInteger.valueOf(3L),
+                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), BigInteger.class));
     }
 
     @Test
