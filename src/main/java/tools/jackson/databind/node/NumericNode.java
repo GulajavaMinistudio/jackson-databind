@@ -105,9 +105,35 @@ public abstract class NumericNode
 
     /*
     /**********************************************************************
-    /* Other
+    /* Extended API
     /**********************************************************************
      */
+
+    /**
+     * Convenience method for checking whether this node is a {@code NumericFPNode}
+     * that contains non-zero fractional part (as opposed to only integer part).
+     * Always returns false for integral {@link NumericNode}s (that is,
+     * {@ode NumericIntNode}s).
+     */
+    public abstract boolean hasFractionalPart();
+
+    /**
+     * Method that can be used to determine whether this numeric value's in
+     * part fits within Java 16-bit {@code short} type.
+     */
+    public abstract boolean inShortRange();
+
+    /**
+     * Method that can be used to determine whether this numeric value's in
+     * part fits within Java 32-bit{@code int} type.
+     */
+    public abstract boolean inIntRange();
+
+    /**
+     * Method that can be used to determine whether this numeric value's in
+     * part fits within Java 64-bit {@code long} type.
+     */
+    public abstract boolean inLongRange();
 
     /**
      * Convenience method for checking whether this node is a

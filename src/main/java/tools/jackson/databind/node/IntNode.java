@@ -84,7 +84,7 @@ public class IntNode
 
     @Override
     public short shortValue() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return (short) _value;
         }
         return _reportShortCoercionRangeFail("shortValue()");
@@ -92,17 +92,17 @@ public class IntNode
 
     @Override
     public short shortValue(short defaultValue) {
-        return _inShortRange() ? (short) _value : defaultValue;
+        return inShortRange() ? (short) _value : defaultValue;
     }
 
     @Override
     public Optional<Short> shortValueOpt() {
-        return _inShortRange() ? Optional.of((short) _value) : Optional.empty();
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
     }
 
     @Override
     public short asShort() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return (short) _value;
         }
         return _reportShortCoercionRangeFail("asShort()");
@@ -110,12 +110,12 @@ public class IntNode
 
     @Override
     public short asShort(short defaultValue) {
-        return _inShortRange() ? (short) _value : defaultValue;
+        return inShortRange() ? (short) _value : defaultValue;
     }
 
     @Override
     public Optional<Short> asShortOpt() {
-        return _inShortRange() ? Optional.of((short) _value) : Optional.empty();
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
     }
 
     @Override
@@ -210,17 +210,17 @@ public class IntNode
     }
 
     @Override
-    protected boolean _inShortRange() {
+    public boolean inShortRange() {
         return (_value >= Short.MIN_VALUE && _value <= Short.MAX_VALUE);
     }
 
     @Override
-    protected boolean _inIntRange() {
+    public boolean inIntRange() {
         return true;
     }
 
     @Override
-    protected boolean _inLongRange() { return true; }
+    public boolean inLongRange() { return true; }
 
     /*
     /**********************************************************************

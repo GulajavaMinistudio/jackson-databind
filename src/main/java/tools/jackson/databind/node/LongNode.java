@@ -64,7 +64,7 @@ public class LongNode
 
     @Override
     public short shortValue() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return (short) _value;
         }
         return _reportShortCoercionRangeFail("shortValue()");
@@ -72,17 +72,17 @@ public class LongNode
 
     @Override
     public short shortValue(short defaultValue) {
-        return _inShortRange() ? (short) _value : defaultValue;
+        return inShortRange() ? (short) _value : defaultValue;
     }
 
     @Override
     public Optional<Short> shortValueOpt() {
-        return _inShortRange() ? Optional.of((short) _value) : Optional.empty();
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
     }
 
     @Override
     public short asShort() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return (short) _value;
         }
         return _reportShortCoercionRangeFail("asShort()");
@@ -90,17 +90,17 @@ public class LongNode
 
     @Override
     public short asShort(short defaultValue) {
-        return _inShortRange() ? (short) _value : defaultValue;
+        return inShortRange() ? (short) _value : defaultValue;
     }
 
     @Override
     public Optional<Short> asShortOpt() {
-        return _inShortRange() ? Optional.of((short) _value) : Optional.empty();
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
     }
 
     @Override
     public int intValue() {
-        if (_inIntRange()) {
+        if (inIntRange()) {
             return (int) _value;
         }
         return _reportIntCoercionRangeFail("intValue()");
@@ -108,17 +108,17 @@ public class LongNode
 
     @Override
     public int intValue(int defaultValue) {
-        return _inIntRange() ? (int) _value : defaultValue;
+        return inIntRange() ? (int) _value : defaultValue;
     }
 
     @Override
     public OptionalInt intValueOpt() {
-        return _inIntRange() ? OptionalInt.of((int) _value) : OptionalInt.empty();
+        return inIntRange() ? OptionalInt.of((int) _value) : OptionalInt.empty();
     }
 
     @Override
     public int asInt() {
-        if (_inIntRange()) {
+        if (inIntRange()) {
             return (int) _value;
         }
         return _reportIntCoercionRangeFail("asInt()");
@@ -126,12 +126,12 @@ public class LongNode
 
     @Override
     public int asInt(int defaultValue) {
-        return _inIntRange() ? (int) _value : defaultValue;
+        return inIntRange() ? (int) _value : defaultValue;
     }
 
     @Override
     public OptionalInt asIntOpt() {
-        return _inIntRange() ? OptionalInt.of((int) _value) : OptionalInt.empty();
+        return inIntRange() ? OptionalInt.of((int) _value) : OptionalInt.empty();
     }
 
     @Override
@@ -200,18 +200,18 @@ public class LongNode
     }
 
     @Override
-    protected boolean _inShortRange() {
+    public boolean inShortRange() {
         return (_value >= Short.MIN_VALUE && _value <= Short.MAX_VALUE);
     }
 
     @Override
-    protected boolean _inIntRange() {
+    public boolean inIntRange() {
         return (_value >= Integer.MIN_VALUE) && (_value <= Integer.MAX_VALUE);
     }
 
     @Override
-    protected boolean _inLongRange() { return true; }
-    
+    public boolean inLongRange() { return true; }
+
     /*
     /**********************************************************************
     /* Overridden methods, other

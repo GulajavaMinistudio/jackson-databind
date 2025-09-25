@@ -33,17 +33,17 @@ public abstract class NumericIntNode extends NumericNode
 
     @Override final
     public boolean canConvertToShort() {
-        return _inShortRange();
+        return inShortRange();
     }
 
     @Override final
     public boolean canConvertToInt() {
-        return _inIntRange();
+        return inIntRange();
     }
 
     @Override final
     public boolean canConvertToLong() {
-        return _inLongRange();
+        return inLongRange();
     }
 
     /*
@@ -169,6 +169,17 @@ public abstract class NumericIntNode extends NumericNode
 
     /*
     /**********************************************************************
+    /* NumericNode extensions
+    /**********************************************************************
+     */
+
+    @Override
+    public boolean hasFractionalPart() {
+        return false;
+    }
+
+    /*
+    /**********************************************************************
     /* Abstract methods for sub-classes
     /**********************************************************************
      */
@@ -178,10 +189,4 @@ public abstract class NumericIntNode extends NumericNode
     protected abstract float _asFloatValueUnchecked();
 
     protected abstract double _asDoubleValueUnchecked();
-
-    protected abstract boolean _inShortRange();
-
-    protected abstract boolean _inIntRange();
-
-    protected abstract boolean _inLongRange();
 }

@@ -184,14 +184,14 @@ public class ShortNode
     }
 
     @Override
-    protected boolean _inShortRange() { return true; }
+    public boolean inShortRange() { return true; }
 
     @Override
-    protected boolean _inIntRange() { return true; }
+    public boolean inIntRange() { return true; }
 
     @Override
-    protected boolean _inLongRange() { return true; }
-    
+    public boolean inLongRange() { return true; }
+
     /*
     /**********************************************************************
     /* Overridden JsonNode methods, other

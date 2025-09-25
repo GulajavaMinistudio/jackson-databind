@@ -185,20 +185,20 @@ public class DoubleNode
     }
     
     @Override
-    protected boolean _hasFractionalPart() { return _value != Math.rint(_value); }
+    public boolean hasFractionalPart() { return _value != Math.rint(_value); }
 
     @Override
-    protected boolean _inShortRange() {
+    public boolean inShortRange() {
         return !isNaN() && (_value >= Short.MIN_VALUE) && (_value <= Short.MAX_VALUE);
     }
 
     @Override
-    protected boolean _inIntRange() {
+    public boolean inIntRange() {
         return !isNaN() && (_value >= Integer.MIN_VALUE) && (_value <= Integer.MAX_VALUE);
     }
 
     @Override
-    protected boolean _inLongRange() {
+    public boolean inLongRange() {
         return !isNaN() && (_value >= Long.MIN_VALUE) && (_value <= Long.MAX_VALUE);
     }
 

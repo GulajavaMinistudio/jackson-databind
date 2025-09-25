@@ -69,7 +69,7 @@ public class BigIntegerNode
 
     @Override
     public short shortValue() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return _value.shortValue();
         }
         return _reportShortCoercionRangeFail("shortValue()");
@@ -77,17 +77,17 @@ public class BigIntegerNode
 
     @Override
     public short shortValue(short defaultValue) {
-        return _inShortRange() ? _value.shortValue() : defaultValue;
+        return inShortRange() ? _value.shortValue() : defaultValue;
     }
 
     @Override
     public Optional<Short> shortValueOpt() {
-        return _inShortRange() ? Optional.of(_value.shortValue()) : Optional.empty();
+        return inShortRange() ? Optional.of(_value.shortValue()) : Optional.empty();
     }
 
     @Override
     public short asShort() {
-        if (_inShortRange()) {
+        if (inShortRange()) {
             return _value.shortValue();
         }
         return _reportShortCoercionRangeFail("asShort()");
@@ -95,17 +95,17 @@ public class BigIntegerNode
 
     @Override
     public short asShort(short defaultValue) {
-        return _inShortRange() ? _value.shortValue() : defaultValue;
+        return inShortRange() ? _value.shortValue() : defaultValue;
     }
 
     @Override
     public Optional<Short> asShortOpt() {
-        return _inShortRange() ? Optional.of(_value.shortValue()) : Optional.empty();
+        return inShortRange() ? Optional.of(_value.shortValue()) : Optional.empty();
     }
 
     @Override
     public int intValue() {
-        if (_inIntRange()) {
+        if (inIntRange()) {
             return _value.intValue();
         }
         return _reportIntCoercionRangeFail("intValue()");
@@ -113,17 +113,17 @@ public class BigIntegerNode
 
     @Override
     public int intValue(int defaultValue) {
-        return _inIntRange() ? _value.intValue() : defaultValue;
+        return inIntRange() ? _value.intValue() : defaultValue;
     }
 
     @Override
     public OptionalInt intValueOpt() {
-        return _inIntRange() ? OptionalInt.of(_value.intValue()) : OptionalInt.empty();
+        return inIntRange() ? OptionalInt.of(_value.intValue()) : OptionalInt.empty();
     }
     
     @Override
     public int asInt() {
-        if (_inIntRange()) {
+        if (inIntRange()) {
             return _value.intValue();
         }
         return _reportIntCoercionRangeFail("asInt()");
@@ -131,12 +131,12 @@ public class BigIntegerNode
 
     @Override
     public int asInt(int defaultValue) {
-        return _inIntRange() ? _value.intValue() : defaultValue;
+        return inIntRange() ? _value.intValue() : defaultValue;
     }
 
     @Override
     public OptionalInt asIntOpt() {
-        return _inIntRange() ? OptionalInt.of(_value.intValue()) : OptionalInt.empty();
+        return inIntRange() ? OptionalInt.of(_value.intValue()) : OptionalInt.empty();
     }
     
     @Override
@@ -321,19 +321,19 @@ public class BigIntegerNode
     }
 
     @Override
-    protected boolean _inShortRange() {
+    public boolean inShortRange() {
         return (_value.compareTo(BI_MIN_SHORT) >= 0)
                 && (_value.compareTo(BI_MAX_SHORT) <= 0);
     }
 
     @Override
-    public boolean _inIntRange() {
+    public boolean inIntRange() {
         return (_value.compareTo(BI_MIN_INTEGER) >= 0)
                 && (_value.compareTo(BI_MAX_INTEGER) <= 0);
     }
 
     @Override
-    protected boolean _inLongRange() {
+    public boolean inLongRange() {
         return (_value.compareTo(BI_MIN_LONG) >= 0)
                 && (_value.compareTo(BI_MAX_LONG) <= 0);
     }

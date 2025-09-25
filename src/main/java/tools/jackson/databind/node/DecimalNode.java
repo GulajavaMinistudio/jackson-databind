@@ -231,24 +231,24 @@ public class DecimalNode
     }
 
     @Override
-    protected boolean _hasFractionalPart() {
+    public boolean hasFractionalPart() {
         return (_value.signum() != 0)
                && (_value.scale() > 0)
                && (_value.stripTrailingZeros().scale() > 0);
     }
     
     @Override
-    protected boolean _inShortRange() {
+    public boolean inShortRange() {
         return (_value.compareTo(BD_MIN_SHORT) >= 0) && (_value.compareTo(BD_MAX_SHORT) <= 0);
     }
 
     @Override
-    protected boolean _inIntRange() {
+    public boolean inIntRange() {
         return (_value.compareTo(BD_MIN_INTEGER) >= 0) && (_value.compareTo(BD_MAX_INTEGER) <= 0);
     }
 
     @Override
-    protected boolean _inLongRange() {
+    public boolean inLongRange() {
         return (_value.compareTo(BD_MIN_LONG) >= 0) && (_value.compareTo(BD_MAX_LONG) <= 0);
     }
 
