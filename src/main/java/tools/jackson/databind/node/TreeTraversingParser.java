@@ -314,6 +314,28 @@ public class TreeTraversingParser
     }
 
     @Override
+    public int getValueAsInt()
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.canConvertToInt()) {
+            return node.intValue();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return getIntValue();
+    }
+
+    @Override
+    public int getValueAsInt(int defaultValue)
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.canConvertToInt()) {
+            return node.intValue();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return defaultValue;
+    }
+    
+    @Override
     public long getLongValue() throws InputCoercionException {
         final NumericNode node = (NumericNode) currentNumericNode(NR_LONG);
         if (!node.canConvertToLong()) {

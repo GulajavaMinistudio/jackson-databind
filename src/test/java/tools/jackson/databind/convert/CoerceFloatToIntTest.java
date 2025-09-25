@@ -86,36 +86,43 @@ public class CoerceFloatToIntTest
     // [databind#5319]
     @JacksonTestFailureExpected
     @Test
-    public void testLegacyDoubleToIntCoercionJsonNode() throws Exception
+    public void testLegacyDoubleToIntCoercionJsonNodeToInteger() throws Exception
     {
-        final ObjectMapper mapperAllow = jsonMapperBuilder()
-                .enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-                .build();
-        final JsonNodeFactory nodeF = mapperAllow.getNodeFactory();
-
-        // First Integer
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
         assertEquals(1,
-                mapperAllow.treeToValue(nodeF.numberNode(1.25), Integer.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Integer.class));
         assertEquals(-2,
-                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), Integer.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Integer.class));
         assertEquals(3,
-                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Integer.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Integer.class));
+    }
 
-        // Second Long
+    // [databind#5319]
+    @JacksonTestFailureExpected
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNodeToLong() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
         assertEquals(1L,
-                mapperAllow.treeToValue(nodeF.numberNode(1.25), Long.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Long.class));
         assertEquals(-2L,
-                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), Long.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Long.class));
         assertEquals(3L,
-                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Long.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Long.class));
+    }
 
-        // Last BigInteger
+    // [databind#5319]
+    //@JacksonTestFailureExpected
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNodeToBigInteger() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
         assertEquals(BigInteger.valueOf(1L),
-                mapperAllow.treeToValue(nodeF.numberNode(1.25), BigInteger.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), BigInteger.class));
         assertEquals(BigInteger.valueOf(-2L),
-                mapperAllow.treeToValue(nodeF.numberNode(-2.5f), BigInteger.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), BigInteger.class));
         assertEquals(BigInteger.valueOf(3L),
-                mapperAllow.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), BigInteger.class));
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), BigInteger.class));
     }
 
     @Test
