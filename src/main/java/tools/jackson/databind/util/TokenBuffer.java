@@ -676,11 +676,16 @@ sb.append("NativeObjectIds=").append(_hasNativeObjectIds).append(",");
 
     // 20-May-2020, tatu: This may or may not be enough -- ideally access is
     //    via `DeserializationContext`, not parser, but if latter is needed
-    //    then we'll need to pass this from parser contents if which were
+    //    then we'll need to pass this from parser contents of which were
     //    buffered.
     @Override
     public JacksonFeatureSet<StreamWriteCapability> streamWriteCapabilities() {
         return BOGUS_WRITE_CAPABILITIES;
+    }
+
+    @Override
+    public boolean has(StreamWriteCapability capability) {
+        return BOGUS_WRITE_CAPABILITIES.isEnabled(capability);
     }
 
     /*

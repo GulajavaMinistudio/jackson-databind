@@ -137,6 +137,11 @@ public class TreeBuildingGenerator
         return BOGUS_WRITE_CAPABILITIES;
     }
 
+    @Override
+    public boolean has(StreamWriteCapability capability) {
+        return BOGUS_WRITE_CAPABILITIES.isEnabled(capability);
+    }
+
     /*
     /**********************************************************************
     /* JsonGenerator implementation: low-level output handling

@@ -113,6 +113,9 @@ public class UUIDSerializer
         //   most conversions.
         // 28-Jan-2021, tatu: [databind#3028] Use capability detection instead
 //        return !(g instanceof TokenBuffer) && g.canWriteBinaryNatively();
+        // 25-Sep-2025, tatu: ^^^ because we DO NOT WANT to ask TokenBuffer.Generator
+        //   (in case of buffering) but rather actual "real" generator.
+        //   So although generator would have capability accessor, we should not call it
         return ctxt.isEnabled(StreamWriteCapability.CAN_WRITE_BINARY_NATIVELY);
     }
 
