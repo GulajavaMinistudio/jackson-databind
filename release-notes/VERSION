@@ -5,7 +5,7 @@ Versions: 3.x (for earlier see VERSION-2.x)
 === Releases ===
 ------------------------------------------------------------------------
 
-Not yet released
+3.0.0 (03-Oct-2025)
 
 #5319: `TreeTraversingParser` does not respect `DeserializationFeature.ACCEPT_FLOAT_AS_INT`
  (reported by @Artur)
