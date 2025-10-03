@@ -25,6 +25,16 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
+  <!-- 03-Oct-2025, tatu: Should NOT be needed (available via parent)...
+     but seems to be
+    -->
+  <developers>
+    <developer>
+      <id>cowtowncoder</id>
+      <name>Tatu Saloranta</name>
+      <email>tatu@fasterxml.com</email>
+    </developer>
+  </developers>
 
   <scm>
     <connection>scm:git:git@github.com:FasterXML/jackson-databind.git</connection>
