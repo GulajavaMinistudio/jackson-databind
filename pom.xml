@@ -9,7 +9,7 @@
   <parent>
     <groupId>tools.jackson</groupId>
     <artifactId>jackson-base</artifactId>
-    <version>3.0.0</version>
+    <version>3.0.1-SNAPSHOT</version>
   </parent>
   <groupId>tools.jackson.core</groupId>
   <artifactId>jackson-databind</artifactId>
@@ -25,16 +25,6 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-  <!-- 03-Oct-2025, tatu: Should NOT be needed (available via parent)...
-     but Sonatype Central validation failed without
-    -->
-  <developers>
-    <developer>
-      <id>cowtowncoder</id>
-      <name>Tatu Saloranta</name>
-      <email>tatu@fasterxml.com</email>
-    </developer>
-  </developers>
 
   <scm>
     <connection>scm:git:git@github.com:FasterXML/jackson-databind.git</connection>
