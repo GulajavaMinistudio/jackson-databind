@@ -9,6 +9,7 @@ import tools.jackson.core.io.CharacterEscapes;
 import tools.jackson.core.io.SerializedString;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.json.JsonWriteFeature;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,7 +25,7 @@ public class MapperViaParserTest
     final static SerializedString TWO_BYTE_ESCAPED_STRING = new SerializedString("&111;");
     final static SerializedString THREE_BYTE_ESCAPED_STRING = new SerializedString("&1111;");
 
-    final static class Pojo
+    static class Pojo
     {
         int _x;
 
@@ -87,17 +88,19 @@ public class MapperViaParserTest
     public void testPojoReadingOk() throws Exception
     {
         final String JSON = "{ \"x\" : 9 }";
-        JsonParser jp = MAPPER.createParser(new StringReader(JSON));
-        jp.nextToken();
-        Pojo p = jp.readValueAs(Pojo.class);
-        assertNotNull(p);
+        try (JsonParser p = MAPPER.createParser(new StringReader(JSON))) {
+            p.nextToken();
+            Pojo pojo = p.readValueAs(Pojo.class);
+            assertNotNull(pojo);
+        }
     }
 
     @Test
     public void testEscapingUsingMapper() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper(JsonFactory.builder()
-                .enable(JsonWriteFeature.ESCAPE_NON_ASCII).build());
+        ObjectMapper mapper = JsonMapper.builder(JsonFactory.builder()
+                .enable(JsonWriteFeature.ESCAPE_NON_ASCII).build())
+                .build();
         final String json = mapper.writeValueAsString(String.valueOf((char) 258));
         assertEquals(q("\\u0102"), json);
     }
