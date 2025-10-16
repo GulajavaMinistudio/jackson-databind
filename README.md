@@ -31,7 +31,7 @@ Functionality of this package is contained in Java package `tools.jackson.databi
 <properties>
   ...
   <!-- Use the latest version whenever possible. -->
-  <jackson.version>3.0.0-rc4</jackson.version>
+  <jackson.version>3.0.0</jackson.version>
   ...
 </properties>
 
