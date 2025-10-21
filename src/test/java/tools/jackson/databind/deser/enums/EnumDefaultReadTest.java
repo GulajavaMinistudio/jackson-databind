@@ -1,6 +1,7 @@
 package tools.jackson.databind.deser.enums;
 
 import java.io.IOException;
+import java.util.EnumSet;
 
 import org.junit.jupiter.api.Test;
 
@@ -82,7 +83,6 @@ public class EnumDefaultReadTest
         B,
         // Let's leave one un-annotated:
         C,
-        @JsonEnumDefaultValue
         Z;
     }
 
