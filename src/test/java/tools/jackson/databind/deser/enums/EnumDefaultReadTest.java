@@ -1,8 +1,5 @@
 package tools.jackson.databind.deser.enums;
 
-import java.io.IOException;
-import java.util.EnumSet;
-
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
@@ -83,6 +80,7 @@ public class EnumDefaultReadTest
         B,
         // Let's leave one un-annotated:
         C,
+        @JsonEnumDefaultValue
         Z;
     }
 
@@ -271,14 +269,14 @@ public class EnumDefaultReadTest
 
     private <T> void _verifyOkDeserialization(ObjectReader reader, String fromValue,
             Class<T> toValueType, T expValue)
-        throws IOException
+        throws Exception
     {
         assertEquals(expValue, reader.forType(toValueType).readValue(q(fromValue)));
     }
 
     private <T> void _verifyFailingDeserialization(final ObjectReader reader,
             final String fromValue, final Class<T> toValueType)
-        throws IOException
+        throws Exception
     {
         try {
             reader.forType(toValueType).readValue(q(fromValue));
