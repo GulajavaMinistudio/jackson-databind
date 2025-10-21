@@ -80,7 +80,7 @@ public class EnumDefaultReadTest
         A,
         @JsonEnumDefaultValue
         B,
-        @JsonEnumDefaultValue
+        // Let's leave one un-annotated:
         C,
         @JsonEnumDefaultValue
         Z;
@@ -308,7 +308,9 @@ public class EnumDefaultReadTest
                 .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .addMixIn(BaseOverloaded.class, MixinOverloadedDefault.class)
                 .build();
-        
+
+        // While not guaranteed by annotation Javadocs, default implementation does
+        // pick the first annotated enum value (in declaration order))
         assertEquals(BaseOverloaded.A, 
                 mixinMapper.readValue(q("UNKNOWN"), BaseOverloaded.class));
     }
