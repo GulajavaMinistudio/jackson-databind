@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.introspect.DefaultAccessorNamingStrategy;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
 
@@ -22,14 +23,12 @@ public class IPhoneStyleProperty5335Test
         private String aProp;
         private String anotherProp;
 
-        // Needed in 3.0 due to incompatible naming
-        @JsonProperty("aProp")
+        // NOTE: non-compliant naming; see JsonMapper configuration
         public String getaProp() {
             return aProp;
         }
 
-        // Needed in 3.0 due to incompatible naming
-        @JsonProperty("aProp")
+        // NOTE: non-compliant naming; see JsonMapper configuration
         public void setaProp(String aProp) {
             this.aProp = aProp;
         }
@@ -49,6 +48,8 @@ public class IPhoneStyleProperty5335Test
         ObjectMapper mapper = JsonMapper.builder()
               .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
               .enable(MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX)
+              .accessorNaming(new DefaultAccessorNamingStrategy.Provider()
+                      .withFirstCharAcceptance(true, false))
               .build();
 
         String json = "{\"aProp\":\"aPropValue\",\"prop1\":\"prop1Value\"}";
