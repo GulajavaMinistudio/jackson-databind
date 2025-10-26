@@ -144,7 +144,7 @@ public enum DeserializationFeature implements ConfigFeature
 
     /**
      * Feature that determines what happens when reading JSON content into tree
-     * ({@link tools.jackson.core.TreeNode}) and a duplicate key
+     * ({@link JsonNode} and a duplicate key
      * is encountered (property name that was already seen for the JSON Object).
      * If enabled, {@link DatabindException} will be thrown; if disabled, no exception
      * is thrown and the new (later) value overwrites the earlier value.
