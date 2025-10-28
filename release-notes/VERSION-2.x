@@ -108,6 +108,10 @@ Project: jackson-databind
 #5069: Add copy-constructor for `MappingIterator`
  (contributed by @wrongwrong)
 
+2.18.5 (27-Oct-2025)
+
+No changes since 2.18.4
+
 2.18.4 (06-May-2025)
 
 #4628: `@JsonIgnore` and `@JsonProperty.access=READ_ONLY` on Record property
