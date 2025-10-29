@@ -59,6 +59,10 @@ Project: jackson-databind
   with `ObjectMapper`, prepare for 3.0)
 - Generate SBOMs [JSTEP-14]
 
+2.19.3 (29-Oct-2025)
+
+No changes since 2.19.2
+
 2.19.2 (18-Jul-2025)
 
 #5202: `JsonSetter.contentNulls` ignored for `Object[]`, `String[]`
@@ -162,6 +166,10 @@ Project: jackson-databind
  (reported by @seadbrane)
 #5069: Add copy-constructor for `MappingIterator`
  (contributed by @wrongwrong)
+
+2.18.5 (27-Oct-2025)
+
+No changes since 2.18.4
 
 2.18.4 (06-May-2025)
 
