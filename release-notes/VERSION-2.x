@@ -4,7 +4,7 @@ Project: jackson-databind
 === Releases === 
 ------------------------------------------------------------------------
 
-2.20.1 (not yet released)
+2.20.1 (30-Oct-2025)
 
 #5292: `MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX` does not work with
   Constructor parameters
