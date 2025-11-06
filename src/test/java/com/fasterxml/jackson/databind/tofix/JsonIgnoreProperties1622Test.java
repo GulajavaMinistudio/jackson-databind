@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.testutil.DatabindTestUtil;
+import com.fasterxml.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -137,6 +138,7 @@ public class JsonIgnoreProperties1622Test
      * This test demonstrates the race condition: deserializing a child first
      * causes the parent deserialization to fail with "No _valueDeserializer assigned"
      */
+    @JacksonTestFailureExpected
     @Test
     public void raceConditionWithChildFirst() throws Exception
     {
@@ -153,7 +155,7 @@ public class JsonIgnoreProperties1622Test
         assertNotNull(deserializedChild);
         assertEquals("Child1", deserializedChild.getName());
 
-        // Now try to deserialize parent - this should fail with the race condition
+        // Now try to deserialize parent - this fail with the race condition
         // Expected error: "No _valueDeserializer assigned"
         Parent deserializedParent = MAPPER.readValue(parentJson, Parent.class);
         assertNotNull(deserializedParent);
