@@ -19,8 +19,8 @@ import tools.jackson.databind.module.SimpleModule;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// For [databind#5165]
-public class EnumSetDeserializer5165Test
+// For [databind#5203]
+public class EnumSetDeserializer5203Test
 {
     public enum MyEnum {
         FOO
