@@ -9,7 +9,7 @@ Versions: 3.x (for earlier see VERSION-2.x)
 
 -
 
-3.0.2 (not yet released)
+3.0.2 (07-Nov-2025)
 
 #5203: Fix `null` handling of `EnumSetDeserializer`
 #5372: Wrong setter is used when deserializing from `InputStream` (or `byte[]`)
