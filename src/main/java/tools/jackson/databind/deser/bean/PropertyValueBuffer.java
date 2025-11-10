@@ -100,9 +100,6 @@ public class PropertyValueBuffer
     /**********************************************************************
      */
 
-    /**
-     * @since 2.18
-     */
     public PropertyValueBuffer(JsonParser p, DeserializationContext ctxt, int paramCount,
             ObjectIdReader oir, SettableAnyProperty anyParamSetter)
     {
@@ -122,13 +119,6 @@ public class PropertyValueBuffer
         } else {
             _anyParamSetter = anyParamSetter;
         }
-    }
-
-    @Deprecated // since 2.18
-    public PropertyValueBuffer(JsonParser p, DeserializationContext ctxt, int paramCount,
-            ObjectIdReader oir)
-    {
-        this(p, ctxt, paramCount, oir, null);
     }
 
     /**
