@@ -22,14 +22,6 @@ class JacksonInject3072Test extends DatabindTestUtil
 
         @JacksonInject(value = "optionalField", optional = OptBoolean.TRUE)
         String optionalField;
-
-        public String getId() {
-            return id;
-        }
-
-        public String getOptionalField() {
-            return optionalField;
-        }
     }
 
     static class DtoWithRequired {
@@ -84,7 +76,7 @@ class JacksonInject3072Test extends DatabindTestUtil
                 MissingInjectableValueExcepion.class, () -> reader.readValue("{}"));
 
         assertThat(exception.getMessage())
-            .startsWith("No 'injectableValues' configured, cannot inject value with id 'requiredValue'");
+            .startsWith("No injectable value with id 'requiredValue' found (for property 'requiredField')");
 
         // Also check the other code path, with non-null Injectables
         ObjectReader reader2 = reader.with(new InjectableValues.Std()

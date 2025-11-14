@@ -469,10 +469,12 @@ public abstract class DeserializationContext
         throws JsonMappingException
     {
         if (_injectableValues == null) {
-            // `optional` comes from property annotation (if any); has precedence
-            // over global setting.
-            if (Boolean.TRUE.equals(optional)
-                    || (optional == null && !isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_INJECT_VALUE))) {
+            // `useInput` and `optional` come from property annotation (if any);
+            // they have precedence over global setting.
+            if (Boolean.TRUE.equals(useInput)
+                    || Boolean.TRUE.equals(optional)
+                    || ((useInput == null || optional == null)
+                            && !isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_INJECT_VALUE))) {
                 return JacksonInject.Value.empty();
             }
             throw missingInjectableValueException(String.format(
