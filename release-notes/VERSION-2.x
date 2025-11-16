@@ -18,6 +18,7 @@ Project: jackson-databind
 #5313: Expose `getConverter()` in `StdDelegatingSerializer` for improved
   customizability
  (contributed by @wrongwrong)
+#5361: Fix Maven SBOM publishing
 
 2.20.1 (30-Oct-2025)
 
