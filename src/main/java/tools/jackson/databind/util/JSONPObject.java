@@ -9,7 +9,7 @@ import tools.jackson.databind.jsontype.TypeSerializer;
  * Container class that can be used to wrap any Object instances (including
  * nulls), and will serialize embedded in
  * <a href="http://en.wikipedia.org/wiki/JSONP">JSONP</a> wrapping.
- * 
+ *
  * @see tools.jackson.databind.util.JSONWrappedObject
  */
 public class JSONPObject
@@ -19,7 +19,7 @@ public class JSONPObject
      * JSONP function name to use for serialization
      */
     protected final String _function;
-    
+
     /**
      * Value to be serialized as JSONP padded; can be null.
      */
@@ -43,7 +43,7 @@ public class JSONPObject
         _value = value;
         _serializationType = asType;
     }
-    
+
     /*
     /**********************************************************************
     /* JacksonSerializable implementation
@@ -51,7 +51,7 @@ public class JSONPObject
      */
 
     @Override
-    public void serializeWithType(JsonGenerator gen, SerializerProvider provider, TypeSerializer typeSer)
+    public void serializeWithType(JsonGenerator gen, SerializationContext provider, TypeSerializer typeSer)
         throws JacksonException
     {
         // No type for JSONP wrapping: value serializer will handle typing for value:
@@ -59,7 +59,7 @@ public class JSONPObject
     }
 
     @Override
-    public void serialize(JsonGenerator gen, SerializerProvider provider)
+    public void serialize(JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         // First, wrapping:
@@ -97,7 +97,7 @@ public class JSONPObject
     /* Accessors
     /**********************************************************************
      */
-    
+
     public String getFunction() { return _function; }
     public Object getValue() { return _value; }
     public JavaType getSerializationType() { return _serializationType; }

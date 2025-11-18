@@ -37,7 +37,17 @@ public class UUIDDeserializer extends FromStringDeserializer<UUID>
             // 14-Sep-2013, tatu: One trick we do allow, Base64-encoding, since we know
             //   length it must have...
             if (id.length() == 24) {
+                // 20-Feb-2024, tatu: As per [databind#4394] need to massage a bit first:
+                id = convertFromUrlSafe(id);
                 byte[] stuff = Base64Variants.getDefaultVariant().decode(id);
+                return _fromBytes(stuff, ctxt);
+            }
+
+            // support for Base64Url encoding (without padding)
+            if (id.length() == 22) {
+                // 20-Feb-2024, tatu: As per [databind#4394] need to massage a bit first:
+                id = convertToUrlSafe(id);
+                byte[] stuff = Base64Variants.MODIFIED_FOR_URL.decode(id);
                 return _fromBytes(stuff, ctxt);
             }
             return _badFormat(id, ctxt);
@@ -67,8 +77,8 @@ public class UUIDDeserializer extends FromStringDeserializer<UUID>
     @Override
     protected UUID _deserializeEmbedded(Object ob, DeserializationContext ctxt) throws JacksonException
     {
-        if (ob instanceof byte[]) {
-            return _fromBytes((byte[]) ob, ctxt);
+        if (ob instanceof byte[] byteArray) {
+            return _fromBytes(byteArray, ctxt);
         }
         return super._deserializeEmbedded(ob, ctxt);
     }
@@ -86,11 +96,11 @@ public class UUIDDeserializer extends FromStringDeserializer<UUID>
                 + (byteFromChars(str, index+4, ctxt) << 8)
                 + byteFromChars(str, index+6, ctxt);
     }
-    
+
     int shortFromChars(String str, int index, DeserializationContext ctxt) {
         return (byteFromChars(str, index, ctxt) << 8) + byteFromChars(str, index+2, ctxt);
     }
-    
+
     int byteFromChars(String str, int index, DeserializationContext ctxt)
     {
         final char c1 = str.charAt(index);
@@ -124,6 +134,18 @@ public class UUIDDeserializer extends FromStringDeserializer<UUID>
                     bytes, handledType());
         }
         return new UUID(_long(bytes, 0), _long(bytes, 8));
+    }
+
+    private String convertToUrlSafe(String base64) {
+        return base64
+            .replace('+', '-')
+            .replace('/', '_');
+    }
+
+    private String convertFromUrlSafe(String base64) {
+        return base64
+            .replace('-', '+')
+            .replace('_', '/');
     }
 
     private static long _long(byte[] b, int offset) {

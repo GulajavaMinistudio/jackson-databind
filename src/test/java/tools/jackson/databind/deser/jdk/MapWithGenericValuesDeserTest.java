@@ -2,15 +2,19 @@ package tools.jackson.databind.deser.jdk;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
-import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SuppressWarnings("serial")
-public class MapWithGenericValuesDeserTest
-    extends BaseMapTest
+public class MapWithGenericValuesDeserTest extends DatabindTestUtil
 {
     /*
     /**********************************************************
@@ -71,7 +75,7 @@ public class MapWithGenericValuesDeserTest
             return new KeyTypeFactory(str, true);
         }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods for sub-classing
@@ -81,6 +85,7 @@ public class MapWithGenericValuesDeserTest
     /**
      * Verifying that sub-classing works ok wrt generics information
      */
+    @Test
     public void testMapSubClass() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -93,6 +98,7 @@ public class MapWithGenericValuesDeserTest
         assertEquals(Boolean.TRUE, bw.b);
     }
 
+    @Test
     public void testMapWrapper() throws Exception
     {
         StringMap value = new ObjectMapper().readValue
@@ -102,6 +108,7 @@ public class MapWithGenericValuesDeserTest
         assertEquals(Long.valueOf(9), value.getEntries().get("a"));
     }
 
+    @Test
     public void testIntermediateTypes() throws Exception
     {
         StringStringWrapperMap result = new ObjectMapper().readValue
@@ -112,7 +119,7 @@ public class MapWithGenericValuesDeserTest
         assertEquals(value.getClass(), StringWrapper.class);
         assertEquals("b", ((StringWrapper) value).str);
     }
-    
+
     /*
     /**********************************************************
     /* Test methods for sub-classing for annotation handling
@@ -122,6 +129,7 @@ public class MapWithGenericValuesDeserTest
     /**
      * Verifying that sub-classing works ok wrt generics information
      */
+    @Test
     public void testAnnotatedMap() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -141,11 +149,12 @@ public class MapWithGenericValuesDeserTest
     /**********************************************************
      */
 
+    @Test
     public void testKeyViaCtor() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
         Map<KeyTypeCtor,Integer> map = mapper.readValue("{\"a\":123}",
-                TypeFactory.defaultInstance().constructMapType(HashMap.class, KeyTypeCtor.class, Integer.class));
+                defaultTypeFactory().constructMapType(HashMap.class, KeyTypeCtor.class, Integer.class));
         assertEquals(1, map.size());
         Map.Entry<?,?> entry = map.entrySet().iterator().next();
         assertEquals(Integer.valueOf(123), entry.getValue());
@@ -154,11 +163,12 @@ public class MapWithGenericValuesDeserTest
         assertEquals("a", ((KeyTypeCtor) key).value);
     }
 
+    @Test
     public void testKeyViaFactory() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
         Map<KeyTypeCtor,Integer> map = mapper.readValue("{\"a\":123}",
-                TypeFactory.defaultInstance().constructMapType(HashMap.class, KeyTypeFactory.class, Integer.class));
+                defaultTypeFactory().constructMapType(HashMap.class, KeyTypeFactory.class, Integer.class));
         assertEquals(1, map.size());
         Map.Entry<?,?> entry = map.entrySet().iterator().next();
         assertEquals(Integer.valueOf(123), entry.getValue());

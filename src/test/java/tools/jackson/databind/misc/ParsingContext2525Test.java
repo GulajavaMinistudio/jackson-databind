@@ -1,20 +1,20 @@
 package tools.jackson.databind.misc;
 
-import java.io.IOException;
+import org.junit.jupiter.api.Test;
 
-import tools.jackson.core.JsonParser;
-import tools.jackson.core.JsonPointer;
-import tools.jackson.core.JsonToken;
-import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.*;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.util.TokenBuffer;
 
-public class ParsingContext2525Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ParsingContext2525Test extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = sharedMapper();
 
     private final String MINIMAL_ARRAY_DOC = "[ 42 ]";
-    
+
     private final String MINIMAL_OBJECT_DOC = "{\"answer\" : 42 }";
 
     private final String FULL_DOC = a2q("{'a':123,'array':[1,2,[3],5,{'obInArray':4}],"
@@ -26,6 +26,7 @@ public class ParsingContext2525Test extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testAllWithRegularParser() throws Exception
     {
         try (JsonParser p = MAPPER.createParser(MINIMAL_ARRAY_DOC)) {
@@ -45,6 +46,7 @@ public class ParsingContext2525Test extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testSimpleArrayWithBuffer() throws Exception
     {
         try (TokenBuffer buf = _readAsTokenBuffer(MINIMAL_ARRAY_DOC)) {
@@ -52,6 +54,7 @@ public class ParsingContext2525Test extends BaseMapTest
         }
     }
 
+    @Test
     public void testSimpleObjectWithBuffer() throws Exception
     {
         try (TokenBuffer buf = _readAsTokenBuffer(MINIMAL_OBJECT_DOC)) {
@@ -59,6 +62,7 @@ public class ParsingContext2525Test extends BaseMapTest
         }
     }
 
+    @Test
     public void testFullDocWithBuffer() throws Exception
     {
         try (TokenBuffer buf = _readAsTokenBuffer(FULL_DOC)) {
@@ -66,11 +70,11 @@ public class ParsingContext2525Test extends BaseMapTest
         }
     }
 
-    private TokenBuffer _readAsTokenBuffer(String doc) throws IOException
+    private TokenBuffer _readAsTokenBuffer(String doc)
     {
         try (JsonParser p = MAPPER.createParser(doc)) {
             p.nextToken();
-            try (TokenBuffer tb = TokenBuffer.forBuffering(p, null)) {
+            try (TokenBuffer tb = TokenBuffer.forBuffering(p, ObjectReadContext.empty())) {
                 tb.copyCurrentStructure(p);
                 return tb.overrideParentContext(null);
             }
@@ -83,6 +87,7 @@ public class ParsingContext2525Test extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testSimpleArrayWithTree() throws Exception
     {
         JsonNode root = MAPPER.readTree(MINIMAL_ARRAY_DOC);
@@ -91,6 +96,7 @@ public class ParsingContext2525Test extends BaseMapTest
         }
     }
 
+    @Test
     public void testSimpleObjectWithTree() throws Exception
     {
         JsonNode root = MAPPER.readTree(MINIMAL_OBJECT_DOC);
@@ -99,6 +105,7 @@ public class ParsingContext2525Test extends BaseMapTest
         }
     }
 
+    @Test
     public void testFullDocWithTree() throws Exception
     {
         JsonNode root = MAPPER.readTree(FULL_DOC);
@@ -112,7 +119,7 @@ public class ParsingContext2525Test extends BaseMapTest
     /* Shared helper methods
     /**********************************************************************
      */
-    
+
     private void _testSimpleArrayUsingPathAsPointer(JsonParser p) throws Exception
     {
         assertSame(JsonPointer.empty(), p.streamReadContext().pathAsPointer());
@@ -124,7 +131,7 @@ public class ParsingContext2525Test extends BaseMapTest
 
         assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
         assertEquals("/0", p.streamReadContext().pathAsPointer().toString());
-        
+
         assertToken(JsonToken.END_ARRAY, p.nextToken());
         assertSame(JsonPointer.empty(), p.streamReadContext().pathAsPointer());
         assertTrue(p.streamReadContext().inRoot());
@@ -146,14 +153,14 @@ public class ParsingContext2525Test extends BaseMapTest
         assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
         assertEquals(42, p.getIntValue());
         assertEquals("/answer", p.streamReadContext().pathAsPointer().toString());
-        
+
         assertToken(JsonToken.END_OBJECT, p.nextToken());
         assertSame(JsonPointer.empty(), p.streamReadContext().pathAsPointer());
         assertTrue(p.streamReadContext().inRoot());
 
         assertNull(p.nextToken());
     }
-    
+
     private void _testFullDocUsingPathAsPointer(JsonParser p) throws Exception
     {
         // by default should just get "empty"

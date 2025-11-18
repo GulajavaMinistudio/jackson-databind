@@ -48,7 +48,7 @@ public abstract class PrimitiveArrayDeserializers<T>
     /* Life-cycle
     /********************************************************
      */
-    
+
     protected PrimitiveArrayDeserializers(Class<T> cls) {
         super(cls);
         _unwrapSingle = null;
@@ -61,7 +61,7 @@ public abstract class PrimitiveArrayDeserializers<T>
         _unwrapSingle = unwrapSingle;
         _nuller = nuller;
     }
-    
+
     public static ValueDeserializer<?> forType(Class<?> rawType)
     {
         // Start with more common types...
@@ -71,7 +71,7 @@ public abstract class PrimitiveArrayDeserializers<T>
         if (rawType == Long.TYPE) {
             return LongDeser.instance;
         }
-        
+
         if (rawType == Byte.TYPE) {
             return new ByteDeser();
         }
@@ -90,7 +90,7 @@ public abstract class PrimitiveArrayDeserializers<T>
         if (rawType == Character.TYPE) {
             return new CharDeser();
         }
-        throw new IllegalStateException();
+        throw new IllegalArgumentException("Unknown primitive array element type: "+rawType);
     }
 
     @Override
@@ -141,7 +141,7 @@ public abstract class PrimitiveArrayDeserializers<T>
 
     // since 2.9
     protected abstract T _constructEmpty();
-    
+
     /*
     /********************************************************
     /* Default implementations
@@ -152,7 +152,7 @@ public abstract class PrimitiveArrayDeserializers<T>
     public LogicalType logicalType() {
         return LogicalType.Array;
     }
-    
+
     @Override // since 2.9
     public Boolean supportsUpdate(DeserializationConfig config) {
         return Boolean.TRUE;
@@ -163,7 +163,7 @@ public abstract class PrimitiveArrayDeserializers<T>
         // Empty values shareable freely
         return AccessPattern.CONSTANT;
     }
-    
+
     @Override
     public Object getEmptyValue(DeserializationContext ctxt) {
         Object empty = _emptyValue;
@@ -206,13 +206,18 @@ public abstract class PrimitiveArrayDeserializers<T>
     @SuppressWarnings("unchecked")
     protected T handleNonArray(JsonParser p, DeserializationContext ctxt) throws JacksonException
     {
-        // Empty String can become null...
-        if (p.hasToken(JsonToken.VALUE_STRING)) {
-            return _deserializeFromString(p, ctxt);
-        }
-        boolean canWrap = (_unwrapSingle == Boolean.TRUE) ||
+        final boolean canWrap = (_unwrapSingle == Boolean.TRUE) ||
                 ((_unwrapSingle == null) &&
                         ctxt.isEnabled(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY));
+        // 12-Mar-2025, tatu: as per [databind#4650] things get bit tricky with
+        //   single-element wrapping of a String value
+        // Let's still call _deserializeFromString() for empty strings no matter what,
+        // and for all values if wrapping not enabled
+        if (p.hasToken(JsonToken.VALUE_STRING)) {
+            if (!canWrap || _isBlank(p.getString())) {
+                return _deserializeFromString(p, ctxt);
+            }
+        }
         if (canWrap) {
             return handleSingleElementUnwrapped(p, ctxt);
         }
@@ -254,17 +259,15 @@ public abstract class PrimitiveArrayDeserializers<T>
         @Override
         public char[] deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException
         {
-            /* Won't take arrays, must get a String (could also
-             * convert other tokens to Strings... but let's not bother
-             * yet, doesn't seem to make sense)
-             */
+            // Won't take arrays, must get a String (could also convert other tokens to Strings...
+            // but let's not bother yet, doesn't seem to make sense)
             JsonToken t = p.currentToken();
             if (t == JsonToken.VALUE_STRING) {
-                // note: can NOT return shared internal buffer, must copy:
-                char[] buffer = p.getTextCharacters();
-                int offset = p.getTextOffset();
-                int len = p.getTextLength();
-    
+                // note: CANNOT return shared internal buffer, must copy:
+                char[] buffer = p.getStringCharacters();
+                int offset = p.getStringOffset();
+                int len = p.getStringLength();
+
                 return Arrays.copyOfRange(buffer, offset, offset + len);
             }
             if (p.isExpectedStartArrayToken()) {
@@ -273,7 +276,7 @@ public abstract class PrimitiveArrayDeserializers<T>
                 while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
                     String str;
                     if (t == JsonToken.VALUE_STRING) {
-                        str = p.getText();
+                        str = p.getString();
                     } else if (t == JsonToken.VALUE_NULL) {
                         if (_nuller != null) {
                             _nuller.getNullValue(ctxt);
@@ -297,15 +300,15 @@ public abstract class PrimitiveArrayDeserializers<T>
             if (t == JsonToken.VALUE_EMBEDDED_OBJECT) {
                 Object ob = p.getEmbeddedObject();
                 if (ob == null) return null;
-                if (ob instanceof char[]) {
-                    return (char[]) ob;
+                if (ob instanceof char[] charArray) {
+                    return charArray;
                 }
-                if (ob instanceof String) {
-                    return ((String) ob).toCharArray();
+                if (ob instanceof String string) {
+                    return string.toCharArray();
                 }
                 // 04-Feb-2011, tatu: byte[] can be converted; assuming base64 is wanted
-                if (ob instanceof byte[]) {
-                    return Base64Variants.getDefaultVariant().encode((byte[]) ob, false).toCharArray();
+                if (ob instanceof byte[] byteArray) {
+                    return Base64Variants.getDefaultVariant().encode(byteArray, false).toCharArray();
                 }
                 // not recognized, just fall through
             }
@@ -391,7 +394,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -442,17 +446,17 @@ public abstract class PrimitiveArrayDeserializers<T>
             //    binary data so...
             return LogicalType.Binary;
         }
-        
+
         @Override
         public byte[] deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException
         {
             JsonToken t = p.currentToken();
-            
+
             // Most likely case: base64 encoded String?
             if (t == JsonToken.VALUE_STRING) {
                 try {
                     return p.getBinaryValue(ctxt.getBase64Variant());
-                } catch (StreamReadException e) {
+                } catch (StreamReadException | DatabindException e) {
                     // 25-Nov-2016, tatu: related to [databind#1425], try to convert
                     //   to a more usable one, as it's not really a JSON-level parse
                     //   exception, but rather binding from JSON String into base64 decoded
@@ -460,16 +464,17 @@ public abstract class PrimitiveArrayDeserializers<T>
                     String msg = e.getOriginalMessage();
                     if (msg.contains("base64")) {
                         return (byte[]) ctxt.handleWeirdStringValue(byte[].class,
-                                p.getText(), msg);
+                                p.getString(), msg);
                     }
+                    throw e;
                 }
             }
             // 31-Dec-2009, tatu: Also may be hidden as embedded Object
             if (t == JsonToken.VALUE_EMBEDDED_OBJECT) {
                 Object ob = p.getEmbeddedObject();
                 if (ob == null) return null;
-                if (ob instanceof byte[]) {
-                    return (byte[]) ob;
+                if (ob instanceof byte[] byteArray) {
+                    return byteArray;
                 }
             }
             if (!p.isExpectedStartArrayToken()) {
@@ -505,7 +510,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -595,7 +601,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -621,7 +628,7 @@ public abstract class PrimitiveArrayDeserializers<T>
         extends PrimitiveArrayDeserializers<int[]>
     {
         public final static IntDeser instance = new IntDeser();
-        
+
         public IntDeser() { super(int[].class); }
         protected IntDeser(IntDeser base, NullValueProvider nuller, Boolean unwrapSingle) {
             super(base, nuller, unwrapSingle);
@@ -671,7 +678,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -747,7 +755,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -789,9 +798,14 @@ public abstract class PrimitiveArrayDeserializers<T>
         }
 
         @Override
-        public float[] deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException
+        public float[] deserialize(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
         {
             if (!p.isExpectedStartArrayToken()) {
+                float[] decoded = _deserializeBinaryVector(p, ctxt);
+                if (decoded != null) {
+                    return decoded;
+                }
                 return handleNonArray(p, ctxt);
             }
             ArrayBuilders.FloatBuilder builder = ctxt.getArrayBuilders().getFloatBuilder();
@@ -816,7 +830,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -834,6 +849,61 @@ public abstract class PrimitiveArrayDeserializers<T>
             float[] result = Arrays.copyOf(oldValue, len1+len2);
             System.arraycopy(newValue, 0, result, len1, len2);
             return result;
+        }
+
+        private float[] _deserializeBinaryVector(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
+        {
+            JsonToken t = p.currentToken();
+            byte[] packed = null;
+
+            // Typical textual format case: base64 encoded String (for Packed Binary Vector)
+            if (t == JsonToken.VALUE_STRING) {
+                try {
+                    packed = p.getBinaryValue(ctxt.getBase64Variant());
+                } catch (StreamReadException | DatabindException e) {
+                    // [databind#1425], try to convert to a more usable one, as it's not really
+                    // a JSON-level parse exception, but rather binding from JSON String into
+                    // base64 decoded  binary data
+                    String msg = e.getOriginalMessage();
+                    if (msg.contains("base64")) {
+                        return (float[]) ctxt.handleWeirdStringValue(float[].class,
+                                p.getString(), msg);
+                    }
+                    throw e;
+                }
+            } else if (t == JsonToken.VALUE_EMBEDDED_OBJECT) {
+                // Typical for binary formats
+                Object ob = p.getEmbeddedObject();
+                if (ob instanceof byte[] byteArray) {
+                    packed = byteArray;
+                } else if (ob == null || (ob instanceof float[])) {
+                    return (float[]) ob;
+                }
+            }
+            // Packed Binary Vector case
+            if (packed != null) {
+                return _unpack(ctxt, packed);
+            }
+            return null;
+        }
+
+        private float[] _unpack(DeserializationContext ctxt, byte[] bytes) throws JacksonException {
+            final int bytesLen = bytes.length;
+            if ((bytesLen & 3) != 0) {
+                return (float[]) ctxt.reportInputMismatch(handledType(),
+                        "Vector length for Packed Binary Float Vector (%d) not a multiple of 4 bytes", bytesLen);
+            }
+            final int vectorLen = bytesLen >> 2;
+            final float[] floats = new float[vectorLen];
+            for (int in = 0, out = 0; in < bytesLen; ) {
+                int packed = (bytes[in++] << 24)
+                        | ((bytes[in++] & 0xFF) << 16)
+                        | ((bytes[in++] & 0xFF) << 8)
+                        | (bytes[in++] & 0xFF);
+                floats[out++] = Float.intBitsToFloat(packed);
+            }
+            return floats;
         }
     }
 
@@ -861,6 +931,10 @@ public abstract class PrimitiveArrayDeserializers<T>
         public double[] deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException
         {
             if (!p.isExpectedStartArrayToken()) {
+                double[] decoded = _deserializeBinaryVector(p, ctxt);
+                if (decoded != null) {
+                    return decoded;
+                }
                 return handleNonArray(p, ctxt);
             }
             ArrayBuilders.DoubleBuilder builder = ctxt.getArrayBuilders().getDoubleBuilder();
@@ -884,7 +958,8 @@ public abstract class PrimitiveArrayDeserializers<T>
                     chunk[ix++] = value;
                 }
             } catch (Exception e) {
-                throw DatabindException.wrapWithPath(e, chunk, builder.bufferedSize() + ix);
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(chunk, builder.bufferedSize() + ix));
             }
             return builder.completeAndClearBuffer(chunk, ix);
         }
@@ -904,6 +979,67 @@ public abstract class PrimitiveArrayDeserializers<T>
             double[] result = Arrays.copyOf(oldValue, len1+len2);
             System.arraycopy(newValue, 0, result, len1, len2);
             return result;
+        }
+
+        private double[] _deserializeBinaryVector(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
+        {
+            JsonToken t = p.currentToken();
+            byte[] packed = null;
+
+            // Typical textual format case: base64 encoded String (for Packed Binary Vector)
+            if (t == JsonToken.VALUE_STRING) {
+                try {
+                    packed = p.getBinaryValue(ctxt.getBase64Variant());
+                } catch (StreamReadException | DatabindException e) {
+                    // [databind#1425], try to convert to a more usable one, as it's not really
+                    // a JSON-level parse exception, but rather binding from JSON String into
+                    // base64 decoded  binary data
+                    String msg = e.getOriginalMessage();
+                    if (msg.contains("base64")) {
+                        return (double[]) ctxt.handleWeirdStringValue(double[].class,
+                                p.getString(), msg);
+                    }
+                    throw e;
+                }
+            } else if (t == JsonToken.VALUE_EMBEDDED_OBJECT) {
+                // Typical for binary formats
+                Object ob = p.getEmbeddedObject();
+                if (ob instanceof byte[] byteArray) {
+                    packed = byteArray;
+                } else if (ob == null || (ob instanceof double[])) {
+                    return (double[]) ob;
+                }
+            }
+            // Packed Binary Vector case
+            if (packed != null) {
+                return _unpack(ctxt, packed);
+            }
+            return null;
+        }
+
+        private double[] _unpack(DeserializationContext ctxt, byte[] bytes) throws JacksonException
+        {
+            final int bytesLen = bytes.length;
+            if ((bytesLen & 7) != 0) {
+                return (double[]) ctxt.reportInputMismatch(handledType(),
+                        "Vector length for Packed Binary Double Vector (%d) not a multiple of 8 bytes", bytesLen);
+            }
+            final int vectorLen = bytesLen >> 3;
+            final double[] doubles = new double[vectorLen];
+            for (int in = 0, out = 0; in < bytesLen; ) {
+                int packed1 = (bytes[in++] << 24)
+                        | ((bytes[in++] & 0xFF) << 16)
+                        | ((bytes[in++] & 0xFF) << 8)
+                        | (bytes[in++] & 0xFF);
+                int packed2 = (bytes[in++] << 24)
+                        | ((bytes[in++] & 0xFF) << 16)
+                        | ((bytes[in++] & 0xFF) << 8)
+                        | (bytes[in++] & 0xFF);
+                long packed = ((long) packed1 << 32) | (packed2 & 0xFFFFFFFFL);
+                doubles[out++] = Double.longBitsToDouble(packed);
+            }
+            return doubles;
         }
     }
 }

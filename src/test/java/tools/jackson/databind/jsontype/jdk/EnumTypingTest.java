@@ -2,15 +2,19 @@ package tools.jackson.databind.jsontype.jdk;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 @SuppressWarnings("serial")
-public class EnumTypingTest extends BaseMapTest
+public class EnumTypingTest extends DatabindTestUtil
 {
     // note: As.WRAPPER_ARRAY worked initially; but as per [JACKSON-485], As.PROPERTY had issues
     @JsonTypeInfo(use=JsonTypeInfo.Id.MINIMAL_CLASS, include=JsonTypeInfo.As.PROPERTY)
@@ -18,17 +22,17 @@ public class EnumTypingTest extends BaseMapTest
 
     public enum Tag implements EnumInterface
     { A, B };
-    
+
     static class EnumInterfaceWrapper {
         public EnumInterface value;
     }
-    
+
     static class EnumInterfaceList extends ArrayList<EnumInterface> { }
 
     static class TagList extends ArrayList<Tag> { }
 
     static enum TestEnum { A, B, C; }
-    
+
     static class UntypedEnumBean
     {
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY, property="__type")
@@ -80,6 +84,7 @@ public class EnumTypingTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testTagList() throws Exception
     {
         TagList list = new TagList();
@@ -93,6 +98,7 @@ public class EnumTypingTest extends BaseMapTest
         assertSame(Tag.B, result.get(1));
     }
 
+    @Test
     public void testEnumInterface() throws Exception
     {
         String json = MAPPER.writeValueAsString(Tag.B);
@@ -100,19 +106,21 @@ public class EnumTypingTest extends BaseMapTest
         assertSame(Tag.B, result);
     }
 
+    @Test
     public void testEnumInterfaceList() throws Exception
     {
         EnumInterfaceList list = new EnumInterfaceList();
         list.add(Tag.A);
         list.add(Tag.B);
         String json = MAPPER.writeValueAsString(list);
-        
+
         EnumInterfaceList result = MAPPER.readValue(json, EnumInterfaceList.class);
         assertEquals(2, result.size());
         assertSame(Tag.A, result.get(0));
         assertSame(Tag.B, result.get(1));
     }
 
+    @Test
     public void testUntypedEnum() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -128,6 +136,7 @@ public class EnumTypingTest extends BaseMapTest
     }
 
     // for [databind#2605]
+    @Test
     public void testRoundtrip() throws Exception
     {
         EnumContaintingClass<TestEnum> input = new EnumContaintingClass<TestEnum>(TestEnum.B);
@@ -138,6 +147,7 @@ public class EnumTypingTest extends BaseMapTest
     }
 
     // [databind#2775]
+    @Test
     public void testEnumAsSubtypeNoFailOnInvalidTypeId() throws Exception
     {
         final Base2775 testValue = TestEnum2775.VALUE;

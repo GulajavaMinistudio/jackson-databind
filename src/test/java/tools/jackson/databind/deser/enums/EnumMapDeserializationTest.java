@@ -4,24 +4,31 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 @SuppressWarnings("serial")
-public class EnumMapDeserializationTest extends BaseMapTest
+public class EnumMapDeserializationTest
 {
     enum TestEnum { JACKSON, RULES, OK; }
 
     enum TestEnumWithDefault {
         JACKSON, RULES,
         @JsonEnumDefaultValue
-        OK; 
+        OK;
     }
-    
+
     protected enum LowerCaseEnum {
         A, B, C;
         private LowerCaseEnum() { }
@@ -29,13 +36,13 @@ public class EnumMapDeserializationTest extends BaseMapTest
         public String toString() { return name().toLowerCase(); }
     }
 
-    static class MySimpleEnumMap extends EnumMap<TestEnum,String> { 
+    static class MySimpleEnumMap extends EnumMap<TestEnum,String> {
         public MySimpleEnumMap() {
             super(TestEnum.class);
         }
     }
 
-    static class FromStringEnumMap extends EnumMap<TestEnum,String> { 
+    static class FromStringEnumMap extends EnumMap<TestEnum,String> {
         @JsonCreator
         public FromStringEnumMap(String value) {
             super(TestEnum.class);
@@ -43,7 +50,7 @@ public class EnumMapDeserializationTest extends BaseMapTest
         }
     }
 
-    static class FromDelegateEnumMap extends EnumMap<TestEnum,String> { 
+    static class FromDelegateEnumMap extends EnumMap<TestEnum,String> {
         @JsonCreator
         public FromDelegateEnumMap(Map<Object,Object> stuff) {
             super(TestEnum.class);
@@ -51,7 +58,7 @@ public class EnumMapDeserializationTest extends BaseMapTest
         }
     }
 
-    static class FromPropertiesEnumMap extends EnumMap<TestEnum,String> { 
+    static class FromPropertiesEnumMap extends EnumMap<TestEnum,String> {
         int a0, b0;
 
         @JsonCreator
@@ -105,6 +112,42 @@ public class EnumMapDeserializationTest extends BaseMapTest
         public String toString() { return name() + " as string"; }
     }
 
+    // [databind#2457]
+    enum MyEnum2457Base {
+        @JsonProperty("a_base")
+        A,
+        @JsonProperty("b_base")
+        B() {
+            // just to ensure subclass construction
+            @Override
+            public void foo() { }
+        };
+        
+        // needed to force subclassing
+        public void foo() { }
+        
+        @Override
+        public String toString() { return name() + " as string"; }
+    }
+
+    // [databind#2457]
+    enum MyEnum2457Mixin {
+        @JsonProperty("a_mixin")
+        A,
+        @JsonProperty("b_mixin")
+        B() {
+            // just to ensure subclass construction
+            @Override
+            public void foo() { }
+        };
+
+        // needed to force subclassing
+        public void foo() { }
+
+        @Override
+        public String toString() { return name() + " as string"; }
+    }
+
     /*
     /**********************************************************
     /* Test methods, basic
@@ -113,6 +156,7 @@ public class EnumMapDeserializationTest extends BaseMapTest
 
     protected final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testEnumMaps() throws Exception
     {
         EnumMap<TestEnum,String> value = MAPPER.readValue("{\"OK\":\"value\"}",
@@ -120,11 +164,12 @@ public class EnumMapDeserializationTest extends BaseMapTest
         assertEquals("value", value.get(TestEnum.OK));
     }
 
+    @Test
     public void testToStringEnumMaps() throws Exception
     {
         // can't reuse global one due to reconfig
         ObjectReader r = MAPPER.reader()
-                .with(DeserializationFeature.READ_ENUMS_USING_TO_STRING);
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING);
         EnumMap<LowerCaseEnum,String> value = r.forType(
             new TypeReference<EnumMap<LowerCaseEnum,String>>() { })
                 .readValue("{\"a\":\"value\"}");
@@ -137,28 +182,32 @@ public class EnumMapDeserializationTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testCustomEnumMapWithDefaultCtor() throws Exception
     {
         MySimpleEnumMap map = MAPPER.readValue(a2q("{'RULES':'waves'}"),
-                MySimpleEnumMap.class);   
+                MySimpleEnumMap.class);
         assertEquals(1, map.size());
         assertEquals("waves", map.get(TestEnum.RULES));
     }
 
+    @Test
     public void testCustomEnumMapFromString() throws Exception
     {
-        FromStringEnumMap map = MAPPER.readValue(q("kewl"), FromStringEnumMap.class);   
+        FromStringEnumMap map = MAPPER.readValue(q("kewl"), FromStringEnumMap.class);
         assertEquals(1, map.size());
         assertEquals("kewl", map.get(TestEnum.JACKSON));
     }
 
+    @Test
     public void testCustomEnumMapWithDelegate() throws Exception
     {
-        FromDelegateEnumMap map = MAPPER.readValue(a2q("{'foo':'bar'}"), FromDelegateEnumMap.class);   
+        FromDelegateEnumMap map = MAPPER.readValue(a2q("{'foo':'bar'}"), FromDelegateEnumMap.class);
         assertEquals(1, map.size());
         assertEquals("{foo=bar}", map.get(TestEnum.OK));
     }
 
+    @Test
     public void testCustomEnumMapFromProps() throws Exception
     {
         FromPropertiesEnumMap map = MAPPER.readValue(a2q(
@@ -180,6 +229,7 @@ public class EnumMapDeserializationTest extends BaseMapTest
      */
 
     // [databind#1859]
+    @Test
     public void testEnumMapAsPolymorphic() throws Exception
     {
         EnumMap<Enum1859, String> enumMap = new EnumMap<>(Enum1859.class);
@@ -215,38 +265,40 @@ public class EnumMapDeserializationTest extends BaseMapTest
      */
 
     // [databind#1859]
+    @Test
     public void testUnknownKeyAsDefault() throws Exception
     {
         // first, via EnumMap
         EnumMap<TestEnumWithDefault,String> value = MAPPER
                 .readerFor(new TypeReference<EnumMap<TestEnumWithDefault,String>>() { })
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .readValue("{\"unknown\":\"value\"}");
         assertEquals(1, value.size());
         assertEquals("value", value.get(TestEnumWithDefault.OK));
 
         Map<TestEnumWithDefault,String> value2 = MAPPER
                 .readerFor(new TypeReference<Map<TestEnumWithDefault,String>>() { })
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .readValue("{\"unknown\":\"value\"}");
         assertEquals(1, value2.size());
         assertEquals("value", value2.get(TestEnumWithDefault.OK));
     }
 
     // [databind#1859]
+    @Test
     public void testUnknownKeyAsNull() throws Exception
     {
         // first, via EnumMap
         EnumMap<TestEnumWithDefault,String> value = MAPPER
                 .readerFor(new TypeReference<EnumMap<TestEnumWithDefault,String>>() { })
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
                 .readValue("{\"unknown\":\"value\"}");
         assertEquals(0, value.size());
 
         // then regular Map
         Map<TestEnumWithDefault,String> value2 = MAPPER
                 .readerFor(new TypeReference<Map<TestEnumWithDefault,String>>() { })
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
                 .readValue("{\"unknown\":\"value\"}");
         // 25-Jan-2018, tatu: as per [databind#1883], we upgrade it to `EnumMap`, which won't accept nulls...
         assertEquals(0, value2.size());
@@ -254,19 +306,47 @@ public class EnumMapDeserializationTest extends BaseMapTest
     }
 
     // [databind#2457]
+    @Test
     public void testCustomEnumAsRootMapKey() throws Exception
     {
         final Map<MyEnum2457, String> map = new LinkedHashMap<>();
         map.put(MyEnum2457.A, "1");
         map.put(MyEnum2457.B, "2");
         assertEquals(a2q("{'A':'1','B':'2'}"),
-                MAPPER.writeValueAsString(map));
+                MAPPER.writer()
+                        .without(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                        .writeValueAsString(map));
 
         // But should be able to override
         assertEquals(a2q("{'"+MyEnum2457.A.toString()+"':'1','"+MyEnum2457.B.toString()+"':'2'}"),
                 MAPPER.writer()
-                    .with(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+                    .with(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
                     .writeValueAsString(map));
+    }
+
+    /**
+     * @see #testCustomEnumAsRootMapKey
+     */
+    // [databind#2457]
+    @Test
+    public void testCustomEnumAsRootMapKeyMixin() throws Exception
+    {
+        ObjectMapper mixinMapper = JsonMapper.builder()
+                .addMixIn(MyEnum2457Base.class, MyEnum2457Mixin.class)
+                .build();
+        final Map<MyEnum2457Base, String> map = new LinkedHashMap<>();
+        map.put(MyEnum2457Base.A, "1");
+        map.put(MyEnum2457Base.B, "2");
+        assertEquals(a2q("{'a_mixin':'1','b_mixin':'2'}"),
+                mixinMapper.writer()
+                        .without(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                        .writeValueAsString(map));
+
+        // But should be able to override
+        assertEquals(a2q("{'"+MyEnum2457Base.A.toString()+"':'1','"+MyEnum2457Base.B.toString()+"':'2'}"),
+                mixinMapper.writer()
+                        .with(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                        .writeValueAsString(map));
     }
 
     /*
@@ -276,6 +356,7 @@ public class EnumMapDeserializationTest extends BaseMapTest
      */
 
     // [databind#1988]
+    @Test
     public void testCaseInsensitiveEnumsInMaps() throws Exception
     {
         ObjectReader r = JsonMapper.builder()

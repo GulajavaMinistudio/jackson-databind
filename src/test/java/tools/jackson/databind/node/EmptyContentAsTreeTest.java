@@ -7,11 +7,15 @@ import java.nio.charset.StandardCharsets;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.TreeNode;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests to verify handling of empty content with "readTree()"
  */
-public class EmptyContentAsTreeTest extends BaseMapTest
+public class EmptyContentAsTreeTest extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = objectMapper();
 
@@ -97,7 +101,7 @@ public class EmptyContentAsTreeTest extends BaseMapTest
         _assertMissing(MAPPER.readTree(EMPTY1));
         _assertMissing(MAPPER.readTree(new StringReader(EMPTY0)));
         _assertMissing(MAPPER.readTree(new StringReader(EMPTY1)));
-        
+
         _assertMissing(MAPPER.readTree(EMPTY0_BYTES));
         _assertMissing(MAPPER.readTree(EMPTY0_BYTES, 0, EMPTY0_BYTES.length));
         _assertMissing(MAPPER.readTree(new ByteArrayInputStream(EMPTY0_BYTES)));
@@ -106,7 +110,7 @@ public class EmptyContentAsTreeTest extends BaseMapTest
         _assertMissing(MAPPER.readTree(new ByteArrayInputStream(EMPTY1_BYTES)));
 
         // Assume File, URL, etc are fine. Note: `DataInput` probably can't be made to
-        // work since it can not easily/gracefully handle unexpected end-of-input
+        // work since it cannot easily/gracefully handle unexpected end-of-input
     }
 
     public void testMissingNodeViaObjectReader() throws Exception
@@ -115,7 +119,7 @@ public class EmptyContentAsTreeTest extends BaseMapTest
         _assertMissing(MAPPER.reader().readTree(EMPTY1));
         _assertMissing(MAPPER.reader().readTree(new StringReader(EMPTY0)));
         _assertMissing(MAPPER.reader().readTree(new StringReader(EMPTY1)));
-        
+
         _assertMissing(MAPPER.reader().readTree(EMPTY0_BYTES));
         _assertMissing(MAPPER.reader().readTree(EMPTY0_BYTES, 0, EMPTY0_BYTES.length));
         _assertMissing(MAPPER.reader().readTree(new ByteArrayInputStream(EMPTY0_BYTES)));
@@ -131,7 +135,7 @@ public class EmptyContentAsTreeTest extends BaseMapTest
     }
 
     private void _assertMissing(JsonNode n) {
-        assertNotNull("Should not get `null` but `MissingNode`", n);
+        assertNotNull(n, "Should not get `null` but `MissingNode`");
         if (!n.isMissingNode()) {
             fail("Should get `MissingNode` but got: "+n.getClass().getName());
         }

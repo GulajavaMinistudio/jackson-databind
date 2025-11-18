@@ -1,8 +1,8 @@
 package tools.jackson.databind.introspect;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 
 /**
  * Interface for object used for determine which property elements
@@ -37,6 +37,22 @@ public class VisibilityChecker
             Visibility.PUBLIC_ONLY // scalar-constructor (new in 3.x)
     );
 
+    /**
+     * Visibility settings needed to support auto-discovery of non-private
+     * Records.
+     *
+     * @since 3.0
+     */
+    protected final static VisibilityChecker ALL_PUBLIC_EXCEPT_CREATORS = new VisibilityChecker(
+            Visibility.PUBLIC_ONLY, // field
+            Visibility.PUBLIC_ONLY, // getter
+            Visibility.PUBLIC_ONLY, // is-getter
+            Visibility.PUBLIC_ONLY, // setter
+            // 26-Oct-2023, tatu: For [databind#4175] change from NON_PRIVATE to ANY
+            Visibility.ANY, // creator
+            Visibility.ANY // scalar-constructor (1 arg)
+    );
+
     protected final Visibility _fieldMinLevel;
     protected final Visibility _getterMinLevel;
     protected final Visibility _isGetterMinLevel;
@@ -47,7 +63,7 @@ public class VisibilityChecker
     /**
      * Constructor used for building instance that has minumum visibility
      * levels as indicated by given annotation instance
-     * 
+     *
      * @param ann Annotations to use for determining minimum visibility levels
      */
     public VisibilityChecker(JsonAutoDetect ann)
@@ -79,7 +95,7 @@ public class VisibilityChecker
     /**
      * Constructor that will assign given visibility value for all
      * properties.
-     * 
+     *
      * @param v level to use for all property types
      */
     public VisibilityChecker(Visibility v)
@@ -109,6 +125,10 @@ public class VisibilityChecker
     public static VisibilityChecker defaultInstance() { return DEFAULT; }
 
     public static VisibilityChecker allPublicInstance() { return ALL_PUBLIC; }
+
+    public static VisibilityChecker allPublicExceptCreatorsInstance() {
+        return ALL_PUBLIC_EXCEPT_CREATORS;
+    }
 
     /*
     /**********************************************************************
@@ -187,7 +207,7 @@ public class VisibilityChecker
             return this;
         }
     }
-    
+
     /**
      * Builder method that will return a checker instance that has
      * specified minimum visibility level for fields.
@@ -330,7 +350,7 @@ public class VisibilityChecker
      * constructor is auto-detectable
      * as delegating Creator, with respect to its visibility
      * (not considering signature, just visibility)
-     * 
+     *
      * @since 3.0
      */
     public boolean isScalarConstructorVisible(AnnotatedMember m) {
@@ -348,5 +368,21 @@ public class VisibilityChecker
         return String.format("[Visibility: field=%s,getter=%s,isGetter=%s,setter=%s,creator=%s,scalarConstructor=%s]",
                 _fieldMinLevel, _getterMinLevel, _isGetterMinLevel, _setterMinLevel,
                 _creatorMinLevel, _scalarConstructorMinLevel);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (o instanceof VisibilityChecker other) {
+            return _fieldMinLevel == other._fieldMinLevel
+                    && _getterMinLevel == other._getterMinLevel
+                    && _isGetterMinLevel == other._isGetterMinLevel
+                    && _setterMinLevel == other._setterMinLevel
+                    &&  _creatorMinLevel== other._creatorMinLevel
+                    &&  _scalarConstructorMinLevel == other._scalarConstructorMinLevel
+                    ;
+        } else {
+            return false;
+        }
     }
 }

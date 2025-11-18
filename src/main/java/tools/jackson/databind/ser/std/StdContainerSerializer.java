@@ -10,6 +10,9 @@ import tools.jackson.databind.ser.impl.PropertySerializerMap;
  * {@link java.util.Collection}s (<code>Lists</code>, <code>Sets</code>
  * etc) and {@link java.util.Map}s and iterable things
  * ({@link java.util.Iterator}s).
+ *<p>
+ * NOTE: in Jackson 2.x, this class was named {@code ContainerSerializer}
+ * (in package {@code com.fasterxml.jackson.databind.ser}).
  */
 public abstract class StdContainerSerializer<T>
     extends StdSerializer<T>
@@ -30,7 +33,7 @@ public abstract class StdContainerSerializer<T>
      * @since 3.0 (in 2.x subtypes contained it)
      */
     protected PropertySerializerMap _dynamicValueSerializers;
-    
+
     /*
     /**********************************************************************
     /* Construction, initialization
@@ -69,7 +72,7 @@ public abstract class StdContainerSerializer<T>
      * Factory(-like) method that can be used to construct a new container
      * serializer that uses specified {@link TypeSerializer} for decorating
      * contained values with additional type information.
-     * 
+     *
      * @param vts Type serializer to use for contained values; can be null,
      *    in which case 'this' serializer is returned as is
      * @return Serializer instance that uses given type serializer for values if
@@ -99,7 +102,7 @@ public abstract class StdContainerSerializer<T>
      * known statically.
      * Note that for dynamic types this may return null; if so,
      * caller has to instead use {@link #getContentType()} and
-     * {@link tools.jackson.databind.SerializerProvider#findContentValueSerializer}.
+     * {@link tools.jackson.databind.SerializationContext#findContentValueSerializer}.
      */
     public abstract ValueSerializer<?> getContentSerializer();
 
@@ -110,7 +113,7 @@ public abstract class StdContainerSerializer<T>
      */
 
     @Override
-    public abstract boolean isEmpty(SerializerProvider prov, T value);
+    public abstract boolean isEmpty(SerializationContext prov, T value);
 
     /**
      * Method called to determine if the given value (of type handled by
@@ -143,7 +146,7 @@ public abstract class StdContainerSerializer<T>
     /**
      * @since 3.0
      */
-    protected ValueSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, Class<?> type)
+    protected ValueSerializer<Object> _findAndAddDynamic(SerializationContext ctxt, Class<?> type)
     {
         PropertySerializerMap map = _dynamicValueSerializers;
         PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type, ctxt, _property);
@@ -157,7 +160,7 @@ public abstract class StdContainerSerializer<T>
     /**
      * @since 3.0
      */
-    protected ValueSerializer<Object> _findAndAddDynamic(SerializerProvider ctxt, JavaType type)
+    protected ValueSerializer<Object> _findAndAddDynamic(SerializationContext ctxt, JavaType type)
     {
         PropertySerializerMap map = _dynamicValueSerializers;
         PropertySerializerMap.SerializerAndMapResult result = map.findAndAddSecondarySerializer(type, ctxt, _property);

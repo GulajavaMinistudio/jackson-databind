@@ -1,18 +1,27 @@
 package tools.jackson.databind.convert;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.type.LogicalType;
 
-public class CoerceFloatToIntTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class CoerceFloatToIntTest
 {
     private final ObjectMapper DEFAULT_MAPPER = newJsonMapper();
     private final ObjectReader READER_LEGACY_FAIL = DEFAULT_MAPPER.reader()
@@ -43,7 +52,8 @@ public class CoerceFloatToIntTest extends BaseMapTest
     /* Test methods, defaults (legacy)
     /********************************************************
      */
-    
+
+    @Test
     public void testLegacyDoubleToIntCoercion() throws Exception
     {
         // by default, should be ok
@@ -72,31 +82,127 @@ public class CoerceFloatToIntTest extends BaseMapTest
         assertEquals(95L, biggie.longValue());
     }
 
+    // [databind#5319]
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNodeToInteger() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
+        assertEquals(1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Integer.class));
+        assertEquals(-2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Integer.class));
+        assertEquals(3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Integer.class));
+
+        assertEquals(1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Integer.TYPE));
+        assertEquals(-2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Integer.TYPE));
+        assertEquals(3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Integer.TYPE));
+    }
+
+    // [databind#5319]
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNodeToLong() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
+        assertEquals(1L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Long.class));
+        assertEquals(-2L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Long.class));
+        assertEquals(3L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Long.class));
+
+        assertEquals(1L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Long.TYPE));
+        assertEquals(-2L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Long.TYPE));
+        assertEquals(3L,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Long.TYPE));
+    }
+
+    // [databind#5319]
+    @Test
+    public void testLegacyDoubleToIntCoercionJsonNodeToBigInteger() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
+        assertEquals(BigInteger.valueOf(1L),
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), BigInteger.class));
+        assertEquals(BigInteger.valueOf(-2L),
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), BigInteger.class));
+        assertEquals(BigInteger.valueOf(3L),
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), BigInteger.class));
+    }
+
+    // [databind#5340]
+    @Test
+    public void testLegacyFPToIntCoercionJsonNodeToByte() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
+        assertEquals((byte) 1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Byte.class));
+        assertEquals((byte) -2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Byte.class));
+        assertEquals((byte) 3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Byte.class));
+
+        assertEquals((byte) 1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Byte.TYPE));
+        assertEquals((byte) -2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Byte.TYPE));
+        assertEquals((byte) 3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Byte.TYPE));
+    }
+
+    // [databind#5340]
+    @Test
+    public void testLegacyFPToIntCoercionJsonNodeToShort() throws Exception
+    {
+        final JsonNodeFactory nodeF = DEFAULT_MAPPER.getNodeFactory();
+        assertEquals((short) 1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Short.class));
+        assertEquals((short) -2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Short.class));
+        assertEquals((short) 3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Short.class));
+
+        assertEquals((short) 1,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(1.25), Short.TYPE));
+        assertEquals((short) -2,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(-2.5f), Short.TYPE));
+        assertEquals((short) 3,
+                DEFAULT_MAPPER.treeToValue(nodeF.numberNode(BigDecimal.valueOf(3.75)), Short.TYPE));
+    }
+
+    @Test
     public void testLegacyFailDoubleToInt() throws Exception
     {
         _verifyCoerceFail(READER_LEGACY_FAIL, Integer.class, "1.5", "java.lang.Integer");
         _verifyCoerceFail(READER_LEGACY_FAIL, Integer.TYPE, "1.5", "int");
         _verifyCoerceFail(READER_LEGACY_FAIL, IntWrapper.class, "{\"i\":-2.25 }", "int");
-        _verifyCoerceFail(READER_LEGACY_FAIL, int[].class, "[ 2.5 ]", "element of `int[]`");
+        _verifyCoerceFail(READER_LEGACY_FAIL, int[].class, "[ 2.5 ]", "to `int` value");
     }
 
+    @Test
     public void testLegacyFailDoubleToLong() throws Exception
     {
         _verifyCoerceFail(READER_LEGACY_FAIL, Long.class, "0.5");
         _verifyCoerceFail(READER_LEGACY_FAIL, Long.TYPE, "-2.5");
         _verifyCoerceFail(READER_LEGACY_FAIL, LongWrapper.class, "{\"l\": 7.7 }");
-        _verifyCoerceFail(READER_LEGACY_FAIL, long[].class, "[ -1.35 ]", "element of `long[]`");
+        _verifyCoerceFail(READER_LEGACY_FAIL, long[].class, "[ -1.35 ]", "to `long` value");
     }
 
+    @Test
     public void testLegacyFailDoubleToOther() throws Exception
     {
-        _verifyCoerceFail(READER_LEGACY_FAIL, Short.class, "0.5");
-        _verifyCoerceFail(READER_LEGACY_FAIL, Short.TYPE, "-2.5");
-        _verifyCoerceFail(READER_LEGACY_FAIL, short[].class, "[ -1.35 ]", "element of `short[]`");
-
         _verifyCoerceFail(READER_LEGACY_FAIL, Byte.class, "0.5");
         _verifyCoerceFail(READER_LEGACY_FAIL, Byte.TYPE, "-2.5");
-        _verifyCoerceFail(READER_LEGACY_FAIL, byte[].class, "[ -1.35 ]", "element of `byte[]`");
+        _verifyCoerceFail(READER_LEGACY_FAIL, byte[].class, "[ -1.35 ]", "to `byte` value");
+
+        _verifyCoerceFail(READER_LEGACY_FAIL, Short.class, "0.5");
+        _verifyCoerceFail(READER_LEGACY_FAIL, Short.TYPE, "-2.5");
+        _verifyCoerceFail(READER_LEGACY_FAIL, short[].class, "[ -1.35 ]", "to `short` value");
 
         _verifyCoerceFail(READER_LEGACY_FAIL, BigInteger.class, "25236.256");
 
@@ -108,8 +214,9 @@ public class CoerceFloatToIntTest extends BaseMapTest
     /* Test methods, legacy, correct exception type
     /********************************************************
      */
-    
+
     // [databind#2804]
+    @Test
     public void testLegacyFail2804() throws Exception
     {
         _testLegacyFail2804("5.5", Integer.class);
@@ -141,13 +248,14 @@ public class CoerceFloatToIntTest extends BaseMapTest
             fail("Should get subtype, got: "+ex);
         }
     }
-    
+
     /*
     /********************************************************
     /* Test methods, CoerceConfig, to null
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigFloatToNull() throws Exception
     {
         assertNull(MAPPER_TO_NULL.readValue("1.5", Integer.class));
@@ -201,6 +309,7 @@ public class CoerceFloatToIntTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigFloatToEmpty() throws Exception
     {
         assertEquals(Integer.valueOf(0), MAPPER_TO_EMPTY.readValue("1.2", Integer.class));
@@ -238,6 +347,7 @@ public class CoerceFloatToIntTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigFloatSuccess() throws Exception
     {
         assertEquals(Integer.valueOf(1), MAPPER_TRY_CONVERT.readValue("1.2", Integer.class));
@@ -275,25 +385,26 @@ public class CoerceFloatToIntTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigFailFromFloat() throws Exception
     {
         _verifyCoerceFail(MAPPER_TO_FAIL, Integer.class, "1.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, Integer.TYPE, "1.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, IntWrapper.class, "{\"i\":-2.25 }", "int");
-        _verifyCoerceFail(MAPPER_TO_FAIL, int[].class, "[ 2.5 ]", "element of `int[]`");
+        _verifyCoerceFail(MAPPER_TO_FAIL, int[].class, "[ 2.5 ]", "to `int` value");
 
         _verifyCoerceFail(MAPPER_TO_FAIL, Long.class, "0.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, Long.TYPE, "-2.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, LongWrapper.class, "{\"l\": 7.7 }");
-        _verifyCoerceFail(MAPPER_TO_FAIL, long[].class, "[ -1.35 ]", "element of `long[]`");
+        _verifyCoerceFail(MAPPER_TO_FAIL, long[].class, "[ -1.35 ]", "to `long` value");
 
         _verifyCoerceFail(MAPPER_TO_FAIL, Short.class, "0.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, Short.TYPE, "-2.5");
-        _verifyCoerceFail(MAPPER_TO_FAIL, short[].class, "[ -1.35 ]", "element of `short[]`");
+        _verifyCoerceFail(MAPPER_TO_FAIL, short[].class, "[ -1.35 ]", "to `short` value");
 
         _verifyCoerceFail(MAPPER_TO_FAIL, Byte.class, "0.5");
         _verifyCoerceFail(MAPPER_TO_FAIL, Byte.TYPE, "-2.5");
-        _verifyCoerceFail(MAPPER_TO_FAIL, byte[].class, "[ -1.35 ]", "element of `byte[]`");
+        _verifyCoerceFail(MAPPER_TO_FAIL, byte[].class, "[ -1.35 ]", "to `byte` value");
 
         _verifyCoerceFail(MAPPER_TO_FAIL, BigInteger.class, "25236.256");
     }

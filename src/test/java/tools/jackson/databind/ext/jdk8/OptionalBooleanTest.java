@@ -2,9 +2,15 @@ package tools.jackson.databind.ext.jdk8;
 
 import java.util.Optional;
 
-import tools.jackson.databind.*;
+import org.junit.jupiter.api.Test;
 
-public class OptionalBooleanTest extends BaseMapTest
+import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class OptionalBooleanTest
+    extends DatabindTestUtil
 {
     static class BooleanBean {
         public Optional<Boolean> value;
@@ -18,6 +24,7 @@ public class OptionalBooleanTest extends BaseMapTest
     private final ObjectMapper MAPPER = newJsonMapper();
 
     // for [datatype-jdk8#23]
+    @Test
     public void testBoolean() throws Exception
     {
         // First, serialization

@@ -6,12 +6,11 @@ import javax.xml.XMLConstants;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-
 import org.w3c.dom.Node;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.JavaType;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import tools.jackson.databind.ser.std.StdSerializer;
 
@@ -24,13 +23,16 @@ public class DOMSerializer extends StdSerializer<Node>
         try {
             transformerFactory = TransformerFactory.newInstance();
             transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+	    // 22-Mar-2023, tatu: [databind#3837] add these 2 settings further
+            setTransformerFactoryAttribute(transformerFactory, XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            setTransformerFactoryAttribute(transformerFactory, XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
         } catch (Exception e) {
             throw new IllegalStateException("Could not instantiate `TransformerFactory`: "+e.getMessage(), e);
         }
     }
 
     @Override
-    public void serialize(Node value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(Node value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         try {
@@ -50,5 +52,14 @@ public class DOMSerializer extends StdSerializer<Node>
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint) {
         if (visitor != null) visitor.expectAnyFormat(typeHint);
+    }
+
+    private static void setTransformerFactoryAttribute(final TransformerFactory transformerFactory,
+                                                       final String name, final Object value) {
+        try {
+            transformerFactory.setAttribute(name, value);
+        } catch (Exception e) {
+            System.err.println("[DOMSerializer] Failed to set TransformerFactory attribute: " + name);
+        }
     }
 }

@@ -2,12 +2,16 @@ package tools.jackson.databind.module;
 
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.Version;
 import tools.jackson.core.type.TypeReference;
-
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestKeyDeserializers extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestKeyDeserializers extends DatabindTestUtil
 {
     static class FooKeyDeserializer extends KeyDeserializer
     {
@@ -17,10 +21,10 @@ public class TestKeyDeserializers extends BaseMapTest
             return new Foo(key);
         }
     }
-    
+
     static class Foo {
         public String value;
-        
+
         public Foo(String v) { value = v; }
     }
 
@@ -30,6 +34,7 @@ public class TestKeyDeserializers extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testKeyDeserializers() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());

@@ -1,5 +1,6 @@
 package tools.jackson.databind.ser;
 
+import java.io.Serializable;
 import java.util.List;
 
 import tools.jackson.databind.*;
@@ -41,7 +42,10 @@ import tools.jackson.databind.type.*;
  * NOTE: In Jackson 2.x was named {@code BeanSerializerModifier}
  */
 public abstract class ValueSerializerModifier
+    implements Serializable
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Method called by {@link BeanSerializerFactory} with tentative set
      * of discovered properties.
@@ -52,13 +56,13 @@ public abstract class ValueSerializerModifier
      * modifiers.
      */
     public List<BeanPropertyWriter> changeProperties(SerializationConfig config,
-            BeanDescription beanDesc, List<BeanPropertyWriter> beanProperties) {
+            BeanDescription.Supplier beanDesc, List<BeanPropertyWriter> beanProperties) {
         return beanProperties;
     }
 
     /**
      * Method called by {@link BeanSerializerFactory} with set of properties
-     * to serialize, in default ordering (based on defaults as well as 
+     * to serialize, in default ordering (based on defaults as well as
      * possible type annotations).
      * Implementations can change ordering any way they like.
      *
@@ -67,7 +71,7 @@ public abstract class ValueSerializerModifier
      * modifiers.
      */
     public List<BeanPropertyWriter> orderProperties(SerializationConfig config,
-            BeanDescription beanDesc, List<BeanPropertyWriter> beanProperties) {
+            BeanDescription.Supplier beanDesc, List<BeanPropertyWriter> beanProperties) {
         return beanProperties;
     }
 
@@ -81,10 +85,10 @@ public abstract class ValueSerializerModifier
      * some modifications.
      */
     public BeanSerializerBuilder updateBuilder(SerializationConfig config,
-            BeanDescription beanDesc, BeanSerializerBuilder builder) {
+            BeanDescription.Supplier beanDesc, BeanSerializerBuilder builder) {
         return builder;
     }
-    
+
     /**
      * Method called by {@link BeanSerializerFactory} after constructing default
      * bean serializer instance with properties collected and ordered earlier.
@@ -98,7 +102,7 @@ public abstract class ValueSerializerModifier
      * methods; mostly for JDK types like {@link java.util.Iterator} and such.
      */
     public ValueSerializer<?> modifySerializer(SerializationConfig config,
-            BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
@@ -114,42 +118,42 @@ public abstract class ValueSerializerModifier
      * {@link ArrayType}
      * to make it possible to either replace or augment this serializer with
      * additional functionality.
-     * 
+     *
      * @param config Configuration in use
      * @param valueType Type of the value serializer is used for.
      * @param beanDesc Details of the type in question, to allow checking class annotations
      * @param serializer Default serializer that would be used.
-     * 
+     *
      * @return Serializer to use; either <code>serializer</code> that was passed
      *   in, or an instance method constructed.
      */
     public ValueSerializer<?> modifyArraySerializer(SerializationConfig config,
-            ArrayType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            ArrayType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
     public ValueSerializer<?> modifyCollectionSerializer(SerializationConfig config,
-            CollectionType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            CollectionType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
     public ValueSerializer<?> modifyCollectionLikeSerializer(SerializationConfig config,
-            CollectionLikeType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            CollectionLikeType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
     public ValueSerializer<?> modifyMapSerializer(SerializationConfig config,
-            MapType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            MapType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
     public ValueSerializer<?> modifyMapLikeSerializer(SerializationConfig config,
-            MapLikeType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            MapLikeType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
     public ValueSerializer<?> modifyEnumSerializer(SerializationConfig config,
-            JavaType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            JavaType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 
@@ -159,17 +163,17 @@ public abstract class ValueSerializerModifier
      * given type.
      * This makes it possible to either replace or augment default serializer with
      * additional functionality.
-     * 
+     *
      * @param config Configuration in use
      * @param valueType Type of keys the serializer is used for.
      * @param beanDesc Details of the type in question, to allow checking class annotations
      * @param serializer Default serializer that would be used.
-     * 
+     *
      * @return Serializer to use; either <code>serializer</code> that was passed
      *   in, or an instance method constructed.
      */
     public ValueSerializer<?> modifyKeySerializer(SerializationConfig config,
-            JavaType valueType, BeanDescription beanDesc, ValueSerializer<?> serializer) {
+            JavaType valueType, BeanDescription.Supplier beanDesc, ValueSerializer<?> serializer) {
         return serializer;
     }
 }

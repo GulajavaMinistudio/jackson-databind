@@ -20,16 +20,16 @@ import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.TokenBuffer;
 
 /**
- * Extension over {@link SerializerProvider} that adds methods needed by
+ * Extension over {@link SerializationContext} that adds methods needed by
  * {@link ObjectMapper} (and {@link ObjectWriter}) but that are not to be exposed
  * as general context during serialization.
  *<p>
- * Also note that all custom {@link SerializerProvider}
+ * Also note that all custom {@link SerializationContext}
  * implementations must sub-class this class: {@link ObjectMapper}
  * requires this type, not basic provider type.
  */
 public class SerializationContextExt
-    extends SerializerProvider
+    extends SerializationContext
 {
     /*
     /**********************************************************************
@@ -42,7 +42,7 @@ public class SerializationContextExt
      * Object Id handling is enabled.
      */
     protected transient Map<Object, WritableObjectId> _seenObjectIds;
-    
+
     protected transient ArrayList<ObjectIdGenerator<?>> _objectIdGenerators;
 
     /*
@@ -62,7 +62,7 @@ public class SerializationContextExt
     /* Abstract method impls, factory methods
     /**********************************************************************
      */
-    
+
     @Override
     public ValueSerializer<Object> serializerInstance(Annotated annotated, Object serDef)
     {
@@ -70,7 +70,7 @@ public class SerializationContextExt
             return null;
         }
         ValueSerializer<?> ser;
-        
+
         if (serDef instanceof ValueSerializer) {
             ser = (ValueSerializer<?>) serDef;
         } else {
@@ -159,7 +159,7 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
      * are not re-constructed through actual format representation. So if transformation
      * requires actual materialization of encoded content,
      * it will be necessary to do actual serialization.
-     * 
+     *
      * @param <T> Actual node type; usually either basic {@link JsonNode} or
      *  {@link tools.jackson.databind.node.ObjectNode}
      * @param fromValue Java value to convert
@@ -178,12 +178,26 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
         if (fromValue == null) {
             return (T) nodeF.nullNode();
         }
-
         try (TreeBuildingGenerator gen = TreeBuildingGenerator.forSerialization(this, nodeF)) {
-            // NOTE: inlined "writeValue(generator, value)" to streamline, force no root wrap:
+            // 16-Jul-2025, tatu: [databind#5225] Must assign generator
+            _assignGenerator(gen);
             final Class<?> rawType = fromValue.getClass();
             final ValueSerializer<Object> ser = findTypedValueSerializer(rawType, true);
-            _serialize(gen, fromValue, ser);
+
+            // 25-Jul-2023, tatu: Copied from other places; as per [databind#4047]
+            //    need to add root-wrapping
+            PropertyName rootName = _config.getFullRootName();
+            if (rootName == null) { // not explicitly specified
+                if (_config.isEnabled(SerializationFeature.WRAP_ROOT_VALUE)) {
+                    _serialize(gen, fromValue, ser, findRootName(rawType));
+                } else {
+                    _serialize(gen, fromValue, ser);
+                }
+            } else if (!rootName.isEmpty()) {
+                _serialize(gen, fromValue, ser, rootName);
+            } else {
+                _serialize(gen, fromValue, ser);
+            }
             return (T) gen.treeBuilt();
         }
     }
@@ -193,7 +207,7 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
     /* Object Id handling
     /**********************************************************************
      */
-    
+
     @Override
     public WritableObjectId findObjectId(Object forPojo, ObjectIdGenerator<?> generatorType)
     {
@@ -207,9 +221,9 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
         }
         // Not seen yet; must add an entry, return it. For that, we need generator
         ObjectIdGenerator<?> generator = null;
-        
+
         if (_objectIdGenerators == null) {
-            _objectIdGenerators = new ArrayList<ObjectIdGenerator<?>>(8);
+            _objectIdGenerators = new ArrayList<>(8);
         } else {
             for (int i = 0, len = _objectIdGenerators.size(); i < len; ++i) {
                 ObjectIdGenerator<?> gen = _objectIdGenerators.get(i);
@@ -235,18 +249,17 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
      */
     protected Map<Object,WritableObjectId> _createObjectIdMap()
     {
-        /* 06-Aug-2013, tatu: We may actually want to use equality,
-         *   instead of identity... so:
-         */
+        // 06-Aug-2013, tatu: We may actually want to use equality,
+        //   instead of identity... so:
         if (isEnabled(SerializationFeature.USE_EQUALITY_FOR_OBJECT_ID)) {
-            return new HashMap<Object,WritableObjectId>();
+            return new HashMap<>();
         }
-        return new IdentityHashMap<Object,WritableObjectId>();
+        return new IdentityHashMap<>();
     }
 
     /*
     /**********************************************************************
-    /* Extended API: simple accesors
+    /* Extended API: simple accessors
     /**********************************************************************
      */
 
@@ -265,7 +278,7 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
     /* Extended API called by ObjectMapper: value serialization
     /**********************************************************************
      */
-    
+
     /**
      * The method to be called by {@link ObjectMapper} and {@link ObjectWriter}
      * for serializing given value, using serializers that
@@ -302,7 +315,7 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
      * using serializers that
      * this provider has access to (via caching and/or creating new serializers
      * as need be),
-     * 
+     *
      * @param rootType Type to use for locating serializer to use, instead of actual
      *    runtime type. Must be actual type, or one of its super types
      */
@@ -337,7 +350,7 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
      * for serializing given value (assumed to be of specified root type,
      * instead of runtime type of value), when it may know specific
      * {@link ValueSerializer} to use.
-     * 
+     *
      * @param rootType Type to use for locating serializer to use, instead of actual
      *    runtime type, if no serializer is passed
      * @param ser Root Serializer to use, if not null
@@ -467,24 +480,11 @@ filter.getClass().getName(), e.getClass().getName(), ClassUtil.exceptionMessage(
      */
     public void acceptJsonFormatVisitor(JavaType javaType, JsonFormatVisitorWrapper visitor)
     {
-        if (javaType == null) {
-            throw new IllegalArgumentException("A class must be provided");
-        }
+        Objects.requireNonNull(javaType);
         // no need for embedded type information for JSON schema generation (all
         // type information it needs is accessible via "untyped" serializer)
-        visitor.setProvider(this);
+        visitor.setContext(this);
         findRootValueSerializer(javaType).acceptJsonFormatVisitor(visitor, javaType);
-    }
-
-    /*
-    /**********************************************************************
-    /* Other helper methods
-    /**********************************************************************
-     */
-
-    private void _assignGenerator(JsonGenerator g) {
-        _generator = g;
-        _writeCapabilities = g.streamWriteCapabilities();
     }
 
     /*

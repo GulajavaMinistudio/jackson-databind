@@ -3,7 +3,7 @@ package tools.jackson.databind.ser.impl;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.ser.SerializerCache;
-import tools.jackson.databind.util.SimpleLookupCache;
+import tools.jackson.databind.util.LookupCache;
 import tools.jackson.databind.util.TypeKey;
 
 /**
@@ -27,7 +27,7 @@ public final class ReadOnlyClassToSerializerMap
     private final int _mask;
 
     protected ReadOnlyClassToSerializerMap(SerializerCache shared,
-            SimpleLookupCache<TypeKey, ValueSerializer<Object>> src)
+            LookupCache<TypeKey, ValueSerializer<Object>> src)
     {
         _sharedCache = shared;
         _size = findSize(src.size());
@@ -55,7 +55,7 @@ public final class ReadOnlyClassToSerializerMap
      * Factory method for constructing an instance.
      */
     public static ReadOnlyClassToSerializerMap from(SerializerCache shared,
-            SimpleLookupCache<TypeKey, ValueSerializer<Object>> src) {
+            LookupCache<TypeKey, ValueSerializer<Object>> src) {
         return new ReadOnlyClassToSerializerMap(shared, src);
     }
 
@@ -66,7 +66,7 @@ public final class ReadOnlyClassToSerializerMap
      */
 
     public int size() { return _size; }
-    
+
     public ValueSerializer<Object> typedValueSerializer(JavaType type)
     {
         Bucket bucket = _buckets[TypeKey.typedHash(type) & _mask];
@@ -129,7 +129,7 @@ public final class ReadOnlyClassToSerializerMap
             }
         }
         return _sharedCache.untypedValueSerializer(rawType);
-    }    
+    }
 
     /*
     /**********************************************************************
@@ -146,7 +146,7 @@ public final class ReadOnlyClassToSerializerMap
         protected final JavaType _type;
 
         protected final boolean _isTyped;
-        
+
         public Bucket(Bucket next, TypeKey key, ValueSerializer<Object> value)
         {
             this.next = next;

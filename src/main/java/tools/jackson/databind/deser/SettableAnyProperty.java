@@ -1,7 +1,10 @@
 package tools.jackson.databind.deser;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
@@ -10,24 +13,18 @@ import tools.jackson.databind.deser.jdk.JDKValueInstantiators;
 import tools.jackson.databind.introspect.AnnotatedField;
 import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.introspect.AnnotatedMethod;
+import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
-import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.util.ClassUtil;
 
 /**
  * Class that represents a "wildcard" set method which can be used
  * to generically set values of otherwise unmapped (aka "unknown")
  * properties read from JSON content.
- *<p>
- * Note: starting with 2.14, is {@code abstract} class with multiple
- * concrete implementations
  */
 public abstract class SettableAnyProperty
-    implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L;
-    
     /**
      * Method used for setting "any" properties, along with annotation
      * information. Retained to allow contextualization of any properties.
@@ -103,6 +100,31 @@ public abstract class SettableAnyProperty
                 ctxt.getNodeFactory());
     }
 
+    /**
+     * @since 2.18
+     */
+    public static SettableAnyProperty constructForMapParameter(DeserializationContext ctxt,
+            BeanProperty property, AnnotatedMember field, JavaType valueType, KeyDeserializer keyDeser,
+            ValueDeserializer<Object> valueDeser, TypeDeserializer typeDeser, int parameterIndex
+    ) {
+        Class<?> mapType = field.getRawType();
+        // 02-Aug-2022, tatu: Ideally would be resolved to a concrete type by caller but
+        //    alas doesn't appear to happen. Nor does `BasicDeserializerFactory` expose method
+        //    for finding default or explicit mappings.
+        if (mapType == Map.class) {
+            mapType = LinkedHashMap.class;
+        }
+        ValueInstantiator vi = JDKValueInstantiators.findStdValueInstantiator(ctxt.getConfig(), mapType);
+        return new MapParameterAnyProperty(property, field, valueType, keyDeser, valueDeser, typeDeser, vi, parameterIndex);
+    }
+
+    public static SettableAnyProperty constructForJsonNodeParameter(DeserializationContext ctxt, BeanProperty prop,
+            AnnotatedMember mutator, JavaType valueType, ValueDeserializer<Object> valueDeser, int parameterIndex
+    ) {
+        return new JsonNodeParameterAnyProperty(prop, mutator, valueType, valueDeser, ctxt.getNodeFactory(), parameterIndex);
+    }
+
+
     // Abstract @since 2.14
     public abstract SettableAnyProperty withValueDeserializer(ValueDeserializer<Object> deser);
 
@@ -113,41 +135,55 @@ public abstract class SettableAnyProperty
 
     /*
     /**********************************************************************
-    /* JDK serialization handling
-    /**********************************************************************
-     */
-
-    /**
-     * Need to define this to verify that we retain actual Method reference
-     */
-    Object readResolve() {
-        // sanity check...
-        if (_setter == null || _setter.getAnnotated() == null) {
-            throw new IllegalArgumentException("Missing method/field (broken JDK (de)serialization?)");
-        }
-        return this;
-    }
-
-    /*
-    /**********************************************************************
     /* Public API, accessors
     /**********************************************************************
      */
 
     public BeanProperty getProperty() { return _property; }
-    
+
     public boolean hasValueDeserializer() { return (_valueDeserializer != null); }
 
     public JavaType getType() { return _type; }
 
     public String getPropertyName() { return _property.getName(); }
 
+    /**
+     * Accessor for parameterIndex.
+     * @return -1 if not a parameterized setter, otherwise index of parameter
+     *
+     * @since 2.18
+     */
+    public int getParameterIndex() { return -1; }
+
+    /**
+     * Method called to check whether this property is field
+     *
+     * @since 2.18.1
+     */
+    public boolean isFieldType() { return _setterIsField; }
+
+    /**
+     * Method called to check whether this property is method
+     *
+     * @return 2.18.2
+     */
+    public boolean isSetterType() { return _setter instanceof AnnotatedMethod; }
+
+    /**
+     * Create an instance of value to pass through Creator parameter.
+     *
+     * @since 2.18
+     */
+    public Object createParameterObject() {
+        throw new UnsupportedOperationException("Cannot call createParameterObject() on " + getClass().getName());
+    }
+
     /*
     /**********************************************************************
     /* Public API, deserialization
     /**********************************************************************
      */
-    
+
     /**
      * Method called to deserialize appropriate value, given parser (and
      * context), and set it using appropriate method (a setter method).
@@ -159,7 +195,7 @@ public abstract class SettableAnyProperty
         try {
             Object key = (_keyDeserializer == null) ? propName
                     : _keyDeserializer.deserializeKey(propName, ctxt);
-            set(instance, key, deserialize(p, ctxt));
+            set(ctxt, instance, key, deserialize(p, ctxt));
         } catch (UnresolvedForwardReference reference) {
             if (_valueDeserializer.getObjectIdReader(ctxt) == null) {
                 throw DatabindException.from(p, "Unresolved forward reference but no identity info.", reference);
@@ -182,18 +218,19 @@ public abstract class SettableAnyProperty
         return _valueDeserializer.deserialize(p, ctxt);
     }
 
-    public void set(Object instance, Object propName, Object value) throws JacksonException
+    public void set(DeserializationContext ctxt, Object instance, Object propName, Object value) throws JacksonException
     {
         try {
-            _set(instance, propName, value);
+            _set(ctxt, instance, propName, value);
         } catch (JacksonException e) {
             throw e;
         } catch (Exception e) {
-            _throwAsIOE(e, propName, value);
+            _throwAsIOE(ctxt, e, propName, value);
         }
     }
 
-    protected abstract void _set(Object instance, Object propName, Object value) throws Exception;
+    protected abstract void _set(DeserializationContext ctxt, Object instance, Object propName, Object value)
+        throws Exception;
 
     /*
     /**********************************************************************
@@ -202,31 +239,38 @@ public abstract class SettableAnyProperty
      */
 
     /**
-     * @param e Exception to re-throw or wrap
+     * @param t Exception to re-throw or wrap
      * @param propName Name of property (from Json input) to set
      * @param value Value of the property
      */
-    protected void _throwAsIOE(Exception e, Object propName, Object value)
+    protected void _throwAsIOE(DeserializationContext ctxt, Throwable t, Object propName, Object value)
         throws JacksonException
     {
-        if (e instanceof IllegalArgumentException) {
+        if (t instanceof IllegalArgumentException) {
             String actType = ClassUtil.classNameOf(value);
             StringBuilder msg = new StringBuilder("Problem deserializing \"any-property\" '").append(propName);
             msg.append("' of class "+getClassName()+" (expected type: ").append(_type);
             msg.append("; actual type: ").append(actType).append(")");
-            String origMsg = ClassUtil.exceptionMessage(e);
+            String origMsg = ClassUtil.exceptionMessage(t);
             if (origMsg != null) {
                 msg.append(", problem: ").append(origMsg);
             } else {
                 msg.append(" (no error message provided)");
             }
-            throw DatabindException.from((JsonParser) null, msg.toString(), e);
+            throw DatabindException.from(ctxt, msg.toString(), t);
         }
-        ClassUtil.throwIfJacksonE(e);
-        ClassUtil.throwIfRTE(e);
+        ClassUtil.throwIfJacksonE(t);
+        ClassUtil.throwIfRTE(t);
         // let's wrap the innermost problem
-        Throwable t = ClassUtil.getRootCause(e);
-        throw DatabindException.from((JsonParser) null, ClassUtil.exceptionMessage(t), t);
+        // 11-Apr-2025: [databind#4603] no more general unwrapping
+        // Throwable t = ClassUtil.getRootCause(e);
+        // ... just one:
+        if (t instanceof InvocationTargetException ite) {
+            t = ite.getTargetException();
+            ClassUtil.throwIfRTE(t);
+            ClassUtil.throwIfJacksonE(t);
+        }
+        throw DatabindException.from(ctxt, ClassUtil.exceptionMessage(t), t);
     }
 
     private String getClassName() { return ClassUtil.nameOf(_setter.getDeclaringClass()); }
@@ -248,14 +292,14 @@ public abstract class SettableAnyProperty
         }
 
         @Override
-        public void handleResolvedForwardReference(Object id, Object value)
+        public void handleResolvedForwardReference(DeserializationContext ctxt, Object id, Object value)
             throws JacksonException
         {
             if (!hasId(id)) {
                 throw new IllegalArgumentException("Trying to resolve a forward reference with id [" + id.toString()
                         + "] that wasn't previously registered.");
             }
-            _parent.set(_pojo, _propName, value);
+            _parent.set(ctxt, _pojo, _propName, value);
         }
     }
 
@@ -266,10 +310,7 @@ public abstract class SettableAnyProperty
      */
 
     protected static class MethodAnyProperty extends SettableAnyProperty
-        implements java.io.Serializable
     {
-        private static final long serialVersionUID = 1L;
-
         public MethodAnyProperty(BeanProperty property,
                 AnnotatedMember field, JavaType valueType,
                 KeyDeserializer keyDeser,
@@ -279,7 +320,8 @@ public abstract class SettableAnyProperty
         }
 
         @Override
-        protected void _set(Object instance, Object propName, Object value) throws Exception
+        protected void _set(DeserializationContext ctxt, Object instance, Object propName, Object value)
+            throws Exception
         {
             // note: cannot use 'setValue()' due to taking 2 args
             ((AnnotatedMethod) _setter).callOnWith(instance, propName, value);
@@ -296,10 +338,7 @@ public abstract class SettableAnyProperty
      * @since 2.14
      */
     protected static class MapFieldAnyProperty extends SettableAnyProperty
-        implements java.io.Serializable
     {
-        private static final long serialVersionUID = 1L;
-
         protected final ValueInstantiator _valueInstantiator;
 
         public MapFieldAnyProperty(BeanProperty property,
@@ -318,10 +357,11 @@ public abstract class SettableAnyProperty
                     _keyDeserializer, deser, _valueTypeDeserializer,
                     _valueInstantiator);
         }
-        
+
         @SuppressWarnings("unchecked")
         @Override
-        protected void _set(Object instance, Object propName, Object value) throws Exception
+        protected void _set(DeserializationContext ctxt, Object instance, Object propName, Object value)
+            throws Exception
         {
             AnnotatedField field = (AnnotatedField) _setter;
             Map<Object,Object> val = (Map<Object,Object>) field.getValue(instance);
@@ -350,14 +390,8 @@ public abstract class SettableAnyProperty
         }
     }
 
-    /**
-     * @since 2.14
-     */
     protected static class JsonNodeFieldAnyProperty extends SettableAnyProperty
-        implements java.io.Serializable
     {
-        private static final long serialVersionUID = 1L;
-
         protected final JsonNodeFactory _nodeFactory;
 
         public JsonNodeFieldAnyProperty(BeanProperty property,
@@ -385,7 +419,7 @@ public abstract class SettableAnyProperty
         }
 
         @Override
-        protected void _set(Object instance, Object propName, Object value) throws Exception {
+        protected void _set(DeserializationContext ctxt, Object instance, Object propName, Object value) throws Exception {
             setProperty(instance, (String) propName, (JsonNode) value);
         }
 
@@ -416,5 +450,89 @@ public abstract class SettableAnyProperty
         public SettableAnyProperty withValueDeserializer(ValueDeserializer<Object> deser) {
             return this;
         }
+    }
+
+    /**
+     * [databind#562] Allow @JsonAnySetter on Creator constructor
+     */
+    protected static class MapParameterAnyProperty extends SettableAnyProperty
+    {
+        protected final ValueInstantiator _valueInstantiator;
+
+        protected final int _parameterIndex;
+
+        public MapParameterAnyProperty(BeanProperty property, AnnotatedMember field, JavaType valueType,
+                KeyDeserializer keyDeser, ValueDeserializer<Object> valueDeser, TypeDeserializer typeDeser,
+                ValueInstantiator inst, int parameterIndex)
+        {
+            super(property, field, valueType, keyDeser, valueDeser, typeDeser);
+            _valueInstantiator = Objects.requireNonNull(inst, "ValueInstantiator for MapParameterAnyProperty cannot be `null`");
+            _parameterIndex = parameterIndex;
+        }
+
+        @Override
+        public SettableAnyProperty withValueDeserializer(ValueDeserializer<Object> deser)
+        {
+            return new MapParameterAnyProperty(_property, _setter, _type, _keyDeserializer, deser,
+                    _valueTypeDeserializer, _valueInstantiator, _parameterIndex);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        protected void _set(DeserializationContext ctxt, Object instance, Object propName, Object value)
+        {
+            ((Map<Object, Object>) instance).put(propName, value);
+        }
+
+        @Override
+        public int getParameterIndex() { return _parameterIndex; }
+
+        @Override
+        public Object createParameterObject() { return new HashMap<>(); }
+    }
+
+    /**
+     * [databind#562] Allow @JsonAnySetter on Creator constructor
+     */
+    protected static class JsonNodeParameterAnyProperty extends SettableAnyProperty
+    {
+        protected final JsonNodeFactory _nodeFactory;
+
+        protected final int _parameterIndex;
+
+        public JsonNodeParameterAnyProperty(BeanProperty property, AnnotatedMember field, JavaType valueType,
+                ValueDeserializer<Object> valueDeser, JsonNodeFactory nodeFactory, int parameterIndex)
+        {
+            super(property, field, valueType, null, valueDeser, null);
+            _nodeFactory = nodeFactory;
+            _parameterIndex = parameterIndex;
+        }
+
+        // Let's override since this is much simpler with JsonNodes
+        @Override
+        public Object deserialize(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
+        {
+            return _valueDeserializer.deserialize(p, ctxt);
+        }
+
+        @Override
+        protected void _set(DeserializationContext ctxt, Object instance, Object propName, Object value)
+            throws Exception
+        {
+            ((ObjectNode) instance).set((String) propName, (JsonNode) value);
+        }
+
+        // Should not get called but...
+        @Override
+        public SettableAnyProperty withValueDeserializer(ValueDeserializer<Object> deser) {
+            throw new UnsupportedOperationException("Cannot call withValueDeserializer() on " + getClass().getName());
+        }
+
+        @Override
+        public int getParameterIndex() { return _parameterIndex; }
+
+        @Override
+        public Object createParameterObject() { return _nodeFactory.objectNode(); }
     }
 }

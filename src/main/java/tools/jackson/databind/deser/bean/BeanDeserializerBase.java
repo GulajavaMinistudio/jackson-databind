@@ -1,15 +1,16 @@
 package tools.jackson.databind.deser.bean;
 
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.*;
 import tools.jackson.core.JsonParser.NumberType;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.ConfigOverride;
 import tools.jackson.databind.deser.*;
 import tools.jackson.databind.deser.impl.*;
 import tools.jackson.databind.deser.std.StdConvertingDeserializer;
@@ -53,7 +54,7 @@ public abstract class BeanDeserializerBase
      */
 
     /**
-     * Object that handles details of constructing initial 
+     * Object that handles details of constructing initial
      * bean value (to which bind data to), unless instance
      * is passed (via updateValue())
      */
@@ -173,7 +174,7 @@ public abstract class BeanDeserializerBase
      * that is, when the actual type is not statically known.
      * For other types this remains null.
      */
-    protected transient HashMap<ClassKey, ValueDeserializer<Object>> _subDeserializers;
+    protected transient ConcurrentHashMap<ClassKey, ValueDeserializer<Object>> _subDeserializers;
 
     /**
      * If one of properties has "unwrapped" value, we need separate
@@ -182,7 +183,7 @@ public abstract class BeanDeserializerBase
     protected UnwrappedPropertyHandler _unwrappedPropertyHandler;
 
     /**
-     * Handler that we need iff any of properties uses external
+     * Handler that we need if any of properties uses external
      * type id.
      */
     protected ExternalTypeHandler _externalTypeIdHandler;
@@ -205,20 +206,20 @@ public abstract class BeanDeserializerBase
      * contains configuration.
      */
     protected BeanDeserializerBase(BeanDeserializerBuilder builder,
-            BeanDescription beanDesc,
+            BeanDescription.Supplier beanDescRef,
             BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
             Set<String> ignorableProps, boolean ignoreAllUnknown,
             Set<String> includableProps,
             boolean hasViews)
     {
-        super(beanDesc.getType());
-        _beanType = beanDesc.getType();
+        super(beanDescRef.getType());
+        _beanType = beanDescRef.getType();
 
         _valueInstantiator = builder.getValueInstantiator();
         _delegateDeserializer = null;
         _arrayDelegateDeserializer = null;
         _propertyBasedCreator = null;
-        
+
         _beanProperties = properties;
         _backRefs = backRefs;
         _ignorableProps = ignorableProps;
@@ -246,7 +247,7 @@ public abstract class BeanDeserializerBase
             ;
 
         // Any transformation we may need to apply?
-        _serializationShape = beanDesc.findExpectedFormat(_beanType.getRawClass()).getShape();
+        _serializationShape = beanDescRef.findExpectedFormat(_beanType.getRawClass()).getShape();
 
         _needViewProcesing = hasViews;
         _vanillaProcessing = !_nonStandardCreation
@@ -264,14 +265,14 @@ public abstract class BeanDeserializerBase
     protected BeanDeserializerBase(BeanDeserializerBase src, boolean ignoreAllUnknown)
     {
         super(src._beanType);
-        
+
         _beanType = src._beanType;
-        
+
         _valueInstantiator = src._valueInstantiator;
         _delegateDeserializer = src._delegateDeserializer;
         _arrayDelegateDeserializer = src._arrayDelegateDeserializer;
         _propertyBasedCreator = src._propertyBasedCreator;
-        
+
         _beanProperties = src._beanProperties;
         _backRefs = src._backRefs;
         _ignorableProps = src._ignorableProps;
@@ -280,31 +281,32 @@ public abstract class BeanDeserializerBase
         _anySetter = src._anySetter;
         _injectables = src._injectables;
         _objectIdReader = src._objectIdReader;
-        
+
         _nonStandardCreation = src._nonStandardCreation;
         _unwrappedPropertyHandler = src._unwrappedPropertyHandler;
         _needViewProcesing = src._needViewProcesing;
         _serializationShape = src._serializationShape;
 
         _vanillaProcessing = src._vanillaProcessing;
+
+        _externalTypeIdHandler = src._externalTypeIdHandler;
     }
 
     /**
-     * Constructor used in cases where unwrapping-with-name-change has been 
+     * Constructor used in cases where unwrapping-with-name-change has been
      * invoked and lookup indices need to be updated.
      */
     protected BeanDeserializerBase(BeanDeserializerBase src,
-            UnwrappedPropertyHandler unwrapHandler, BeanPropertyMap renamedProperties,
-            boolean ignoreAllUnknown)
+            UnwrappedPropertyHandler unwrapHandler, PropertyBasedCreator propertyBasedCreator,
+           BeanPropertyMap renamedProperties, boolean ignoreAllUnknown)
     {
         super(src._beanType);
 
         _beanType = src._beanType;
-        
+
         _valueInstantiator = src._valueInstantiator;
         _delegateDeserializer = src._delegateDeserializer;
         _arrayDelegateDeserializer = src._arrayDelegateDeserializer;
-        _propertyBasedCreator = src._propertyBasedCreator;
 
         _backRefs = src._backRefs;
         _ignorableProps = src._ignorableProps;
@@ -317,31 +319,35 @@ public abstract class BeanDeserializerBase
         _nonStandardCreation = src._nonStandardCreation;
 
         _unwrappedPropertyHandler = unwrapHandler;
+        _propertyBasedCreator = propertyBasedCreator;
         _beanProperties = renamedProperties;
+
         _needViewProcesing = src._needViewProcesing;
         _serializationShape = src._serializationShape;
 
         // probably adds a twist, so:
         _vanillaProcessing = false;
+
+        _externalTypeIdHandler = src._externalTypeIdHandler;
     }
 
     protected BeanDeserializerBase(BeanDeserializerBase src, ObjectIdReader oir)
     {
         super(src._beanType);
         _beanType = src._beanType;
-        
+
         _valueInstantiator = src._valueInstantiator;
         _delegateDeserializer = src._delegateDeserializer;
         _arrayDelegateDeserializer = src._arrayDelegateDeserializer;
         _propertyBasedCreator = src._propertyBasedCreator;
-        
+
         _backRefs = src._backRefs;
         _ignorableProps = src._ignorableProps;
         _ignoreAllUnknown = src._ignoreAllUnknown;
         _includableProps = src._includableProps;
         _anySetter = src._anySetter;
         _injectables = src._injectables;
-        
+
         _nonStandardCreation = src._nonStandardCreation;
         _unwrappedPropertyHandler = src._unwrappedPropertyHandler;
         _needViewProcesing = src._needViewProcesing;
@@ -361,6 +367,8 @@ public abstract class BeanDeserializerBase
             _beanProperties = src._beanProperties.withProperty(idProp);
             _vanillaProcessing = false;
         }
+
+        _externalTypeIdHandler = src._externalTypeIdHandler;
     }
 
     /**
@@ -371,7 +379,7 @@ public abstract class BeanDeserializerBase
     {
         super(src._beanType);
         _beanType = src._beanType;
-        
+
         _valueInstantiator = src._valueInstantiator;
         _delegateDeserializer = src._delegateDeserializer;
         _arrayDelegateDeserializer = src._arrayDelegateDeserializer;
@@ -395,6 +403,8 @@ public abstract class BeanDeserializerBase
         // 01-May-2016, tatu: [databind#1217]: Remove properties from mapping,
         //    to avoid them being deserialized
         _beanProperties = src._beanProperties.withoutProperties(ignorableProps, includableProps);
+
+        _externalTypeIdHandler = src._externalTypeIdHandler;
     }
 
     protected BeanDeserializerBase(BeanDeserializerBase src, BeanPropertyMap beanProps)
@@ -415,13 +425,15 @@ public abstract class BeanDeserializerBase
         _anySetter = src._anySetter;
         _injectables = src._injectables;
         _objectIdReader = src._objectIdReader;
-        
+
         _nonStandardCreation = src._nonStandardCreation;
         _unwrappedPropertyHandler = src._unwrappedPropertyHandler;
         _needViewProcesing = src._needViewProcesing;
         _serializationShape = src._serializationShape;
 
         _vanillaProcessing = src._vanillaProcessing;
+
+        _externalTypeIdHandler = src._externalTypeIdHandler;
     }
 
     public abstract BeanDeserializerBase withObjectIdReader(ObjectIdReader oir);
@@ -475,7 +487,7 @@ public abstract class BeanDeserializerBase
             creatorProps = _valueInstantiator.getFromObjectArguments(ctxt.getConfig());
 
             // 22-Jan-2018, tatu: May need to propagate "ignorable" status (from `Access.READ_ONLY`
-            //     or perhaps class-ignorables) into Creator properties too. Can not just delete,
+            //     or perhaps class-ignorables) into Creator properties too. Cannot just delete,
             //     at this point, but is needed for further processing down the line
             if (_ignorableProps != null || _includableProps != null) {
                 for (int i = 0, end = creatorProps.length; i < end; ++i) {
@@ -538,7 +550,13 @@ public abstract class BeanDeserializerBase
                     if (unwrapped == null) {
                         unwrapped = new UnwrappedPropertyHandler();
                     }
-                    unwrapped.addProperty(prop);
+
+                    if (prop instanceof CreatorProperty) {
+                        unwrapped.addCreatorProperty(prop);
+                    } else {
+                        unwrapped.addProperty(prop);
+                    }
+
                     // 12-Dec-2014, tatu: As per [databind#647], we will have problems if
                     //    the original property is left in place. So let's remove it now.
                     // 25-Mar-2017, tatu: Wonder if this could be problematic wrt creators?
@@ -616,7 +634,7 @@ ClassUtil.getTypeDescription(_beanType), ClassUtil.classNameOf(_valueInstantiato
             // we consider this non-standard, to offline handling
             _nonStandardCreation = true;
         }
-        
+
         _unwrappedPropertyHandler = unwrapped;
         if (unwrapped != null) { // we consider this non-standard, to offline handling
             _nonStandardCreation = true;
@@ -656,11 +674,27 @@ ClassUtil.getTypeDescription(_beanType), ClassUtil.classNameOf(_valueInstantiato
     private ValueDeserializer<Object> _findDelegateDeserializer(DeserializationContext ctxt,
             JavaType delegateType, AnnotatedWithParams delegateCreator)
     {
-        // Need to create a temporary property to allow contextual deserializers:
-        BeanProperty.Std property = new BeanProperty.Std(TEMP_PROPERTY_NAME,
-                delegateType, null, delegateCreator,
-                PropertyMetadata.STD_OPTIONAL);
-        TypeDeserializer td = (TypeDeserializer) delegateType.getTypeHandler();
+        // 27-Nov-2023, tatu: [databind#4200] Need to resolve PropertyMetadata.
+        //   And all we have is the actual Creator method; but for annotations
+        //   we actually need the one parameter -- if there is one
+        //   (NOTE! This would not work for case of more than one parameter with
+        //   delegation, others injected)
+        final BeanProperty property;
+
+        if ((delegateCreator != null) && (delegateCreator.getParameterCount() == 1)) {
+            AnnotatedMember delegator = delegateCreator.getParameter(0);
+            PropertyMetadata propMd = _getSetterInfo(ctxt, delegator, delegateType);
+            property = new BeanProperty.Std(TEMP_PROPERTY_NAME,
+                    delegateType, null, delegator, propMd);
+        } else {
+            // No creator indicated; or Zero, or more than 2 arguments (since we don't
+            // know which one is the  "real" delegating parameter. Although could possibly
+            // figure it out if someone provides actual use case
+            property = new BeanProperty.Std(TEMP_PROPERTY_NAME,
+                    delegateType, null, delegateCreator,
+                    PropertyMetadata.STD_OPTIONAL);
+        }
+        TypeDeserializer td = (TypeDeserializer)  delegateType.getTypeHandler();
         if (td == null) {
             td = ctxt.findTypeDeserializer(delegateType);
         }
@@ -677,6 +711,60 @@ ClassUtil.getTypeDescription(_beanType), ClassUtil.classNameOf(_valueInstantiato
             return new TypeWrappedDeserializer(td, dd);
         }
         return dd;
+    }
+
+    /**
+     * Method essentially copied from {@code BasicDeserializerFactory},
+     * needed to find {@link PropertyMetadata} for Delegating Creator,
+     * for access to annotation-derived info.
+     */
+    protected PropertyMetadata _getSetterInfo(DeserializationContext ctxt,
+            AnnotatedMember accessor, JavaType type)
+    {
+        final AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
+        final DeserializationConfig config = ctxt.getConfig();
+
+        PropertyMetadata metadata = PropertyMetadata.STD_OPTIONAL;
+        boolean needMerge = true;
+        Nulls valueNulls = null;
+        Nulls contentNulls = null;
+
+        // NOTE: compared to `POJOPropertyBuilder`, we only have access to creator
+        // parameter, not other accessors, so code bit simpler
+        // Ok, first: does property itself have something to say?
+        if (intr != null) {
+            JsonSetter.Value setterInfo = intr.findSetterInfo(config, accessor);
+            if (setterInfo != null) {
+                valueNulls = setterInfo.nonDefaultValueNulls();
+                contentNulls = setterInfo.nonDefaultContentNulls();
+            }
+        }
+        // If not, config override?
+        if (needMerge || (valueNulls == null) || (contentNulls == null)) {
+            ConfigOverride co = config.getConfigOverride(type.getRawClass());
+            JsonSetter.Value setterInfo = co.getNullHandling();
+            if (setterInfo != null) {
+                if (valueNulls == null) {
+                    valueNulls = setterInfo.nonDefaultValueNulls();
+                }
+                if (contentNulls == null) {
+                    contentNulls = setterInfo.nonDefaultContentNulls();
+                }
+            }
+        }
+        if (needMerge || (valueNulls == null) || (contentNulls == null)) {
+            JsonSetter.Value setterInfo = config.getDefaultNullHandling();
+            if (valueNulls == null) {
+                valueNulls = setterInfo.nonDefaultValueNulls();
+            }
+            if (contentNulls == null) {
+                contentNulls = setterInfo.nonDefaultContentNulls();
+            }
+        }
+        if ((valueNulls != null) || (contentNulls != null)) {
+            metadata = metadata.withNulls(valueNulls, contentNulls);
+        }
+        return metadata;
     }
 
     /**
@@ -727,7 +815,7 @@ ClassUtil.getTypeDescription(_beanType), ClassUtil.classNameOf(_valueInstantiato
             if (objectIdInfo != null) { // some code duplication here as well (from BeanDeserializerFactory)
                 // 2.1: allow modifications by "id ref" annotations as well:
                 objectIdInfo = intr.findObjectReferenceInfo(config, accessor, objectIdInfo);
-                
+
                 Class<?> implClass = objectIdInfo.getGeneratorType();
                 // Property-based generator is trickier
                 JavaType idType;
@@ -803,7 +891,7 @@ ClassUtil.nameOf(handledType()), ClassUtil.name(propName)));
         // 30-Mar-2020, tatu: As per [databind#2627], need to also allow
         //    per-property override to "ignore all unknown".
         //  NOTE: there is no way to override with `false` because annotation
-        //  defaults to `false` (i.e. can not know if `false` is explicit value)
+        //  defaults to `false` (i.e. cannot know if `false` is explicit value)
         if (ignorals.getIgnoreUnknown() && !_ignoreAllUnknown) {
             contextual = contextual.withIgnoreAllUnknown(true);
         }
@@ -891,13 +979,6 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
             NameTransformer unwrapper = ctxt.getAnnotationIntrospector().findUnwrappingNameTransformer(
                     ctxt.getConfig(), am);
             if (unwrapper != null) {
-                // 01-Dec-2016, tatu: As per [databind#265] we cannot yet support passing
-                //   of unwrapped values through creator properties, so fail fast
-                if (prop instanceof CreatorProperty) {
-                    ctxt.reportBadDefinition(getValueType(), String.format(
-                            "Cannot define Creator property \"%s\" as `@JsonUnwrapped`: combination not yet supported",
-                            prop.getName()));
-                }
                 return unwrapper;
             }
         }
@@ -916,8 +997,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
          */
         ValueDeserializer<Object> deser = prop.getValueDeserializer();
         // ideally wouldn't rely on it being BeanDeserializerBase; but for now it'll have to do
-        if (deser instanceof BeanDeserializerBase) {
-            BeanDeserializerBase bd = (BeanDeserializerBase) deser;
+        if (deser instanceof BeanDeserializerBase bd) {
             ValueInstantiator vi = bd.getValueInstantiator();
             if (!vi.canCreateUsingDefault()) { // no default constructor
                 Class<?> valueClass = prop.getType().getRawClass();
@@ -950,7 +1030,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         if (merge != null) {
             ValueDeserializer<?> valueDeser = prop.getValueDeserializer();
             Boolean mayMerge = valueDeser.supportsUpdate(ctxt.getConfig());
-    
+
             if (mayMerge == null) {
                 // we don't really know if it's ok; so only use if explicitly specified
                 if (merge.fromDefaults) {
@@ -1019,7 +1099,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     /**
      * Accessor for checking whether this deserializer is operating
      * in case-insensitive manner.
-     * 
+     *
      * @return True if this deserializer should match property names without
      *    considering casing; false if case has to match exactly.
      *
@@ -1036,7 +1116,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         //   bean settings...
         return Boolean.TRUE;
     }
-    
+
     @Override
     public Class<?> handledType() {
         return _beanType.getRawClass();
@@ -1051,7 +1131,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     public ObjectIdReader getObjectIdReader(DeserializationContext ctxt) {
         return _objectIdReader;
     }
-    
+
     public boolean hasProperty(String propertyName) {
         return _beanProperties.findDefinition(propertyName) != null;
     }
@@ -1059,11 +1139,11 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     public boolean hasViews() {
         return _needViewProcesing;
     }
-    
+
     /**
      * Accessor for checking number of deserialized properties.
      */
-    public int getPropertyCount() { 
+    public int getPropertyCount() {
         return _beanProperties.size();
     }
 
@@ -1125,7 +1205,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         // TODO: start matching full name?
         return findProperty(propertyName.getSimpleName());
     }
-    
+
     /**
      * Accessor for finding the property with given name, if POJO
      * has one. Name used is the external name, i.e. name used
@@ -1248,11 +1328,11 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         }
 
         ReadableObjectId roid = ctxt.findObjectId(id, _objectIdReader.generator, _objectIdReader.resolver);
-        roid.bindItem(pojo);
+        roid.bindItem(ctxt, pojo);
         // also: may need to set a property value as well
         SettableBeanProperty idProp = _objectIdReader.idProperty;
         if (idProp != null) {
-            return idProp.setAndReturn(pojo, id);
+            return idProp.setAndReturn(ctxt, pojo, id);
         }
         return pojo;
     }
@@ -1269,12 +1349,12 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
             Object rawId, ValueDeserializer<Object> idDeser) throws JacksonException
     {
         TokenBuffer buf = ctxt.bufferForInputBuffering(p);
-        if (rawId instanceof String) {
-            buf.writeString((String) rawId);
-        } else if (rawId instanceof Long) {
-            buf.writeNumber(((Long) rawId).longValue());
-        } else if (rawId instanceof Integer) {
-            buf.writeNumber(((Integer) rawId).intValue());
+        if (rawId instanceof String rString) {
+            buf.writeString(rString);
+        } else if (rawId instanceof Long rLong) {
+            buf.writeNumber(rLong.longValue());
+        } else if (rawId instanceof Integer rInt) {
+            buf.writeNumber(rInt.intValue());
         } else {
             // should we worry about UUIDs? They should be fine, right?
             // 07-Aug-2014, tatu: Maybe, but not necessarily; had issues with
@@ -1283,7 +1363,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
             //   but that won't work for default impl (JSON and most dataformats)
             buf.writePOJO(rawId);
         }
-        JsonParser bufParser = buf.asParserOnFirstToken();
+        JsonParser bufParser = buf.asParserOnFirstToken(ctxt);
         return idDeser.deserialize(bufParser, ctxt);
     }
 
@@ -1321,7 +1401,9 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     protected Object deserializeFromObjectUsingNonDefault(JsonParser p,
             DeserializationContext ctxt) throws JacksonException
     {
-        final ValueDeserializer<Object> delegateDeser = _delegateDeserializer();
+        // 02-Jul-2024, tatu: [databind#4602] Need to tweak regular and "array" delegating
+        //   Creator handling
+        final ValueDeserializer<Object> delegateDeser = _delegateDeserializer(p);
         if (delegateDeser != null) {
             final Object bean = _valueInstantiator.createUsingDelegate(ctxt,
                     delegateDeser.deserialize(p, ctxt));
@@ -1344,7 +1426,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         // 01-May-2022, tatu: [databind#3417] special handling for (Graal) native images
         if (NativeImageUtil.needsReflectionConfiguration(raw)) {
             return ctxt.handleMissingInstantiator(raw, null, p,
-                    "cannot deserialize from Object value (no delegate- or property-based Creator): this appears to be a native image, in which case you may need to configure reflection for the class that is to be deserialized");
+"cannot deserialize from Object value (no delegate- or property-based Creator): this appears to be a native image, in which case you may need to configure reflection for the class that is to be deserialized");
         }
         return ctxt.handleMissingInstantiator(raw, getValueInstantiator(), p,
 "cannot deserialize from Object value (no delegate- or property-based Creator)");
@@ -1534,6 +1616,28 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         return deser;
     }
 
+    /**
+     * Alternate to {@link #_delegateDeserializer()} which will only consider
+     * {@code _arrayDelegateDeserializer} if given {@link JsonParser} points to
+     * {@link JsonToken#START_ARRAY} token.
+     */
+    protected final ValueDeserializer<Object> _delegateDeserializer(JsonParser p) {
+        if (_delegateDeserializer == null) {
+            // Note! Will not call `JsonParser.isExpectedArrayToken()` as that could
+            // "transform" `JsonToken.START_OBJECT` into `JsonToken.START_ARRAY` and
+            // here there is no strong expectation of Array value
+            if (_arrayDelegateDeserializer != null) {
+                // Alas, need bit elaborate logic: either JSON Array, OR no
+                // Properties-based Creator
+                if (p.hasToken(JsonToken.START_ARRAY)
+                        || (_propertyBasedCreator == null)) {
+                    return _arrayDelegateDeserializer;
+                }
+            }
+        }
+        return _delegateDeserializer;
+    }
+
     /*
     /**********************************************************************
     /* Overridable helper methods
@@ -1644,18 +1748,17 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
      *   (in addition to buffered properties); if null, all properties are passed
      *   in buffer
      */
-    protected Object handlePolymorphic(JsonParser p, DeserializationContext ctxt,                                          
+    protected Object handlePolymorphic(JsonParser p, DeserializationContext ctxt,
             Object bean, TokenBuffer unknownTokens)
         throws JacksonException
-    {  
+    {
         // First things first: maybe there is a more specific deserializer available?
         ValueDeserializer<Object> subDeser = _findSubclassDeserializer(ctxt, bean, unknownTokens);
         if (subDeser != null) {
             if (unknownTokens != null) {
                 // need to add END_OBJECT marker first
                 unknownTokens.writeEndObject();
-                JsonParser p2 = unknownTokens.asParser(ctxt);
-                p2.nextToken(); // to get to first data field
+                JsonParser p2 = unknownTokens.asParserOnFirstToken(ctxt, p);
                 bean = subDeser.deserialize(p2, ctxt, bean);
             }
             // Original parser may also have some leftovers
@@ -1682,18 +1785,15 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     protected ValueDeserializer<Object> _findSubclassDeserializer(DeserializationContext ctxt,
             Object bean, TokenBuffer unknownTokens)
         throws JacksonException
-    {  
-        ValueDeserializer<Object> subDeser;
-
+    {
         // First: maybe we have already created sub-type deserializer?
-        synchronized (this) {
-            subDeser = (_subDeserializers == null) ? null : _subDeserializers.get(new ClassKey(bean.getClass()));
-        }
+        final ClassKey classKey = new ClassKey(bean.getClass());
+        ValueDeserializer<Object> subDeser = (_subDeserializers == null) ? null : _subDeserializers.get(classKey);
         if (subDeser != null) {
             return subDeser;
         }
         // If not, maybe we can locate one. First, need provider
-        JavaType type = ctxt.constructType(bean.getClass());
+        final JavaType type = ctxt.constructType(bean.getClass());
         /* 30-Jan-2012, tatu: Ideally we would be passing referring
          *   property; which in theory we could keep track of via
          *   ResolvableDeserializer (if we absolutely must...).
@@ -1703,12 +1803,14 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         subDeser = ctxt.findRootValueDeserializer(type);
         // Also, need to cache it
         if (subDeser != null) {
-            synchronized (this) {
-                if (_subDeserializers == null) {
-                    _subDeserializers = new HashMap<ClassKey,ValueDeserializer<Object>>();;
+            if (_subDeserializers == null) {
+                synchronized (this) {
+                    if (_subDeserializers == null) {
+                        _subDeserializers = new ConcurrentHashMap<>();
+                    }
                 }
-                _subDeserializers.put(new ClassKey(bean.getClass()), subDeser);
-            }            
+            }
+            _subDeserializers.put(classKey, subDeser);
         }
         return subDeser;
     }
@@ -1722,33 +1824,34 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
     /**
      * Method that will modify caught exception (passed in as argument)
      * as necessary to include reference information, and to ensure it
-     * is a subtype of {@link IOException}, or an unchecked exception.
+     * is a subtype of {@link DatabindException}, or an unchecked exception.
      *<p>
      * Rules for wrapping and unwrapping are bit complicated; essentially:
      *<ul>
      * <li>Errors are to be passed as is (if uncovered via unwrapping)
-     * <li>"Plain" IOExceptions (ones that are not of type
-     *   {@link DatabindException} are to be passed as is
+     * <li>{@code JacksonException} are to be passed as is
      *</ul>
      * The method always throws but declares its return type as
-     * {@link IOException} in order to allow callers to invoke method as
+     * {@link DatabindException} in order to allow callers to invoke method as
      * {@code throw wrapAndThrow(...);} thereby ensuring complete code
      * coverage is possible. This also ensures that all call paths within
      * this method throw an exception; otherwise they would be required
      * to return.
      */
-    public DatabindException wrapAndThrow(Throwable t, Object bean, String fieldName, DeserializationContext ctxt)
+    public DatabindException wrapAndThrow(Throwable t, Object bean, String fieldName,
+            DeserializationContext ctxt)
     {
         // 23-Aug-2022, tatu: Due to fix to prevent "double-array-wrapping", looks
         //    like 'fieldName' may occasionally be `null`; hence
         if (fieldName == null) {
             fieldName = "";
         }
-        throw DatabindException.wrapWithPath(throwOrReturnThrowable(t, ctxt),
-                bean, fieldName);
+        throw DatabindException.wrapWithPath(ctxt,
+                throwOrReturnThrowable(ctxt, t),
+                new JacksonException.Reference(bean, fieldName));
     }
 
-    private Throwable throwOrReturnThrowable(Throwable t, DeserializationContext ctxt) 
+    private Throwable throwOrReturnThrowable(DeserializationContext ctxt, Throwable t)
         throws JacksonException
     {
         // 05-Mar-2009, tatu: But one nasty edge is when we get
@@ -1771,7 +1874,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         return t;
     }
 
-    protected Object wrapInstantiationProblem(Throwable t, DeserializationContext ctxt)
+    protected Object wrapInstantiationProblem(DeserializationContext ctxt,Throwable t)
         throws JacksonException
     {
         while (t instanceof InvocationTargetException && t.getCause() != null) {

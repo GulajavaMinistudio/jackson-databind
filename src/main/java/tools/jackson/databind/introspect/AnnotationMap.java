@@ -2,6 +2,7 @@ package tools.jackson.databind.introspect;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.stream.Stream;
 
 import tools.jackson.databind.util.Annotations;
 
@@ -13,15 +14,17 @@ import tools.jackson.databind.util.Annotations;
  */
 public final class AnnotationMap implements Annotations
 {
-    protected Map<Class<?>,Annotation> _annotations;
+    protected final Map<Class<?>, Annotation> _annotations;
 
     /*
     /**********************************************************
     /* Construction
     /**********************************************************
      */
-    
-    public AnnotationMap() { }
+
+    public AnnotationMap() {
+        _annotations = null;
+    }
 
     public AnnotationMap(Map<Class<?>,Annotation> a) {
         _annotations = a;
@@ -46,7 +49,7 @@ public final class AnnotationMap implements Annotations
     /* Annotations impl
     /**********************************************************
      */
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public <A extends Annotation> A get(Class<A> cls)
@@ -58,7 +61,7 @@ public final class AnnotationMap implements Annotations
     }
 
     @Override
-    public boolean has(Class<?> cls)
+    public boolean has(Class<? extends Annotation> cls)
     {
         if (_annotations == null) {
             return false;
@@ -82,19 +85,20 @@ public final class AnnotationMap implements Annotations
         return false;
     }
 
+    @Override
+    public Stream<Annotation> values() {
+        if (_annotations == null || _annotations.size() == 0) {
+            return Stream.empty();
+        }
+        return _annotations.values().stream();
+    }
+    
     /*
     /**********************************************************
     /* Other API
     /**********************************************************
      */
 
-    public Iterable<Annotation> annotations() {
-        if (_annotations == null || _annotations.size() == 0) {
-            return Collections.emptyList();
-        }
-        return _annotations.values();
-    }
-    
     public static AnnotationMap merge(AnnotationMap primary, AnnotationMap secondary)
     {
         if (primary == null || primary._annotations == null || primary._annotations.isEmpty()) {
@@ -103,7 +107,7 @@ public final class AnnotationMap implements Annotations
         if (secondary == null || secondary._annotations == null || secondary._annotations.isEmpty()) {
             return primary;
         }
-        HashMap<Class<?>,Annotation> annotations = new HashMap<Class<?>,Annotation>();
+        HashMap<Class<?>,Annotation> annotations = new HashMap<>();
         // add secondary ones first
         for (Annotation ann : secondary._annotations.values()) {
             annotations.put(ann.annotationType(), ann);
@@ -114,7 +118,7 @@ public final class AnnotationMap implements Annotations
         }
         return new AnnotationMap(annotations);
     }
-    
+
     @Override
     public int size() {
         return (_annotations == null) ? 0 : _annotations.size();

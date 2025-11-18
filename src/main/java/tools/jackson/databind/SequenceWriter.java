@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.Collection;
 
 import tools.jackson.core.*;
-import tools.jackson.core.exc.WrappedIOException;
+import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.ser.SerializationContextExt;
 import tools.jackson.databind.ser.impl.PropertySerializerMap;
@@ -42,7 +42,7 @@ public class SequenceWriter
 
     protected final ValueSerializer<Object> _rootSerializer;
     protected final TypeSerializer _typeSerializer;
-    
+
     protected final boolean _closeGenerator;
     protected final boolean _cfgFlush;
     protected final boolean _cfgCloseCloseable;
@@ -60,7 +60,7 @@ public class SequenceWriter
      * Assumption is that
      */
     protected PropertySerializerMap _dynamicSerializers;
-    
+
     /**
      * State flag for keeping track of need to write matching END_ARRAY,
      * if a START_ARRAY was written during initialization
@@ -136,7 +136,7 @@ public class SequenceWriter
             _provider.serializeValue(_generator, null);
             return this;
         }
-        
+
         if (_cfgCloseCloseable && (value instanceof Closeable)) {
             return _writeCloseableValue(value);
         }
@@ -160,7 +160,7 @@ public class SequenceWriter
      * to write; further, full type (often generic, like {@link java.util.Map}
      * is passed in case a new
      * {@link ValueSerializer} needs to be fetched to handle type
-     * 
+     *
      * If root type was specified for {@link ObjectWriter},
      * value must be of compatible type (same or subtype).
      */
@@ -170,7 +170,7 @@ public class SequenceWriter
             _provider.serializeValue(_generator, null);
             return this;
         }
-        
+
         if (_cfgCloseCloseable && (value instanceof Closeable)) {
             return _writeCloseableValue(value, type);
         }
@@ -214,7 +214,7 @@ public class SequenceWriter
         }
         return this;
     }
-    
+
     @Override
     public void flush() {
         if (!_closed) {
@@ -264,7 +264,7 @@ public class SequenceWriter
             try {
                 tmpToClose.close();
             } catch (IOException e) {
-                throw WrappedIOException.construct(e, _generator);
+                throw JacksonIOException.construct(e, _generator);
             }
         } finally {
             if (toClose != null) { // only if there was other throwable
@@ -295,7 +295,7 @@ public class SequenceWriter
             try {
                 tmpToClose.close();
             } catch (IOException e) {
-                throw WrappedIOException.construct(e);
+                throw JacksonIOException.construct(e);
             }
         } finally {
             if (toClose != null) { // only if there was another throwable

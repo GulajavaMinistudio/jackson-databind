@@ -4,13 +4,18 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 // Unit test for [JACKSON-890]
-public class TestBackRefsWithPolymorphic extends BaseMapTest
+public class TestBackRefsWithPolymorphic extends DatabindTestUtil
 {
     @JsonPropertyOrder(alphabetic=true)
     interface Entity
@@ -173,7 +178,7 @@ public class TestBackRefsWithPolymorphic extends BaseMapTest
     {
         private String m_value;
 
-        public StringPropertyImpl(String name, String value) {
+        protected StringPropertyImpl(String name, String value) {
             super(name);
             m_value = value;
         }
@@ -204,15 +209,17 @@ public class TestBackRefsWithPolymorphic extends BaseMapTest
             +"\"" +CLASS_NAME+ "$StringPropertyImpl\",\"id\":0,\"name\":\"p1name\",\"value\":\"p1value\"},"
             +"\"p2name\":{\"@class\":\""+CLASS_NAME+"$StringPropertyImpl\",\"id\":0,"
             +"\"name\":\"p2name\",\"value\":\"p2value\"}}}";
-    
-    private final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final ObjectMapper MAPPER = newJsonMapper();
+
+    @Test
     public void testDeserialize() throws IOException
     {
         PropertySheet input = MAPPER.readValue(JSON, PropertySheet.class);
         assertEquals(JSON, MAPPER.writeValueAsString(input));
     }
 
+    @Test
     public void testSerialize() throws IOException
     {
         PropertySheet sheet = new PropertySheetImpl();

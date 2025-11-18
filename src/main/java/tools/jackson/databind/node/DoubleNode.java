@@ -2,23 +2,25 @@ package tools.jackson.databind.node;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Optional;
+import java.util.OptionalDouble;
 
 import tools.jackson.core.*;
 import tools.jackson.core.io.NumberOutput;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * Numeric node that contains 64-bit ("double precision")
  * floating point values simple 32-bit integer values.
  */
 public class DoubleNode
-    extends NumericNode
+    extends NumericFPNode
 {
     private static final long serialVersionUID = 3L;
 
     protected final double _value;
 
-    /* 
+    /*
     /**********************************************************************
     /* Construction
     /**********************************************************************
@@ -28,41 +30,39 @@ public class DoubleNode
 
     public static DoubleNode valueOf(double v) { return new DoubleNode(v); }
 
-    /* 
+    /*
     /**********************************************************************
-    /* BaseJsonNode extended API
+    /* Overridden JsonNode methods, simple properties
     /**********************************************************************
      */
-
-    @Override public JsonToken asToken() { return JsonToken.VALUE_NUMBER_FLOAT; }
 
     @Override
     public JsonParser.NumberType numberType() { return JsonParser.NumberType.DOUBLE; }
 
-    /* 
+    @Override
+    public boolean isDouble() { return true; }
+
+    @Override
+    public boolean isNaN() {
+        return NumberOutput.notFinite(_value);
+    }
+
+    /*
     /**********************************************************************
-    /* Overrridden JsonNode methods
+    /* Overridden JsonNode methods, scalar access, non-numeric
     /**********************************************************************
      */
 
     @Override
-    public boolean isFloatingPointNumber() { return true; }
-
-    @Override
-    public boolean isDouble() { return true; }
-
-    @Override public boolean canConvertToInt() {
-        return (_value >= Integer.MIN_VALUE && _value <= Integer.MAX_VALUE);
+    protected String _asString() {
+        return String.valueOf(_value);
     }
-    @Override public boolean canConvertToLong() {
-        return (_value >= Long.MIN_VALUE && _value <= Long.MAX_VALUE);
-    }
-
-    @Override // since 2.12
-    public boolean canConvertToExactIntegral() {
-        return !Double.isNaN(_value) && !Double.isInfinite(_value)
-                && (_value == Math.rint(_value));
-    }
+    
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, scalar access, numeric
+    /**********************************************************************
+     */
 
     @Override
     public Number numberValue() {
@@ -70,41 +70,148 @@ public class DoubleNode
     }
 
     @Override
-    public short shortValue() { return (short) _value; }
-
-    @Override
-    public int intValue() { return (int) _value; }
-
-    @Override
-    public long longValue() { return (long) _value; }
-
-    @Override
-    public float floatValue() { return (float) _value; }
-
-    @Override
-    public double doubleValue() { return _value; }
-
-    @Override
-    public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
-
-    @Override
-    public BigInteger bigIntegerValue() {
-        return decimalValue().toBigInteger();
+    public float floatValue() {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return f;
+        }
+        return _reportFloatCoercionRangeFail("floatValue()");
     }
 
     @Override
-    public String asText() {
-        return String.valueOf(_value);
+    public float floatValue(float defaultValue) {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return f;
+        }
+        return defaultValue;
     }
 
     @Override
-    public boolean isNaN() {
-        return NumberOutput.notFinite(_value);
+    public Optional<Float> floatValueOpt() {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return Optional.of(f);
+        }
+        return Optional.empty();
     }
 
     @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
-            throws JacksonException {
+    public float asFloat() {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return f;
+        }
+        return _reportFloatCoercionRangeFail("asFloat()");
+    }
+
+    @Override
+    public float asFloat(float defaultValue) {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return f;
+        }
+        return defaultValue;
+    }
+
+    @Override
+    public Optional<Float> asFloatOpt() {
+        float f = (float) _value;
+        if (Float.isFinite(f)) {
+            return Optional.of(f);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public double doubleValue() {
+        return _value;
+    }
+
+    @Override
+    public double doubleValue(double defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public OptionalDouble doubleValueOpt() {
+        return OptionalDouble.of(_value);
+    }
+
+    @Override
+    public double asDouble() {
+        return _value;
+    }
+
+    @Override
+    public double asDouble(double defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public OptionalDouble asDoubleOpt() {
+        return OptionalDouble.of(_value);
+    }
+
+    /*
+    /**********************************************************************
+    /* NumericFPNode abstract method impls
+    /**********************************************************************
+     */
+
+    @Override
+    public short _asShortValueUnchecked() {
+        return (short) _value;
+    }
+
+    @Override
+    public int _asIntValueUnchecked() {
+        return (int) _value;
+    }
+    
+    @Override
+    public long _asLongValueUnchecked() {
+        return (long) _value;
+    }
+
+    @Override
+    protected BigInteger _asBigIntegerValueUnchecked() {
+        return BigDecimal.valueOf(_value).toBigInteger();
+    }
+
+    @Override
+    protected BigDecimal _asDecimalValueUnchecked() {
+        return BigDecimal.valueOf(_value);
+    }
+    
+    @Override
+    public boolean hasFractionalPart() { return _value != Math.rint(_value); }
+
+    @Override
+    public boolean inShortRange() {
+        return !isNaN() && (_value >= Short.MIN_VALUE) && (_value <= Short.MAX_VALUE);
+    }
+
+    @Override
+    public boolean inIntRange() {
+        return !isNaN() && (_value >= Integer.MIN_VALUE) && (_value <= Integer.MAX_VALUE);
+    }
+
+    @Override
+    public boolean inLongRange() {
+        return !isNaN() && (_value >= Long.MIN_VALUE) && (_value <= Long.MAX_VALUE);
+    }
+
+    /*
+    /**********************************************************************
+    /* Overrides, other
+    /**********************************************************************
+     */
+
+    @Override
+    public final void serialize(JsonGenerator g, SerializationContext provider)
+        throws JacksonException
+    {
         g.writeNumber(_value);
     }
 
@@ -128,6 +235,5 @@ public class DoubleNode
         // same as hashCode Double.class uses
         long l = Double.doubleToLongBits(_value);
         return ((int) l) ^ (int) (l >> 32);
-
     }
 }

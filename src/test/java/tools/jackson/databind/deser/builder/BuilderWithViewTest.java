@@ -1,12 +1,19 @@
 package tools.jackson.databind.deser.builder;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class BuilderWithViewTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+public class BuilderWithViewTest
+    extends DatabindTestUtil
 {
     static class ViewX { }
     static class ViewY { }
@@ -46,9 +53,9 @@ public class BuilderWithViewTest extends BaseMapTest
     @JsonDeserialize(builder=CreatorBuilderXY.class)
     static class CreatorValueXY
     {
-        final int _x, _y;
+        final Integer _x, _y;
 
-        protected CreatorValueXY(int x, int y) {
+        protected CreatorValueXY(Integer x, Integer y) {
             _x = x;
             _y = y;
         }
@@ -57,11 +64,11 @@ public class BuilderWithViewTest extends BaseMapTest
     @JsonIgnoreProperties({ "bogus" })
     static class CreatorBuilderXY
     {
-        public int x, y;
+        public Integer x, y;
 
         @JsonCreator
-        public CreatorBuilderXY(@JsonProperty("x") @JsonView(ViewX.class) int x,
-                @JsonProperty("y") @JsonView(ViewY.class) int y)
+        public CreatorBuilderXY(@JsonProperty("x") @JsonView(ViewX.class) Integer x,
+                @JsonProperty("y") @JsonView(ViewY.class) Integer y)
         {
             this.x = x;
             this.y = y;
@@ -78,8 +85,11 @@ public class BuilderWithViewTest extends BaseMapTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+        .disable(DeserializationFeature.FAIL_ON_UNEXPECTED_VIEW_PROPERTIES)
+        .build();
 
+    @Test
     public void testSimpleViews() throws Exception
     {
         final String json = a2q("{'x':5,'y':10}");
@@ -96,6 +106,7 @@ public class BuilderWithViewTest extends BaseMapTest
         assertEquals(11, resultY._y);
     }
 
+    @Test
     public void testCreatorViews() throws Exception
     {
         final String json = a2q("{'x':5,'y':10,'bogus':false}");
@@ -103,12 +114,12 @@ public class BuilderWithViewTest extends BaseMapTest
                 .withView(ViewX.class)
                 .readValue(json);
         assertEquals(5, resultX._x);
-        assertEquals(0, resultX._y);
+        assertNull(resultX._y);
 
         CreatorValueXY resultY = MAPPER.readerFor(CreatorValueXY.class)
                 .withView(ViewY.class)
                 .readValue(json);
-        assertEquals(0, resultY._x);
+        assertNull(resultY._x);
         assertEquals(10, resultY._y);
     }
 }

@@ -2,6 +2,8 @@ package tools.jackson.databind.jsontype.deftyping;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
@@ -10,11 +12,13 @@ import tools.jackson.databind.jsontype.NamedType;
 import tools.jackson.databind.jsontype.TypeResolverBuilder;
 import tools.jackson.databind.jsontype.impl.DefaultTypeResolverBuilder;
 import tools.jackson.databind.jsontype.impl.TypeNameIdResolver;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
-import tools.jackson.databind.type.TypeFactory;
 
-public class TestDefaultForMaps 
-    extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestDefaultForMaps
+    extends DatabindTestUtil
 {
     static class MapKey {
         public String key;
@@ -39,7 +43,7 @@ public class TestDefaultForMaps
     }
 
     // // For #234
-    
+
     static class ItemList {
         public String value;
         public List<ItemList> childItems = new LinkedList<ItemList>();
@@ -64,13 +68,14 @@ public class TestDefaultForMaps
           childItems.put(key, items);
         }
     }
-    
+
     /*
     /**********************************************************
     /* Unit tests
     /**********************************************************
      */
-    
+
+    @Test
     public void testJackson428() throws Exception
     {
         TypeResolverBuilder<?> serializerTyper = new DefaultTypeResolverBuilder(NoCheckSubTypeValidator.instance,
@@ -122,9 +127,10 @@ public class TestDefaultForMaps
         subtypes.add(new NamedType(HashMap.class, "HMap"));
         ObjectMapper mapper = new ObjectMapper();
         return TypeNameIdResolver.construct(mapper.deserializationConfig(),
-                TypeFactory.defaultInstance().constructType(Object.class), subtypes, forSerialization, !forSerialization);
+                defaultTypeFactory().constructType(Object.class), subtypes, forSerialization, !forSerialization);
     }
 
+    @Test
     public void testList() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -143,6 +149,7 @@ public class TestDefaultForMaps
         assertNotNull(o);
     }
 
+    @Test
     public void testMap() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()

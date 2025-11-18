@@ -1,15 +1,21 @@
 package tools.jackson.databind.introspect;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.Nulls;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class PropertyMetadataTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class PropertyMetadataTest extends DatabindTestUtil
 {
+    @Test
     public void testPropertyName()
     {
         PropertyName name = PropertyName.NO_NAME;
-        
+
         assertFalse(name.hasSimpleName());
         assertFalse(name.hasNamespace());
         assertSame(name, name.internSimpleName());
@@ -41,6 +47,7 @@ public class PropertyMetadataTest extends BaseMapTest
         name.hashCode();
     }
 
+    @Test
     public void testPropertyMetadata()
     {
         PropertyMetadata md = PropertyMetadata.STD_OPTIONAL;
@@ -74,7 +81,7 @@ public class PropertyMetadataTest extends BaseMapTest
         md = md.withRequired(null);
         assertNull(md.getRequired());
         assertFalse(md.isRequired());
- 
+
         assertFalse(md.hasIndex());
         md = md.withIndex(Integer.valueOf(3));
         assertTrue(md.hasIndex());

@@ -1,5 +1,6 @@
 package tools.jackson.databind.introspect;
 
+import java.lang.reflect.Member;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -390,12 +391,22 @@ public class POJOPropertyBuilder
     @Override
     public boolean hasField() { return _fields != null; }
 
+    // @since 2.20 additional accessor
+    public boolean hasFieldAndNothingElse() {
+        return (_fields != null)
+                && ((_getters == null) && (_setters == null) && (_ctorParameters == null));
+    }
+
     @Override
     public boolean hasConstructorParameter() { return _ctorParameters != null; }
 
     @Override
     public boolean couldDeserialize() {
-        return (_ctorParameters != null) || (_setters != null) || (_fields != null);
+        return (_ctorParameters != null)
+            || (_setters != null)
+            || ((_fields != null)
+                // [databind#736] Since 2.17: Fix `REQUIRE_SETTERS_FOR_GETTERS` taking no effect
+                && (_anyVisible(_fields)));
     }
 
     @Override
@@ -431,7 +442,7 @@ public class POJOPropertyBuilder
                 }
             }
             /* 30-May-2014, tatu: Three levels of precedence:
-             * 
+             *
              * 1. Regular getters ("getX")
              * 2. Is-getters ("isX")
              * 3. Implicit, possible getters ("x")
@@ -579,7 +590,7 @@ public class POJOPropertyBuilder
         }
 
         /* 30-May-2014, tatu: Two levels of precedence:
-         * 
+         *
          * 1. Regular setters ("setX(...)")
          * 2. Implicit, possible setters ("x(...)")
          */
@@ -623,6 +634,21 @@ public class POJOPropertyBuilder
                     continue;
                 }
             }
+            // 11-Jan-2024, tatu: Wrt [databind#4302] problem here is that we have
+            //   Enum constant fields (static!) added due to change in 2.16.0 (see
+            //  {@code AnnotatedFieldCollector#_isIncludableField}) and they can
+            //  conflict with actual fields.
+            /// Let's resolve conflict in favor of non-static Field.
+            final boolean currStatic = field.isStatic();
+            final boolean nextStatic = nextField.isStatic();
+
+            if (currStatic != nextStatic) {
+                if (currStatic) {
+                    field = nextField;
+                }
+                continue;
+            }
+
             throw new IllegalArgumentException("Multiple fields representing property \""+getName()+"\": "
                     +field.getFullName()+" vs "+nextField.getFullName());
         }
@@ -651,7 +677,7 @@ public class POJOPropertyBuilder
         /* Hmmh. Checking for constructor parameters is trickier; for one,
          * we must allow creator and factory method annotations.
          * If this is the case, constructor parameter has the precedence.
-         * 
+         *
          * So, for now, just try finding the first constructor parameter;
          * if none, first factory method. And don't check for dups, if we must,
          * can start checking for them later on.
@@ -750,6 +776,24 @@ public class POJOPropertyBuilder
         return 2;
     }
 
+    // @since 2.19.2
+    public boolean hasFieldOrGetter(AnnotatedMember member) {
+        return _hasAccessor(_fields, member) || _hasAccessor(_getters, member);
+    }
+
+    private boolean _hasAccessor(Linked<? extends AnnotatedMember> node,
+            AnnotatedMember memberToMatch)
+    {
+        // AnnotatedXxx are not canonical, but underlying JDK Members are:
+        final Member rawMemberToMatch = memberToMatch.getMember();
+        for (; node != null; node = node.next) {
+            if (node.value.getMember() == rawMemberToMatch) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /*
     /**********************************************************
     /* Implementations of refinement accessors
@@ -814,15 +858,38 @@ public class POJOPropertyBuilder
         return (v == null) ? JsonInclude.Value.empty() : v;
     }
 
+    // since 2.17
+    @Override
+    public List<PropertyName> findAliases() {
+        AnnotatedMember ann = getPrimaryMember();
+        if (ann != null) {
+            List<PropertyName> propertyNames = _annotationIntrospector.findPropertyAliases(_config, ann);
+            if (propertyNames != null) {
+                return propertyNames;
+            }
+        }
+        return Collections.emptyList();
+    }
+
     public JsonProperty.Access findAccess() {
         // 25-Sep-2017, tatu: IMPORTANT! Called BEFORE merge occurs so MUST traverse
         //    accessors separately
-        return fromMemberAnnotationsExcept(new WithMember<JsonProperty.Access>() {
+        JsonProperty.Access acc =  fromMemberAnnotationsExcept(new WithMember<JsonProperty.Access>() {
             @Override
             public JsonProperty.Access withMember(AnnotatedMember member) {
                 return _annotationIntrospector.findPropertyAccess(_config, member);
             }
         }, JsonProperty.Access.AUTO);
+
+        // [databind#2951] add feature to inverse access logic
+        if (_config.isEnabled(MapperFeature.INVERSE_READ_WRITE_ACCESS)) {
+            if (acc == JsonProperty.Access.READ_ONLY) {
+                acc = JsonProperty.Access.WRITE_ONLY;
+            } else if (acc == JsonProperty.Access.WRITE_ONLY) {
+                acc = JsonProperty.Access.READ_ONLY;
+            }
+        }
+        return acc;
     }
 
     /*
@@ -830,21 +897,21 @@ public class POJOPropertyBuilder
     /* Data aggregation
     /**********************************************************
      */
-    
+
     public void addField(AnnotatedField a, PropertyName name, boolean explName, boolean visible, boolean ignored) {
-        _fields = new Linked<AnnotatedField>(a, _fields, name, explName, visible, ignored);
+        _fields = new Linked<>(a, _fields, name, explName, visible, ignored);
     }
 
     public void addCtor(AnnotatedParameter a, PropertyName name, boolean explName, boolean visible, boolean ignored) {
-        _ctorParameters = new Linked<AnnotatedParameter>(a, _ctorParameters, name, explName, visible, ignored);
+        _ctorParameters = new Linked<>(a, _ctorParameters, name, explName, visible, ignored);
     }
 
     public void addGetter(AnnotatedMethod a, PropertyName name, boolean explName, boolean visible, boolean ignored) {
-        _getters = new Linked<AnnotatedMethod>(a, _getters, name, explName, visible, ignored);
+        _getters = new Linked<>(a, _getters, name, explName, visible, ignored);
     }
 
     public void addSetter(AnnotatedMethod a, PropertyName name, boolean explName, boolean visible, boolean ignored) {
-        _setters = new Linked<AnnotatedMethod>(a, _setters, name, explName, visible, ignored);
+        _setters = new Linked<>(a, _setters, name, explName, visible, ignored);
     }
 
     /**
@@ -888,28 +955,25 @@ public class POJOPropertyBuilder
         _ctorParameters = _removeIgnored(_ctorParameters);
     }
 
-    @Deprecated // since 2.12
-    public JsonProperty.Access removeNonVisible(boolean inferMutators) {
-        return removeNonVisible(inferMutators, null);
-    }
-    
     /**
      * @param inferMutators Whether mutators can be "pulled in" by visible
-     *    accessors or not. 
+     *    accessors or not.
+     * @param parent (nullable) Collector to add name ignorals to, if that is
+     *    desired.
      *
      * @since 2.12 (earlier had different signature)
      */
     public JsonProperty.Access removeNonVisible(boolean inferMutators,
             POJOPropertiesCollector parent)
     {
-        /* 07-Jun-2015, tatu: With 2.6, we will allow optional definition
-         *  of explicit access type for property; if not "AUTO", it will
-         *  dictate how visibility checks are applied.
-         */
+        // 07-Jun-2015, tatu: With 2.6, we will allow optional definition
+        //  of explicit access type for property; if not "AUTO", it will
+        //  dictate how visibility checks are applied.
         JsonProperty.Access acc = findAccess();
         if (acc == null) {
             acc = JsonProperty.Access.AUTO;
         }
+
         switch (acc) {
         case READ_ONLY:
             // [databind#2719]: Need to add ignorals, first, keeping in mind
@@ -953,13 +1017,22 @@ public class POJOPropertyBuilder
 
     /**
      * Mutator that will simply drop any constructor parameters property may have.
-     * 
+     *
      * @since 2.5
      */
     public void removeConstructors() {
         _ctorParameters = null;
     }
-    
+
+    /**
+     * Mutator that will simply drop any fields property may have.
+     *
+     * @since 2.18
+     */
+    public void removeFields() {
+        _fields = null;
+    }
+
     /**
      * Method called to trim unnecessary entries, such as implicit
      * getter if there is an explict one available. This is important
@@ -1021,15 +1094,13 @@ public class POJOPropertyBuilder
      * does "deep merge" if an as necessary, across alternate accessors of same type:
      * most importantly, "is-getter vs regular getter"
      */
+    @SuppressWarnings("deprecation") // only marked to prevent external use
     private AnnotationMap _getAllAnnotations(Linked<? extends AnnotatedMember> node) {
         if (node == null) {
             return null;
         }
-        AnnotationMap ann = node.value.getAllAnnotations();
-        if (node.next != null) {
-            ann = AnnotationMap.merge(ann, _getAllAnnotations(node.next));
-        }
-        return ann;
+        AnnotationMap ann = node.value._annotationMap();
+        return AnnotationMap.merge(ann, _getAllAnnotations(node.next));
     }
 
     /**
@@ -1071,7 +1142,7 @@ public class POJOPropertyBuilder
         }
         return node.trimByVisibility();
     }
-        
+
     /*
     /**********************************************************
     /* Accessors for aggregate information
@@ -1168,7 +1239,7 @@ public class POJOPropertyBuilder
     /**
      * Method called to find out set of explicit names for accessors
      * bound together due to implicit name.
-     * 
+     *
      * @since 2.4
      */
     public Set<PropertyName> findExplicitNames()
@@ -1178,10 +1249,36 @@ public class POJOPropertyBuilder
         renamed = _findExplicitNames(_getters, renamed);
         renamed = _findExplicitNames(_setters, renamed);
         renamed = _findExplicitNames(_ctorParameters, renamed);
-        if (renamed == null) {
-            return Collections.emptySet();
+        return (renamed == null) ? Collections.emptySet() : renamed;
+    }
+
+    /**
+     * Method find out if this property has specified explicit name: this
+     * is generally needed for properties that have not yet been renamed
+     * (Creator-detection).
+     *
+     * @param name Name to check against
+     *
+     * @return True if this property has specified explicit name
+     *
+     * @since 2.18.2
+     */
+    public boolean hasExplicitName(PropertyName name) {
+        return _hasExplicitName(_fields, name)
+                || _hasExplicitName(_getters, name)
+                || _hasExplicitName(_setters, name)
+                || _hasExplicitName(_ctorParameters, name);
+    }
+
+    private boolean _hasExplicitName(Linked<? extends AnnotatedMember> node,
+            PropertyName nameToMatch)
+    {
+        for (; node != null; node = node.next) {
+            if (node.isNameExplicit && nameToMatch.equals(node.name)) {
+                return true;
+            }
         }
-        return renamed;
+        return false;
     }
 
     /**
@@ -1189,7 +1286,7 @@ public class POJOPropertyBuilder
      * multiple distinct explicit names, and the property this builder represents
      * basically needs to be broken apart and replaced by a set of more than
      * one properties.
-     * 
+     *
      * @since 2.4
      */
     public Collection<POJOPropertyBuilder> explode(Collection<PropertyName> newNames)
@@ -1215,7 +1312,7 @@ public class POJOPropertyBuilder
                 if (!node.isVisible) {
                     continue;
                 }
-                
+
                 throw new IllegalStateException("Conflicting/ambiguous property name definitions (implicit name "
                         +ClassUtil.name(_name)+"): found multiple explicit names: "
                         +newNames+", but also implicit accessor: "+node);
@@ -1379,8 +1476,7 @@ public class POJOPropertyBuilder
     protected Class<?> _rawTypeOf(AnnotatedMember m) {
         // AnnotatedMethod always returns return type, but for setters we
         // actually need argument type
-        if (m instanceof AnnotatedMethod) {
-            AnnotatedMethod meh = (AnnotatedMethod) m;
+        if (m instanceof AnnotatedMethod meh) {
             if (meh.getParameterCount() > 0) {
                 // note: get raw type FROM full type since only that resolves
                 // generic types
@@ -1409,11 +1505,11 @@ public class POJOPropertyBuilder
         implements Iterator<T>
     {
         private Linked<T> next;
-        
+
         public MemberIterator(Linked<T> first) {
             next = first;
         }
-        
+
         @Override
         public boolean hasNext() {
             return (next != null);
@@ -1431,9 +1527,9 @@ public class POJOPropertyBuilder
         public void remove() {
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
+
     /**
      * Node used for creating simple linked lists to efficiently store small sets
      * of things.
@@ -1447,7 +1543,7 @@ public class POJOPropertyBuilder
         public final boolean isNameExplicit;
         public final boolean isVisible;
         public final boolean isMarkedIgnored;
-        
+
         public Linked(T v, Linked<T> n,
                 PropertyName name, boolean explName, boolean visible, boolean ignored)
         {
@@ -1466,7 +1562,7 @@ public class POJOPropertyBuilder
                     explName = false;
                 }
             }
-            
+
             isNameExplicit = explName;
             isVisible = visible;
             isMarkedIgnored = ignored;
@@ -1478,21 +1574,21 @@ public class POJOPropertyBuilder
             }
             return new Linked<T>(value, null, name, isNameExplicit, isVisible, isMarkedIgnored);
         }
-        
+
         public Linked<T> withValue(T newValue) {
             if (newValue == value) {
                 return this;
             }
             return new Linked<T>(newValue, next, name, isNameExplicit, isVisible, isMarkedIgnored);
         }
-        
+
         public Linked<T> withNext(Linked<T> newNext) {
             if (newNext == next) {
                 return this;
             }
             return new Linked<T>(value, newNext, name, isNameExplicit, isVisible, isMarkedIgnored);
         }
-        
+
         public Linked<T> withoutIgnored() {
             if (isMarkedIgnored) {
                 return (next == null) ? null : next.withoutIgnored();
@@ -1505,7 +1601,7 @@ public class POJOPropertyBuilder
             }
             return this;
         }
-        
+
         public Linked<T> withoutNonVisible() {
             Linked<T> newNext = (next == null) ? null : next.withoutNonVisible();
             return isVisible ? withNext(newNext) : newNext;
@@ -1543,7 +1639,7 @@ public class POJOPropertyBuilder
             }
             return isVisible ? withNext(null) : newNext;
         }
-        
+
         @Override
         public String toString() {
             String msg = String.format("%s[visible=%b,ignore=%b,explicitName=%b]",

@@ -5,6 +5,8 @@ import java.util.Date;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
+import tools.jackson.databind.introspect.AnnotatedClass;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import tools.jackson.databind.ser.impl.PropertySerializerMap;
 import tools.jackson.databind.ser.std.StdSerializer;
@@ -76,11 +78,11 @@ public abstract class JDKKeySerializers
 
     /**
      * Method called if no specified key serializer was located; will return a
-     * "default" key serializer.
+     * "default" key serializer initialized by {@link EnumKeySerializer#construct(Class, EnumValues, EnumValues)}
      */
     @SuppressWarnings("unchecked")
     public static ValueSerializer<Object> getFallbackKeySerializer(SerializationConfig config,
-            Class<?> rawKeyType)
+            Class<?> rawKeyType, AnnotatedClass annotatedClass)
     {
         if (rawKeyType != null) {
             // 29-Sep-2015, tatu: Odd case here, of `Enum`, which we may get for `EnumMap`; not sure
@@ -92,11 +94,12 @@ public abstract class JDKKeySerializers
             if (rawKeyType == Enum.class) {
                 return new Dynamic();
             }
-            // 29-Sep-2019, tatu: [databind#2457] can not use 'rawKeyType.isEnum()`, won't work
+            // 29-Sep-2019, tatu: [databind#2457] cannot use 'rawKeyType.isEnum()`, won't work
             //    for subtypes.
             if (ClassUtil.isEnumType(rawKeyType)) {
                 return EnumKeySerializer.construct(rawKeyType,
-                        EnumValues.constructFromName(config, (Class<Enum<?>>) rawKeyType));
+                    EnumValues.constructFromName(config, annotatedClass),
+                    EnumSerializer.constructEnumNamingStrategyValues(config, (Class<Enum<?>>) rawKeyType, annotatedClass));
             }
         }
         // 19-Oct-2016, tatu: Used to just return DEFAULT_KEY_SERIALIZER but why not:
@@ -128,14 +131,14 @@ public abstract class JDKKeySerializers
         final static int TYPE_TO_STRING = 8;
 
         protected final int _typeId;
-        
+
         public Default(int typeId, Class<?> type) {
             super(type);
             _typeId = typeId;
         }
 
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             switch (_typeId) {
@@ -152,12 +155,12 @@ public abstract class JDKKeySerializers
                 {
                     String key;
 
-                    if (provider.isEnabled(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)) {
+                    if (provider.isEnabled(EnumFeature.WRITE_ENUMS_USING_TO_STRING)) {
                         key = value.toString();
                     } else {
                         Enum<?> e = (Enum<?>) value;
                         // 14-Sep-2019, tatu: [databind#2129] Use this specific feature
-                        if (provider.isEnabled(SerializationFeature.WRITE_ENUM_KEYS_USING_INDEX)) {
+                        if (provider.isEnabled(EnumFeature.WRITE_ENUM_KEYS_USING_INDEX)) {
                             key = String.valueOf(e.ordinal());
                         } else {
                             key = e.name();
@@ -191,7 +194,7 @@ public abstract class JDKKeySerializers
     {
         // Important: MUST be transient, to allow serialization of key serializer itself
         protected transient PropertySerializerMap _dynamicSerializers;
-        
+
         public Dynamic() {
             super(String.class);
             _dynamicSerializers = PropertySerializerMap.emptyForProperties();
@@ -204,7 +207,7 @@ public abstract class JDKKeySerializers
         }
 
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             Class<?> cls = value.getClass();
@@ -222,7 +225,7 @@ public abstract class JDKKeySerializers
         }
 
         protected ValueSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
-                Class<?> type, SerializerProvider provider)
+                Class<?> type, SerializationContext provider)
         {
             // 27-Jun-2017, tatu: [databind#1679] Need to avoid StackOverflowError...
             if (type == Object.class) {
@@ -250,7 +253,7 @@ public abstract class JDKKeySerializers
         public StringKeySerializer() { super(String.class); }
 
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             g.writeName((String) value);
@@ -264,9 +267,21 @@ public abstract class JDKKeySerializers
     {
         protected final EnumValues _values;
 
+        /**
+         * Map with key as converted property class defined implementation of {@link EnumNamingStrategy}
+         * and with value as Enum names collected using <code>Enum.name()</code>.
+         */
+        protected final EnumValues _valuesByEnumNaming;
+
+        @Deprecated
         protected EnumKeySerializer(Class<?> enumType, EnumValues values) {
+            this(enumType, values, null);
+        }
+
+        protected EnumKeySerializer(Class<?> enumType, EnumValues values, EnumValues valuesByEnumNaming) {
             super(enumType);
             _values = values;
+            _valuesByEnumNaming = valuesByEnumNaming;
         }
 
         public static EnumKeySerializer construct(Class<?> enumType,
@@ -274,18 +289,28 @@ public abstract class JDKKeySerializers
         {
             return new EnumKeySerializer(enumType, enumValues);
         }
-        
+
+        public static EnumKeySerializer construct(Class<?> enumType,
+                EnumValues enumValues, EnumValues valuesByEnumNaming)
+        {
+            return new EnumKeySerializer(enumType, enumValues, valuesByEnumNaming);
+        }
+
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider serializers)
+        public void serialize(Object value, JsonGenerator g, SerializationContext serializers)
             throws JacksonException
         {
-            if (serializers.isEnabled(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)) {
+            if (serializers.isEnabled(EnumFeature.WRITE_ENUMS_USING_TO_STRING)) {
                 g.writeName(value.toString());
                 return;
             }
             Enum<?> en = (Enum<?>) value;
+            if (_valuesByEnumNaming != null) {
+                g.writeName(_valuesByEnumNaming.serializedValueFor(en));
+                return;
+            }
             // 14-Sep-2019, tatu: [databind#2129] Use this specific feature
-            if (serializers.isEnabled(SerializationFeature.WRITE_ENUM_KEYS_USING_INDEX)) {
+            if (serializers.isEnabled(EnumFeature.WRITE_ENUM_KEYS_USING_INDEX)) {
                 g.writeName(String.valueOf(en.ordinal()));
                 return;
             }

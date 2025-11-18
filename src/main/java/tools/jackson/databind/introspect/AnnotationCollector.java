@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import tools.jackson.databind.util.Annotations;
 
@@ -67,7 +68,7 @@ public abstract class AnnotationCollector
         public Annotations asAnnotations() {
             return NO_ANNOTATIONS;
         }
- 
+
         @Override
         public AnnotationMap asAnnotationMap() {
             return new AnnotationMap();
@@ -108,7 +109,7 @@ public abstract class AnnotationCollector
         public boolean isPresent(Annotation ann) {
             return ann.annotationType() == _type;
         }
-        
+
         @Override
         public AnnotationCollector addOrOverride(Annotation ann) {
             final Class<?> type = ann.annotationType();
@@ -187,7 +188,7 @@ public abstract class AnnotationCollector
         }
 
         @Override
-        public boolean has(Class<?> cls) {
+        public boolean has(Class<? extends Annotation> cls) {
             return false;
         }
 
@@ -199,6 +200,11 @@ public abstract class AnnotationCollector
         @Override
         public int size() {
             return 0;
+        }
+
+        @Override
+        public Stream<Annotation> values() {
+            return Stream.empty();
         }
     }
 
@@ -225,7 +231,7 @@ public abstract class AnnotationCollector
         }
 
         @Override
-        public boolean has(Class<?> cls) {
+        public boolean has(Class<? extends Annotation> cls) {
             return (_type == cls);
         }
 
@@ -240,6 +246,11 @@ public abstract class AnnotationCollector
         }
 
         @Override
+        public Stream<Annotation> values() {
+            return Stream.of(_value);
+        }
+        
+        @Override
         public int size() {
             return 1;
         }
@@ -249,10 +260,10 @@ public abstract class AnnotationCollector
         implements Annotations, java.io.Serializable
     {
         private static final long serialVersionUID = 1L;
-    
+
         private final Class<?> _type1, _type2;
         private final Annotation _value1, _value2;
-    
+
         public TwoAnnotations(Class<?> type1, Annotation value1,
                 Class<?> type2, Annotation value2) {
             _type1 = type1;
@@ -274,7 +285,7 @@ public abstract class AnnotationCollector
         }
 
         @Override
-        public boolean has(Class<?> cls) {
+        public boolean has(Class<? extends Annotation> cls) {
             return (_type1 == cls) || (_type2 == cls);
         }
 
@@ -286,6 +297,11 @@ public abstract class AnnotationCollector
                 }
             }
             return false;
+        }
+
+        @Override
+        public Stream<Annotation> values() {
+            return Stream.of(_value1, _value2);
         }
 
         @Override

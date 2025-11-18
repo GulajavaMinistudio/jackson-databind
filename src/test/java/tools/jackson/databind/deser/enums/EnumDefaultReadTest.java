@@ -1,13 +1,18 @@
 package tools.jackson.databind.deser.enums;
 
-import java.io.IOException;
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.exc.InvalidFormatException;
 
-public class EnumDefaultReadTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class EnumDefaultReadTest
 {
     enum SimpleEnum {
         ZERO,
@@ -19,17 +24,17 @@ public class EnumDefaultReadTest extends BaseMapTest
         ZERO,
         ONE;
     }
-    
+
     enum CustomEnum {
         ZERO(0),
         ONE(1);
-    
+
         private final int number;
-    
+
         CustomEnum(final int number) {
             this.number = number;
         }
-    
+
         @JsonValue
         int getNumber() {
             return this.number;
@@ -40,17 +45,43 @@ public class EnumDefaultReadTest extends BaseMapTest
         @JsonEnumDefaultValue
         ZERO(0),
         ONE(1);
-    
+
         private final int number;
-    
+
         CustomEnumWithDefault(final int number) {
             this.number = number;
         }
-    
+
         @JsonValue
         int getNumber() {
             return this.number;
         }
+    }
+    
+    enum BaseEnumDefault {
+        A, B, C, Z;
+    }
+
+    enum MixinEnumDefault {
+        A, B, C,
+        @JsonEnumDefaultValue
+        Z;
+    }
+
+    enum BaseOverloaded {
+        A, B, C,
+        Z;
+    }
+
+    enum MixinOverloadedDefault {
+        @JsonEnumDefaultValue
+        A,
+        @JsonEnumDefaultValue
+        B,
+        // Let's leave one un-annotated:
+        C,
+        @JsonEnumDefaultValue
+        Z;
     }
 
     /*
@@ -58,8 +89,12 @@ public class EnumDefaultReadTest extends BaseMapTest
     /* Test methods
     /**********************************************************
      */
-    private final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+            .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
+            .build();
+
+    @Test
     public void testWithoutCustomFeatures() throws Exception
     {
         final ObjectReader r = MAPPER.reader();
@@ -93,10 +128,11 @@ public class EnumDefaultReadTest extends BaseMapTest
         _verifyFailingDeserialization(r, "2", CustomEnumWithDefault.class);
     }
 
+    @Test
     public void testWithFailOnNumbers() throws Exception
     {
         ObjectReader r = MAPPER.reader()
-                .with(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+                .with(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
 
         _verifyOkDeserialization(r, "ZERO", SimpleEnum.class, SimpleEnum.ZERO);
         _verifyOkDeserialization(r, "ONE", SimpleEnum.class, SimpleEnum.ONE);
@@ -127,10 +163,11 @@ public class EnumDefaultReadTest extends BaseMapTest
         _verifyFailingDeserialization(r, "2", CustomEnumWithDefault.class);
     }
 
+    @Test
     public void testWithReadUnknownAsDefault() throws Exception
     {
         ObjectReader r = MAPPER.reader()
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
 
         _verifyOkDeserialization(r, "ZERO", SimpleEnum.class, SimpleEnum.ZERO);
         _verifyOkDeserialization(r, "ONE", SimpleEnum.class, SimpleEnum.ONE);
@@ -161,12 +198,13 @@ public class EnumDefaultReadTest extends BaseMapTest
         _verifyOkDeserialization(r, "2", CustomEnumWithDefault.class, CustomEnumWithDefault.ZERO);
     }
 
+    @Test
     public void testWithFailOnNumbersAndReadUnknownAsDefault()
         throws Exception
     {
         ObjectReader r = MAPPER.reader()
-                .with(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
+                .with(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
 
         _verifyOkDeserialization(r, "ZERO", SimpleEnum.class, SimpleEnum.ZERO);
         _verifyOkDeserialization(r, "ONE", SimpleEnum.class, SimpleEnum.ONE);
@@ -195,23 +233,24 @@ public class EnumDefaultReadTest extends BaseMapTest
         _verifyOkDeserialization(r, "0", CustomEnumWithDefault.class, CustomEnumWithDefault.ZERO);
         _verifyOkDeserialization(r, "1", CustomEnumWithDefault.class, CustomEnumWithDefault.ONE);
 
-        // 
+        //
         // The three tests below fail; Jackson throws an exception on the basis that
         // "FAIL_ON_NUMBERS_FOR_ENUMS" is enabled. I claim the default value should be returned instead.
         _verifyOkDeserialization(r, "0", SimpleEnumWithDefault.class, SimpleEnumWithDefault.ZERO);
         _verifyOkDeserialization(r, "1", SimpleEnumWithDefault.class, SimpleEnumWithDefault.ZERO);
         _verifyOkDeserialization(r, "2", SimpleEnumWithDefault.class, SimpleEnumWithDefault.ZERO);
-        
+
         // Fails. Jackson throws an exception on the basis that "FAIL_ON_NUMBERS_FOR_ENUMS"
         // is enabled, but the default value should have been returned instead.
         _verifyOkDeserialization(r, "2", CustomEnumWithDefault.class, CustomEnumWithDefault.ZERO);
     }
 
     // [databind#3171]: Ensure "" gets returned as Default Value, not coerced
+    @Test
     public void testEmptyStringAsDefault() throws Exception
     {
         ObjectReader r = MAPPER.readerFor(SimpleEnumWithDefault.class)
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
         assertEquals(SimpleEnumWithDefault.ONE,
                 r.readValue(q("ONE")));
         assertEquals(SimpleEnumWithDefault.ZERO,
@@ -223,21 +262,21 @@ public class EnumDefaultReadTest extends BaseMapTest
 
         // Also check with `null` coercion as well
         ObjectReader r2 = MAPPER.readerFor(SimpleEnumWithDefault.class)
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
         assertNull(r2.readValue(q("")));
         assertNull(r2.readValue(q("    ")));
     }
 
     private <T> void _verifyOkDeserialization(ObjectReader reader, String fromValue,
             Class<T> toValueType, T expValue)
-        throws IOException
+        throws Exception
     {
         assertEquals(expValue, reader.forType(toValueType).readValue(q(fromValue)));
     }
 
     private <T> void _verifyFailingDeserialization(final ObjectReader reader,
             final String fromValue, final Class<T> toValueType)
-        throws IOException
+        throws Exception
     {
         try {
             reader.forType(toValueType).readValue(q(fromValue));
@@ -246,5 +285,31 @@ public class EnumDefaultReadTest extends BaseMapTest
             verifyException(e, "Cannot deserialize value of type");
             /* Expected. */
         }
+    }
+
+    @Test
+    public void testEnumDefaultValueViaMixin() throws Exception 
+    {
+        ObjectMapper mixinMapper = jsonMapperBuilder()
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .addMixIn(BaseEnumDefault.class, MixinEnumDefault.class)
+                .build();
+        
+        assertEquals(BaseEnumDefault.Z, 
+                mixinMapper.readValue(q("UNKNOWN"), BaseEnumDefault.class));
+    }
+
+    @Test
+    public void testFirstEnumDefaultValueViaMixin() throws Exception 
+    {
+        ObjectMapper mixinMapper = jsonMapperBuilder()
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .addMixIn(BaseOverloaded.class, MixinOverloadedDefault.class)
+                .build();
+
+        // While not guaranteed by annotation Javadocs, default implementation does
+        // pick the first annotated enum value (in declaration order))
+        assertEquals(BaseOverloaded.A, 
+                mixinMapper.readValue(q("UNKNOWN"), BaseOverloaded.class));
     }
 }

@@ -5,17 +5,26 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
+import tools.jackson.core.StreamReadFeature;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.type.LogicalType;
 
-public class CoerceToBooleanTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class CoerceToBooleanTest
 {
     static class BooleanPOJO {
         public boolean value;
@@ -33,9 +42,9 @@ public class CoerceToBooleanTest extends BaseMapTest
     static class BooleanWrapper {
         public Boolean wrapper;
         public boolean primitive;
-        
+
         protected Boolean ctor;
-        
+
         @JsonCreator
         public BooleanWrapper(@JsonProperty("ctor") Boolean foo) {
             ctor = foo;
@@ -45,10 +54,14 @@ public class CoerceToBooleanTest extends BaseMapTest
         public void setPrimitive(boolean v) { primitive = v; }
     }
 
-    private final ObjectMapper DEFAULT_MAPPER = newJsonMapper();
+    private final ObjectMapper DEFAULT_MAPPER = jsonMapperBuilder()
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .build();
 
     private final ObjectMapper LEGACY_NONCOERCING_MAPPER = jsonMapperBuilder()
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+            // 30-May-2025, tatu: Needed after [core#1438] (clear current token on close)
+            .disable(StreamReadFeature.CLEAR_CURRENT_TOKEN_ON_CLOSE)
             .build();
 
     private final ObjectMapper MAPPER_INT_TO_EMPTY = jsonMapperBuilder()
@@ -81,6 +94,7 @@ public class CoerceToBooleanTest extends BaseMapTest
      */
 
     // for [databind#403]
+    @Test
     public void testEmptyStringFailForBooleanPrimitive() throws IOException
     {
         final ObjectReader reader = DEFAULT_MAPPER
@@ -95,6 +109,7 @@ public class CoerceToBooleanTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testStringToBooleanCoercionOk() throws Exception
     {
         // first successful coercions. Boolean has a ton...
@@ -124,6 +139,7 @@ public class CoerceToBooleanTest extends BaseMapTest
         assertEquals(exp, result);
     }
 
+    @Test
     public void testStringToBooleanCoercionFail() throws Exception
     {
         _verifyRootStringCoerceFail(LEGACY_NONCOERCING_MAPPER, "true", Boolean.TYPE);
@@ -168,7 +184,7 @@ public class CoerceToBooleanTest extends BaseMapTest
             assertSame(p, e.processor());
 
             assertToken(JsonToken.VALUE_STRING, p.currentToken());
-            assertEquals(unquotedValue, p.getText());
+            assertEquals(unquotedValue, p.getString());
         }
     }
 
@@ -178,24 +194,26 @@ public class CoerceToBooleanTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testIntToBooleanCoercionSuccessPojo() throws Exception
-    {        
+    {
         BooleanPOJO p;
         final ObjectReader r = DEFAULT_MAPPER.readerFor(BooleanPOJO.class);
 
         p = r.readValue(DOC_WITH_0);
-        assertEquals(false, p.value);
+        assertFalse(p.value);
         p = r.readValue(utf8Bytes(DOC_WITH_0));
-        assertEquals(false, p.value);
+        assertFalse(p.value);
 
         p = r.readValue(DOC_WITH_1);
-        assertEquals(true, p.value);
+        assertTrue(p.value);
         p = r.readValue(utf8Bytes(DOC_WITH_1));
-        assertEquals(true, p.value);
+        assertTrue(p.value);
     }
 
+    @Test
     public void testIntToBooleanCoercionSuccessRoot() throws Exception
-    {        
+    {
         final ObjectReader br = DEFAULT_MAPPER.readerFor(Boolean.class);
 
         assertEquals(Boolean.FALSE, br.readValue(" 0"));
@@ -206,18 +224,19 @@ public class CoerceToBooleanTest extends BaseMapTest
         final ObjectReader atomicR = DEFAULT_MAPPER.readerFor(AtomicBoolean.class);
 
         AtomicBoolean ab;
-        
+
         ab = atomicR.readValue(" 0");
         ab = atomicR.readValue(utf8Bytes(" 0"));
-        assertEquals(false, ab.get());
+        assertFalse(ab.get());
 
         ab = atomicR.readValue(" 111");
-        assertEquals(true, ab.get());
+        assertTrue(ab.get());
         ab = atomicR.readValue(utf8Bytes(" 111"));
-        assertEquals(true, ab.get());
+        assertTrue(ab.get());
     }
 
     // Test for verifying that Long values are coerced to boolean correctly as well
+    @Test
     public void testLongToBooleanCoercionOk() throws Exception
     {
         long value = 1L + Integer.MAX_VALUE;
@@ -245,6 +264,7 @@ public class CoerceToBooleanTest extends BaseMapTest
     }
 
     // [databind#2635], [databind#2770]
+    @Test
     public void testIntToBooleanCoercionFailBytes() throws Exception
     {
         _verifyBooleanCoerceFail(a2q("{'value':1}"), true, JsonToken.VALUE_NUMBER_INT, "1", BooleanPOJO.class);
@@ -257,6 +277,7 @@ public class CoerceToBooleanTest extends BaseMapTest
     }
 
     // [databind#2635], [databind#2770]
+    @Test
     public void testIntToBooleanCoercionFailChars() throws Exception
     {
         _verifyBooleanCoerceFail(a2q("{'value':1}"), false, JsonToken.VALUE_NUMBER_INT, "1", BooleanPOJO.class);
@@ -274,12 +295,13 @@ public class CoerceToBooleanTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testIntToNullCoercion() throws Exception
     {
         assertNull(MAPPER_INT_TO_NULL.readValue("0", Boolean.class));
         assertNull(MAPPER_INT_TO_NULL.readValue("1", Boolean.class));
 
-        // but due to coercion to `boolean`, can not return null here -- however,
+        // but due to coercion to `boolean`, cannot return null here -- however,
         // goes "1 -> false (no null for primitive) -> Boolean.FALSE
         assertEquals(Boolean.FALSE, MAPPER_INT_TO_NULL.readValue("0", Boolean.TYPE));
         assertEquals(Boolean.FALSE, MAPPER_INT_TO_NULL.readValue("1", Boolean.TYPE));
@@ -295,6 +317,7 @@ public class CoerceToBooleanTest extends BaseMapTest
         assertFalse(p.value);
     }
 
+    @Test
     public void testIntToEmptyCoercion() throws Exception
     {
         // "empty" value for Boolean/boolean is False/false
@@ -317,7 +340,8 @@ public class CoerceToBooleanTest extends BaseMapTest
         p = MAPPER_INT_TO_EMPTY.readValue(DOC_WITH_1, BooleanPOJO.class);
         assertFalse(p.value);
     }
-        
+
+    @Test
     public void testIntToTryCoercion() throws Exception
     {
         // And "TryCoerce" should do what would be typically expected
@@ -347,6 +371,7 @@ public class CoerceToBooleanTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testFailFromInteger() throws Exception
     {
         _verifyFailFromInteger(MAPPER_TO_FAIL, BooleanPOJO.class, DOC_WITH_0, Boolean.TYPE);
@@ -394,12 +419,13 @@ public class CoerceToBooleanTest extends BaseMapTest
             JsonToken tokenType, String tokenValue) throws IOException
     {
         verifyException(e, "Cannot coerce ", "Cannot deserialize value of type ");
+        // 30-May-2025, tatu: [databind#5179] got access via exception now
+        assertToken(tokenType, e.getCurrentToken());
 
         JsonParser p = (JsonParser) e.processor();
+        assertNotNull(p);
 
-        assertToken(tokenType, p.currentToken());
-
-        final String text = p.getText();
+        final String text = p.getString();
         if (!tokenValue.equals(text)) {
             String textDesc = (text == null) ? "NULL" : q(text);
             fail("Token text ("+textDesc+") via parser of type "+p.getClass().getName()
@@ -413,7 +439,7 @@ public class CoerceToBooleanTest extends BaseMapTest
 
     private void _verifyFailFromInteger(ObjectMapper m, Class<?> targetType, String doc,
             Class<?> valueType) throws Exception
-    {       
+    {
         try {
             m.readerFor(targetType).readValue(doc);
             fail("Should not accept Integer for "+targetType.getName()+" by default");

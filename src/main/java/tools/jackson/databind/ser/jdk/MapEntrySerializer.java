@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonToken;
@@ -135,7 +136,7 @@ public class MapEntrySerializer
     }
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider provider,
+    public ValueSerializer<?> createContextual(SerializationContext provider,
             BeanProperty property)
     {
         ValueSerializer<?> ser = null;
@@ -220,10 +221,8 @@ public class MapEntrySerializer
                 }
             }
         }
-        MapEntrySerializer mser = withResolved(property, keySer, ser,
-                valueToSuppress, suppressNulls);
         // but note: no (full) filtering or sorting (unlike Maps)
-        return mser;
+        return withResolved(property, keySer, ser, valueToSuppress, suppressNulls);
     }
 
     /*
@@ -248,7 +247,7 @@ public class MapEntrySerializer
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider ctxt, Entry<?, ?> entry)
+    public boolean isEmpty(SerializationContext ctxt, Entry<?, ?> entry)
     {
         Object value = entry.getValue();
         if (value == null) {
@@ -280,7 +279,7 @@ public class MapEntrySerializer
      */
 
     @Override
-    public void serialize(Map.Entry<?, ?> value, JsonGenerator g, SerializerProvider ctxt)
+    public void serialize(Map.Entry<?, ?> value, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
         g.writeStartObject(value);
@@ -290,7 +289,7 @@ public class MapEntrySerializer
 
     @Override
     public void serializeWithType(Map.Entry<?, ?> value, JsonGenerator g,
-            SerializerProvider ctxt, TypeSerializer typeSer)
+            SerializationContext ctxt, TypeSerializer typeSer)
         throws JacksonException
     {
         // [databind#631]: Assign current value, to be accessible by custom serializers
@@ -302,7 +301,7 @@ public class MapEntrySerializer
     }
 
     protected void serializeDynamic(Map.Entry<?, ?> value, JsonGenerator gen,
-            SerializerProvider ctxt)
+            SerializationContext ctxt)
         throws JacksonException
     {
         final TypeSerializer vts = _valueTypeSerializer;
@@ -343,7 +342,8 @@ public class MapEntrySerializer
                     if (valueSer.isEmpty(ctxt, valueElem)) {
                         return;
                     }
-                } if (_suppressableValue.equals(valueElem)) {
+                }
+                else if (_suppressableValue.equals(valueElem)) {
                     return;
                 }
             }

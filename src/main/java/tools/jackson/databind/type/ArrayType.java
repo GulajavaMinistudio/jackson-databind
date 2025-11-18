@@ -67,7 +67,7 @@ public final class ArrayType
     @Override
     public ArrayType withContentTypeHandler(Object h)
     {
-        if (h == _componentType.<Object>getTypeHandler()) {
+        if (h == _componentType.getTypeHandler()) {
             return this;
         }
         return new ArrayType(_componentType.withTypeHandler(h), _bindings, _emptyArray,
@@ -84,7 +84,7 @@ public final class ArrayType
 
     @Override
     public ArrayType withContentValueHandler(Object h) {
-        if (h == _componentType.<Object>getValueHandler()) {
+        if (h == _componentType.getValueHandler()) {
             return this;
         }
         return new ArrayType(_componentType.withValueHandler(h), _bindings, _emptyArray,
@@ -122,7 +122,7 @@ public final class ArrayType
 
     @Override
     public boolean isArrayType() { return true; }
-    
+
     /**
      * For some odd reason, modifiers for array classes would
      * claim they are abstract types. Not so, at least for our
@@ -171,7 +171,7 @@ public final class ArrayType
     public boolean hasHandlers() {
         return super.hasHandlers() || _componentType.hasHandlers();
     }
-    
+
     @Override
     public StringBuilder getGenericSignature(StringBuilder sb) {
         sb.append('[');

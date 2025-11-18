@@ -2,12 +2,17 @@ package tools.jackson.databind.objectid;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class ReferentialWithObjectIdTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ReferentialWithObjectIdTest extends DatabindTestUtil
 {
     public static class EmployeeList {
         public AtomicReference<Employee> first;
@@ -32,7 +37,8 @@ public class ReferentialWithObjectIdTest extends BaseMapTest
      */
 
     private final ObjectMapper MAPPER = new ObjectMapper();
-    
+
+    @Test
     public void testAtomicWithObjectId() throws Exception
     {
         Employee first = new Employee();
@@ -52,7 +58,7 @@ public class ReferentialWithObjectIdTest extends BaseMapTest
         String json = MAPPER.writeValueAsString(input);
 
         // and back
- 
+
         EmployeeList result = MAPPER.readValue(json, EmployeeList.class);
         Employee firstB = result.first.get();
         assertNotNull(firstB);

@@ -1,12 +1,22 @@
 package tools.jackson.databind.convert;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
 
-public class ScalarConversionTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class ScalarConversionTest
 {
-    private final ObjectMapper MAPPER = new ObjectMapper();
-    
+    // 08-Jan-2025, tatu: Need to allow null-to-int coercion here
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .build();
+
     // [databind#1433]
+    @Test
     public void testConvertValueNullPrimitive() throws Exception
     {
         assertEquals(Byte.valueOf((byte) 0), MAPPER.convertValue(null, Byte.TYPE));
@@ -18,8 +28,9 @@ public class ScalarConversionTest extends BaseMapTest
         assertEquals(Character.valueOf('\0'), MAPPER.convertValue(null, Character.TYPE));
         assertEquals(Boolean.FALSE, MAPPER.convertValue(null, Boolean.TYPE));
     }
-    
+
     // [databind#1433]
+    @Test
     public void testConvertValueNullBoxed() throws Exception
     {
         assertNull(MAPPER.convertValue(null, Byte.class));

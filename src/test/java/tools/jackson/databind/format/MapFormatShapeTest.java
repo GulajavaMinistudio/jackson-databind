@@ -5,6 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -12,9 +14,12 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SuppressWarnings("serial")
-public class MapFormatShapeTest extends BaseMapTest
+public class MapFormatShapeTest extends DatabindTestUtil
 {
     @JsonPropertyOrder({ "extra" })
     static class Map476Base extends LinkedHashMap<String,Integer> {
@@ -66,17 +71,17 @@ public class MapFormatShapeTest extends BaseMapTest
     static class Map1540Implementation implements Map<Integer, Integer> {
         public int property;
         public Map<Integer, Integer> map = new LinkedHashMap<>();
- 
+
         public Map<Integer, Integer> getMap() {
             return map;
        }
 
-       public void setMap(Map<Integer, Integer> map) {
+        public void setMap(Map<Integer, Integer> map) {
             this.map = map;
-       }        
+       }
 
-       @Override
-       public Integer put(Integer key, Integer value) {
+        @Override
+        public Integer put(Integer key, Integer value) {
             return map.put(key, value);
        }
 
@@ -100,17 +105,17 @@ public class MapFormatShapeTest extends BaseMapTest
         public boolean containsValue(Object value) {
             return map.containsValue(value);
         }
-    
+
         @Override
         public Integer get(Object key) {
             return map.get(key);
         }
-    
+
         @Override
         public Integer remove(Object key) {
             return map.remove(key);
         }
-    
+
         @Override
         public void putAll(Map<? extends Integer, ? extends Integer> m) {
             map.putAll(m);
@@ -130,29 +135,50 @@ public class MapFormatShapeTest extends BaseMapTest
         public Collection<Integer> values() {
             return map.values();
         }
-    
+
         @Override
         public Set<java.util.Map.Entry<Integer, Integer>> entrySet() {
             return map.entrySet();
         }
     }
 
-    
+
     /*
     /**********************************************************
     /* Test methods, serialization
     /**********************************************************
      */
 
-    final private ObjectMapper MAPPER = objectMapper();
+    final private ObjectMapper MAPPER = newJsonMapper();
 
     // for [databind#476]: Maps as POJOs
+    @Test
     public void testSerializeAsPOJOViaClass() throws Exception
     {
         String result = MAPPER.writeValueAsString(new Bean476Container(1,2,0));
         assertEquals(a2q("{'a':{'extra':13,'empty':false},'b':{'value':2}}"),
                 result);
     }
+
+    // Can't yet use per-property overrides at all, see [databind#1419]
+
+    /*
+    @Test
+    public void testSerializeAsPOJOViaProperty() throws Exception
+    {
+        String result = MAPPER.writeValueAsString(new Bean476Container(1,0,3));
+        assertEquals(a2q("{'a':{'extra':13,'empty':false},'c':{'empty':false,'value':3}}"),
+                result);
+    }
+
+    @Test
+    public void testSerializeNaturalViaOverride() throws Exception
+    {
+        String result = MAPPER.writeValueAsString(new Bean476Override(123));
+        assertEquals(a2q("{'stuff':{'value':123}}"),
+                result);
+    }
+    */
 
     /*
     /**********************************************************
@@ -161,6 +187,7 @@ public class MapFormatShapeTest extends BaseMapTest
      */
 
     // [databind#1540]
+    @Test
     public void testRoundTrip() throws Exception
     {
         Map1540Implementation input = new Map1540Implementation();
@@ -176,8 +203,9 @@ public class MapFormatShapeTest extends BaseMapTest
         assertEquals(result.property, input.property);
         assertEquals(input.getMap(), input.getMap());
    }
-    
+
     // [databind#1554]
+    @Test
     public void testDeserializeAsPOJOViaClass() throws Exception
     {
         Map476AsPOJO result = MAPPER.readValue(a2q("{'extra':42}"),

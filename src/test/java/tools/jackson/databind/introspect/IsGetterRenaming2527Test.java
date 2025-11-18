@@ -3,13 +3,18 @@ package tools.jackson.databind.introspect;
 import java.util.Collections;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.MapperConfig;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 // [databind#2527] Support Kotlin-style "is" properties
-public class IsGetterRenaming2527Test extends BaseMapTest
+public class IsGetterRenaming2527Test extends DatabindTestUtil
 {
     static class POJO2527 {
         boolean isEnabled;
@@ -36,7 +41,7 @@ public class IsGetterRenaming2527Test extends BaseMapTest
     }
 
     static class POJO2527Creator {
-        final boolean isEnabled;
+        boolean isEnabled;
 
         public POJO2527Creator(@JsonProperty("enabled") boolean b) {
             isEnabled = b;
@@ -86,8 +91,10 @@ public class IsGetterRenaming2527Test extends BaseMapTest
 
     private final ObjectMapper MAPPER = jsonMapperBuilder()
             .annotationIntrospector(new MyIntrospector())
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
             .build();
 
+    @Test
     public void testIsPropertiesStdKotlin() throws Exception
     {
         POJO2527 input = new POJO2527(true);
@@ -96,11 +103,12 @@ public class IsGetterRenaming2527Test extends BaseMapTest
         Map<?, ?> props = MAPPER.readValue(json, Map.class);
         assertEquals(Collections.singletonMap("isEnabled", Boolean.TRUE),
                 props);
-        
+
         POJO2527 output = MAPPER.readValue(json, POJO2527.class);
         assertEquals(input.isEnabled, output.isEnabled);
     }
 
+    @Test
     public void testIsPropertiesWithPublicField() throws Exception
     {
         POJO2527PublicField input = new POJO2527PublicField(true);
@@ -109,11 +117,12 @@ public class IsGetterRenaming2527Test extends BaseMapTest
         Map<?, ?> props = MAPPER.readValue(json, Map.class);
         assertEquals(Collections.singletonMap("isEnabled", Boolean.TRUE),
                 props);
-        
+
         POJO2527PublicField output = MAPPER.readValue(json, POJO2527PublicField.class);
         assertEquals(input.isEnabled, output.isEnabled);
     }
 
+    @Test
     public void testIsPropertiesViaCreator() throws Exception
     {
         POJO2527Creator input = new POJO2527Creator(true);
@@ -122,7 +131,7 @@ public class IsGetterRenaming2527Test extends BaseMapTest
         Map<?, ?> props = MAPPER.readValue(json, Map.class);
         assertEquals(Collections.singletonMap("isEnabled", Boolean.TRUE),
                 props);
-        
+
         POJO2527Creator output = MAPPER.readValue(json, POJO2527Creator.class);
         assertEquals(input.isEnabled, output.isEnabled);
     }

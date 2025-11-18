@@ -17,7 +17,7 @@ import tools.jackson.databind.ser.std.ToStringSerializer;
 
 /**
  * Container class for serializers used for handling standard JDK-provided
- * types.
+ * primitive number types and their wrapper counterparts (like {@link java.lang.Integer}).
  */
 public class NumberSerializers {
     protected NumberSerializers() { }
@@ -84,7 +84,7 @@ public class NumberSerializers {
         }
 
         @Override
-        public ValueSerializer<?> createContextual(SerializerProvider prov,
+        public ValueSerializer<?> createContextual(SerializationContext prov,
                 BeanProperty property)
         {
             JsonFormat.Value format = findFormatOverrides(prov, property, handledType());
@@ -113,13 +113,13 @@ public class NumberSerializers {
         final static ShortSerializer instance = new ShortSerializer();
 
         public ShortSerializer() {
-            super(Short.class, JsonParser.NumberType.INT, "number");
+            super(Short.class, JsonParser.NumberType.INT, "integer");
         }
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException {
-            gen.writeNumber(((Short) value).shortValue());
+                SerializationContext provider) throws JacksonException {
+            gen.writeNumber((Short) value);
         }
     }
 
@@ -138,14 +138,14 @@ public class NumberSerializers {
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException {
-            gen.writeNumber(((Integer) value).intValue());
+                SerializationContext provider) throws JacksonException {
+            gen.writeNumber((Integer) value);
         }
 
         // IMPORTANT: copied from `NonTypedScalarSerializerBase`
         @Override
         public void serializeWithType(Object value, JsonGenerator gen,
-                SerializerProvider provider, TypeSerializer typeSer)
+                SerializationContext provider, TypeSerializer typeSer)
                 throws JacksonException {
             // no type info, just regular serialization
             serialize(value, gen, provider);
@@ -167,7 +167,7 @@ public class NumberSerializers {
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException {
+                SerializationContext provider) throws JacksonException {
             gen.writeNumber(((Number) value).intValue());
         }
     }
@@ -175,13 +175,13 @@ public class NumberSerializers {
     @JacksonStdImpl
     public static class LongSerializer extends Base<Object> {
         public LongSerializer(Class<?> cls) {
-            super(cls, JsonParser.NumberType.LONG, "number");
+            super(cls, JsonParser.NumberType.LONG, "integer");
         }
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException {
-            gen.writeNumber(((Long) value).longValue());
+                SerializationContext provider) throws JacksonException {
+            gen.writeNumber((Long) value);
         }
     }
 
@@ -195,8 +195,8 @@ public class NumberSerializers {
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException {
-            gen.writeNumber(((Float) value).floatValue());
+                SerializationContext provider) throws JacksonException {
+            gen.writeNumber((Float) value);
         }
     }
 
@@ -215,15 +215,15 @@ public class NumberSerializers {
 
         @Override
         public void serialize(Object value, JsonGenerator gen,
-                SerializerProvider provider) throws JacksonException
+                SerializationContext provider) throws JacksonException
         {
-            gen.writeNumber(((Double) value).doubleValue());
+            gen.writeNumber((Double) value);
         }
 
         // IMPORTANT: copied from `NonTypedScalarSerializerBase`
         @Override
         public void serializeWithType(Object value, JsonGenerator g,
-                SerializerProvider ctxt, TypeSerializer typeSer)
+                SerializationContext ctxt, TypeSerializer typeSer)
             throws JacksonException
         {
             // no type info, just regular serialization

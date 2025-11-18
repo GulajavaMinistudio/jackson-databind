@@ -2,12 +2,17 @@ package tools.jackson.databind.mixins;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TestMixinSerWithViews
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     /*
     /**********************************************************
@@ -93,7 +98,7 @@ public class TestMixinSerWithViews
       {
         this.testDataArray = testDataArray;
       }
-    }    
+    }
 
     public interface TestDataJAXBMixin
     {
@@ -122,7 +127,7 @@ public class TestMixinSerWithViews
     static class Views {
         static class View { }
     }
-    
+
     public class A {
         private String name;
         private int age;
@@ -158,7 +163,8 @@ public class TestMixinSerWithViews
     /* Tests
     /**********************************************************
      */
-    
+
+    @Test
     public void testDataBindingUsage( ) throws Exception
     {
       ObjectMapper objectMapper = createObjectMapper();
@@ -167,8 +173,9 @@ public class TestMixinSerWithViews
       String json = objectWriter.writeValueAsString(object);
       assertTrue( json.indexOf( "nameHidden" ) == -1 );
       assertTrue( json.indexOf( "\"name\" : \"shown\"" ) > 0 );
-    }    
+    }
 
+    @Test
     public void testIssue560() throws Exception
     {
         A a = new A("myname", 29, "mysurname");

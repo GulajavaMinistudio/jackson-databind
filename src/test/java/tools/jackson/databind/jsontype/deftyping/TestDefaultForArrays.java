@@ -5,13 +5,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-public class TestDefaultForArrays extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestDefaultForArrays extends DatabindTestUtil
 {
     static class ArrayBean {
         public Object[] values;
@@ -38,6 +43,7 @@ public class TestDefaultForArrays extends BaseMapTest
      * Simple unit test for verifying that we get String array
      * back, even though declared type is Object array
      */
+    @Test
     public void testArrayTypingSimple() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -52,6 +58,7 @@ public class TestDefaultForArrays extends BaseMapTest
     }
 
     // And let's try it with deeper array as well
+    @Test
     public void testArrayTypingNested() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -65,13 +72,14 @@ public class TestDefaultForArrays extends BaseMapTest
         assertEquals(String[][].class, result.values.getClass());
     }
 
+    @Test
     public void testNodeInArray() throws Exception
     {
-        JsonNode node = objectMapper().readTree("{\"a\":3}");
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(NoCheckSubTypeValidator.instance,
                         DefaultTyping.JAVA_LANG_OBJECT)
                 .build();
+        JsonNode node = mapper.readTree("{\"a\":3}");
         Object[] obs = new Object[] { node };
         String json = mapper.writeValueAsString(obs);
         Object[] result = mapper.readValue(json, Object[].class);
@@ -79,8 +87,9 @@ public class TestDefaultForArrays extends BaseMapTest
         Object ob = result[0];
         assertTrue(ob instanceof JsonNode);
     }
-    
+
     @SuppressWarnings("deprecation")
+    @Test
     public void testNodeInEmptyArray() throws Exception
     {
         Map<String, List<String>> outerMap = new HashMap<String, List<String>>();
@@ -89,10 +98,10 @@ public class TestDefaultForArrays extends BaseMapTest
                 .disable(SerializationFeature.WRITE_EMPTY_JSON_ARRAYS)
                 .build();
         JsonNode tree = vanillaMapper.convertValue(outerMap, JsonNode.class);
-        
+
         String json = vanillaMapper.writeValueAsString(tree);
         assertEquals("{}", json);
-        
+
         JsonNode node = vanillaMapper.readTree("{\"a\":[]}");
 
         ObjectMapper mapper = vanillaMapper.rebuild()
@@ -109,6 +118,7 @@ public class TestDefaultForArrays extends BaseMapTest
         assertEquals(0, ((ObjectNode) elem).size());
     }
 
+    @Test
     public void testArraysOfArrays() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -125,6 +135,7 @@ public class TestDefaultForArrays extends BaseMapTest
         _testArraysAs(mapper, json, Object.class);
     }
 
+    @Test
     public void testArrayTypingForPrimitiveArrays() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -154,7 +165,7 @@ public class TestDefaultForArrays extends BaseMapTest
     /* Helper methods
     /**********************************************************
      */
-    
+
     protected void _testArraysAs(ObjectMapper mapper, String json, Class<?> type)
         throws Exception
     {

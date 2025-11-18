@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -12,14 +14,17 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import tools.jackson.core.io.SerializedString;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class SequenceWriterTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class SequenceWriterTest extends DatabindTestUtil
 {
     static class Bean {
         public int a;
 
         public Bean(int value) { a = value; }
-        
+
         @Override
         public boolean equals(Object o) {
             if (o == null || o.getClass() != getClass()) return false;
@@ -36,14 +41,14 @@ public class SequenceWriterTest extends BaseMapTest
     @JsonTypeName("A")
     static class ImplA extends PolyBase {
         public int value;
-        
+
         public ImplA(int v) { value = v; }
     }
 
     @JsonTypeName("B")
     static class ImplB extends PolyBase {
         public int b;
-        
+
         public ImplB(int v) { b = v; }
     }
 
@@ -62,7 +67,7 @@ public class SequenceWriterTest extends BaseMapTest
         public int c = 3;
 
         boolean closed = false;
-        
+
         @Override
         public void close() throws IOException {
             closed = true;
@@ -74,7 +79,7 @@ public class SequenceWriterTest extends BaseMapTest
         public int x;
 
         public boolean closed;
-        
+
         @Override
         public void close() throws IOException {
             closed = true;
@@ -87,10 +92,11 @@ public class SequenceWriterTest extends BaseMapTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
     private final ObjectWriter WRITER = MAPPER.writer()
             .withRootValueSeparator("\n");
 
+    @Test
     public void testSimpleNonArray() throws Exception
     {
         StringWriter strw = new StringWriter();
@@ -117,6 +123,7 @@ public class SequenceWriterTest extends BaseMapTest
                 strw.toString());
     }
 
+    @Test
     public void testSimpleNonArrayNoSeparator() throws Exception
     {
         final String EXP = a2q("{'a':1}{'a':2}");
@@ -134,6 +141,7 @@ public class SequenceWriterTest extends BaseMapTest
         //   will not work in 2.x.
     }
 
+    @Test
     public void testSimpleArray() throws Exception
     {
         StringWriter strw = new StringWriter();
@@ -163,6 +171,7 @@ public class SequenceWriterTest extends BaseMapTest
      */
 
     @SuppressWarnings("resource")
+    @Test
     public void testPolymorphicNonArrayWithoutType() throws Exception
     {
         StringWriter strw = new StringWriter();
@@ -176,6 +185,7 @@ public class SequenceWriterTest extends BaseMapTest
     }
 
     @SuppressWarnings("resource")
+    @Test
     public void testPolymorphicArrayWithoutType() throws Exception
     {
         StringWriter strw = new StringWriter();
@@ -188,6 +198,7 @@ public class SequenceWriterTest extends BaseMapTest
                 strw.toString());
     }
 
+    @Test
     public void testPolymorphicArrayWithType() throws Exception
     {
         StringWriter strw = new StringWriter();
@@ -204,6 +215,7 @@ public class SequenceWriterTest extends BaseMapTest
     }
 
     @SuppressWarnings("resource")
+    @Test
     public void testSimpleCloseable() throws Exception
     {
         JsonMapper mapper = JsonMapper.builder().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).build();
@@ -222,6 +234,7 @@ public class SequenceWriterTest extends BaseMapTest
         assertEquals(a2q("{'closed':false,'x':0}"), out.toString());
     }
 
+    @Test
     public void testWithExplicitType() throws Exception
     {
         ObjectWriter w = MAPPER.writer()

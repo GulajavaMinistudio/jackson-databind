@@ -2,15 +2,20 @@ package tools.jackson.databind.jsontype;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-public class TestSubtypes extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestSubtypes extends DatabindTestUtil
 {
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME)
     static abstract class SuperType {
@@ -32,7 +37,7 @@ public class TestSubtypes extends BaseMapTest
     // "Empty" bean
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME)
     static abstract class BaseBean { }
-    
+
     static class EmptyBean extends BaseBean { }
 
     static class EmptyNonFinal { }
@@ -43,9 +48,9 @@ public class TestSubtypes extends BaseMapTest
     {
         @JsonTypeInfo(use=JsonTypeInfo.Id.NAME)
         public SuperType value;
-        
+
         public PropertyBean() { this(null); }
-        public PropertyBean(SuperType v) { value = v; }
+        protected PropertyBean(SuperType v) { value = v; }
     }
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=As.PROPERTY, property="type")
@@ -60,7 +65,7 @@ public class TestSubtypes extends BaseMapTest
         public int x;
 
         public ImplX() { }
-        public ImplX(int x) { this.x = x; }
+        protected ImplX(int x) { this.x = x; }
     }
 
     @JsonTypeName("y")
@@ -78,7 +83,7 @@ public class TestSubtypes extends BaseMapTest
         public BaseX value;
 
         public AtomicWrapper() { }
-        public AtomicWrapper(int x) { value = new ImplX(x); }
+        protected AtomicWrapper(int x) { value = new ImplX(x); }
     }
 
     // Verifying limits on sub-class ids
@@ -103,7 +108,7 @@ public class TestSubtypes extends BaseMapTest
         public Issue1125Wrapper() { }
         public Issue1125Wrapper(Base1125 v) { value = v; }
     }
-    
+
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, defaultImpl=Default1125.class)
     @JsonSubTypes({ @JsonSubTypes.Type(Interm1125.class) })
     static class Base1125 {
@@ -119,7 +124,7 @@ public class TestSubtypes extends BaseMapTest
         public int c;
 
         public Impl1125() { }
-        public Impl1125(int a0, int b0, int c0) {
+        protected Impl1125(int a0, int b0, int c0) {
             a = a0;
             b = b0;
             c = c0;
@@ -130,7 +135,7 @@ public class TestSubtypes extends BaseMapTest
         public int def;
 
         Default1125() { }
-        public Default1125(int a0, int b0, int def0) {
+        protected Default1125(int a0, int b0, int def0) {
             a = a0;
             b = b0;
             def = def0;
@@ -181,6 +186,7 @@ public class TestSubtypes extends BaseMapTest
 
     private final ObjectMapper MAPPER = new ObjectMapper();
 
+    @Test
     public void testPropertyWithSubtypes() throws Exception
     {
         // must register subtypes
@@ -193,6 +199,7 @@ public class TestSubtypes extends BaseMapTest
     }
 
     // also works via modules
+    @Test
     public void testSubtypesViaModule() throws Exception
     {
         SimpleModule module = new SimpleModule();
@@ -218,7 +225,8 @@ public class TestSubtypes extends BaseMapTest
         result = mapper.readValue(json, PropertyBean.class);
         assertSame(SubC.class, result.value.getClass());
     }
-    
+
+    @Test
     public void testSerialization() throws Exception
     {
         // serialization can detect type name ok without anything extra:
@@ -232,9 +240,10 @@ public class TestSubtypes extends BaseMapTest
         assertEquals("{\"@type\":\"typeB\",\"b\":1}", mapper.writeValueAsString(bean));
 
         // and default name ought to be simple class name; with context
-        assertEquals("{\"@type\":\"TestSubtypes$SubD\",\"d\":0}", mapper.writeValueAsString(new SubD()));  
+        assertEquals("{\"@type\":\"TestSubtypes$SubD\",\"d\":0}", mapper.writeValueAsString(new SubD()));
     }
 
+    @Test
     public void testDeserializationNonNamed() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -246,6 +255,7 @@ public class TestSubtypes extends BaseMapTest
         assertEquals(1, ((SubC) bean).c);
     }
 
+    @Test
     public void testDeserializatioNamed() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -263,6 +273,7 @@ public class TestSubtypes extends BaseMapTest
         assertEquals(-4, ((SubD) bean).d);
     }
 
+    @Test
     public void testEmptyBean() throws Exception
     {
         // First, with annotations
@@ -287,6 +298,7 @@ public class TestSubtypes extends BaseMapTest
         assertEquals("[\"tools.jackson.databind.jsontype.TestSubtypes$EmptyNonFinal\",{}]", json);
     }
 
+    @Test
     public void testErrorMessage() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         try {
@@ -298,6 +310,7 @@ public class TestSubtypes extends BaseMapTest
         }
     }
 
+    @Test
     public void testViaAtomic() throws Exception {
         AtomicWrapper input = new AtomicWrapper(3);
         String json = MAPPER.writeValueAsString(input);
@@ -310,6 +323,7 @@ public class TestSubtypes extends BaseMapTest
 
     // Test to verify that base/impl restriction is applied to polymorphic handling
     // even if class name is used as the id
+    @Test
     public void testSubclassLimits() throws Exception
     {
         try {
@@ -326,10 +340,11 @@ public class TestSubtypes extends BaseMapTest
 
     // [databind#1125]: properties from base class too
 
+    @Test
     public void testIssue1125NonDefault() throws Exception
     {
         String json = MAPPER.writeValueAsString(new Issue1125Wrapper(new Impl1125(1, 2, 3)));
-        
+
         Issue1125Wrapper result = MAPPER.readValue(json, Issue1125Wrapper.class);
         assertNotNull(result.value);
         assertEquals(Impl1125.class, result.value.getClass());
@@ -339,6 +354,7 @@ public class TestSubtypes extends BaseMapTest
         assertEquals(3, impl.c);
     }
 
+    @Test
     public void testIssue1125WithDefault() throws Exception
     {
         Issue1125Wrapper result = MAPPER.readValue(a2q("{'value':{'a':3,'def':9,'b':5}}"),
@@ -366,22 +382,22 @@ public class TestSubtypes extends BaseMapTest
     // [databind#2525]
     public void testDeserializationWithDuplicateRegisteredSubtypes() throws Exception {
         ObjectMapper mapper = jsonMapperBuilder()
-            // We can register the same class with different names
-            .registerSubtypes(new NamedType(Sub.class, "sub1"))
-            .registerSubtypes(new NamedType(Sub.class, "sub2"))
-            .build();
+        // We can register the same class with different names
+        .registerSubtypes(new NamedType(Sub.class, "sub1"))
+        .registerSubtypes(new NamedType(Sub.class, "sub2"))
+        .build();
 
-            // fields of a POJO will be deserialized correctly according to their field name
-            POJOWrapper pojoWrapper = mapper.readValue("{\"sub1\":{\"#type\":\"sub1\",\"a\":10},\"sub2\":{\"#type\":\"sub2\",\"a\":50}}", POJOWrapper.class);
-            assertEquals(10, pojoWrapper.sub1.a);
-            assertEquals(50, pojoWrapper.sub2.a);
+        // fields of a POJO will be deserialized correctly according to their field name
+        POJOWrapper pojoWrapper = mapper.readValue("{\"sub1\":{\"#type\":\"sub1\",\"a\":10},\"sub2\":{\"#type\":\"sub2\",\"a\":50}}", POJOWrapper.class);
+        assertEquals(10, pojoWrapper.sub1.a);
+        assertEquals(50, pojoWrapper.sub2.a);
 
-            // Instances of the same object can be deserialized with multiple names
-            SuperTypeWithoutDefault sub1 = mapper.readValue("{\"#type\":\"sub1\", \"a\":20}", SuperTypeWithoutDefault.class);
-            assertSame(Sub.class, sub1.getClass());
-            assertEquals(20, ((Sub) sub1).a);
-            SuperTypeWithoutDefault sub2 = mapper.readValue("{\"#type\":\"sub2\", \"a\":30}", SuperTypeWithoutDefault.class);
-            assertSame(Sub.class, sub2.getClass());
-            assertEquals(30, ((Sub) sub2).a);
-        }
+        // Instances of the same object can be deserialized with multiple names
+        SuperTypeWithoutDefault sub1 = mapper.readValue("{\"#type\":\"sub1\", \"a\":20}", SuperTypeWithoutDefault.class);
+        assertSame(Sub.class, sub1.getClass());
+        assertEquals(20, ((Sub) sub1).a);
+        SuperTypeWithoutDefault sub2 = mapper.readValue("{\"#type\":\"sub2\", \"a\":30}", SuperTypeWithoutDefault.class);
+        assertSame(Sub.class, sub2.getClass());
+        assertEquals(30, ((Sub) sub2).a);
+    }
 }

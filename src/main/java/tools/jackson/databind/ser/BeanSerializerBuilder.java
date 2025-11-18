@@ -19,19 +19,19 @@ public class BeanSerializerBuilder
     private final static BeanPropertyWriter[] NO_PROPERTIES = new BeanPropertyWriter[0];
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Basic configuration we start with
-    /**********************************************************
+    /**********************************************************************
      */
 
-    final protected BeanDescription _beanDesc;
+    protected final BeanDescription.Supplier _beanDescRef;
 
-    protected SerializationConfig _config;
-    
+    protected final SerializationConfig _config;
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Accumulated information about properties
-    /**********************************************************
+    /**********************************************************************
      */
 
     /**
@@ -44,7 +44,7 @@ public class BeanSerializerBuilder
      * view-based filtering is performed.
      */
     protected BeanPropertyWriter[] _filteredProperties;
-    
+
     /**
      * Writer used for "any getter" properties, if any.
      */
@@ -68,37 +68,31 @@ public class BeanSerializerBuilder
     protected ObjectIdWriter _objectIdWriter;
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Construction and setter methods
-    /**********************************************************
+    /**********************************************************************
      */
 
-    public BeanSerializerBuilder(BeanDescription beanDesc) {
-        _beanDesc = beanDesc;
+    public BeanSerializerBuilder(SerializationConfig config,
+            BeanDescription.Supplier beanDescRef) {
+        _config = config;
+        _beanDescRef = beanDescRef;
     }
 
     /**
      * Copy-constructor that may be used for sub-classing
      */
     protected BeanSerializerBuilder(BeanSerializerBuilder src) {
-        _beanDesc = src._beanDesc;
+        _beanDescRef = src._beanDescRef;
+        _config = src._config;
         _properties = src._properties;
         _filteredProperties = src._filteredProperties;
         _anyGetter = src._anyGetter;
         _filterId = src._filterId;
+        _typeId = src._typeId;
+        _objectIdWriter = src._objectIdWriter;
     }
 
-    /**
-     * Initialization method called right after construction, to specify
-     * configuration to use.
-     *<p>
-     * Note: ideally should be passed in constructor, but for backwards
-     * compatibility, needed to add a setter instead
-     */
-    protected void setConfig(SerializationConfig config) {
-        _config = config;
-    }
-    
     public void setProperties(List<BeanPropertyWriter> properties) {
         _properties = properties;
     }
@@ -126,7 +120,7 @@ public class BeanSerializerBuilder
     public void setFilterId(Object filterId) {
         _filterId = filterId;
     }
-    
+
     public void setTypeId(AnnotatedMember idProp) {
         // Not legal to use multiple ones...
         if (_typeId != null) {
@@ -138,18 +132,20 @@ public class BeanSerializerBuilder
     public void setObjectIdWriter(ObjectIdWriter w) {
         _objectIdWriter = w;
     }
-    
+
     /*
-    /**********************************************************
-    /* Accessors for things BeanSerializer cares about:
-    /* note -- likely to change between minor revisions
-    /* by new methods getting added.
-    /**********************************************************
+    /**********************************************************************
+    /* Accessors for things BeanSerializer cares about -- note -- likely to
+    /* change between minor revisions by new methods getting added.
+    /**********************************************************************
      */
 
-    public AnnotatedClass getClassInfo() { return _beanDesc.getClassInfo(); }
-    
-    public BeanDescription getBeanDescription() { return _beanDesc; }
+    public AnnotatedClass getClassInfo() { return _beanDescRef.getClassInfo(); }
+
+    // 21-May-2025, tatu: Hopefully not needed and can be removed?
+//    public BeanDescription getBeanDescription() { return _beanDescRef.get(); }
+
+    public BeanDescription.Supplier getBeanDescriptionRef() { return _beanDescRef; }
 
     public List<BeanPropertyWriter> getProperties() { return _properties; }
     public boolean hasProperties() {
@@ -157,21 +153,21 @@ public class BeanSerializerBuilder
     }
 
     public BeanPropertyWriter[] getFilteredProperties() { return _filteredProperties; }
-    
+
     public AnyGetterWriter getAnyGetter() { return _anyGetter; }
-    
+
     public Object getFilterId() { return _filterId; }
 
     public AnnotatedMember getTypeId() { return _typeId; }
 
     public ObjectIdWriter getObjectIdWriter() { return _objectIdWriter; }
-    
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Build methods for actually creating serializer instance
-    /**********************************************************
+    /**********************************************************************
      */
-    
+
     /**
      * Method called to create {@link BeanSerializer} instance with
      * all accumulated information. Will construct a serializer if we
@@ -216,12 +212,12 @@ _properties.size(), _filteredProperties.length));
             }
         }
         ValueSerializer<?> ser = UnrolledBeanSerializer.tryConstruct(
-                    _beanDesc.getType(), this,
+                _beanDescRef.getType(), this,
                     properties, _filteredProperties);
         if (ser != null) {
             return ser;
         }
-        return new BeanSerializer(_beanDesc.getType(), this,
+        return new BeanSerializer(_beanDescRef.getType(), this,
                 properties, _filteredProperties);
     }
 
@@ -231,7 +227,7 @@ _properties.size(), _filteredProperties.length));
      * type information)
      */
     public BeanSerializer createDummy() {
-        // 20-Sep-2019, tatu: Can not skimp on passing builder  (see [databind#2077])
-        return BeanSerializer.createDummy(_beanDesc.getType(), this);
+        // 20-Sep-2019, tatu: Cannot skimp on passing builder  (see [databind#2077])
+        return BeanSerializer.createDummy(_beanDescRef.getType(), this);
     }
 }

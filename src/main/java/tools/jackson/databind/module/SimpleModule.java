@@ -17,10 +17,17 @@ import tools.jackson.databind.util.UniqueId;
  * as well as some other commonly
  * needed aspects (addition of custom {@link AbstractTypeResolver}s,
  * {@link tools.jackson.databind.deser.ValueInstantiator}s).
+ * <p>
+ * NOTE: that [de]serializers are registered as "default" [de]serializers.
+ * As a result, they will have lower priority than the ones indicated through annotations on
+ * both Class and property-associated annotations -- for example,
+ * {@link tools.jackson.databind.annotation.JsonDeserialize}.<br>
+ * In cases where both module-based [de]serializers and annotation-based [de]serializers are registered,
+ * the [de]serializer specified by the annotation will take precedence.
  *<p>
  * NOTE: although it is not expected that sub-types should need to
  * override {@link #setupModule(SetupContext)} method, if they choose
- * to do so they MUST call {@code super.setupModule(context);}
+ * to do so they MUST call {@code super.setupModule(context)}
  * to ensure that registration works as expected.
  *<p>
  * WARNING: when registering {@link ValueSerializer}s and {@link ValueDeserializer}s,
@@ -29,7 +36,7 @@ import tools.jackson.databind.util.UniqueId;
  * {@link java.util.Collection}s or {@link java.util.Map}s: this because parametric
  * type information will not be considered and you may end up having "wrong" handler
  * for your type.
- * What you need to do, instead, is to implement {@link tools.jackson.databind.deser.Deserializers} 
+ * What you need to do, instead, is to implement {@link tools.jackson.databind.deser.Deserializers}
  * and/or {@link tools.jackson.databind.ser.Serializers} callbacks to match full type
  * signatures (with {@link JavaType}).
  */
@@ -61,7 +68,7 @@ public class SimpleModule
 
     protected ValueSerializer<?> _defaultNullKeySerializer = null;
     protected ValueSerializer<?> _defaultNullValueSerializer = null;
-    
+
     /**
      * Lazily-constructed resolver used for storing mappings from
      * abstract classes to more specific implementing classes
@@ -85,7 +92,7 @@ public class SimpleModule
      * by target class, value being mix-in to apply.
      */
     protected HashMap<Class<?>, Class<?>> _mixins = null;
-    
+
     /**
      * Set of subtypes to register, if any.
      */
@@ -124,13 +131,13 @@ public class SimpleModule
     public SimpleModule(Version version) {
         this(version.getArtifactId(), version);
     }
-    
+
     /**
      * Constructor to use for actual reusable modules.
      * ObjectMapper may use name as identifier to notice attempts
      * for multiple registrations of the same module (although it
      * does not have to).
-     * 
+     *
      * @param name Unique name of the module
      * @param version Version of the module
      */
@@ -139,7 +146,7 @@ public class SimpleModule
     }
 
     public SimpleModule(String name, Version version, Object registrationId) {
-        if (name == null) {
+        if (name == null || name.isEmpty()) {
             // So: if constructing plain `SimpleModule`, instances assumed to be
             // distinct, not same, so generate unique id. But if sub-class,
             // class name assumed.
@@ -167,7 +174,7 @@ public class SimpleModule
     /* Simple accessors
     /**********************************************************************
      */
-    
+
     @Override
     public Version version() { return _version; }
 
@@ -233,7 +240,7 @@ public class SimpleModule
      * Resets currently configured abstract type mappings
      */
     public SimpleModule setAbstractTypes(SimpleAbstractTypeResolver atr) {
-        _abstractTypes = atr;        
+        _abstractTypes = atr;
         return this;
     }
 
@@ -259,7 +266,7 @@ public class SimpleModule
         _namingStrategy = naming;
         return this;
     }
-    
+
     /*
     /**********************************************************************
     /* Configuration methods, adding serializers
@@ -273,6 +280,12 @@ public class SimpleModule
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
+     * <p>
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
+     * @see #addKeySerializer(Class, ValueSerializer) is used to register key serializers (for Map keys)
      */
     public SimpleModule addSerializer(ValueSerializer<?> ser)
     {
@@ -286,10 +299,18 @@ public class SimpleModule
 
     /**
      * Method for adding serializer to handle values of specific type.
+     * <p>
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
      *<p>
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
+     * <p>
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
+     * @see #addKeySerializer(Class, ValueSerializer) is used to register key serializers (for Map keys)
      */
     public <T> SimpleModule addSerializer(Class<? extends T> type, ValueSerializer<T> ser)
     {
@@ -302,6 +323,9 @@ public class SimpleModule
         return this;
     }
 
+    /**
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
+     */
     public <T> SimpleModule addKeySerializer(Class<? extends T> type, ValueSerializer<T> ser)
     {
         _checkNotNull(type, "type to register key serializer for");
@@ -325,6 +349,12 @@ public class SimpleModule
      * WARNING! Type matching only uses type-erased {@code Class} and should NOT
      * be used when registering serializers for generic types like
      * {@link java.util.Collection} and {@link java.util.Map}.
+     *<p>
+     * WARNING! "Last one wins" rule is applied.
+     * Possible earlier addition of a serializer for a given Class will be replaced.
+     * <p>
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
+     * @see #addKeyDeserializer(Class, KeyDeserializer)  is used to register key deserializers (for Map keys)
      */
     public <T> SimpleModule addDeserializer(Class<T> type, ValueDeserializer<? extends T> deser)
     {
@@ -337,6 +367,9 @@ public class SimpleModule
         return this;
     }
 
+    /**
+     * NOTE: This method registers "default" (de)serializers only. See a note on precedence in class JavaDoc.
+     */
     public SimpleModule addKeyDeserializer(Class<?> type, KeyDeserializer deser)
     {
         _checkNotNull(type, "type to register key deserializer for");
@@ -428,7 +461,7 @@ public class SimpleModule
     /* Configuration methods, add other handlers
     /**********************************************************************
      */
-    
+
     /**
      * Method for registering {@link ValueInstantiator} to use when deserializing
      * instances of type <code>beanType</code>.
@@ -471,7 +504,7 @@ public class SimpleModule
     /* Module impl
     /**********************************************************************
      */
-    
+
     @Override
     public String getModuleName() {
         return _name;
@@ -479,7 +512,7 @@ public class SimpleModule
 
     /**
      * Standard implementation handles registration of all configured
-     * customizations: it is important that sub-classes call this 
+     * customizations: it is important that sub-classes call this
      * implementation (usually before additional custom logic)
      * if they choose to override it; otherwise customizations
      * will not be registered.

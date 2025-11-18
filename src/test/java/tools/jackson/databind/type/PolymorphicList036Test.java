@@ -2,12 +2,16 @@ package tools.jackson.databind.type;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 import tools.jackson.databind.*;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 // For [databind#936], losing parametric type information it seems
-public class PolymorphicList036Test extends BaseMapTest
+public class PolymorphicList036Test
 {
     // note: would prefer using CharSequence, but while abstract, that's deserialized
     // just fine as ... String
@@ -22,7 +26,7 @@ public class PolymorphicList036Test extends BaseMapTest
         public StringyList() {
             _stuff = new ArrayList<T>();
         }
-        
+
         @Override
         public boolean add(T arg) {
             return _stuff.add(arg);
@@ -90,21 +94,22 @@ public class PolymorphicList036Test extends BaseMapTest
     }
 
     private final ObjectMapper MAPPER = new ObjectMapper();
-    
+
+    @Test
     public void testPolymorphicWithOverride() throws Exception
     {
         JavaType type = MAPPER.getTypeFactory().constructCollectionType(StringyList.class, String.class);
-        
+
         StringyList<String> list = new StringyList<String>();
         list.add("value 1");
         list.add("value 2");
-        
+
         String serialized = MAPPER.writeValueAsString(list);
 //        System.out.println(serialized);
-        
+
         StringyList<String> deserialized = MAPPER.readValue(serialized, type);
 //        System.out.println(deserialized);
-        
+
         assertNotNull(deserialized);
     }
 }

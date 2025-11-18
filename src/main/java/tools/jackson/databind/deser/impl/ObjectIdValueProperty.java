@@ -17,8 +17,6 @@ import tools.jackson.databind.introspect.AnnotatedMember;
 public final class ObjectIdValueProperty
     extends SettableBeanProperty
 {
-    private static final long serialVersionUID = 1L;
-
     protected final ObjectIdReader _objectIdReader;
 
     public ObjectIdValueProperty(ObjectIdReader objectIdReader,
@@ -62,7 +60,7 @@ public final class ObjectIdValueProperty
     }
 
     // // // BeanProperty impl
-    
+
     @Override
     public <A extends Annotation> A getAnnotation(Class<A> acls) {
         return null;
@@ -98,28 +96,28 @@ public final class ObjectIdValueProperty
         }
         Object id = _valueDeserializer.deserialize(p, ctxt);
         ReadableObjectId roid = ctxt.findObjectId(id, _objectIdReader.generator, _objectIdReader.resolver);
-        roid.bindItem(instance);
+        roid.bindItem(ctxt, instance);
         // also: may need to set a property value as well
         SettableBeanProperty idProp = _objectIdReader.idProperty;
         if (idProp != null) {
-            return idProp.setAndReturn(instance, id);
+            return idProp.setAndReturn(ctxt, instance, id);
         }
         return instance;
     }
 
     @Override
-    public void set(Object instance, Object value) {
-        setAndReturn(instance, value);
+    public void set(DeserializationContext ctxt,Object instance, Object value) {
+        setAndReturn(ctxt, instance, value);
     }
 
     @Override
-    public Object setAndReturn(Object instance, Object value)
+    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value)
     {
         SettableBeanProperty idProp = _objectIdReader.idProperty;
         if (idProp == null) {
             throw new UnsupportedOperationException(
                     "Should not call set() on ObjectIdProperty that has no SettableBeanProperty");
         }
-        return idProp.setAndReturn(instance, value);
+        return idProp.setAndReturn(ctxt, instance, value);
     }
 }

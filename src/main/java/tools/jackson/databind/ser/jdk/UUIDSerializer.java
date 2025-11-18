@@ -40,18 +40,15 @@ public class UUIDSerializer
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider prov, UUID value)
+    public boolean isEmpty(SerializationContext prov, UUID value)
     {
         // Null UUID is empty, so...
-        if (value.getLeastSignificantBits() == 0L
-                && value.getMostSignificantBits() == 0L) {
-            return true;
-        }
-        return false;
+        return value.getLeastSignificantBits() == 0L
+                && value.getMostSignificantBits() == 0L;
     }
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider serializers,
+    public ValueSerializer<?> createContextual(SerializationContext serializers,
             BeanProperty property)
     {
         JsonFormat.Value format = findFormatOverrides(serializers,
@@ -74,7 +71,7 @@ public class UUIDSerializer
     }
 
     @Override
-    public void serialize(UUID value, JsonGenerator gen, SerializerProvider ctxt)
+    public void serialize(UUID value, JsonGenerator gen, SerializationContext ctxt)
         throws JacksonException
     {
         // First: perhaps we could serialize it as raw binary data?
@@ -105,7 +102,7 @@ public class UUIDSerializer
         gen.writeString(ch, 0, 36);
     }
 
-    protected boolean _writeAsBinary(SerializerProvider ctxt)
+    protected boolean _writeAsBinary(SerializationContext ctxt)
     {
         if (_asBinary != null) {
             return _asBinary;
@@ -116,6 +113,9 @@ public class UUIDSerializer
         //   most conversions.
         // 28-Jan-2021, tatu: [databind#3028] Use capability detection instead
 //        return !(g instanceof TokenBuffer) && g.canWriteBinaryNatively();
+        // 25-Sep-2025, tatu: ^^^ because we DO NOT WANT to ask TokenBuffer.Generator
+        //   (in case of buffering) but rather actual "real" generator.
+        //   So although generator would have capability accessor, we should not call it
         return ctxt.isEnabled(StreamWriteCapability.CAN_WRITE_BINARY_NATIVELY);
     }
 

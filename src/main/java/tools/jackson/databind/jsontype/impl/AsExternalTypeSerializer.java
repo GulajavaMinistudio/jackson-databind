@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.BeanProperty;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsontype.TypeIdResolver;
 
 /**
@@ -31,7 +31,7 @@ public class AsExternalTypeSerializer extends TypeSerializerBase
     }
 
     @Override
-    public AsExternalTypeSerializer forProperty(SerializerProvider ctxt,
+    public AsExternalTypeSerializer forProperty(SerializationContext ctxt,
             BeanProperty prop) {
         return (_property == prop) ? this : new AsExternalTypeSerializer(_idResolver, prop, _typePropertyName);
     }
@@ -58,13 +58,13 @@ public class AsExternalTypeSerializer extends TypeSerializerBase
     protected final void _writeArrayPrefix(Object value, JsonGenerator g) throws JacksonException {
         g.writeStartArray();
     }
-   
+
     protected final void _writeScalarSuffix(Object value, JsonGenerator g, String typeId) throws JacksonException {
         if (typeId != null) {
             g.writeStringProperty(_typePropertyName, typeId);
         }
     }
-   
+
     protected final void _writeObjectSuffix(Object value, JsonGenerator g, String typeId) throws JacksonException {
         g.writeEndObject();
         if (typeId != null) {

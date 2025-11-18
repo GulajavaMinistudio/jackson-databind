@@ -1,20 +1,22 @@
 package tools.jackson.databind.struct;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.exc.InvalidDefinitionException;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for "POJO as array" feature using Builder-style
  * POJO construction.
  */
-public class TestPOJOAsArrayWithBuilder extends BaseMapTest
+public class TestPOJOAsArrayWithBuilder extends DatabindTestUtil
 {
     @JsonDeserialize(builder=SimpleBuilderXY.class)
     @JsonFormat(shape=JsonFormat.Shape.ARRAY)
@@ -40,7 +42,7 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
             x = x0;
             y = y0;
         }
-        
+
         public SimpleBuilderXY withX(int x0) {
             this.x = x0;
             return this;
@@ -85,7 +87,7 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
             this.a = a;
             this.b = b;
         }
-        
+
         @JsonView(String.class)
         public CreatorBuilder withC(int v) {
             c = v;
@@ -103,8 +105,9 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
     /*****************************************************
      */
 
-    private final static ObjectMapper MAPPER = new ObjectMapper();
+    private final static ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSimpleBuilder() throws Exception
     {
         // Ok, first, ensure that serializer will "black out" filtered properties
@@ -114,6 +117,7 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
     }
 
     // Won't work, but verify exception
+    @Test
     public void testBuilderWithUpdate() throws Exception
     {
         // Ok, first, simple case of all values being present
@@ -134,35 +138,46 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
     /* Creator test(s)
     /*****************************************************
      */
-    
+
     // test to ensure @JsonCreator also works
+    @Test
     public void testWithCreator() throws Exception
     {
-        CreatorValue value = MAPPER.readValue("[1,2,3]", CreatorValue.class);
+        ObjectReader r = MAPPER.readerFor(CreatorValue.class)
+                .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
+
+        CreatorValue value = r.readValue("[1,2,3]");
         assertEquals(1, value.a);
         assertEquals(2, value.b);
         assertEquals(3, value.c);
 
         // and should be ok with partial too?
-        value = MAPPER.readValue("[1,2]", CreatorValue.class);
+        value = r.readValue("[1,2]");
         assertEquals(1, value.a);
         assertEquals(2, value.b);
         assertEquals(0, value.c);
 
-        value = MAPPER.readValue("[1]", CreatorValue.class);
+        value = r.readValue("[1]");
         assertEquals(1, value.a);
         assertEquals(0, value.b);
         assertEquals(0, value.c);
 
-        value = MAPPER.readValue("[]", CreatorValue.class);
+        value = r.readValue("[]");
         assertEquals(0, value.a);
         assertEquals(0, value.b);
         assertEquals(0, value.c);
     }
 
+    @Test
     public void testWithCreatorAndView() throws Exception
     {
-        ObjectReader reader = MAPPER.readerFor(CreatorValue.class);
+        // 06-Jan-2025, tatu: NOTE! need to make sure Default View Inclusion
+        //   is enabled for tests to work as expected
+        ObjectReader reader = jsonMapperBuilder()
+                .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+                .build()
+                .readerFor(CreatorValue.class);
+
         CreatorValue value;
 
         // First including values in view
@@ -184,14 +199,18 @@ public class TestPOJOAsArrayWithBuilder extends BaseMapTest
     /*****************************************************
      */
 
+    @Test
     public void testUnknownExtraProp() throws Exception
     {
         String json = "[1, 2, 3, 4]";
         try {
-            MAPPER.readValue(json, ValueClassXY.class);
+            MAPPER.readerFor(ValueClassXY.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .readValue(json);
             fail("should not pass with extra element");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Unexpected JSON values");
+            // Looks like we get either "Unexpected JSON values" or "Unexpected JSON value(s)"
+            verifyException(e, "Unexpected JSON value");
         }
 
         // but actually fine if skip-unknown set

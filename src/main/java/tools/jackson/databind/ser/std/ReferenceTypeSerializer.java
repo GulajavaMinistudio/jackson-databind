@@ -88,7 +88,7 @@ public abstract class ReferenceTypeSerializer<T>
     public ValueSerializer<T> unwrappingSerializer(NameTransformer transformer) {
         ValueSerializer<Object> valueSer = _valueSerializer;
         if (valueSer != null) {
-            // 09-Dec-2019, tatu: [databind#2565] Can not assume that serializer in
+            // 09-Dec-2019, tatu: [databind#2565] Cannot assume that serializer in
             //    question actually can unwrap
             valueSer = valueSer.unwrappingSerializer(transformer);
             if (valueSer == _valueSerializer) {
@@ -149,7 +149,7 @@ public abstract class ReferenceTypeSerializer<T>
      */
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property)
     {
         TypeSerializer typeSer = _valueTypeSerializer;
@@ -170,6 +170,9 @@ public abstract class ReferenceTypeSerializer<T>
                 ser = ctxt.handlePrimaryContextualization(ser, property);
             }
         }
+        // 23-Jan-2024, tatu: [databind#4337]: May have a content converter
+        ser = findContextualConvertingSerializer(ctxt, property, ser);
+
         // First, resolve wrt property, resolved serializers
         ReferenceTypeSerializer<?> refSer;
         if ((_property == property)
@@ -234,7 +237,7 @@ public abstract class ReferenceTypeSerializer<T>
         return refSer;
     }
 
-    protected boolean _useStatic(SerializerProvider serializers, BeanProperty property,
+    protected boolean _useStatic(SerializationContext serializers, BeanProperty property,
             JavaType referredType)
     {
         // First: no serializer for `Object.class`, must be dynamic
@@ -275,7 +278,7 @@ public abstract class ReferenceTypeSerializer<T>
      */
 
     @Override
-    public boolean isEmpty(SerializerProvider provider, T value) throws JacksonException
+    public boolean isEmpty(SerializationContext provider, T value) throws JacksonException
     {
         // First, absent value (note: null check is just sanity check here)
         if (!_isValuePresent(value)) {
@@ -314,7 +317,7 @@ public abstract class ReferenceTypeSerializer<T>
      */
 
     @Override
-    public void serialize(T ref, JsonGenerator g, SerializerProvider provider)
+    public void serialize(T ref, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         Object value = _getReferencedIfPresent(ref);
@@ -336,7 +339,7 @@ public abstract class ReferenceTypeSerializer<T>
     }
 
     @Override
-    public void serializeWithType(T ref, JsonGenerator g, SerializerProvider provider,
+    public void serializeWithType(T ref, JsonGenerator g, SerializationContext provider,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -351,7 +354,7 @@ public abstract class ReferenceTypeSerializer<T>
         // 19-Apr-2016, tatu: In order to basically "skip" the whole wrapper level
         //    (which is what non-polymorphic serialization does too), we will need
         //    to simply delegate call, I think, and NOT try to use it here.
-        
+
         // Otherwise apply type-prefix/suffix, then std serialize:
         /*
         typeSer.writeTypePrefixForScalar(ref, g);
@@ -376,7 +379,7 @@ public abstract class ReferenceTypeSerializer<T>
     {
         ValueSerializer<?> ser = _valueSerializer;
         if (ser == null) {
-            ser = _findSerializer(visitor.getProvider(), _referredType, _property);
+            ser = _findSerializer(visitor.getContext(), _referredType, _property);
             if (_unwrapper != null) {
                 ser = ser.unwrappingSerializer(_unwrapper);
             }
@@ -389,12 +392,12 @@ public abstract class ReferenceTypeSerializer<T>
     /* Helper methods
     /**********************************************************************
      */
-    
+
     /**
      * Helper method that encapsulates logic of retrieving and caching required
      * serializer.
      */
-    private final ValueSerializer<Object> _findCachedSerializer(SerializerProvider provider,
+    private final ValueSerializer<Object> _findCachedSerializer(SerializationContext provider,
             Class<?> rawType)
     {
         ValueSerializer<Object> ser = _dynamicValueSerializers.serializerFor(rawType);
@@ -420,7 +423,7 @@ public abstract class ReferenceTypeSerializer<T>
         return ser;
     }
 
-    private final ValueSerializer<Object> _findSerializer(SerializerProvider provider,
+    private final ValueSerializer<Object> _findSerializer(SerializationContext provider,
         JavaType type, BeanProperty prop)
     {
         // 13-Mar-2017, tatu: Used to call `findTypeValueSerializer()`, but contextualization

@@ -85,7 +85,7 @@ public class TreeTraversingParser
 
     /*
     /**********************************************************************
-    /* Closeable implementation
+    /* Closing, related
     /**********************************************************************
      */
 
@@ -95,9 +95,15 @@ public class TreeTraversingParser
         if (!_closed) {
             _closed = true;
             _nodeCursor = null;
-            _currToken = null;
+            _updateTokenToNull();
         }
     }
+
+    @Override
+    protected void _closeInput() throws IOException { }
+
+    @Override
+    protected void _releaseBuffers() { }
 
     /*
     /**********************************************************************
@@ -108,7 +114,7 @@ public class TreeTraversingParser
     @Override
     public JsonToken nextToken()
     {
-        _currToken = _nodeCursor.nextToken();
+        _nullSafeUpdateToken(_nodeCursor.nextToken());
         if (_currToken == null) {
             _closed = true; // if not already set
             return null;
@@ -136,10 +142,10 @@ public class TreeTraversingParser
     {
         if (_currToken == JsonToken.START_OBJECT) {
             _nodeCursor = _nodeCursor.getParent();
-            _currToken = JsonToken.END_OBJECT;
+            _updateToken(JsonToken.END_OBJECT);
         } else if (_currToken == JsonToken.START_ARRAY) {
             _nodeCursor = _nodeCursor.getParent();
-            _currToken = JsonToken.END_ARRAY;
+            _updateToken(JsonToken.END_ARRAY);
         }
         return this;
     }
@@ -172,13 +178,13 @@ public class TreeTraversingParser
     @Override public Object currentValue() { return _nodeCursor.currentValue(); }
 
     @Override
-    public JsonLocation currentTokenLocation() {
-        return JsonLocation.NA;
+    public TokenStreamLocation currentTokenLocation() {
+        return TokenStreamLocation.NA;
     }
 
     @Override
-    public JsonLocation currentLocation() {
-        return JsonLocation.NA;
+    public TokenStreamLocation currentLocation() {
+        return TokenStreamLocation.NA;
     }
 
     /*
@@ -188,7 +194,7 @@ public class TreeTraversingParser
      */
 
     @Override
-    public String getText()
+    public String getString()
     {
         if (_currToken == null) {
             return null;
@@ -198,7 +204,7 @@ public class TreeTraversingParser
         case PROPERTY_NAME:
             return _nodeCursor.currentName();
         case VALUE_STRING:
-            return currentNode().textValue();
+            return currentNode().stringValue();
         case VALUE_NUMBER_INT:
         case VALUE_NUMBER_FLOAT:
             return String.valueOf(currentNode().numberValue());
@@ -206,7 +212,7 @@ public class TreeTraversingParser
             JsonNode n = currentNode();
             if (n != null && n.isBinary()) {
                 // this will convert it to base64
-                return n.asText();
+                return n.asString();
             }
         default:
             return _currToken.asString();
@@ -214,22 +220,22 @@ public class TreeTraversingParser
     }
 
     @Override
-    public char[] getTextCharacters() {
-        return getText().toCharArray();
+    public char[] getStringCharacters() {
+        return getString().toCharArray();
     }
 
     @Override
-    public int getTextLength() {
-        return getText().length();
+    public int getStringLength() {
+        return getString().length();
     }
 
     @Override
-    public int getTextOffset() {
+    public int getStringOffset() {
         return 0;
     }
 
     @Override
-    public boolean hasTextCharacters() {
+    public boolean hasStringCharacters() {
         // generally we do not have efficient access as char[], hence:
         return false;
     }
@@ -254,6 +260,21 @@ public class TreeTraversingParser
     }
 
     @Override
+    public NumberTypeFP getNumberTypeFP() {
+        NumberType nt = getNumberType();
+        if (nt == NumberType.BIG_DECIMAL) {
+            return NumberTypeFP.BIG_DECIMAL;
+        }
+        if (nt == NumberType.DOUBLE) {
+            return NumberTypeFP.DOUBLE64;
+        }
+        if (nt == NumberType.FLOAT) {
+            return NumberTypeFP.FLOAT32;
+        }
+        return NumberTypeFP.UNKNOWN;
+    }
+
+    @Override
     public BigInteger getBigIntegerValue() throws InputCoercionException {
         return currentNumericNode(NR_BIGINT).bigIntegerValue();
     }
@@ -274,23 +295,104 @@ public class TreeTraversingParser
     }
 
     @Override
+    public short getShortValue() throws InputCoercionException {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (!node.canConvertToShort()) {
+            String desc = _longIntegerDesc(node.asString());
+            if (!node.canConvertToExactIntegral()) {
+                throw _constructInputCoercion(String.format(
+"Numeric value (%s) of `%s` has fractional part; cannot convert to `short`",
+                        desc, node.getClass().getSimpleName()),
+                    node.asToken(), Integer.TYPE);
+            }
+            // otherwise assume range overflow
+            _reportOverflowShort(desc, currentToken());
+        }
+        return node.shortValue();
+    }
+
+    @Override
     public int getIntValue() throws InputCoercionException {
         final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
         if (!node.canConvertToInt()) {
+            // [databind#5309] Misleading exception message for DoubleNode to `int` value conversion
+            if (!node.canConvertToExactIntegral()) {
+                throw _constructInputCoercion(String.format(
+"Numeric value (%s) of `%s` has fractional part; cannot convert to `int`",
+                            _longIntegerDesc(node.asString()),
+                            node.getClass().getSimpleName()
+                        ),
+                        node.asToken(), Integer.TYPE);
+            }
+            // otherwise assume range overflow
             _reportOverflowInt();
         }
         return node.intValue();
     }
 
     @Override
+    public int getValueAsInt()
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.inIntRange()) {
+            return node._asIntValueUnchecked();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return getIntValue();
+    }
+
+    @Override
+    public int getValueAsInt(int defaultValue)
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.inIntRange()) {
+            return node._asIntValueUnchecked();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return defaultValue;
+    }
+
+    @Override
     public long getLongValue() throws InputCoercionException {
         final NumericNode node = (NumericNode) currentNumericNode(NR_LONG);
         if (!node.canConvertToLong()) {
+            // [databind#5309] Misleading exception message for DoubleNode to `long` value conversion
+            if (!node.canConvertToExactIntegral()) {
+                throw _constructInputCoercion(String.format(
+"Numeric value (%s) of `%s` has fractional part; cannot convert to `long`",
+                            _longIntegerDesc(node.asString()),
+                            node.getClass().getSimpleName()
+                        ),
+                        node.asToken(), Long.TYPE);
+            }
+            // otherwise assume range overflow
             _reportOverflowLong();
         }
         return node.longValue();
     }
 
+    @Override
+    public long getValueAsLong()
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.inLongRange()) {
+            return node._asLongValueUnchecked();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return getLongValue();
+    }
+
+    @Override
+    public long getValueAsLong(long defaultValue)
+    {
+        final NumericNode node = (NumericNode) currentNumericNode(NR_INT);
+        if (node.inLongRange()) {
+            return node._asLongValueUnchecked();
+        }
+        // !!! TODO: better defaulting/coercion?
+        return defaultValue;
+    }
+    
     @Override
     public Number getNumberValue() throws InputCoercionException {
         return currentNumericNode(-1).numberValue();
@@ -338,9 +440,9 @@ public class TreeTraversingParser
         JsonNode n = currentNode();
         if (n != null) {
             // [databind#2096]: although `binaryValue()` works for real binary node
-            // and embedded "POJO" node, coercion from TextNode may require variant, so:
-            if (n instanceof TextNode) {
-                return ((TextNode) n).getBinaryValue(b64variant);
+            // and embedded "POJO" node, coercion from `StringNode` may require variant, so:
+            if (n instanceof StringNode) {
+                return ((StringNode) n).getBinaryValue(b64variant);
             }
             return n.binaryValue();
         }

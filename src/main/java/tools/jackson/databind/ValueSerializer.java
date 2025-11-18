@@ -1,6 +1,7 @@
 package tools.jackson.databind;
 
 import java.util.Iterator;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -17,7 +18,7 @@ import tools.jackson.databind.util.NameTransformer;
  * other chained {@link ValueSerializer}s too) to serialize Objects of
  * arbitrary types into JSON, using provided {@link JsonGenerator}.
  * Note that although API is defined here, custom serializer implementations
- * should almost always be based on {@link tools.jackson.databind.ser.std.StdSerializer} 
+ * should almost always be based on {@link tools.jackson.databind.ser.std.StdSerializer}
  * since it will implement many of optional methods of this class.
  *<p>
  * If serializer is an aggregate one -- meaning it delegates handling of some
@@ -44,7 +45,7 @@ import tools.jackson.databind.util.NameTransformer;
  *<p>
  * NOTE: various <code>serialize</code> methods are never (to be) called
  * with null values -- caller <b>must</b> handle null values, usually
- * by calling {@link SerializerProvider#findNullValueSerializer} to obtain
+ * by calling {@link SerializationContext#findNullValueSerializer} to obtain
  * serializer to use.
  * This also means that custom serializers cannot be directly used to change
  * the output to produce when serializing null values.
@@ -62,7 +63,7 @@ public abstract class ValueSerializer<T>
      */
 
     /**
-     * Method called after {@link SerializerProvider} has registered
+     * Method called after {@link SerializationContext} has registered
      * the serializer, but before it has returned it to the caller.
      * Called object can then resolve its dependencies to other types,
      * including self-references (direct or indirect).
@@ -70,10 +71,9 @@ public abstract class ValueSerializer<T>
      * Note that this method does NOT return serializer, since resolution
      * is not allowed to change actual serializer to use.
      *
-     * @param provider Provider that has constructed serializer this method
-     *   is called on.
+     * @param ctxt Currently active serialization context.
      */
-    public void resolve(SerializerProvider provider) {
+    public void resolve(SerializationContext ctxt) {
         // Default implementation does nothing
     }
 
@@ -90,17 +90,17 @@ public abstract class ValueSerializer<T>
      * value serializer; it is not called for every serialization, as doing that would have
      * significant performance impact; most serializers cache contextual instances for future
      * use.
-     * 
-     * @param prov Serializer provider to use for accessing config, other serializers
+     *
+     * @param ctxt Context to use for accessing config, other serializers
      * @param property Property (defined by one or more accessors - field or method - used
      *     for accessing logical property value) for which serializer is used to be used;
      *     or, `null` for root value (or in cases where caller does not have this information,
      *     which is handled as root value case).
-     * 
+     *
      * @return Serializer to use for serializing values of specified property;
      *   may be this instance or a new instance.
      */
-    public ValueSerializer<?> createContextual(SerializerProvider prov,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property) {
         // default implementation returns instance unmodified
         return this;
@@ -122,7 +122,7 @@ public abstract class ValueSerializer<T>
      *<p>
      * Default implementation just returns serializer as-is,
      * indicating that no unwrapped variant exists
-     * 
+     *
      * @param unwrapper Name transformation to use to convert between names
      *   of unwrapper properties
      */
@@ -150,6 +150,17 @@ public abstract class ValueSerializer<T>
      * filtering will need to create and return new instance if filter changes.
      */
     public ValueSerializer<?> withFilterId(Object filterId) {
+        return this;
+    }
+
+    /**
+     * Mutant factory method called to create a new instance after excluding specified set of
+     * properties by name, if there is any.
+     *
+     * @param ignoredProperties Set of property names to ignore for serialization;
+     * @return Serializer instance that without specified set of properties to ignore (if any)
+     */
+    public ValueSerializer<?> withIgnoredProperties(Set<String> ignoredProperties) {
         return this;
     }
 
@@ -204,10 +215,10 @@ public abstract class ValueSerializer<T>
      *
      * @param value Value to serialize; can <b>not</b> be null.
      * @param gen Generator used to output resulting Json content
-     * @param serializers Provider that can be used to get serializers for
+     * @param ctxt Context that can be used to get serializers for
      *   serializing Objects value contains, if any.
      */
-    public abstract void serialize(T value, JsonGenerator gen, SerializerProvider serializers)
+    public abstract void serialize(T value, JsonGenerator gen, SerializationContext ctxt)
         throws JacksonException;
 
     /**
@@ -233,11 +244,11 @@ public abstract class ValueSerializer<T>
      *
      * @param value Value to serialize; can <b>not</b> be null.
      * @param gen Generator used to output resulting Json content
-     * @param serializers Provider that can be used to get serializers for
+     * @param ctxt Context that can be used to get serializers for
      *   serializing Objects value contains, if any.
      * @param typeSer Type serializer to use for including type information
      */
-    public void serializeWithType(T value, JsonGenerator gen, SerializerProvider serializers,
+    public void serializeWithType(T value, JsonGenerator gen, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -245,7 +256,7 @@ public abstract class ValueSerializer<T>
         if (clz == null) {
             clz = value.getClass();
         }
-        serializers.reportBadDefinition(clz, String.format(
+        ctxt.reportBadDefinition(clz, String.format(
                 "Type id handling not implemented for type %s (by serializer of type %s)",
                 clz.getName(), getClass().getName()));
     }
@@ -289,7 +300,7 @@ public abstract class ValueSerializer<T>
      * another serializer for actual serialization, by delegating
      * calls. If so, will return immediate delegate (which itself may
      * delegate to further serializers); otherwise will return null.
-     * 
+     *
      * @return Serializer this serializer delegates calls to, if null;
      *   null otherwise.
      */
@@ -314,7 +325,7 @@ public abstract class ValueSerializer<T>
     /* Accessors for introspecting handling of values
     /**********************************************************************
      */
-    
+
     /**
      * Method called to check whether given serializable value is
      * considered "empty" value (for purposes of suppressing serialization
@@ -322,7 +333,7 @@ public abstract class ValueSerializer<T>
      *<p>
      * Default implementation will consider only null values to be empty.
      */
-    public boolean isEmpty(SerializerProvider provider, T value) {
+    public boolean isEmpty(SerializationContext ctxt, T value) {
         return (value == null);
     }
 

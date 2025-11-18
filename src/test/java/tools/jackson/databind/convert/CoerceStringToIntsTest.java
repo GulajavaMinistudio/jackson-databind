@@ -3,13 +3,19 @@ package tools.jackson.databind.convert;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.type.LogicalType;
 
-public class CoerceStringToIntsTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class CoerceStringToIntsTest
 {
     private final ObjectMapper DEFAULT_MAPPER = newJsonMapper();
     private final ObjectReader READER_LEGACY_FAIL = jsonMapperBuilder()
@@ -28,6 +34,8 @@ public class CoerceStringToIntsTest extends BaseMapTest
         .build();
 
     private final ObjectMapper MAPPER_TO_NULL = jsonMapperBuilder()
+            // 08-Jan-2025, tatu: Need to allow null-to-int coercion for some tests
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
             .withCoercionConfig(LogicalType.Integer, cfg ->
             cfg.setCoercion(CoercionInputShape.String, CoercionAction.AsNull))
         .build();
@@ -42,7 +50,8 @@ public class CoerceStringToIntsTest extends BaseMapTest
     /* Test methods, defaults (legacy)
     /********************************************************
      */
-    
+
+    @Test
     public void testLegacyStringToIntCoercion() throws Exception
     {
         // by default, should be ok
@@ -71,6 +80,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
         assertEquals(95007, biggie.intValue());
     }
 
+    @Test
     public void testLegacyFailStringToInt() throws Exception
     {
         _verifyCoerceFail(READER_LEGACY_FAIL, Integer.class, q("52"), "java.lang.Integer");
@@ -79,6 +89,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
         _verifyCoerceFail(READER_LEGACY_FAIL, int[].class, "[ \"-128\" ]", "element of `int[]`");
     }
 
+    @Test
     public void testLegacyFailStringToLong() throws Exception
     {
         _verifyCoerceFail(READER_LEGACY_FAIL, Long.class, q("55"));
@@ -87,6 +98,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
         _verifyCoerceFail(READER_LEGACY_FAIL, long[].class, "[ \"136\" ]", "element of `long[]`");
     }
 
+    @Test
     public void testLegacyFailStringToOther() throws Exception
     {
         _verifyCoerceFail(READER_LEGACY_FAIL, Short.class, q("50"));
@@ -108,6 +120,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigStringToNull() throws Exception
     {
         assertNull(MAPPER_TO_NULL.readValue(q("155"), Integer.class));
@@ -161,6 +174,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigStringToEmpty() throws Exception
     {
         assertEquals(Integer.valueOf(0), MAPPER_TO_EMPTY.readValue(q("12"), Integer.class));
@@ -198,6 +212,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigStringConvert() throws Exception
     {
         assertEquals(Integer.valueOf(12), MAPPER_TRY_CONVERT.readValue(q("12"), Integer.class));
@@ -235,6 +250,7 @@ public class CoerceStringToIntsTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testCoerceConfigFailFromString() throws Exception
     {
         _verifyCoerceFail(MAPPER_TO_FAIL, Integer.class, q("15"));

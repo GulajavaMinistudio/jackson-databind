@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.KeyDeserializers;
@@ -34,21 +35,30 @@ import tools.jackson.databind.util.EnumResolver;
 public class JDKKeyDeserializers
     implements KeyDeserializers
 {
-    public static KeyDeserializer constructEnumKeyDeserializer(EnumResolver enumResolver) {
-        return new JDKKeyDeserializer.EnumKD(enumResolver, null);
+    /**
+     * @since 2.16
+     */
+    public static KeyDeserializer constructEnumKeyDeserializer(EnumResolver enumRes, EnumResolver byEnumNamingResolver, EnumResolver byToStringResolver, 
+        EnumResolver byIndexResolver) 
+    {
+        return new JDKKeyDeserializer.EnumKD(enumRes, null, byEnumNamingResolver, byToStringResolver, byIndexResolver);
     }
 
-    public static KeyDeserializer constructEnumKeyDeserializer(EnumResolver enumResolver,
-            AnnotatedMethod factory) {
-        return new JDKKeyDeserializer.EnumKD(enumResolver, factory);
+    /**
+     * @since 2.16
+     */
+    public static KeyDeserializer constructEnumKeyDeserializer(EnumResolver enumResolver, AnnotatedMethod factory, 
+            EnumResolver enumNamingResolver, EnumResolver byToStringResolver, EnumResolver byIndexResolver) 
+    {
+        return new JDKKeyDeserializer.EnumKD(enumResolver, factory, enumNamingResolver, byToStringResolver, byIndexResolver);
     }
-    
+
     public static KeyDeserializer constructDelegatingKeyDeserializer(DeserializationConfig config,
             JavaType type, ValueDeserializer<?> deser)
     {
         return new JDKKeyDeserializer.DelegatingKD(type.getRawClass(), deser);
     }
-    
+
     public static KeyDeserializer findStringBasedKeyDeserializer(DeserializationContext ctxt,
             JavaType type)
    {
@@ -107,8 +117,8 @@ public class JDKKeyDeserializers
     private static KeyDeserializer _constructCreatorKeyDeserializer(DeserializationContext ctxt,
             AnnotatedMember creator)
     {
-        if (creator instanceof AnnotatedConstructor) {
-            Constructor<?> rawCtor = ((AnnotatedConstructor) creator).getAnnotated();
+        if (creator instanceof AnnotatedConstructor annotatedConstructor) {
+            Constructor<?> rawCtor = annotatedConstructor.getAnnotated();
             if (ctxt.canOverrideAccessModifiers()) {
                 ClassUtil.checkAndFixAccess(rawCtor, ctxt.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
             }
@@ -170,7 +180,7 @@ public class JDKKeyDeserializers
 
     @Override
     public KeyDeserializer findKeyDeserializer(JavaType type,
-            DeserializationConfig config, BeanDescription beanDesc)
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef)
     {
         Class<?> raw = type.getRawClass();
         // 23-Apr-2013, tatu: Map primitive types, just in case one was given

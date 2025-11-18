@@ -3,13 +3,15 @@ package tools.jackson.databind.misc;
 import java.util.*;
 import java.util.concurrent.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class RaceCondition738Test extends BaseMapTest
+public class RaceCondition738Test extends DatabindTestUtil
 {
     static abstract class AbstractHasSubTypes implements HasSubTypes { }
 
@@ -48,20 +50,21 @@ public class RaceCondition738Test extends BaseMapTest
             return hasSubTypes;
         }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
-    
+
+    @Test
     public void testRepeatedly() throws Exception {
         final int COUNT = 3000;
         for (int i = 0; i < COUNT; i++) {
             runOnce(i, COUNT);
         }
     }
-    
+
     void runOnce(int round, int max) throws Exception {
         final ObjectMapper mapper = newJsonMapper();
         Callable<String> writeJson = new Callable<String>() {

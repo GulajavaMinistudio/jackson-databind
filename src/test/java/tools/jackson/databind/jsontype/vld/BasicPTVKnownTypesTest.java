@@ -1,19 +1,22 @@
 package tools.jackson.databind.jsontype.vld;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.DefaultTyping;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 // for [databind#2539]
-public class BasicPTVKnownTypesTest extends BaseMapTest
+public class BasicPTVKnownTypesTest extends DatabindTestUtil
 {
     private final ObjectMapper DEFAULTING_MAPPER = jsonMapperBuilder()
             .activateDefaultTyping(BasicPolymorphicTypeValidator.builder()
                     .allowSubTypesWithExplicitDeserializer()
-                    .build(), 
-                    DefaultTyping.EVERYTHING)
+                    .build(),
+                    DefaultTyping.NON_FINAL_AND_ENUMS)
             .build();
 
     static class Dangerous {

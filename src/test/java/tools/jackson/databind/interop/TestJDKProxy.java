@@ -2,10 +2,15 @@ package tools.jackson.databind.interop;
 
 import java.lang.reflect.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 // mostly for [Issue#57]
-public class TestJDKProxy extends BaseMapTest
+public class TestJDKProxy extends DatabindTestUtil
 {
     final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -20,27 +25,28 @@ public class TestJDKProxy extends BaseMapTest
 
         public Planet() { }
         public Planet(String s) { name = s; }
-        
+
         @Override
         public String getName(){return name;}
         @Override
         public String setName(String iName) {name = iName;
             return name;
         }
-    }    
-    
+    }
+
     /*
     /********************************************************
     /* Test methods
     /********************************************************
      */
-    
+
+    @Test
     public void testSimple() throws Exception
     {
         IPlanet input = getProxy(IPlanet.class, new Planet("Foo"));
         String json = MAPPER.writeValueAsString(input);
         assertEquals("{\"name\":\"Foo\"}", json);
-        
+
         // and just for good measure
         Planet output = MAPPER.readValue(json, Planet.class);
         assertEquals("Foo", output.getName());

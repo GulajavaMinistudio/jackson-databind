@@ -3,21 +3,28 @@ package tools.jackson.databind.node;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import tools.jackson.core.JsonParser;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Additional tests for {@link ObjectNode} container class.
  */
 public class ObjectNodeTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     @JsonDeserialize(as = DataImpl.class)
     public interface Data {
@@ -31,16 +38,9 @@ public class ObjectNodeTest
         public DataImpl(JsonNode n) {
             root = n;
         }
-        
+
         @JsonValue
         public JsonNode value() { return root; }
-        
-        /*
-        public Wrapper(ObjectNode n) { root = n; }
-        
-        @JsonValue
-        public ObjectNode value() { return root; }
-        */
     }
 
     static class ObNodeWrapper {
@@ -71,8 +71,9 @@ public class ObjectNodeTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = sharedMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSimpleObject() throws Exception
     {
         String JSON = "{ \"key\" : 1, \"b\" : \"x\" }";
@@ -80,19 +81,19 @@ public class ObjectNodeTest
 
         // basic properties first:
         assertFalse(root.isValueNode());
-        assertTrue(root.isContainerNode());
+        assertTrue(root.isContainer());
         assertFalse(root.isArray());
         assertTrue(root.isObject());
         assertEquals(2, root.size());
         assertFalse(root.isEmpty());
 
         assertFalse(root.isBoolean());
-        assertFalse(root.isTextual());
+        assertFalse(root.isString());
         assertFalse(root.isNumber());
-        assertFalse(root.canConvertToInt()); 
-        assertFalse(root.canConvertToLong()); 
-        assertFalse(root.canConvertToExactIntegral()); 
-        
+        assertFalse(root.canConvertToInt());
+        assertFalse(root.canConvertToLong());
+        assertFalse(root.canConvertToExactIntegral());
+
         Iterator<JsonNode> it = root.iterator();
         assertNotNull(it);
         assertTrue(it.hasNext());
@@ -103,13 +104,13 @@ public class ObjectNodeTest
         assertTrue(it.hasNext());
         n = it.next();
         assertNotNull(n);
-        assertEquals(TextNode.valueOf("x"), n);
+        assertEquals(StringNode.valueOf("x"), n);
 
         assertFalse(it.hasNext());
 
         // Ok, then, let's traverse via extended interface
         ObjectNode obNode = (ObjectNode) root;
-        Iterator<Map.Entry<String,JsonNode>> fit = obNode.fields();
+        Iterator<Map.Entry<String,JsonNode>> fit = obNode.properties().iterator();
         // we also know that LinkedHashMap is used, i.e. order preserved
         assertTrue(fit.hasNext());
         Map.Entry<String,JsonNode> en = fit.next();
@@ -119,7 +120,7 @@ public class ObjectNodeTest
         assertTrue(fit.hasNext());
         en = fit.next();
         assertEquals("b", en.getKey());
-        assertEquals(TextNode.valueOf("x"), en.getValue());
+        assertEquals(StringNode.valueOf("x"), en.getValue());
 
         // Plus: we should be able to modify the node via iterator too:
         fit.remove();
@@ -129,31 +130,34 @@ public class ObjectNodeTest
     }
 
     // for [databind#346]
+    @Test
     public void testEmptyNodeAsValue() throws Exception
     {
         Data w = MAPPER.readValue("{}", Data.class);
         assertNotNull(w);
     }
-    
+
+    @Test
     public void testBasics()
     {
         ObjectNode n = new ObjectNode(JsonNodeFactory.instance);
         assertStandardEquals(n);
         assertTrue(n.isEmpty());
-        
-        assertFalse(n.elements().hasNext());
-        assertFalse(n.fields().hasNext());
-        assertFalse(n.propertyNames().hasNext());
+
+        assertTrue(n.values().isEmpty());
+        assertTrue(n.properties().isEmpty());
+        assertTrue(n.propertyNames().isEmpty());
         assertNull(n.get("a"));
+        assertFalse(n.optional("a").isPresent());
         assertTrue(n.path("a").isMissingNode());
 
-        TextNode text = TextNode.valueOf("x");
+        StringNode text = StringNode.valueOf("x");
         assertSame(n, n.set("a", text));
-        
+
         assertEquals(1, n.size());
-        assertTrue(n.elements().hasNext());
-        assertTrue(n.fields().hasNext());
-        assertTrue(n.propertyNames().hasNext());
+        assertFalse(n.properties().isEmpty());
+        assertFalse(n.propertyNames().isEmpty());
+        assertFalse(n.values().isEmpty());
         assertSame(text, n.get("a"));
         assertSame(text, n.path("a"));
         assertNull(n.get("b"));
@@ -170,7 +174,7 @@ public class ObjectNodeTest
         n2.put("b", 13);
         assertFalse(n.equals(n2));
         n.setAll(n2);
-        
+
         assertEquals(2, n.size());
         n.set("null", (JsonNode)null);
         assertEquals(3, n.size());
@@ -192,12 +196,13 @@ public class ObjectNodeTest
         assertEquals(0, n.size());
     }
 
+    @Test
     public void testBasicsPutSet()
     {
         final JsonNodeFactory f = JsonNodeFactory.instance;
         ObjectNode root = f.objectNode();
         JsonNode old;
-        old = root.putIfAbsent("key", f.textNode("foobar"));
+        old = root.putIfAbsent("key", f.stringNode("foobar"));
         assertNull(old);
         assertEquals(1, root.size());
         old = root.putIfAbsent("key", f.numberNode(3));
@@ -207,9 +212,10 @@ public class ObjectNodeTest
         // but can replace with straight set
         old = root.replace("key", f.numberNode(72));
         assertNotNull(old);
-        assertEquals("foobar", old.textValue());
+        assertEquals("foobar", old.stringValue());
     }
 
+    @Test
     public void testBigNumbers()
     {
         ObjectNode n = new ObjectNode(JsonNodeFactory.instance);
@@ -231,6 +237,7 @@ public class ObjectNodeTest
     /**
      * Verify null handling
      */
+    @Test
     public void testNullChecking()
     {
         ObjectNode o1 = JsonNodeFactory.instance.objectNode();
@@ -245,6 +252,7 @@ public class ObjectNodeTest
         JsonNode n = o1.get("x");
         assertNotNull(n);
         assertSame(n, NullNode.instance);
+        assertEquals(NullNode.instance, o1.optional("x").get());
 
         o1.put("str", (String) null);
         n = o1.get("str");
@@ -264,9 +272,7 @@ public class ObjectNodeTest
         assertEquals(4, o1.size());
     }
 
-    /**
-     * Another test to verify [JACKSON-227]...
-     */
+    @Test
     public void testNullChecking2()
     {
         ObjectNode src = MAPPER.createObjectNode();
@@ -275,6 +281,24 @@ public class ObjectNodeTest
         dest.setAll(src);
     }
 
+    // for [databind#346]
+    @Test
+    public void testNullKeyChecking()
+    {
+        ObjectNode src = MAPPER.createObjectNode();
+        assertThrows(NullPointerException.class, () -> src.put(null, "a"));
+        assertThrows(NullPointerException.class, () -> src.put(null, 123));
+        assertThrows(NullPointerException.class, () -> src.put(null, 123L));
+        assertThrows(NullPointerException.class, () -> src.putNull(null));
+
+        assertThrows(NullPointerException.class, () -> src.set(null, BooleanNode.TRUE));
+        assertThrows(NullPointerException.class, () -> src.replace(null, BooleanNode.TRUE));
+
+        assertThrows(NullPointerException.class, () -> src.setAll(Collections.singletonMap(null,
+                MAPPER.createArrayNode())));
+    }
+
+    @Test
     public void testRemove()
     {
         ObjectNode ob = MAPPER.createObjectNode();
@@ -284,9 +308,10 @@ public class ObjectNodeTest
         assertEquals(3, ob.size());
         assertSame(ob, ob.without(Arrays.asList("a", "c")));
         assertEquals(1, ob.size());
-        assertEquals("b", ob.get("b").textValue());
+        assertEquals("b", ob.get("b").stringValue());
     }
 
+    @Test
     public void testRetain()
     {
         ObjectNode ob = MAPPER.createObjectNode();
@@ -296,11 +321,12 @@ public class ObjectNodeTest
         assertEquals(3, ob.size());
         assertSame(ob, ob.retain("a", "c"));
         assertEquals(2, ob.size());
-        assertEquals("a", ob.get("a").textValue());
+        assertEquals("a", ob.get("a").stringValue());
         assertNull(ob.get("b"));
-        assertEquals("c", ob.get("c").textValue());
+        assertEquals("c", ob.get("c").stringValue());
     }
 
+    @Test
     public void testValidWithObject() throws Exception
     {
         ObjectNode root = MAPPER.createObjectNode();
@@ -310,6 +336,7 @@ public class ObjectNodeTest
         assertEquals("{\"prop\":{}}", MAPPER.writeValueAsString(root));
     }
 
+    @Test
     public void testValidWithArray() throws Exception
     {
         JsonNode root = MAPPER.createObjectNode();
@@ -319,6 +346,7 @@ public class ObjectNodeTest
         assertEquals("{\"arr\":[]}", MAPPER.writeValueAsString(root));
     }
 
+    @Test
     public void testInvalidWithObject() throws Exception
     {
         JsonNode root = MAPPER.createArrayNode();
@@ -326,7 +354,7 @@ public class ObjectNodeTest
             root.withObject("/prop");
             fail("Expected exception");
         } catch (JsonNodeException e) {
-            verifyException(e, "Cannot replace context node (of type");
+            verifyException(e, "`JsonNode` not of type `ObjectNode`");
             verifyException(e, "ArrayNode");
         }
         // also: should fail of we already have non-object property
@@ -341,6 +369,7 @@ public class ObjectNodeTest
         }
     }
 
+    @Test
     public void testInvalidWithArray() throws Exception
     {
         JsonNode root = MAPPER.createArrayNode();
@@ -348,7 +377,7 @@ public class ObjectNodeTest
             root.withArray("/prop");
             fail("Expected exception");
         } catch (JsonNodeException e) {
-            verifyException(e, "Cannot replace context node (of type");
+            verifyException(e, "`JsonNode` not of type `ObjectNode`");
             verifyException(e, "ArrayNode");
         }
         // also: should fail of we already have non-Array property
@@ -363,6 +392,7 @@ public class ObjectNodeTest
         }
     }
 
+    @Test
     public void testSetAll() throws Exception
     {
         ObjectNode root = MAPPER.createObjectNode();
@@ -401,19 +431,20 @@ public class ObjectNodeTest
     }
 
     // [databind#237] (databind): support DeserializationFeature#FAIL_ON_READING_DUP_TREE_KEY
+    @Test
     public void testFailOnDupKeys() throws Exception
     {
         final String DUP_JSON = "{ \"a\":1, \"a\":2 }";
-        
+
         // first: verify defaults:
         assertFalse(MAPPER.isEnabled(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY));
-        ObjectNode root = (ObjectNode) MAPPER.readTree(DUP_JSON);
+        ObjectNode root = _objNode(DUP_JSON);
         assertEquals(2, root.path("a").asInt());
 
         // and via ObjectReader, too:
         root = (ObjectNode) MAPPER.reader().readTree(DUP_JSON);
         assertEquals(2, root.path("a").asInt());
-        
+
         // and then enable checks:
         try {
             MAPPER.reader(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY).readTree(DUP_JSON);
@@ -423,6 +454,7 @@ public class ObjectNodeTest
         }
     }
 
+    @Test
     public void testFailOnDupNestedKeys() throws Exception
     {
         final String DOC = a2q(
@@ -438,13 +470,14 @@ public class ObjectNodeTest
         }
     }
 
+    @Test
     public void testEqualityWrtOrder() throws Exception
     {
         ObjectNode ob1 = MAPPER.createObjectNode();
         ObjectNode ob2 = MAPPER.createObjectNode();
 
         // same contents, different insertion order; should not matter
-        
+
         ob1.put("a", 1);
         ob1.put("b", 2);
         ob1.put("c", 3);
@@ -457,6 +490,7 @@ public class ObjectNodeTest
         assertTrue(ob2.equals(ob1));
     }
 
+    @Test
     public void testSimplePath() throws Exception
     {
         JsonNode root = MAPPER.readTree("{ \"results\" : { \"a\" : 3 } }");
@@ -467,6 +501,7 @@ public class ObjectNodeTest
         assertEquals(3, rnode.path("a").intValue());
     }
 
+    @Test
     public void testNonEmptySerialization() throws Exception
     {
         ObNodeWrapper w = new ObNodeWrapper(MAPPER.createObjectNode()
@@ -476,6 +511,7 @@ public class ObjectNodeTest
         assertEquals("{}", MAPPER.writeValueAsString(w));
     }
 
+    @Test
     public void testIssue941() throws Exception
     {
         ObjectNode object = MAPPER.createObjectNode();
@@ -492,14 +528,97 @@ public class ObjectNodeTest
         assertNotNull(de2);
     }
 
+    @Test
     public void testSimpleMismatch() throws Exception
     {
-        ObjectMapper mapper = objectMapper();
         try {
-            mapper.readValue("[ 1, 2, 3 ]", ObjectNode.class);
+            MAPPER.readValue("[ 1, 2, 3 ]", ObjectNode.class);
             fail("Should not pass");
         } catch (MismatchedInputException e) {
             verifyException(e, "from Array value (token `JsonToken.START_ARRAY`)");
         }
+    }
+
+    // [databind#3809]
+    @Test
+    public void testPropertiesTraversal() throws Exception
+    {
+        // Nothing to traverse for other types
+        assertEquals("", _toString(MAPPER.createArrayNode()));
+        assertEquals("", _toString(MAPPER.getNodeFactory().stringNode("foo")));
+
+        // But yes for ObjectNode:
+        JsonNode n = MAPPER.readTree(a2q(
+                "{ 'a':1, 'b':true,'c':'stuff'}"));
+        assertEquals("a/1,b/true,c/\"stuff\"", _toString(n));
+    }
+
+    // [databind#4863]: valueStream(), entryStream(), forEachEntry()
+    @Test
+    public void testStreamMethods()
+    {
+        ObjectMapper mapper = objectMapper();
+        ObjectNode obj = mapper.createObjectNode();
+        JsonNode n1 = obj.numberNode(42);
+        JsonNode n2 = obj.stringNode("foo");
+
+        obj.set("a", n1);
+        obj.set("b", n2);
+
+        // First, valueStream() testing
+        assertEquals(2, obj.valueStream().count());
+        assertEquals(Arrays.asList(n1, n2),
+                obj.valueStream().collect(Collectors.toList()));
+
+        // And then entryStream() (empty)
+        assertEquals(2, obj.propertyStream().count());
+        assertEquals(new ArrayList<>(obj.properties()),
+                obj.propertyStream().collect(Collectors.toList()));
+
+        // And then empty forEachEntry()
+        final LinkedHashMap<String,JsonNode> map = new LinkedHashMap<>();
+        obj.forEachEntry((k, v) -> { map.put(k, v); });
+        assertEquals(obj.properties(), map.entrySet());
+    }
+
+    @Test
+    public void testRemoveAll() throws Exception
+    {
+        assertEquals(_objNode("{}"),
+                _objNode("{'a':1, 'b':2, 'c':3}").removeAll());
+    }
+
+    // [databind#4955]: remove methods
+    @Test
+    public void testRemoveIf() throws Exception
+    {
+        assertEquals(_objNode("{'c':3}"),
+                _objNode("{'a':1, 'b':2, 'c':3}")
+                .removeIf(value -> value.asInt() <= 2));
+        assertEquals(_objNode("{'a':1}"),
+                _objNode("{'a':1, 'b':2, 'c':3}")
+                .removeIf(value -> value.asInt() > 1));
+    }
+
+    // [databind#4955]: remove methods
+    @Test
+    public void testRemoveNulls() throws Exception
+    {
+        assertEquals(_objNode("{'b':2}"),
+                _objNode("{'a':null,'b':2,'c':null}")
+                .removeNulls());
+    }
+
+    private ObjectNode _objNode(String json) throws Exception {
+        // Use different read method for better code coverage
+        try (JsonParser p = MAPPER.createParser(a2q(json))) {
+            return (ObjectNode) MAPPER.reader().readTree(p);
+        }
+    }
+
+    private String _toString(JsonNode n) {
+        return n.properties().stream()
+                .map(e -> e.getKey() + "/" + e.getValue())
+                .collect(Collectors.joining(","));
     }
 }

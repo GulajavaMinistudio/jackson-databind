@@ -1,10 +1,15 @@
 package tools.jackson.databind.introspect;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestNameConflicts extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestNameConflicts extends DatabindTestUtil
 {
     @JsonAutoDetect
     (fieldVisibility= JsonAutoDetect.Visibility.NONE,getterVisibility=JsonAutoDetect.Visibility.NONE, setterVisibility= JsonAutoDetect.Visibility.NONE, isGetterVisibility= JsonAutoDetect.Visibility.NONE)
@@ -25,21 +30,21 @@ public class TestNameConflicts extends BaseMapTest
             this.bar = bar.toString();
         }
     }
-    
+
     static class Bean193
     {
         @JsonProperty("val1")
         private int x;
         @JsonIgnore
         private int value2;
-        
+
         public Bean193(@JsonProperty("val1")int value1,
                     @JsonProperty("val2")int value2)
         {
             this.x = value1;
             this.value2 = value2;
         }
-        
+
         @JsonProperty("val2")
         int x()
         {
@@ -72,56 +77,54 @@ public class TestNameConflicts extends BaseMapTest
         public MultipleTheoreticalGetters(@JsonProperty("a") int foo) {
             ;
         }
-        
+
         @JsonProperty
         public int getA() { return 3; }
 
         public int a() { return 5; }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = objectMapper();
-    
+    private final ObjectMapper MAPPER = newJsonMapper();
+
     // [Issue#193]
+    @Test
     public void testIssue193() throws Exception
     {
-        String json = objectWriter().writeValueAsString(new Bean193(1, 2));
+        String json = MAPPER.writeValueAsString(new Bean193(1, 2));
         assertNotNull(json);
     }
 
     // [Issue#327]
+    @Test
     public void testNonConflict() throws Exception
     {
         String json = MAPPER.writeValueAsString(new BogusConflictBean());
         assertEquals(a2q("{'prop1':2,'prop2':1}"), json);
-    }    
+    }
 
+    @Test
     public void testHypotheticalGetters() throws Exception
     {
-        String json = objectWriter().writeValueAsString(new MultipleTheoreticalGetters());
+        String json = MAPPER.writeValueAsString(new MultipleTheoreticalGetters());
         assertEquals(a2q("{'a':3}"), json);
     }
 
     // for [jackson-core#158]
+    @Test
     public void testOverrideName() throws Exception
     {
-        final ObjectMapper mapper = objectMapper();
-        String json = mapper.writeValueAsString(new CoreBean158());
+        String json = MAPPER.writeValueAsString(new CoreBean158());
         assertEquals(a2q("{'bar':'x'}"), json);
 
         // and back
-        CoreBean158 result = null;
-        try {
-            result = mapper.readValue(a2q("{'bar':'y'}"), CoreBean158.class);
-        } catch (Exception e) {
-            fail("Unexpected failure when reading CoreBean158: "+e);
-        }
+        CoreBean158 result = MAPPER.readValue(a2q("{'bar':'y'}"), CoreBean158.class);
         assertNotNull(result);
         assertEquals("y", result.bar);
-    }    
+    }
 }

@@ -1,13 +1,16 @@
 package tools.jackson.databind.cfg;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 
-import tools.jackson.databind.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class ConfigOverridesTest extends BaseMapTest
+public class ConfigOverridesTest
 {
+    @Test
     public void testSnapshot() throws Exception
     {
         ConfigOverrides co = new ConfigOverrides();

@@ -4,8 +4,8 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
-import com.fasterxml.jackson.annotation.ObjectIdResolver;
 import com.fasterxml.jackson.annotation.ObjectIdGenerator.IdKey;
+import com.fasterxml.jackson.annotation.ObjectIdResolver;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
@@ -109,7 +109,7 @@ public abstract class DeserializationContextExt
      * needed for {@link #tryToResolveUnresolvedObjectId}.
      * Default implementation simply constructs default {@link ReadableObjectId} with
      * given <code>key</code>.
-     * 
+     *
      * @param key The key to associate with the new ReadableObjectId
      * @return New ReadableObjectId instance
      */
@@ -164,13 +164,13 @@ public abstract class DeserializationContextExt
     {
         return roid.tryToResolveUnresolved(this);
     }
-    
+
     /*
     /**********************************************************************
     /* Abstract methods impls, other factory methods
     /**********************************************************************
      */
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public ValueDeserializer<Object> deserializerInstance(Annotated ann, Object deserDef)
@@ -179,9 +179,9 @@ public abstract class DeserializationContextExt
             return null;
         }
         ValueDeserializer<?> deser;
-        
-        if (deserDef instanceof ValueDeserializer) {
-            deser = (ValueDeserializer<?>) deserDef;
+
+        if (deserDef instanceof ValueDeserializer valueDeserializer) {
+            deser = valueDeserializer;
         } else {
             // Alas, there's no way to force return type of "either class
             // X or Y" -- need to throw an exception after the fact
@@ -218,9 +218,9 @@ public abstract class DeserializationContextExt
         }
 
         KeyDeserializer deser;
-        
-        if (deserDef instanceof KeyDeserializer) {
-            deser = (KeyDeserializer) deserDef;
+
+        if (deserDef instanceof KeyDeserializer keyDeserializer) {
+            deser = keyDeserializer;
         } else {
             if (!(deserDef instanceof Class)) {
                 throw new IllegalStateException("AnnotationIntrospector returned key deserializer definition of type "

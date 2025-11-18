@@ -1,20 +1,28 @@
 package tools.jackson.databind.convert;
 
-import java.util.*;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 
-public class CoerceContainersTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class CoerceContainersTest
 {
     private final String JSON_EMPTY = q("");
 
     private final ObjectMapper VANILLA_MAPPER = sharedMapper();
 
     private final ObjectMapper COERCING_MAPPER = jsonMapperBuilder()
-            .withCoercionConfigDefaults(cfg -> 
+            .withCoercionConfigDefaults(cfg ->
                 cfg.setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsEmpty))
             .build();
 
@@ -24,14 +32,15 @@ public class CoerceContainersTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testScalarCollections() throws Exception
     {
         final JavaType listType = VANILLA_MAPPER.getTypeFactory()
                 .constructType(new TypeReference<List<Double>>() { });
-        
+
         // 03-Aug-2022, tatu: Due to [databind#3418] message changed; not
         //    100% sure how it should work but let's try this
-        
+
 //        _verifyNoCoercion(listType);
         try {
             VANILLA_MAPPER.readerFor(listType).readValue(JSON_EMPTY);
@@ -41,12 +50,13 @@ public class CoerceContainersTest extends BaseMapTest
             verifyException(e, "Cannot deserialize value of type");
             verifyException(e, "from String value");
         }
-        
+
         List<Double> result = _readWithCoercion(listType);
         assertNotNull(result);
         assertEquals(0, result.size());
     }
 
+    @Test
     public void testStringCollections() throws Exception
     {
         final JavaType listType = VANILLA_MAPPER.getTypeFactory()
@@ -63,6 +73,7 @@ public class CoerceContainersTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testScalarMap() throws Exception
     {
         final JavaType mapType = VANILLA_MAPPER.getTypeFactory()
@@ -73,6 +84,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.size());
     }
 
+    @Test
     public void testEnumMap() throws Exception
     {
         final JavaType mapType = VANILLA_MAPPER.getTypeFactory()
@@ -89,6 +101,7 @@ public class CoerceContainersTest extends BaseMapTest
     /********************************************************
      */
 
+    @Test
     public void testObjectArray() throws Exception
     {
         final JavaType arrayType = VANILLA_MAPPER.getTypeFactory()
@@ -99,6 +112,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testStringArray() throws Exception
     {
         final JavaType arrayType = VANILLA_MAPPER.getTypeFactory()
@@ -109,6 +123,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testBooleanArray() throws Exception
     {
         _verifyNoCoercion(boolean[].class);
@@ -117,6 +132,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testIntArray() throws Exception
     {
         _verifyNoCoercion(int[].class);
@@ -125,6 +141,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testLongArray() throws Exception
     {
         _verifyNoCoercion(long[].class);
@@ -133,22 +150,29 @@ public class CoerceContainersTest extends BaseMapTest
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testFloatArray() throws Exception
     {
-        _verifyNoCoercion(float[].class);
+        // 06-Aug-2025, tatu: with [databind#5242] will coerce empty String
+        //    as empty Base64 array, so no exception here
+        //_verifyNoCoercion(float[].class);
         float[] result = _readWithCoercion(float[].class);
         assertNotNull(result);
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testDoubleArray() throws Exception
     {
-        _verifyNoCoercion(double[].class);
+        // 06-Aug-2025, tatu: with [databind#5242] will coerce empty String
+        //    as empty Base64 array, so no exception here
+        //_verifyNoCoercion(double[].class);
         double[] result = _readWithCoercion(double[].class);
         assertNotNull(result);
         assertEquals(0, result.length);
     }
 
+    @Test
     public void testPOJOArray() throws Exception
     {
         _verifyNoCoercion(StringWrapper[].class);
@@ -156,7 +180,7 @@ public class CoerceContainersTest extends BaseMapTest
         assertNotNull(result);
         assertEquals(0, result.length);
     }
-    
+
     /*
     /********************************************************
     /* Helper methods

@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.function.UnaryOperator;
 
 import tools.jackson.core.*;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.JacksonModule.SetupContext;
 import tools.jackson.databind.deser.*;
@@ -57,7 +58,7 @@ public class ModuleContextBase
     /* Accessors for metadata
     /**********************************************************************
      */
-    
+
     @Override
     public Version getMapperVersion() {
         return tools.jackson.databind.cfg.PackageVersion.VERSION;
@@ -94,7 +95,7 @@ public class ModuleContextBase
     /* Accessors on/off features
     /**********************************************************************
      */
-    
+
     @Override
     public boolean isEnabled(MapperFeature f) {
         return _builder.isEnabled(f);
@@ -125,6 +126,16 @@ public class ModuleContextBase
         return _builder.isEnabled(f);
     }
 
+    @Override
+    public boolean isEnabled(DatatypeFeature f) {
+        return _builder.isEnabled(f);
+    }
+
+    @Override
+    public DatatypeFeatures datatypeFeatures() {
+        return _builder.datatypeFeatures();
+    }
+    
     /*
     /**********************************************************************
     /* Mutators for adding deserializers, related
@@ -184,7 +195,7 @@ public class ModuleContextBase
         _set(_serializerFactory().withNullKeySerializer(ser));
         return this;
     }
-    
+
     @Override
     public SetupContext overrideDefaultNullValueSerializer(ValueSerializer<?> ser) {
         _set(_serializerFactory().withNullValueSerializer(ser));
@@ -274,7 +285,7 @@ public class ModuleContextBase
         }
         return this;
     }
-    
+
     @Override
     public SetupContext setMixIn(Class<?> target, Class<?> mixinSource) {
         _builder.addMixIn(target, mixinSource);

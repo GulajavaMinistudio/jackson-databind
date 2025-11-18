@@ -1,13 +1,22 @@
 package tools.jackson.databind.deser.filter;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+import static tools.jackson.databind.testutil.DatabindTestUtil.newJsonMapper;
 
 // for [databind#1402]; configurable null handling, specifically with SKIP
-public class NullConversionsSkipTest extends BaseMapTest
-{
+public class NullConversionsSkipTest {
     static class NullSkipField {
         public String nullsOk = "a";
 
@@ -28,7 +37,7 @@ public class NullConversionsSkipTest extends BaseMapTest
             _noNulls = v;
         }
     }
-    
+
     static class StringValue {
         String value = "default";
 
@@ -55,6 +64,7 @@ public class NullConversionsSkipTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSkipNullField() throws Exception
     {
         // first, ok if assigning non-null to not-nullable, null for nullable
@@ -70,6 +80,7 @@ public class NullConversionsSkipTest extends BaseMapTest
         assertEquals("a", result.nullsOk);
     }
 
+    @Test
     public void testSkipNullMethod() throws Exception
     {
         NullSkipMethod result = MAPPER.readValue(a2q("{'noNulls':'foo', 'nullsOk':null}"),
@@ -84,11 +95,12 @@ public class NullConversionsSkipTest extends BaseMapTest
     }
 
     // for [databind#2015]
+    @Test
     public void testEnumAsNullThenSkip() throws Exception
-    {    
+    {
         Pojo2015 p = MAPPER.readerFor(Pojo2015.class)
-                .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
-                .readValue("{\"number\":\"THREE\"}"); 
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+                .readValue("{\"number\":\"THREE\"}");
         assertEquals(NUMS2015.TWO, p.number);
     }
 
@@ -97,7 +109,8 @@ public class NullConversionsSkipTest extends BaseMapTest
     /* Test methods, defaulting
     /**********************************************************
      */
-    
+
+    @Test
     public void testSkipNullWithDefaults() throws Exception
     {
         String json = a2q("{'value':null}");

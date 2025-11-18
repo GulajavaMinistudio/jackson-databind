@@ -4,13 +4,15 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import tools.jackson.databind.AnnotationIntrospector;
 import tools.jackson.databind.BeanDescription;
+import tools.jackson.databind.JavaType;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.annotation.JsonPOJOBuilder;
 import tools.jackson.databind.cfg.MapperConfig;
-import tools.jackson.databind.jdk14.JDK14Util;
+import tools.jackson.databind.util.RecordUtil;
 
 /**
  * Default {@link AccessorNamingStrategy} used by Jackson: to be used either as-is,
@@ -25,6 +27,17 @@ public class DefaultAccessorNamingStrategy
      * based on various rules.
      */
     public interface BaseNameValidator {
+        /**
+         * Method called to check whether given base name is acceptable: called
+         * for accessor method name after removing prefix.
+         * NOTE: called even if "prefix" is empy (i.e. nothing really removed)
+         * 
+         * @param firstChar First character of the base name
+         * @param basename Full base name (after removing prefix)
+         * @param offset Length of prefix removed
+         *
+         * @return {@code true} if base name is acceptable; {@code false} otherwise
+         */
         public boolean accept(char firstChar, String basename, int offset);
     }
 
@@ -60,19 +73,32 @@ public class DefaultAccessorNamingStrategy
         _isGetterPrefix = isGetterPrefix;
         _baseNameValidator = baseNameValidator;
     }
-    
+
     @Override
     public String findNameForIsGetter(AnnotatedMethod am, String name)
     {
         if (_isGetterPrefix != null) {
-            final Class<?> rt = am.getRawType();
-            if (_isGettersNonBoolean || rt == Boolean.class || rt == Boolean.TYPE) {
-                if (name.startsWith(_isGetterPrefix)) { // plus, must return a boolean
-                    return stdManglePropertyName(name, 2);
+            if (_isGettersNonBoolean || _booleanType(am.getType())) {
+                if (name.startsWith(_isGetterPrefix)) {
+                    return stdManglePropertyName(name, _isGetterPrefix.length());
                 }
             }
         }
         return null;
+    }
+
+    private boolean _booleanType(JavaType type) {
+        // but then, as per [databind#3836] Reference types too
+        if (type.isReferenceType()) {
+            type = type.getReferencedType();
+        }
+        // First, well-known JDK boolean types
+        if (type.hasRawClass(Boolean.TYPE)
+                || type.hasRawClass(Boolean.class)
+                || type.hasRawClass(AtomicBoolean.class)) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -84,14 +110,12 @@ public class DefaultAccessorNamingStrategy
             // coverage without false matches; but for now let's assume there is
             // no reason to use any such getter from CGLib.
 
-            // 05-Oct-2020, tatu: Removed from Jackson 3.0
-            /*
+            // 20-Oct-2025 https://github.com/FasterXML/jackson-databind/issues/5354
             if ("getCallbacks".equals(name)) {
                 if (_isCglibGetCallbacks(am)) {
                     return null;
                 }
-            } else */
-            if ("getMetaClass".equals(name)) {
+            } else if ("getMetaClass".equals(name)) {
                 // 30-Apr-2009, tatu: Need to suppress serialization of a cyclic reference
                 if (_isGroovyMetaClassGetter(am)) {
                     return null;
@@ -167,13 +191,12 @@ public class DefaultAccessorNamingStrategy
      */
 
     // This method was added to address the need to weed out CGLib-injected
-    // "getCallbacks" method. 
+    // "getCallbacks" method.
     // At this point caller has detected a potential getter method with
     // name "getCallbacks" and we need to determine if it is indeed injected
     // by Cglib. We do this by verifying that the  result type is "net.sf.cglib.proxy.Callback[]"
 
-    // 05-Oct-2020, tatu: Removed from 3.0
-    /*
+    // 20-Oct-2025 https://github.com/FasterXML/jackson-databind/issues/5354
     protected boolean _isCglibGetCallbacks(AnnotatedMethod am)
     {
         Class<?> rt = am.getRawType();
@@ -196,7 +219,6 @@ public class DefaultAccessorNamingStrategy
         }
         return false;
     }
-    */
 
     // 05-Oct-2020, tatu: Left in 3.0 for now
     // Another helper method to deal with Groovy's problematic metadata accessors
@@ -224,15 +246,18 @@ public class DefaultAccessorNamingStrategy
      * <li>Is-getter (for Boolean values): "is"
      *  </li>
      *</ul>
-     * and no additional restrictions on base names accepted (configurable for
-     * limits using {@link BaseNameValidator}), allowing names like
-     * "get_value()" and "getvalue()".
+     * with additional restrictions on base names accepted (configurable for
+     * limits using {@link BaseNameValidator}), preventing names like
+     * "get_value()" and "getvalue()" (unlike Jackson 2.x that allowed these).
      */
     public static class Provider
         extends AccessorNamingStrategy.Provider
         implements java.io.Serializable
     {
         private static final long serialVersionUID = 1L;
+
+        private static final BaseNameValidator DEFAULT_BASE_NAME_VALIDATOR
+            = FirstCharBasedValidator.forFirstNameRule(false, false);
 
         protected final String _setterPrefix;
         protected final String _withPrefix;
@@ -244,7 +269,7 @@ public class DefaultAccessorNamingStrategy
 
         public Provider() {
             this("set", JsonPOJOBuilder.DEFAULT_WITH_PREFIX,
-                    "get", "is", null);
+                    "get", "is", DEFAULT_BASE_NAME_VALIDATOR);
         }
 
         protected Provider(Provider p,
@@ -287,7 +312,7 @@ public class DefaultAccessorNamingStrategy
             return new Provider(this,
                     prefix, _withPrefix, _getterPrefix, _isGetterPrefix);
         }
-        
+
         /**
          * Mutant factory for changing the prefix used for Builders
          * (from default {@link JsonPOJOBuilder#DEFAULT_WITH_PREFIX})
@@ -365,7 +390,8 @@ public class DefaultAccessorNamingStrategy
         public Provider withFirstCharAcceptance(boolean allowLowerCaseFirstChar,
                 boolean allowNonLetterFirstChar) {
             return withBaseNameValidator(
-                    FirstCharBasedValidator.forFirstNameRule(allowLowerCaseFirstChar, allowNonLetterFirstChar));
+                    FirstCharBasedValidator.forFirstNameRule(allowLowerCaseFirstChar,
+                            allowNonLetterFirstChar));
         }
 
         /**
@@ -381,7 +407,7 @@ public class DefaultAccessorNamingStrategy
         public Provider withBaseNameValidator(BaseNameValidator vld) {
             return new Provider(this, vld);
         }
-        
+
         @Override
         public AccessorNamingStrategy forPOJO(MapperConfig<?> config, AnnotatedClass targetClass)
         {
@@ -394,7 +420,8 @@ public class DefaultAccessorNamingStrategy
         public AccessorNamingStrategy forBuilder(MapperConfig<?> config,
                 AnnotatedClass builderClass, BeanDescription valueTypeDesc)
         {
-            AnnotationIntrospector ai = config.isAnnotationProcessingEnabled() ? config.getAnnotationIntrospector() : null;
+            AnnotationIntrospector ai = config.isAnnotationProcessingEnabled()
+                    ? config.getAnnotationIntrospector() : null;
             JsonPOJOBuilder.Value builderConfig = (ai == null) ? null : ai.findPOJOBuilderConfig(config, builderClass);
             String mutatorPrefix = (builderConfig == null) ? _withPrefix : builderConfig.withPrefix;
             return new DefaultAccessorNamingStrategy(config, builderClass,
@@ -411,14 +438,17 @@ public class DefaultAccessorNamingStrategy
 
     /**
      * Simple implementation of {@link BaseNameValidator} that checks the
-     * first character and nothing else.
+     * first character and nothing else if (and only if!) prefix is empty
+     * (so {@code offset} passed is NOT zero).
      *<p>
      * Instances are to be constructed using method
      * {@link FirstCharBasedValidator#forFirstNameRule}.
      */
     public static class FirstCharBasedValidator
-        implements BaseNameValidator
+        implements BaseNameValidator, java.io.Serializable
     {
+        private static final long serialVersionUID = 3L;
+
         private final boolean _allowLowerCaseFirstChar;
         private final boolean _allowNonLetterFirstChar;
 
@@ -438,21 +468,29 @@ public class DefaultAccessorNamingStrategy
          * @param allowNonLetterFirstChar  Whether base names that start with non-letter
          *    character (like {@code "_"} or number {@code 1}) are accepted as valid or not:
          *    consider difference between "setter-methods" {@code setValue()} and {@code set_value()}.
-         * 
+         *
          * @return Validator instance to use, if any; {@code null} to indicate no additional
-         *   rules applied (case when both arguments are {@code false})
+         *   rules applied (case when both arguments are {@code true})
          */
         public static BaseNameValidator forFirstNameRule(boolean allowLowerCaseFirstChar,
                 boolean allowNonLetterFirstChar) {
-            if (!allowLowerCaseFirstChar && !allowNonLetterFirstChar) {
+            if (allowLowerCaseFirstChar && allowNonLetterFirstChar) {
                 return null;
             }
             return new FirstCharBasedValidator(allowLowerCaseFirstChar,
                     allowNonLetterFirstChar);
         }
-            
+
         @Override
         public boolean accept(char firstChar, String basename, int offset) {
+            // 27-Mar-2025, tatu: [databind#2882] Need to make sure we don't
+            //   try to validate cases where no prefix is removed (mostly case
+            //   for builders, but also for Record-style plain "getters" and
+            //   "setters".
+            if (offset == 0) {
+                return true;
+            }
+            
             // Ok, so... If UTF-16 letter, then check whether lc allowed
             // (title-case and upper-case both assumed to be acceptable by default)
             if (Character.isLetter(firstChar)) {
@@ -462,7 +500,7 @@ public class DefaultAccessorNamingStrategy
             return _allowNonLetterFirstChar;
         }
     }
-    
+
     /**
      * Implementation used for supporting "non-prefix" naming convention of
      * Java 14 {@code java.lang.Record} types, and in particular find default
@@ -487,7 +525,7 @@ public class DefaultAccessorNamingStrategy
                     // trickier: regular fields are ok (handled differently), but should
                     // we also allow getter discovery? For now let's do so
                     "get", "is", null);
-            String[] recordFieldNames = JDK14Util.getRecordFieldNames(forClass.getRawType());
+            String[] recordFieldNames = RecordUtil.getRecordFieldNames(forClass.getRawType());
             // 01-May-2022, tatu: Due to [databind#3417] may return null when no info available
             _fieldNames = recordFieldNames == null ?
                     Collections.emptySet() :

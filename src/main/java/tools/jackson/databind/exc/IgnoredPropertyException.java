@@ -2,7 +2,7 @@ package tools.jackson.databind.exc;
 
 import java.util.*;
 
-import tools.jackson.core.JsonLocation;
+import tools.jackson.core.TokenStreamLocation;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DatabindException;
 
@@ -16,7 +16,7 @@ public class IgnoredPropertyException
 {
     private static final long serialVersionUID = 1L;
 
-    public IgnoredPropertyException(JsonParser p, String msg, JsonLocation loc,
+    public IgnoredPropertyException(JsonParser p, String msg, TokenStreamLocation loc,
             Class<?> referringClass, String propName,
             Collection<Object> propertyIds)
     {
@@ -25,7 +25,7 @@ public class IgnoredPropertyException
 
     /**
      * Factory method used for constructing instances of this exception type.
-     * 
+     *
      * @param p Underlying parser used for reading input being used for data-binding
      * @param fromObjectOrClass Reference to either instance of problematic type (
      *    if available), or if not, type itself

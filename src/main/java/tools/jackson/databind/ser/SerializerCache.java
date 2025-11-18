@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import tools.jackson.core.util.Snapshottable;
 import tools.jackson.databind.*;
 import tools.jackson.databind.ser.impl.ReadOnlyClassToSerializerMap;
+import tools.jackson.databind.util.LookupCache;
 import tools.jackson.databind.util.SimpleLookupCache;
 import tools.jackson.databind.util.TypeKey;
 
@@ -31,7 +32,7 @@ public final class SerializerCache
      * By default, allow caching of up to 4000 serializer entries (for possibly up to
      * 1000 types; but depending access patterns may be as few as half of that).
      */
-    public final static int DEFAULT_MAX_CACHED = 4000;
+    public final static int DEFAULT_MAX_CACHE_SIZE = 4000;
 
     /**
      * Shared, modifiable map; used if local read-only copy does not contain serializer
@@ -40,7 +41,7 @@ public final class SerializerCache
      * NOTE: keys are of various types (see below for key types), in addition to
      * basic {@link JavaType} used for "untyped" serializers.
      */
-    private final SimpleLookupCache<TypeKey, ValueSerializer<Object>> _sharedMap;
+    private final LookupCache<TypeKey, ValueSerializer<Object>> _sharedMap;
 
     /**
      * Most recent read-only instance, created from _sharedMap, if any.
@@ -48,7 +49,7 @@ public final class SerializerCache
     private final transient AtomicReference<ReadOnlyClassToSerializerMap> _readOnlyMap;
 
     public SerializerCache() {
-        this(DEFAULT_MAX_CACHED);
+        this(DEFAULT_MAX_CACHE_SIZE);
     }
 
     /**
@@ -57,7 +58,12 @@ public final class SerializerCache
     public SerializerCache(int maxCached) {
         int initial = Math.min(64, maxCached>>2);
         _sharedMap = new SimpleLookupCache<TypeKey, ValueSerializer<Object>>(initial, maxCached);
-        _readOnlyMap = new AtomicReference<ReadOnlyClassToSerializerMap>();
+        _readOnlyMap = new AtomicReference<>();
+    }
+
+    public SerializerCache(LookupCache<TypeKey, ValueSerializer<Object>> cache) {
+        _sharedMap = cache;
+        _readOnlyMap = new AtomicReference<>();
     }
 
     protected SerializerCache(SimpleLookupCache<TypeKey, ValueSerializer<Object>> shared) {
@@ -162,7 +168,7 @@ public final class SerializerCache
     }
 
     public void addAndResolveNonTypedSerializer(Class<?> type, ValueSerializer<Object> ser,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(type, false), ser) == null) {
@@ -178,7 +184,7 @@ public final class SerializerCache
     }
 
     public void addAndResolveNonTypedSerializer(JavaType type, ValueSerializer<Object> ser,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         synchronized (this) {
             if (_sharedMap.put(new TypeKey(type, false), ser) == null) {
@@ -199,7 +205,7 @@ public final class SerializerCache
      */
     public void addAndResolveNonTypedSerializer(Class<?> rawType, JavaType fullType,
             ValueSerializer<Object> ser,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         synchronized (this) {
             Object ob1 = _sharedMap.put(new TypeKey(rawType, false), ser);
@@ -212,10 +218,11 @@ public final class SerializerCache
     }
 
     /**
-     * Method called by StdSerializerProvider#flushCachedSerializers() to
+     * Method called by StdSerializationContext#flushCachedSerializers() to
      * clear all cached serializers
      */
     public synchronized void flush() {
         _sharedMap.clear();
+        _readOnlyMap.set(null);
     }
 }

@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 
 import tools.jackson.core.*;
+import tools.jackson.core.io.CharacterEscapes;
 import tools.jackson.core.util.JacksonFeatureSet;
 import tools.jackson.databind.*;
 import tools.jackson.databind.util.RawValue;
@@ -70,7 +71,7 @@ public class TreeBuildingGenerator
         _tokenWriteContext = _rootWriteContext;
     }
 
-    public static TreeBuildingGenerator forSerialization(SerializerProvider ctxt,
+    public static TreeBuildingGenerator forSerialization(SerializationContext ctxt,
             JsonNodeFactory nodeFactory) {
         return new TreeBuildingGenerator(ctxt, nodeFactory);
     }
@@ -137,6 +138,23 @@ public class TreeBuildingGenerator
         return BOGUS_WRITE_CAPABILITIES;
     }
 
+    @Override
+    public boolean has(StreamWriteCapability capability) {
+        return BOGUS_WRITE_CAPABILITIES.isEnabled(capability);
+    }
+
+    @Override
+    public CharacterEscapes getCharacterEscapes() { return null; }
+
+    @Override
+    public int getHighestNonEscapedChar() { return 0; }
+
+    @Override
+    public PrettyPrinter getPrettyPrinter() { return null; }
+
+    @Override
+    public FormatSchema getSchema() { return null; }
+    
     /*
     /**********************************************************************
     /* JsonGenerator implementation: low-level output handling
@@ -615,7 +633,7 @@ public class TreeBuildingGenerator
         @Override
         public void writeNumber(ValueNode v) { _node = v; }
         @Override
-        public void writeString(String v) { _node = _nodeFactory.textNode(v); }
+        public void writeString(String v) { _node = _nodeFactory.stringNode(v); }
 
         @Override
         public void writePOJO(Object value) { _node = _nodeFactory.pojoNode(value); }

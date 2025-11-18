@@ -4,11 +4,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.core.*;
 import tools.jackson.core.type.TypeReference;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.annotation.JsonSerialize;
@@ -16,9 +17,12 @@ import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.deser.std.StdDeserializer;
 import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("serial")
-public class TestCustomEnumKeyDeserializer extends BaseMapTest
+public class TestCustomEnumKeyDeserializer extends DatabindTestUtil
 {
     @JsonSerialize(using = TestEnumSerializer.class, keyUsing = TestEnumKeySerializer.class)
     @JsonDeserialize(using = TestEnumDeserializer.class, keyUsing = TestEnumKeyDeserializer.class)
@@ -56,7 +60,7 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
 
     static class TestEnumSerializer extends ValueSerializer<TestEnum> {
         @Override
-        public void serialize(TestEnum languageCode, JsonGenerator g, SerializerProvider serializerProvider) {
+        public void serialize(TestEnum languageCode, JsonGenerator g, SerializationContext ctxt) {
             g.writeString(languageCode.code());
         }
 
@@ -84,7 +88,7 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
 
         @Override
         public TestEnum deserialize(JsonParser p, DeserializationContext ctxt) {
-            String code = p.getText();
+            String code = p.getString();
             try {
                 return TestEnum.lookup(code);
             } catch (IllegalArgumentException e) {
@@ -96,7 +100,7 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
 
     static class TestEnumKeySerializer extends ValueSerializer<TestEnum> {
         @Override
-        public void serialize(TestEnum test, JsonGenerator g, SerializerProvider serializerProvider) {
+        public void serialize(TestEnum test, JsonGenerator g, SerializationContext ctxt) {
             g.writeName(test.code());
         }
 
@@ -166,8 +170,9 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
     /* Test methods
     /**********************************************************
      */
-    
+
     // Test passing with the fix
+    @Test
     public void testWithEnumKeys() throws Exception {
         ObjectMapper plainObjectMapper = new ObjectMapper();
         JsonNode tree = plainObjectMapper.readTree(a2q("{'red' : [ 'a', 'b']}"));
@@ -182,6 +187,7 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
 
     // and another still failing
     // NOTE: temporarily named as non-test to ignore it; JsonIgnore doesn't work for some reason
+    @Test
 //    public void testWithTree749() throws Exception
     public void withTree749() throws Exception
     {
@@ -199,11 +205,12 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
         ObjectNode ob = (ObjectNode) tree;
 
         JsonNode inner = ob.get("replacements");
-        String firstFieldName = inner.propertyNames().next();
+        String firstFieldName = inner.propertyNames().iterator().next();
         assertEquals("green", firstFieldName);
     }
 
     // [databind#1441]
+    @Test
     public void testCustomEnumKeySerializerWithPolymorphic() throws IOException
     {
         SimpleModule simpleModule = new SimpleModule();
@@ -211,7 +218,7 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
             @Override
             public SuperTypeEnum deserialize(JsonParser p, DeserializationContext deserializationContext)
             {
-                return SuperTypeEnum.valueOf(p.getText());
+                return SuperTypeEnum.valueOf(p.getString());
             }
         });
         ObjectMapper mapper = jsonMapperBuilder()
@@ -220,19 +227,20 @@ public class TestCustomEnumKeyDeserializer extends BaseMapTest
 
         SuperType superType = mapper.readValue("{\"someMap\": {\"FOO\": \"bar\"}}",
                 SuperType.class);
-        assertEquals("Deserialized someMap.FOO should equal bar", "bar",
-                superType.someMap.get(SuperTypeEnum.FOO));
+        assertEquals("bar", superType.someMap.get(SuperTypeEnum.FOO),
+            "Deserialized someMap.FOO should equal bar");
     }
 
     // [databind#1445]
     @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
     public void testCustomEnumValueAndKeyViaModifier() throws IOException
     {
         SimpleModule module = new SimpleModule();
-        module.setDeserializerModifier(new ValueDeserializerModifier() {        
+        module.setDeserializerModifier(new ValueDeserializerModifier() {
             @Override
             public ValueDeserializer<Enum> modifyEnumDeserializer(DeserializationConfig config,
-                    final JavaType type, BeanDescription beanDesc,
+                    final JavaType type, BeanDescription.Supplier beanDescRef,
                     final ValueDeserializer<?> deserializer) {
                 return new ValueDeserializer<Enum>() {
                     @Override

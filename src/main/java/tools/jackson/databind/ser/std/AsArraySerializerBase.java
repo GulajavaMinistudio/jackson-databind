@@ -103,7 +103,7 @@ public abstract class AsArraySerializerBase<T>
         _unwrapSingle = unwrapSingle;
     }
 
-    public abstract AsArraySerializerBase<T> withResolved(BeanProperty property,
+    protected abstract AsArraySerializerBase<T> withResolved(BeanProperty property,
             TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle);
 
@@ -112,7 +112,7 @@ public abstract class AsArraySerializerBase<T>
     /* Post-processing
     /**********************************************************************
      */
-    
+
     /**
      * This method is needed to resolve contextual annotations like
      * per-property overrides, as well as do recursive call
@@ -120,7 +120,7 @@ public abstract class AsArraySerializerBase<T>
      * known statically.
      */
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property)
     {
         TypeSerializer typeSer = _valueTypeSerializer;
@@ -130,7 +130,7 @@ public abstract class AsArraySerializerBase<T>
         ValueSerializer<?> ser = null;
         Boolean unwrapSingle = null;
         // First: if we have a property, may have property-annotation overrides
-        
+
         if (property != null) {
             final AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
             AnnotatedMember m = property.getMember();
@@ -171,7 +171,7 @@ public abstract class AsArraySerializerBase<T>
     /* Accessors
     /**********************************************************************
      */
-    
+
     @Override
     public JavaType getContentType() {
         return _elementType;
@@ -190,12 +190,12 @@ public abstract class AsArraySerializerBase<T>
 
     // 16-Apr-2018, tatu: Sample code, but sub-classes need to implement (for more
     //    efficient "is-single-unwrapped" check)
-    
+
     // at least if they can provide access to actual size of value and use `writeStartArray()`
     // variant that passes size of array to output, which is helpful with some data formats
     /*
     @Override
-    public void serialize(T value, JsonGenerator gen, SerializerProvider ctxt) throws JacksonException
+    public void serialize(T value, JsonGenerator gen, SerializationContext ctxt) throws JacksonException
     {
         if (provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
                 && hasSingleElement(value)) {
@@ -209,7 +209,7 @@ public abstract class AsArraySerializerBase<T>
     */
 
     @Override
-    public void serializeWithType(T value, JsonGenerator g, SerializerProvider ctxt,
+    public void serializeWithType(T value, JsonGenerator g, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -221,7 +221,7 @@ public abstract class AsArraySerializerBase<T>
         typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
     }
 
-    protected abstract void serializeContents(T value, JsonGenerator gen, SerializerProvider provider)
+    protected abstract void serializeContents(T value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException;
 
     @Override
@@ -233,7 +233,7 @@ public abstract class AsArraySerializerBase<T>
             // 19-Oct-2016, tatu: Apparently we get null for untyped/raw `EnumSet`s... not 100%
             //   sure what'd be the clean way but let's try this for now:
             if (_elementType != null) {
-                valueSer = visitor.getProvider().findContentValueSerializer(_elementType, _property);
+                valueSer = visitor.getContext().findContentValueSerializer(_elementType, _property);
             }
         }
         visitArrayFormat(visitor, typeHint, valueSer, _elementType);

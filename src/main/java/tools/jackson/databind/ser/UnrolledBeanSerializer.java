@@ -86,7 +86,7 @@ public class UnrolledBeanSerializer
 
     /**
      * Factory method that will construct optimized instance if all the constraints
-     * are obeyed; or, if not, return `null` to indicate that instance can not be
+     * are obeyed; or, if not, return `null` to indicate that instance cannot be
      * created.
      */
     public static UnrolledBeanSerializer tryConstruct(JavaType type, BeanSerializerBuilder builder,
@@ -123,6 +123,12 @@ public class UnrolledBeanSerializer
     }
 
     @Override
+    public ValueSerializer<?> withIgnoredProperties(Set<String> toIgnore) {
+        // Revert to Vanilla variant here as well
+        return new BeanSerializer(this, toIgnore, null);
+    }
+    
+    @Override
     protected BeanSerializerBase withByNameInclusion(Set<String> toIgnore, Set<String> toInclude) {
         return new UnrolledBeanSerializer(this, toIgnore, toInclude);
     }
@@ -144,7 +150,7 @@ public class UnrolledBeanSerializer
     }
 
     @Override
-    public void resolve(SerializerProvider provider)
+    public void resolve(SerializationContext provider)
     {
         super.resolve(provider);
         _calcUnrolled();
@@ -157,13 +163,13 @@ public class UnrolledBeanSerializer
      */
 
     @Override
-    public void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
+    public void serialize(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         // NOTE! We have ensured that "JSON Filter" and "Object Id" cases
         // always use "vanilla" BeanSerializer, so no need to check here
 
-        BeanPropertyWriter[] fProps = _filteredProps;        
+        BeanPropertyWriter[] fProps = _filteredProps;
         if ((fProps != null) && (provider.getActiveView() != null)) {
             gen.writeStartObject(bean);
             _serializePropertiesMaybeView(bean, gen, provider, fProps);
@@ -173,7 +179,7 @@ public class UnrolledBeanSerializer
         serializeNonFiltered(bean, gen, provider);
     }
 
-    protected void serializeNonFiltered(Object bean, JsonGenerator gen, SerializerProvider provider)
+    protected void serializeNonFiltered(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         gen.writeStartObject(bean);
@@ -204,9 +210,6 @@ public class UnrolledBeanSerializer
             case 0:
             }
             prop = null;
-            if (_anyGetterWriter != null) {
-                _anyGetterWriter.getAndSerialize(bean, gen, provider);
-            }
         } catch (Exception e) {
             String name = (prop == null) ? "[anySetter]" : prop.getName();
             wrapAndThrow(provider, e, bean, name);

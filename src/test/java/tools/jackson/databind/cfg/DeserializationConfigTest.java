@@ -2,15 +2,20 @@ package tools.jackson.databind.cfg;
 
 import java.util.Collections;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.json.JsonReadFeature;
-
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class DeserializationConfigTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class DeserializationConfigTest extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testFeatureDefaults()
     {
         ObjectMapper m = new ObjectMapper();
@@ -24,9 +29,10 @@ public class DeserializationConfigTest extends BaseMapTest
         assertFalse(cfg.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS));
         assertFalse(cfg.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
 
-        assertTrue(cfg.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
+        assertFalse(cfg.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
     }
 
+    @Test
     public void testBasicFeatures() throws Exception
     {
         DeserializationConfig config = MAPPER.deserializationConfig();
@@ -40,6 +46,7 @@ public class DeserializationConfigTest extends BaseMapTest
                 DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES));
     }
 
+    @Test
     public void testStreamReadFeatures() throws Exception
     {
         DeserializationConfig config = MAPPER.deserializationConfig();
@@ -53,6 +60,7 @@ public class DeserializationConfigTest extends BaseMapTest
                 StreamReadFeature.STRICT_DUPLICATE_DETECTION));
     }
 
+    @Test
     public void testJsonReadFeatures() throws Exception
     {
         final JsonReadFeature DISABLED_BY_DEFAULT = JsonReadFeature.ALLOW_JAVA_COMMENTS;
@@ -73,10 +81,11 @@ public class DeserializationConfigTest extends BaseMapTest
      * hit the limit, need to change implementation -- this test just
      * gives low-water mark
      */
+    @Test
     public void testEnumIndexes()
     {
         int max = 0;
-        
+
         for (DeserializationFeature f : DeserializationFeature.values()) {
             max = Math.max(max, f.ordinal());
         }
@@ -85,6 +94,7 @@ public class DeserializationConfigTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testMisc() throws Exception
     {
         DeserializationConfig config = MAPPER.deserializationConfig();

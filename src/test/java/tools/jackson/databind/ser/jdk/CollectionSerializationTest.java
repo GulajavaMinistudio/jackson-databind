@@ -3,15 +3,21 @@ package tools.jackson.databind.ser.jdk;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.ser.std.StdSerializer;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 public class CollectionSerializationTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     enum Key { A, B, C };
 
@@ -40,7 +46,7 @@ public class CollectionSerializationTest
      * Class needed for testing [JACKSON-220]
      */
     @SuppressWarnings("serial")
-    @JsonSerialize(using=ListSerializer.class)    
+    @JsonSerialize(using=ListSerializer.class)
     static class PseudoList extends ArrayList<String>
     {
         public PseudoList(String... values) {
@@ -53,7 +59,7 @@ public class CollectionSerializationTest
         public ListSerializer() { super(List.class); }
 
         @Override
-        public void serialize(List<String> value, JsonGenerator gen, SerializerProvider provider)
+        public void serialize(List<String> value, JsonGenerator gen, SerializationContext provider)
         {
             // just use standard List.toString(), output as JSON String
             gen.writeString(value.toString());
@@ -75,7 +81,7 @@ public class CollectionSerializationTest
             list = new ArrayList<String>(Arrays.asList(v));
         }
         protected StaticListWrapper() { }
-        
+
         public List<String> getList( ) { return list; }
         public void setList(List<String> l) { list = l; }
     }
@@ -86,8 +92,9 @@ public class CollectionSerializationTest
     /**********************************************************
      */
 
-    private final static ObjectMapper MAPPER = new ObjectMapper();
+    private final static ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testCollections() throws IOException
     {
         // Let's try different collections, arrays etc
@@ -122,7 +129,7 @@ public class CollectionSerializationTest
                 value = c;
             }
             String json = MAPPER.writeValueAsString(value);
-            
+
             // and then need to verify:
             JsonParser p = MAPPER.createParser(json);
             assertToken(JsonToken.START_ARRAY, p.nextToken());
@@ -136,6 +143,7 @@ public class CollectionSerializationTest
     }
 
     @SuppressWarnings("resource")
+    @Test
     public void testBigCollection() throws IOException
     {
         final int COUNT = 9999;
@@ -179,6 +187,7 @@ public class CollectionSerializationTest
         }
     }
 
+    @Test
     public void testEnumMap() throws IOException
     {
         EnumMap<Key,String> map = new EnumMap<Key,String>(Key.class);
@@ -192,6 +201,7 @@ public class CollectionSerializationTest
     // Test that checks that empty collections are properly serialized
     // when they are Bean properties
     @SuppressWarnings("unchecked")
+    @Test
     public void testEmptyBeanCollection() throws IOException
     {
         Collection<Object> x = new ArrayList<Object>();
@@ -205,6 +215,7 @@ public class CollectionSerializationTest
         assertEquals(x, x2);
     }
 
+    @Test
     public void testNullBeanCollection()
         throws IOException
     {
@@ -216,6 +227,7 @@ public class CollectionSerializationTest
     }
 
     @SuppressWarnings("unchecked")
+    @Test
     public void testEmptyBeanEnumMap() throws IOException
     {
         EnumMap<Key,String> map = new EnumMap<Key,String>(Key.class);
@@ -231,6 +243,7 @@ public class CollectionSerializationTest
     }
 
     // Should also be able to serialize null EnumMaps as expected
+    @Test
     public void testNullBeanEnumMap() throws IOException
     {
         EnumMapBean b = new EnumMapBean(null);
@@ -241,6 +254,7 @@ public class CollectionSerializationTest
         assertNull(result.get("map"));
     }
 
+    @Test
     public void testListSerializer() throws IOException
     {
         assertEquals(q("[ab, cd, ef]"),
@@ -250,6 +264,7 @@ public class CollectionSerializationTest
     }
 
     @SuppressWarnings("deprecation")
+    @Test
     public void testEmptyListOrArray() throws IOException
     {
         // by default, empty lists serialized normally
@@ -267,6 +282,7 @@ public class CollectionSerializationTest
         assertEquals("{}", m.writeValueAsString(array));
     }
 
+    @Test
     public void testStaticList() throws IOException
     {
         // First: au naturel

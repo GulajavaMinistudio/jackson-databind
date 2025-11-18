@@ -2,17 +2,22 @@ package tools.jackson.databind.jsontype.vld;
 
 import java.util.regex.Pattern;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidDefinitionException;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for the main user-configurable {@code PolymorphicTypeValidator},
  * {@link BasicPolymorphicTypeValidator}.
  */
-public class BasicPTVTest extends BaseMapTest
+public class BasicPTVTest extends DatabindTestUtil
 {
     // // // Value types
 
@@ -70,7 +75,7 @@ public class BasicPTVTest extends BaseMapTest
         protected NumberWrapper() { }
         public NumberWrapper(Number v) { value = v; }
     }
-    
+
     /*
     /**********************************************************************
     /* Test methods: by base type, pass
@@ -78,13 +83,14 @@ public class BasicPTVTest extends BaseMapTest
      */
 
     // First: test simple Base-type-as-class allowing
+    @Test
     public void testAllowByBaseClass() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfBaseType(BaseValue.class)
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withA(42));
@@ -113,13 +119,14 @@ public class BasicPTVTest extends BaseMapTest
     }
 
     // Then subtype-prefix
+    @Test
     public void testAllowByBaseClassPrefix() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfBaseType("tools.jackson.")
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withA(42));
@@ -138,13 +145,14 @@ public class BasicPTVTest extends BaseMapTest
     }
 
     // Then subtype-pattern
+    @Test
     public void testAllowByBaseClassPattern() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfBaseType(Pattern.compile("\\w+\\.jackson\\..+"))
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withA(42));
@@ -163,6 +171,7 @@ public class BasicPTVTest extends BaseMapTest
     }
 
     // And finally, block by specific direct-match base type
+    @Test
     public void testDenyByBaseClass() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 // indicate that all subtypes `BaseValue` would be fine
@@ -172,7 +181,7 @@ public class BasicPTVTest extends BaseMapTest
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
         final String json = mapper.writeValueAsString(new ObjectWrapper(new ValueA(15)));
         try {
             mapper.readValue(json, ObjectWrapper.class);
@@ -190,13 +199,14 @@ public class BasicPTVTest extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testAllowBySubClass() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType(ValueB.class)
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withB(42));
@@ -214,13 +224,14 @@ public class BasicPTVTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testAllowBySubClassPrefix() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType(ValueB.class.getName())
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withB(42));
@@ -238,13 +249,14 @@ public class BasicPTVTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testAllowBySubClassPattern() throws Exception {
         final PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType(Pattern.compile(Pattern.quote(ValueB.class.getName())))
                 .build();
         ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();        
+                .build();
 
         // First, test accepted case
         final String json = mapper.writeValueAsString(BaseValueWrapper.withB(42));

@@ -15,14 +15,10 @@ import tools.jackson.databind.introspect.AnnotatedMember;
  * Note that there are many similarities to {@link SetterlessProperty}, which predates
  * this variant; and that one is even used in cases where there is no mutator
  * available.
- *
- * @since 2.9
  */
 public class MergingSettableBeanProperty
     extends SettableBeanProperty.Delegating
 {
-    private static final long serialVersionUID = 1L;
-
     /**
      * Member (field, method) used for accessing existing value.
      */
@@ -59,6 +55,11 @@ public class MergingSettableBeanProperty
         return new MergingSettableBeanProperty(d, _accessor);
     }
 
+    @Override // since 2.20
+    public boolean isMerging() {
+        return true;
+    }
+
     /*
     /**********************************************************
     /* Deserialization methods
@@ -81,7 +82,7 @@ public class MergingSettableBeanProperty
         if (newValue != oldValue) {
             // 18-Apr-2017, tatu: Null handling should occur within delegate, which may
             //     set/skip/transform it, or throw an exception.
-            delegate.set(instance, newValue);
+            delegate.set(ctxt, instance, newValue);
         }
     }
 
@@ -106,27 +107,27 @@ public class MergingSettableBeanProperty
             // 31-Oct-2016, tatu: Basically should just ignore as null can't really
             //    contribute to merging.
             if (newValue != null) {
-                return delegate.setAndReturn(instance, newValue);
+                return delegate.setAndReturn(ctxt, instance, newValue);
             }
         }
         return instance;
     }
 
     @Override
-    public void set(Object instance, Object value) {
+    public void set(DeserializationContext ctxt, Object instance, Object value) {
         // 31-Oct-2016, tatu: Basically should just ignore as null can't really
         //    contribute to merging.
         if (value != null) {
-            delegate.set(instance, value);
+            delegate.set(ctxt, instance, value);
         }
     }
 
     @Override
-    public Object setAndReturn(Object instance, Object value) {
+    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) {
         // 31-Oct-2016, tatu: Basically should just ignore as null can't really
         //    contribute to merging.
         if (value != null) {
-            return delegate.setAndReturn(instance, value);
+            return delegate.setAndReturn(ctxt, instance, value);
         }
         return instance;
     }

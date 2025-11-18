@@ -1,10 +1,15 @@
 package tools.jackson.databind.convert;
 
-import tools.jackson.databind.BaseMapTest;
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 
-public class CoerceNaNStringToNumberTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class CoerceNaNStringToNumberTest
 {
     static class DoubleBean {
         double _v;
@@ -31,7 +36,8 @@ public class CoerceNaNStringToNumberTest extends BaseMapTest
     /* this is needed for backwards-compatibility.
     /**********************************************************************
      */
-    
+
+    @Test
     public void testDoublePrimitiveNonNumeric() throws Exception
     {
         // first, simple case:
@@ -47,6 +53,7 @@ public class CoerceNaNStringToNumberTest extends BaseMapTest
         assertEquals(Double.POSITIVE_INFINITY, array[0]);
     }
 
+    @Test
     public void testDoublePrimFromNaNCoercionDisabled() throws Exception
     {
         // first, simple case:
@@ -61,20 +68,22 @@ public class CoerceNaNStringToNumberTest extends BaseMapTest
         assertEquals(Double.POSITIVE_INFINITY, array[0]);
     }
 
+    @Test
     public void testDoubleWrapperFromNaNCoercionDisabled() throws Exception
     {
         double value = Double.POSITIVE_INFINITY;
         Double dv = MAPPER_NO_COERCION.readValue(q(String.valueOf(value)), Double.class);
         assertTrue(dv.isInfinite());
     }
-    
+
+    @Test
     public void testFloatPrimitiveNonNumeric() throws Exception
     {
         // bit tricky with binary fps but...
         float value = Float.POSITIVE_INFINITY;
         FloatBean result = MAPPER.readValue("{\"v\":\""+value+"\"}", FloatBean.class);
         assertEquals(value, result._v);
-        
+
         // should work with arrays too..
         float[] array = MAPPER.readValue("[ \"Infinity\" ]", float[].class);
         assertNotNull(array);
@@ -82,6 +91,7 @@ public class CoerceNaNStringToNumberTest extends BaseMapTest
         assertEquals(Float.POSITIVE_INFINITY, array[0]);
     }
 
+    @Test
     public void testFloatPriFromNaNCoercionDisabled() throws Exception
     {
         // first, simple case:
@@ -96,6 +106,7 @@ public class CoerceNaNStringToNumberTest extends BaseMapTest
         assertEquals(Float.POSITIVE_INFINITY, array[0]);
     }
 
+    @Test
     public void testFloatWrapperFromNaNCoercionDisabled() throws Exception
     {
         float value = Float.POSITIVE_INFINITY;

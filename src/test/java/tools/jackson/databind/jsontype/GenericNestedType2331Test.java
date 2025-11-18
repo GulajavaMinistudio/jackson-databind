@@ -4,14 +4,18 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import tools.jackson.databind.*;
+import org.junit.jupiter.api.Test;
+
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 // [databind#2331]
-public class GenericNestedType2331Test extends BaseMapTest
+public class GenericNestedType2331Test extends DatabindTestUtil
 {
     static class SuperNode<T> { }
     static class SuperTestClass { }
-    
+
     @SuppressWarnings("serial")
     static class Node<T extends SuperTestClass & Cloneable> extends SuperNode<Node<T>> implements Serializable {
 
@@ -28,9 +32,10 @@ public class GenericNestedType2331Test extends BaseMapTest
         public List<? extends SuperNode<Node<T>>> getChildren() {
             return children;
         }
-    }    
+    }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
+    @Test
     public void testGeneric2331() throws Exception {
         Node root = new Node();
         root.children.add(new Node());

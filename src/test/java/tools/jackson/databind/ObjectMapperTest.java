@@ -1,32 +1,35 @@
 package tools.jackson.databind;
 
-import tools.jackson.core.type.TypeReference;
-
 import java.io.*;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.zip.ZipOutputStream;
+
+import org.junit.jupiter.api.Test;
 
 import tools.jackson.core.*;
 import tools.jackson.core.json.JsonWriteFeature;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.core.util.MinimalPrettyPrinter;
-
 import tools.jackson.databind.cfg.DeserializationContexts;
+import tools.jackson.databind.cfg.SerializationContexts;
 import tools.jackson.databind.deser.DeserializerCache;
 import tools.jackson.databind.introspect.JacksonAnnotationIntrospector;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.node.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+import tools.jackson.databind.testutil.MockDataInput;
 import tools.jackson.databind.type.SimpleType;
 
-public class ObjectMapperTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ObjectMapperTest extends DatabindTestUtil
 {
     static class Bean {
         int value = 3;
-        
+
         public void setX(int v) { value = v; }
 
         protected Bean() { }
@@ -82,11 +85,12 @@ public class ObjectMapperTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testProps()
     {
         // should have default factory
         assertNotNull(MAPPER.getNodeFactory());
-        JsonNodeFactory nf = new JsonNodeFactory(true);
+        JsonNodeFactory nf = new JsonNodeFactory();
         JsonMapper m = JsonMapper.builder()
                 .nodeFactory(nf)
                 .build();
@@ -95,20 +99,32 @@ public class ObjectMapperTest extends BaseMapTest
     }
 
     // Test to ensure that we can check property ordering defaults...
+    @Test
     public void testConfigForPropertySorting() throws Exception
     {
         ObjectMapper m = newJsonMapper();
-        
+
         // sort-alphabetically is disabled by default:
-        assertFalse(m.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
-        assertTrue(m.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
+        assertEquals(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.enabledByDefault(),
+                m.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
+        assertEquals(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST.enabledByDefault(),
+                m.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
+
         SerializationConfig sc = m.serializationConfig();
-        assertFalse(sc.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
-        assertFalse(sc.shouldSortPropertiesAlphabetically());
-        assertTrue(sc.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
+        assertEquals(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.enabledByDefault(),
+                sc.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
+        assertEquals(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.enabledByDefault(),
+                sc.shouldSortPropertiesAlphabetically());
+        assertEquals(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST.enabledByDefault(),
+                sc.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
+
         DeserializationConfig dc = m.deserializationConfig();
-        assertFalse(dc.shouldSortPropertiesAlphabetically());
-        assertTrue(dc.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
+        assertEquals(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.enabledByDefault(),
+                dc.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY));
+        assertEquals(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY.enabledByDefault(),
+                dc.shouldSortPropertiesAlphabetically());
+        assertEquals(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST.enabledByDefault(),
+                dc.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
 
         // but when enabled, should be visible:
         m = jsonMapperBuilder()
@@ -128,7 +144,8 @@ public class ObjectMapperTest extends BaseMapTest
         assertFalse(dc.isEnabled(MapperFeature.SORT_CREATOR_PROPERTIES_FIRST));
     }
 
-    public void testDeserializationContextCache() throws Exception   
+    @Test
+    public void testDeserializationContextCache() throws Exception
     {
         ObjectMapper m = newJsonMapper();
         final String JSON = "{ \"x\" : 3 }";
@@ -158,6 +175,7 @@ public class ObjectMapperTest extends BaseMapTest
     }
 
     // For [databind#689]
+    @Test
     public void testCustomDefaultPrettyPrinter() throws Exception
     {
         final int[] input = new int[] { 1, 2 };
@@ -190,6 +208,7 @@ public class ObjectMapperTest extends BaseMapTest
                 .writeValueAsString(input));
     }
 
+    @Test
     public void testDataOutputViaMapper() throws Exception
     {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -199,37 +218,37 @@ public class ObjectMapperTest extends BaseMapTest
         try (DataOutputStream data = new DataOutputStream(bytes)) {
             MAPPER.writeValue((DataOutput) data, input);
         }
-        assertEquals(exp, bytes.toString("UTF-8"));
+        assertEquals(exp, bytes.toString(StandardCharsets.UTF_8));
 
         // and also via ObjectWriter...
         bytes.reset();
         try (DataOutputStream data = new DataOutputStream(bytes)) {
             MAPPER.writer().writeValue((DataOutput) data, input);
         }
-        assertEquals(exp, bytes.toString("UTF-8"));
+        assertEquals(exp, bytes.toString(StandardCharsets.UTF_8));
     }
 
     @SuppressWarnings("unchecked")
+    @Test
     public void testDataInputViaMapper() throws Exception
     {
-        byte[] src = "{\"a\":1}".getBytes("UTF-8");
-        DataInput input = new DataInputStream(new ByteArrayInputStream(src));
+        DataInput input = new MockDataInput("{\"a\":1, \"b\":[1, 2, 3]}");
         Map<String,Object> map = (Map<String,Object>) MAPPER.readValue(input, Map.class);
         assertEquals(Integer.valueOf(1), map.get("a"));
 
-        input = new DataInputStream(new ByteArrayInputStream(src));
+        input = new MockDataInput("{\"a\":1, \"b\": [1, true]}");
         // and via ObjectReader
         map = MAPPER.readerFor(Map.class)
                 .readValue(input);
         assertEquals(Integer.valueOf(1), map.get("a"));
 
-        input = new DataInputStream(new ByteArrayInputStream(src));
+        input = new MockDataInput("{\"a\":1, \"b\": [\"abc\"]}");
         JsonNode n = MAPPER.readerFor(Map.class)
                 .readTree(input);
         assertNotNull(n);
     }
 
-    @SuppressWarnings("serial")
+    @Test
     public void testRegisterDependentModules() {
 
         final SimpleModule secondModule = new SimpleModule() {
@@ -262,13 +281,13 @@ public class ObjectMapperTest extends BaseMapTest
                 .addModule(mainModule)
                 .build();
 
-        Collection<JacksonModule> mods = objectMapper.getRegisteredModules();
+        Collection<JacksonModule> mods = objectMapper.registeredModules();
         List<Object> ids = mods.stream().map(mod -> mod.getRegistrationId())
-                .collect(Collectors.toList());
+                .toList();
         assertEquals(Arrays.asList("dep1", "dep2", "main"), ids);
     }
 
-    // since 2.12
+    @Test
     public void testHasExplicitTimeZone() throws Exception
     {
         final TimeZone DEFAULT_TZ = TimeZone.getTimeZone("UTC");
@@ -315,88 +334,86 @@ public class ObjectMapperTest extends BaseMapTest
 
     // Tons of test for [databind#2013] (and other similar)
 
+    @Test
     public void test_createParser_InputStream() throws Exception
     {
         InputStream inputStream = new ByteArrayInputStream("\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonParser jsonParser =  MAPPER.createParser(inputStream);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_File() throws Exception
     {
         Path path = Files.createTempFile("", "");
         Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonParser jsonParser = MAPPER.createParser(path.toFile());
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_Path() throws Exception
     {
         Path path = Files.createTempFile("", "");
         Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonParser jsonParser = MAPPER.createParser(path);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
-    public void test_createParser_Url() throws Exception
-    {
-        Path path = Files.createTempFile("", "");
-        Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
-        JsonParser jsonParser = MAPPER.createParser(path.toUri().toURL());
-
-        assertEquals(jsonParser.nextTextValue(), "value");
-    }
-
+    @Test
     public void test_createParser_Reader() throws Exception
     {
         Reader reader = new StringReader("\"value\"");
         JsonParser jsonParser = MAPPER.createParser(reader);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_ByteArray() throws Exception
     {
         byte[] bytes = "\"value\"".getBytes(StandardCharsets.UTF_8);
         JsonParser jsonParser = MAPPER.createParser(bytes);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_String() throws Exception
     {
         String string = "\"value\"";
         JsonParser jsonParser = MAPPER.createParser(string);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_CharArray() throws Exception
     {
         char[] chars = "\"value\"".toCharArray();
         JsonParser jsonParser = MAPPER.createParser(chars);
 
-        assertEquals(jsonParser.nextTextValue(), "value");
+        assertEquals(jsonParser.nextStringValue(), "value");
     }
 
+    @Test
     public void test_createParser_DataInput() throws Exception
     {
-        InputStream inputStream = new ByteArrayInputStream("\"value\"".getBytes(StandardCharsets.UTF_8));
-        DataInput dataInput = new DataInputStream(inputStream);
-        JsonParser jsonParser = MAPPER.createParser(dataInput);
-
-        assertEquals(jsonParser.nextTextValue(), "value");
+        DataInput dataInput = new MockDataInput("\"value\"");
+        try (JsonParser jsonParser = MAPPER.createParser(dataInput)) {
+            assertEquals(jsonParser.nextStringValue(), "value");
+        }
     }
 
+    @Test
     public void test_createParser_failsIfArgumentIsNull() throws Exception
     {
         ObjectMapper objectMapper = MAPPER;
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((InputStream) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((DataInput) null));
-        test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((URL) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((Path) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((File) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((Reader) null));
@@ -407,6 +424,7 @@ public class ObjectMapperTest extends BaseMapTest
         test_method_failsIfArgumentIsNull(() -> objectMapper.createParser((char[]) null, -1, -1));
     }
 
+    @Test
     public void test_createGenerator_OutputStream() throws Exception
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -421,6 +439,7 @@ public class ObjectMapperTest extends BaseMapTest
         outputStream.write(1);
     }
 
+    @Test
     public void test_createGenerator_File() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -432,6 +451,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(new String(Files.readAllBytes(path), StandardCharsets.UTF_8), "\"value\"");
     }
 
+    @Test
     public void test_createGenerator_Path() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -443,6 +463,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(new String(Files.readAllBytes(path), StandardCharsets.UTF_8), "\"value\"");
     }
 
+    @Test
     public void test_createGenerator_Writer() throws Exception
     {
         Writer writer = new StringWriter();
@@ -457,6 +478,7 @@ public class ObjectMapperTest extends BaseMapTest
         writer.append('1');
     }
 
+    @Test
     public void test_createGenerator_DataOutput() throws Exception
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -472,6 +494,7 @@ public class ObjectMapperTest extends BaseMapTest
         dataOutput.write(1);
     }
 
+    @Test
     public void test_createGenerator_failsIfArgumentIsNull() throws Exception
     {
         ObjectMapper objectMapper = MAPPER;
@@ -483,76 +506,73 @@ public class ObjectMapperTest extends BaseMapTest
         test_method_failsIfArgumentIsNull(() -> objectMapper.createGenerator((Writer) null));
     }
 
+    @Test
     public void test_readTree_InputStream() throws Exception
     {
         InputStream inputStream = new ByteArrayInputStream("\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonNode jsonNode =  MAPPER.readTree(inputStream);
 
-        assertEquals(jsonNode.textValue(), "value");
+        assertEquals(jsonNode.stringValue(), "value");
     }
 
+    @Test
     public void test_readTree_File() throws Exception
     {
         Path path = Files.createTempFile("", "");
         Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonNode jsonNode = MAPPER.readTree(path.toFile());
 
-        assertEquals(jsonNode.textValue(), "value");
+        assertEquals(jsonNode.stringValue(), "value");
     }
 
+    @Test
     public void test_readTree_Path() throws Exception
     {
         Path path = Files.createTempFile("", "");
         Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
         JsonNode jsonNode = MAPPER.readTree(path);
 
-        assertEquals(jsonNode.textValue(), "value");
+        assertEquals(jsonNode.stringValue(), "value");
     }
 
-    public void test_readTree_Url() throws Exception
-    {
-        Path path = Files.createTempFile("", "");
-        Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
-        JsonNode jsonNode = MAPPER.readTree(path.toUri().toURL());
-
-        assertEquals(jsonNode.textValue(), "value");
-    }
-
+    @Test
     public void test_readTree_Reader() throws Exception
     {
         Reader reader = new StringReader("\"value\"");
         JsonNode jsonNode = MAPPER.readTree(reader);
 
-        assertEquals(jsonNode.textValue(), "value");
+        assertEquals(jsonNode.stringValue(), "value");
     }
 
+    @Test
     public void test_readTree_ByteArray() throws Exception
     {
         // with offset and length
         byte[] bytes = "\"value\"".getBytes(StandardCharsets.UTF_8);
         JsonNode jsonNode1 = MAPPER.readTree(bytes);
 
-        assertEquals(jsonNode1.textValue(), "value");
+        assertEquals(jsonNode1.stringValue(), "value");
 
         // without offset and length
         JsonNode jsonNode2 = MAPPER.readTree(bytes, 0, bytes.length);
 
-        assertEquals(jsonNode2.textValue(), "value");
+        assertEquals(jsonNode2.stringValue(), "value");
     }
 
+    @Test
     public void test_readTree_String() throws Exception
     {
         String string = "\"value\"";
         JsonNode jsonNode = MAPPER.readTree(string);
 
-        assertEquals(jsonNode.textValue(), "value");
+        assertEquals(jsonNode.stringValue(), "value");
     }
 
+    @Test
     public void test_readTree_failsIfArgumentIsNull() throws Exception
     {
         ObjectMapper objectMapper = MAPPER;
         test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((InputStream) null));
-        test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((URL) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((Path) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((File) null));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((Reader) null));
@@ -561,6 +581,7 @@ public class ObjectMapperTest extends BaseMapTest
         test_method_failsIfArgumentIsNull(() -> objectMapper.readTree((byte[]) null, -1, -1));
     }
 
+    @Test
     public void test_readValue_InputStream() throws Exception
     {
         InputStream inputStream = new ByteArrayInputStream("\"value\"".getBytes(StandardCharsets.UTF_8));
@@ -576,6 +597,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result3, "value");
     }
 
+    @Test
     public void test_readValue_File() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -588,6 +610,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result3, "value");
     }
 
+    @Test
     public void test_readValue_Path() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -600,18 +623,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result3, "value");
     }
 
-    public void test_readValue_Url() throws Exception
-    {
-        Path path = Files.createTempFile("", "");
-        Files.write(path, "\"value\"".getBytes(StandardCharsets.UTF_8));
-        String result1 = MAPPER.readValue(path.toUri().toURL(), String.class);
-        assertEquals(result1, "value");
-        String result2 = MAPPER.readValue(path.toUri().toURL(), SimpleType.constructUnsafe(String.class));
-        assertEquals(result2, "value");
-        String result3 = MAPPER.readValue(path.toUri().toURL(), new TypeReference<String>() {});
-        assertEquals(result3, "value");
-    }
-
+    @Test
     public void test_readValue_Reader() throws Exception
     {
         Reader reader1 = new StringReader("\"value\"");
@@ -627,6 +639,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result3, "value");
     }
 
+    @Test
     public void test_readValue_ByteArray() throws Exception
     {
         byte[] bytes = "\"value\"".getBytes(StandardCharsets.UTF_8);
@@ -644,6 +657,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result6, "value");
     }
 
+    @Test
     public void test_readValue_String() throws Exception
     {
         String string = "\"value\"";
@@ -655,24 +669,24 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(result3, "value");
     }
 
+    @Test
     public void test_readValue_DataInput() throws Exception
     {
-        InputStream inputStream = new ByteArrayInputStream("\"value\"".getBytes(StandardCharsets.UTF_8));
-        DataInput dataInput1 = new DataInputStream(inputStream);
+        byte[] inputBytes = utf8Bytes("\"value\"");
+        DataInput dataInput1 = new MockDataInput(inputBytes);
         String result1 = MAPPER.readValue(dataInput1, String.class);
         assertEquals(result1, "value");
 
-        inputStream.reset();
-        DataInput dataInput2 = new DataInputStream(inputStream);
+        DataInput dataInput2 = new MockDataInput(inputBytes);
         String result2 = MAPPER.readValue(dataInput2, SimpleType.constructUnsafe(String.class));
         assertEquals(result2, "value");
 
-        inputStream.reset();
-        DataInput dataInput3 = new DataInputStream(inputStream);
+        DataInput dataInput3 = new MockDataInput(inputBytes);
         String result3 = MAPPER.readValue(dataInput3, new TypeReference<String>() {});
         assertEquals(result3, "value");
     }
 
+    @Test
     public void test_readValue_JsonParser() throws Exception
     {
         String string = "\"value\"";
@@ -691,6 +705,7 @@ public class ObjectMapperTest extends BaseMapTest
     }
 
     @SuppressWarnings("rawtypes")
+    @Test
     public void test_readValue_failsIfArgumentIsNull() throws Exception
     {
         final ObjectMapper objectMapper = MAPPER;
@@ -700,9 +715,6 @@ public class ObjectMapperTest extends BaseMapTest
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((DataInput) null, Map.class));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((DataInput) null, SimpleType.constructUnsafe(Map.class)));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((DataInput) null, new TypeReference<Map>() {}));
-        test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((URL) null, Map.class));
-        test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((URL) null, SimpleType.constructUnsafe(Map.class)));
-        test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((URL) null, new TypeReference<Map>() {}));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((Path) null, Map.class));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((Path) null, SimpleType.constructUnsafe(Map.class)));
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((Path) null, new TypeReference<Map>() {}));
@@ -726,6 +738,7 @@ public class ObjectMapperTest extends BaseMapTest
         test_method_failsIfArgumentIsNull(() -> objectMapper.readValue((byte[]) null, -1, -1, new TypeReference<Map>() {}));
     }
 
+    @Test
     public void test_writeValue_OutputStream() throws Exception
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -737,6 +750,7 @@ public class ObjectMapperTest extends BaseMapTest
         outputStream.write(1);
     }
 
+    @Test
     public void test_writeValue_File() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -745,6 +759,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(new String(Files.readAllBytes(path), StandardCharsets.UTF_8), "\"value\"");
     }
 
+    @Test
     public void test_writeValue_Path() throws Exception
     {
         Path path = Files.createTempFile("", "");
@@ -753,6 +768,7 @@ public class ObjectMapperTest extends BaseMapTest
         assertEquals(new String(Files.readAllBytes(path), StandardCharsets.UTF_8), "\"value\"");
     }
 
+    @Test
     public void test_writeValue_Writer() throws Exception
     {
         Writer writer = new StringWriter();
@@ -764,6 +780,7 @@ public class ObjectMapperTest extends BaseMapTest
         writer.append('1');
     }
 
+    @Test
     public void test_writeValue_DataOutput() throws Exception
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -776,6 +793,7 @@ public class ObjectMapperTest extends BaseMapTest
         dataOutput.write(1);
     }
 
+    @Test
     public void test_writeValue_JsonGenerator() throws Exception
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -788,6 +806,7 @@ public class ObjectMapperTest extends BaseMapTest
         outputStream.write(1);
     }
 
+    @Test
     public void test_writeValue_failsIfArgumentIsNull() throws Exception
     {
         ObjectMapper objectMapper = MAPPER;
@@ -803,6 +822,7 @@ public class ObjectMapperTest extends BaseMapTest
      * Verifies that {@link ObjectMapper} can read from and write to {@link Path}s
      * whose {@link Path#getFileSystem()} is not the {@linkplain FileSystems#getDefault() default file system}.
      */
+    @Test
     public void test_readValue_writeValue_Path_nonDefaultFileSystem() throws IOException {
         Path zipFile = Files.createTempFile("", ".zip");
         // write an empty zip archive to the temp file
@@ -825,7 +845,7 @@ public class ObjectMapperTest extends BaseMapTest
         }
     }
 
-    private static void test_method_failsIfArgumentIsNull(Runnable runnable) throws Exception
+    private void test_method_failsIfArgumentIsNull(Runnable runnable) throws Exception
     {
         try {
             runnable.run();
@@ -834,5 +854,40 @@ public class ObjectMapperTest extends BaseMapTest
             verifyException(expected, "Argument \"");
             verifyException(expected, "\" is null");
         }
+    }
+
+    @Test
+    public void testClearCaches() throws Exception
+    {
+        ObjectMapper m = newJsonMapper();
+
+        // At first, ser/deser caches should be empty
+        assertEquals(0, ((DeserializationContexts.DefaultImpl) m._deserializationContexts)
+                .cacheForTests().cachedDeserializersCount());
+        assertEquals(0, m._rootDeserializers.size());
+        assertEquals(0, ((SerializationContexts.DefaultImpl) m._serializationContexts)
+                .cacheForTests().size());
+
+        // Serialize and deserialize to fill caches
+        final String JSON = "{ \"x\" : 3 }";
+        Bean bean = m.readValue(JSON, Bean.class);
+        assertNotNull(bean);
+        m.writeValueAsString("test");
+        // Caches should not be empty any longer
+        assertNotEquals(0, m._rootDeserializers.size());
+        assertNotEquals(0, ((DeserializationContexts.DefaultImpl) m._deserializationContexts)
+                .cacheForTests().cachedDeserializersCount());
+        assertNotEquals(0, ((SerializationContexts.DefaultImpl)m._serializationContexts)
+                .cacheForTests().size());
+
+        // Clear caches
+        m.clearCaches();
+
+        // Caches should be empty
+        assertEquals(0, ((DeserializationContexts.DefaultImpl) m._deserializationContexts)
+                .cacheForTests().cachedDeserializersCount());
+        assertEquals(0, m._rootDeserializers.size());
+        assertEquals(0, ((SerializationContexts.DefaultImpl) m._serializationContexts)
+                .cacheForTests().size());
     }
 }

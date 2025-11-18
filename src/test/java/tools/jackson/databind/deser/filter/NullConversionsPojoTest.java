@@ -1,5 +1,9 @@
 package tools.jackson.databind.deser.filter;
 
+import java.util.Collection;
+
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
@@ -8,8 +12,12 @@ import com.fasterxml.jackson.annotation.Nulls;
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidNullException;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 // for [databind#1402]; configurable null handling, for values themselves
-public class NullConversionsPojoTest extends BaseMapTest
+public class NullConversionsPojoTest
 {
     static class NullFail {
         public String nullsOk = "a";
@@ -59,6 +67,21 @@ public class NullConversionsPojoTest extends BaseMapTest
         public String getName() { return n; }
     }
 
+    // [databind#3645]
+    static class Issue3645BeanA {
+        String name;
+        Collection<Integer> prices;
+
+        public Issue3645BeanA(
+            @JsonProperty("name") String name,
+            @JsonProperty("prices")
+            @JsonSetter(nulls = Nulls.AS_EMPTY) Collection<Integer> prices
+        ) {
+            this.name = name;
+            this.prices = prices;
+        }
+    }
+
     /*
     /**********************************************************
     /* Test methods
@@ -67,6 +90,7 @@ public class NullConversionsPojoTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testFailOnNull() throws Exception
     {
         // first, ok if assigning non-null to not-nullable, null for nullable
@@ -102,6 +126,7 @@ public class NullConversionsPojoTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testFailOnNullWithDefaults() throws Exception
     {
         // also: config overrides by type should work
@@ -121,6 +146,7 @@ public class NullConversionsPojoTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNullsToEmptyScalar() throws Exception
     {
         NullAsEmpty result = MAPPER.readValue(a2q("{'nullAsEmpty':'foo', 'nullsOk':null}"),
@@ -146,6 +172,7 @@ public class NullConversionsPojoTest extends BaseMapTest
         assertEquals("", named.getName());
     }
 
+    @Test
     public void testNullsToEmptyViaCtor() throws Exception
     {
         NullAsEmptyCtor result = MAPPER.readValue(a2q("{'nullAsEmpty':'foo', 'nullsOk':null}"),
@@ -161,5 +188,27 @@ public class NullConversionsPojoTest extends BaseMapTest
         // and get coerced from "missing", as well
         result = MAPPER.readValue(a2q("{}"), NullAsEmptyCtor.class);
         assertEquals("", result._nullAsEmpty);
+    }
+
+    // [databind#3645]
+    @Test
+    public void testDeserializeMissingCollectionFieldAsEmpty() throws Exception {
+        String json = "{\"name\": \"Computer\"}";
+
+        Issue3645BeanA actual = MAPPER.readValue(json, Issue3645BeanA.class);
+
+        assertEquals(actual.name, "Computer");
+        assertTrue(actual.prices.isEmpty());
+    }
+
+    // [databind#3645]
+    @Test
+    public void testDeserializeNullAsEmpty() throws Exception {
+        String json = "{\"name\": \"Computer\", \"prices\" : null}";
+
+        Issue3645BeanA actual = MAPPER.readValue(json, Issue3645BeanA.class);
+
+        assertEquals(actual.name, "Computer");
+        assertTrue(actual.prices.isEmpty());
     }
 }

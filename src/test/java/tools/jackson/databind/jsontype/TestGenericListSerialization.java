@@ -3,16 +3,20 @@ package tools.jackson.databind.jsontype;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
-import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TestGenericListSerialization
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
-    // [JACKSON-356]
     public static class JSONResponse<T> {
 
         private T result;
@@ -24,7 +28,7 @@ public class TestGenericListSerialization
         public void setResult(T result) {
             this.result = result;
         }
-    } 
+    }
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY, property="@class")
     public static class Parent {
@@ -45,6 +49,7 @@ public class TestGenericListSerialization
     /**********************************************************
      */
 
+    @Test
     public void testSubTypesFor356() throws Exception
     {
         JSONResponse<List<Parent>> input = new JSONResponse<List<Parent>>();
@@ -58,9 +63,9 @@ public class TestGenericListSerialization
                 .configure(MapperFeature.USE_STATIC_TYPING, true)
                 .build();
 
-        JavaType rootType = TypeFactory.defaultInstance().constructType(new TypeReference<JSONResponse<List<Parent>>>() { });
+        JavaType rootType = defaultTypeFactory().constructType(new TypeReference<JSONResponse<List<Parent>>>() { });
         byte[] json = mapper.writerFor(rootType).writeValueAsBytes(input);
-        
+
         JSONResponse<List<Parent>> out = mapper.readValue(json, 0, json.length, rootType);
 
         List<Parent> deserializedContent = out.getResult();
@@ -77,5 +82,5 @@ public class TestGenericListSerialization
         assertEquals("CHILD1", ((Child1) deserializedContent.get(0)).childContent1);
         assertEquals("CHILD2", ((Child2) deserializedContent.get(1)).childContent2);
     }
-    
+
 }

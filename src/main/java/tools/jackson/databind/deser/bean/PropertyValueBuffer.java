@@ -2,19 +2,24 @@ package tools.jackson.databind.deser.bean;
 
 import java.util.BitSet;
 
+import com.fasterxml.jackson.annotation.JacksonInject;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.deser.CreatorProperty;
 import tools.jackson.databind.deser.ReadableObjectId;
 import tools.jackson.databind.deser.SettableAnyProperty;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.introspect.AnnotatedMember;
+import tools.jackson.databind.util.TokenBuffer;
 
 /**
  * Simple container used for temporarily buffering a set of
  * <code>PropertyValue</code>s.
- * Using during construction of beans (and Maps) that use Creators, 
+ * Using during construction of beans (and Maps) that use Creators,
  * and hence need buffering before instance (that will have properties
  * to assign values to) is constructed.
  */
@@ -30,7 +35,7 @@ public class PropertyValueBuffer
     protected final DeserializationContext _context;
 
     protected final ObjectIdReader _objectIdReader;
-    
+
     /*
     /**********************************************************************
     /* Accumulated properties, other stuff
@@ -42,7 +47,7 @@ public class PropertyValueBuffer
      * instance.
      */
     protected final Object[] _creatorParameters;
-    
+
     /**
      * Number of creator parameters for which we have not yet received
      * values.
@@ -66,7 +71,7 @@ public class PropertyValueBuffer
     /**
      * If we get non-creator parameters before or between
      * creator parameters, those need to be buffered. Buffer
-     * is just a simple linked list
+     * is just a simple linked list.
      */
     protected PropertyValue _buffered;
 
@@ -76,14 +81,41 @@ public class PropertyValueBuffer
      */
     protected Object _idValue;
 
+    /**
+     * "Any setter" property bound to a Creator parameter (via {@code @JsonAnySetter}).
+     *
+     * @since 2.18
+     */
+    protected final SettableAnyProperty _anyParamSetter;
+
+    /**
+     * If "Any-setter-via-Creator" exists, we will need to buffer values to feed it,
+     * separate from regular, non-creator properties (see {@code _buffered}).
+     *
+     * @since 2.18
+     */
+    protected PropertyValue _anyParamBuffered;
+
+    /**
+     * Indexes properties that are injectable, if any; {@code null} if none,
+     * cleared as they are injected.
+     *
+     * @since 2.21
+     */
+    protected final BitSet _injectablePropIndexes;
+
     /*
     /**********************************************************************
     /* Life-cycle
     /**********************************************************************
      */
-    
+
+    /**
+     * @since 3.1
+     */
     public PropertyValueBuffer(JsonParser p, DeserializationContext ctxt, int paramCount,
-            ObjectIdReader oir)
+            ObjectIdReader oir, SettableAnyProperty anyParamSetter,
+            BitSet injectablePropIndexes)
     {
         _parser = p;
         _context = ctxt;
@@ -95,6 +127,14 @@ public class PropertyValueBuffer
         } else {
             _paramsSeenBig = new BitSet();
         }
+        // Only care about Creator-bound Any setters:
+        if ((anyParamSetter == null) || (anyParamSetter.getParameterIndex() < 0)) {
+            _anyParamSetter = null;
+        } else {
+            _anyParamSetter = anyParamSetter;
+        }
+        _injectablePropIndexes = (injectablePropIndexes == null)
+                ? null : (BitSet) injectablePropIndexes.clone();
     }
 
     /**
@@ -103,28 +143,47 @@ public class PropertyValueBuffer
      */
     public final boolean hasParameter(SettableBeanProperty prop)
     {
+        final int ix = prop.getCreatorIndex();
+
         if (_paramsSeenBig == null) {
-            return ((_paramsSeen >> prop.getCreatorIndex()) & 1) == 1;
+            if (((_paramsSeen >> ix) & 1) == 1) {
+                return true;
+            }
+        } else {
+            if (_paramsSeenBig.get(ix)) {
+                return true;
+            }
         }
-        return _paramsSeenBig.get(prop.getCreatorIndex());
+        // 28-Sep-2024 : [databind#4508] Support any-setter flowing through creator
+        if (_anyParamSetter != null) {
+            if (ix == _anyParamSetter.getParameterIndex()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * A variation of {@link #getParameters(SettableBeanProperty[])} that
+     * A variation of {@link #getParameters} that
      * accepts a single property.  Whereas the plural form eagerly fetches and
      * validates all properties, this method may be used (along with
      * {@link #hasParameter(SettableBeanProperty)}) to let applications only
      * fetch the properties defined in the JSON source itself, and to have some
      * other customized behavior for missing properties.
      */
-    public Object getParameter(SettableBeanProperty prop)
-        throws DatabindException
+    public Object getParameter(DeserializationContext ctxt, SettableBeanProperty prop)
+        throws JacksonException
     {
         Object value;
         if (hasParameter(prop)) {
             value = _creatorParameters[prop.getCreatorIndex()];
         } else {
             value = _creatorParameters[prop.getCreatorIndex()] = _findMissing(prop);
+        }
+        // 28-Sep-2024 : [databind#4508] Support any-setter flowing through creator
+        if ((value == null) && (_anyParamSetter != null )
+                && (prop.getCreatorIndex() == _anyParamSetter.getParameterIndex())) {
+            value = _createAndSetAnySetterValue(ctxt);
         }
         if (value == null && _context.isEnabled(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES)) {
             return _context.reportInputMismatch(prop,
@@ -139,10 +198,10 @@ public class PropertyValueBuffer
      * and verification of values for required properties,
      * after either {@link #assignParameter(SettableBeanProperty, Object)}
      * returns <code>true</code> (to indicate all creator properties are found), or when
-     * then whole JSON Object has been processed,
+     * the whole JSON Object has been processed,
      */
-    public Object[] getParameters(SettableBeanProperty[] props)
-        throws DatabindException
+    public Object[] getParameters(DeserializationContext ctxt, SettableBeanProperty[] props)
+        throws JacksonException
     {
         // quick check to see if anything else is needed
         if (_paramsNeeded > 0) {
@@ -162,9 +221,23 @@ public class PropertyValueBuffer
                 }
             }
         }
+        // [databind#562] since 2.18 : Respect @JsonAnySetter in @JsonCreator
+        if (_anyParamSetter != null) {
+            _creatorParameters[_anyParamSetter.getParameterIndex()] = _createAndSetAnySetterValue(ctxt);
+        }
+
+        // [databind#1381] handle inject-only (useInput = false) properties
+        if (_injectablePropIndexes != null) {
+            int ix = _injectablePropIndexes.nextSetBit(0);
+            while (ix >= 0) {
+                _inject(props[ix]);
+                ix = _injectablePropIndexes.nextSetBit(ix + 1);
+            }
+        }
 
         if (_context.isEnabled(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES)) {
-            for (int ix = 0; ix < props.length; ++ix) {
+            final int len = _creatorParameters.length;
+            for (int ix = 0; ix < len; ++ix) {
                 if (_creatorParameters[ix] == null) {
                     SettableBeanProperty prop = props[ix];
                     _context.reportInputMismatch(prop,
@@ -173,16 +246,42 @@ public class PropertyValueBuffer
                 }
             }
         }
+
         return _creatorParameters;
     }
 
-    protected Object _findMissing(SettableBeanProperty prop)
+    /**
+     * Helper method called to create and set any values buffered for "any setter"
+     */
+    private Object _createAndSetAnySetterValue(DeserializationContext ctxt) throws JacksonException
     {
+        Object anySetterParameterObject = _anyParamSetter.createParameterObject();
+        for (PropertyValue pv = _anyParamBuffered; pv != null; pv = pv.next) {
+            pv.setValue(ctxt, anySetterParameterObject);
+        }
+        return anySetterParameterObject;
+    }
+
+    protected Object _findMissing(SettableBeanProperty prop) throws JacksonException
+    {
+        // 08-Jun-2024: [databind#562] AnySetters are bit special
+        if (_anyParamSetter != null) {
+            if (prop.getCreatorIndex() == _anyParamSetter.getParameterIndex()) {
+                // Ok if anything buffered
+                if (_anyParamBuffered != null) {
+                    // ... will be assigned by caller later on, for now return null
+                    return null;
+                }
+            }
+        }
+
         // First: do we have injectable value?
-        Object injectableValueId = prop.getInjectableValueId();
-        if (injectableValueId != null) {
+        final JacksonInject.Value injection = prop.getInjectionDefinition();
+        if (injection != null) {
+            // 10-Nov-2025: [databind#1381] Is this needed?
+            _injectablePropIndexes.clear(prop.getCreatorIndex());
             return _context.findInjectableValue(prop.getInjectableValueId(),
-                    prop, null);
+                    prop, null, injection.getOptional(), injection.getUseInput());
         }
         // Second: required?
         if (prop.isRequired()) {
@@ -205,13 +304,37 @@ public class PropertyValueBuffer
             // Fourth: default value
             ValueDeserializer<Object> deser = prop.getValueDeserializer();
             return deser.getAbsentValue(_context);
-        } catch (DatabindException e) {
+        } catch (JacksonException e) {
             // [databind#2101]: Include property name, if we have it
             AnnotatedMember member = prop.getMember();
             if (member != null) {
                 e.prependPath(member.getDeclaringClass(), prop.getName());
             }
             throw e;
+        }
+    }
+
+    /**
+     * Method called to inject value for given property, possibly overriding
+     * assigned (from input) value.
+     *
+     * @since 2.21
+     */
+    private void _inject(final SettableBeanProperty prop) throws JacksonException {
+        final JacksonInject.Value injection = prop.getInjectionDefinition();
+
+        if (injection != null) {
+            final Boolean useInput = injection.getUseInput();
+
+            if (!Boolean.TRUE.equals(useInput)) {
+                final Object value = _context.findInjectableValue(injection.getId(),
+                        prop, prop.getMember(), injection.getOptional(), useInput);
+
+                if (value != null) {
+                    int ix = prop.getCreatorIndex();
+                    _creatorParameters[ix] = value;
+                }
+            }
         }
     }
 
@@ -242,11 +365,15 @@ public class PropertyValueBuffer
         if (_objectIdReader != null) {
             if (_idValue != null) {
                 ReadableObjectId roid = ctxt.findObjectId(_idValue, _objectIdReader.generator, _objectIdReader.resolver);
-                roid.bindItem(bean);
+                roid.bindItem(ctxt, bean);
                 // also: may need to set a property value as well
                 SettableBeanProperty idProp = _objectIdReader.idProperty;
                 if (idProp != null) {
-                    return idProp.setAndReturn(bean, _idValue);
+                    // [databind#5328] Records/Creators do not have setters, skip
+                    if (idProp instanceof CreatorProperty) {
+                        return bean;
+                    }
+                    return idProp.setAndReturn(ctxt, bean, _idValue);
                 }
             } else {
                 // 07-Jun-2016, tatu: Trying to improve error messaging here...
@@ -255,7 +382,7 @@ public class PropertyValueBuffer
         }
         return bean;
     }
-    
+
     protected PropertyValue buffered() { return _buffered; }
 
     public boolean isComplete() { return _paramsNeeded <= 0; }
@@ -285,6 +412,7 @@ public class PropertyValueBuffer
                 _paramsSeenBig.set(ix);
                 if (--_paramsNeeded <= 0) {
                     // 29-Nov-2016, tatu: But! May still require Object Id value
+                    return (_objectIdReader == null) || (_idValue != null);
                 }
             }
         }
@@ -294,12 +422,20 @@ public class PropertyValueBuffer
     public void bufferProperty(SettableBeanProperty prop, Object value) {
         _buffered = new PropertyValue.Regular(_buffered, value, prop);
     }
-    
+
     public void bufferAnyProperty(SettableAnyProperty prop, String propName, Object value) {
         _buffered = new PropertyValue.Any(_buffered, value, prop, propName);
     }
 
     public void bufferMapProperty(Object key, Object value) {
         _buffered = new PropertyValue.Map(_buffered, value, key);
+    }
+
+    public void bufferAnyParameterProperty(SettableAnyProperty prop, String propName, Object value) {
+        _anyParamBuffered = new PropertyValue.AnyParameter(_anyParamBuffered, value, prop, propName);
+    }
+
+    public void bufferMergingProperty(SettableBeanProperty prop, TokenBuffer buffered) {
+        _buffered = new PropertyValue.Merging(_buffered, buffered, prop);
     }
 }

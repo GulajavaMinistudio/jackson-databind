@@ -7,6 +7,7 @@ import java.util.TimeZone;
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.cfg.DatatypeFeature;
+import tools.jackson.databind.cfg.DatatypeFeatures;
 import tools.jackson.databind.cfg.HandlerInstantiator;
 import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.Annotated;
@@ -21,7 +22,7 @@ import tools.jackson.databind.util.Converter;
 
 /**
  * Shared base class for {@link DeserializationContext} and
- * {@link SerializerProvider}, context objects passed through data-binding
+ * {@link SerializationContext}, context objects passed through data-binding
  * process. Designed so that some of implementations can rely on shared
  * aspects like access to secondary contextual objects like type factories
  * or handler instantiators.
@@ -84,6 +85,11 @@ public abstract class DatabindContext
     public abstract boolean isEnabled(DatatypeFeature feature);
 
     /**
+     * @since 2.15
+     */
+    public abstract DatatypeFeatures getDatatypeFeatures();
+
+    /**
      * Convenience method for accessing serialization view in use (if any); equivalent to:
      *<pre>
      *   getConfig().canOverrideAccessModifiers();
@@ -114,7 +120,7 @@ public abstract class DatabindContext
      * Per-call attributes have highest precedence; attributes set
      * via {@link ObjectReader} or {@link ObjectWriter} have lower
      * precedence.
-     * 
+     *
      * @param key Key of the attribute to get
      * @return Value of the attribute, if any; null otherwise
      */
@@ -124,10 +130,10 @@ public abstract class DatabindContext
      * Method for setting per-call value of given attribute.
      * This will override any previously defined value for the
      * attribute within this context.
-     * 
+     *
      * @param key Key of the attribute to set
      * @param value Value to set attribute to
-     * 
+     *
      * @return This context object, to allow chaining
      */
     public abstract DatabindContext setAttribute(Object key, Object value);
@@ -301,10 +307,32 @@ public abstract class DatabindContext
      */
 
     /**
-     * Convenience method for doing full "for serialization" introspection of specified
-     * type; results may be cached during lifespan of this context as well.
+     * Convenience method for doing full "for serialization or deserialization"
+     * introspection of specified type; results may be cached for duration  (lifespan)
+     * of this context as well.
      */
-    public abstract BeanDescription introspectBeanDescription(JavaType type);
+    public final BeanDescription introspectBeanDescription(JavaType type) {
+        return introspectBeanDescription(type, introspectClassAnnotations(type));
+    }
+
+    public abstract BeanDescription introspectBeanDescription(JavaType type,
+           AnnotatedClass classDef);
+
+    public BeanDescription.Supplier lazyIntrospectBeanDescription(JavaType type) {
+         return new BeanDescription.LazySupplier(getConfig(), type) {
+             @Override
+             protected BeanDescription _construct(JavaType forType, AnnotatedClass ac) {
+// System.out.println("lazyIntrospectBeanDescription.beanDesc("+forType+")");
+                 return introspectBeanDescription(forType);
+             }
+
+             @Override
+             protected AnnotatedClass _introspect(JavaType forType) {
+// System.out.println("lazyIntrospectBeanDescription.annotatedClass("+forType+")");
+                 return introspectClassAnnotations(forType);
+             }
+         };
+    }
 
     public AnnotatedClass introspectClassAnnotations(JavaType type) {
         return classIntrospector().introspectClassAnnotations(type);
@@ -418,6 +446,16 @@ public abstract class DatabindContext
         throws DatabindException
     {
         return reportBadDefinition(constructType(type), msg);
+    }
+
+    public abstract <T> T reportBadTypeDefinition(BeanDescription bean,
+            String msg, Object... msgArgs)
+        throws DatabindException;
+
+    public <T> T reportBadTypeDefinition(BeanDescription.Supplier beanDescRef,
+            String msg, Object... msgArgs)
+        throws DatabindException {
+        return reportBadTypeDefinition(beanDescRef.get(), msg, msgArgs);
     }
 
     /*

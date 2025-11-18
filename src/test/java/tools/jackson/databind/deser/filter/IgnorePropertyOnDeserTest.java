@@ -2,19 +2,26 @@ package tools.jackson.databind.deser.filter;
 
 import java.io.IOException;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
-import tools.jackson.databind.BaseMapTest;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
-public class IgnorePropertyOnDeserTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class IgnorePropertyOnDeserTest
 {
     // [databind#426]
     @JsonIgnoreProperties({ "userId" })
     static class User {
         public String firstName;
-        Integer userId; 
+        Integer userId;
 
         public Integer getUserId() {
             return userId;
@@ -90,6 +97,7 @@ public class IgnorePropertyOnDeserTest extends BaseMapTest
     private final ObjectMapper MAPPER = newJsonMapper();
 
     // [databind#426]
+    @Test
     public void testIssue426() throws Exception
     {
         final String JSON = a2q("{'userId': 9, 'firstName': 'Mike' }");
@@ -100,6 +108,7 @@ public class IgnorePropertyOnDeserTest extends BaseMapTest
     }
 
     // [databind#1217]
+    @Test
     public void testIgnoreOnProperty1217() throws Exception
     {
         TestIgnoreObject result = MAPPER.readValue(
@@ -116,11 +125,13 @@ public class IgnorePropertyOnDeserTest extends BaseMapTest
                   TestIgnoreObject.class);
         assertEquals(1, result1.obj.x);
         assertEquals(30, result1.obj.y);
-       
+
         assertEquals(20, result1.obj2.x);
         assertEquals(2, result1.obj2.y);
     }
 
+    // [databind#1217]
+    @Test
     public void testIgnoreViaConfigOverride1217() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -133,25 +144,52 @@ public class IgnorePropertyOnDeserTest extends BaseMapTest
         assertEquals(0, p.y);
     }
 
+    // [databind#3721]
+    @Test
+    public void testIgnoreUnknownViaConfigOverride() throws Exception
+    {
+        final String DOC = a2q("{'x':2,'foobar':3}");
+
+        // First, fail without overrides
+        try {
+            MAPPER.readerFor(Point.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .readValue(DOC);
+            fail("Should not pass");
+        } catch (UnrecognizedPropertyException e) {
+            verifyException(e, "foobar"); // message varies between 2.x and 3.x
+        }
+
+        // But pass with specific class override:
+        ObjectMapper mapper = jsonMapperBuilder()
+            .withConfigOverride(Point.class,
+                cfg -> cfg.setIgnorals(JsonIgnoreProperties.Value.forIgnoreUnknown(true)))
+            .build();
+        Point p = mapper.readValue(DOC, Point.class);
+        assertEquals(2, p.x);
+
+        // 13-Jan-2023, tatu: Alas, no global defaulting yet!
+    }
+
     // [databind#1595]
+    @Test
     public void testIgnoreGetterNotSetter1595() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
         Simple1595 config = new Simple1595();
         config.setId(123);
         config.setName("jack");
-        String json = mapper.writeValueAsString(config);
+        String json = MAPPER.writeValueAsString(config);
         assertEquals(a2q("{'id':123}"), json);
-        Simple1595 des = mapper.readValue(a2q("{'id':123,'name':'jack'}"), Simple1595.class);
+        Simple1595 des = MAPPER.readValue(a2q("{'id':123,'name':'jack'}"), Simple1595.class);
         assertEquals("jack", des.getName());
     }
 
     // [databind#2627]
+    @Test
     public void testIgnoreUnknownOnField() throws IOException
     {
-        ObjectMapper objectMapper = new ObjectMapper();
         String json = "{\"value\": {\"name\": \"my_name\", \"extra\": \"val\"}, \"type\":\"Json\"}";
-        MyPojoValue value = objectMapper.readValue(json, MyPojoValue.class);
+        MyPojoValue value = MAPPER.readValue(json, MyPojoValue.class);
         assertNotNull(value);
         assertNotNull(value.getValue());
         assertEquals("my_name", value.getValue().name);

@@ -4,7 +4,16 @@ databind core component, version 2.x
 
 (note: for older credits, check out release notes for 1.x versions)
 
-Tatu Saloranta, tatu.saloranta@iki.fi: author
+Author: Tatu Saloranta, tatu.saloranta@iki.fi
+
+Co-Authors (with only partial listings below):
+
+* Joo Hyuk Kim (@JooHyukKim)
+* PJ Fanning (@pjfanning)
+* Sim Yih Tsern (@yihtsern)
+* wrongwrong (@k163377)
+
+----------------------------------------------------------------------------
 
 Pascal Glinas:
   * Contributed fixes to 'MappingIterator' handling (Pull#58 and Pull#59)
@@ -143,6 +152,8 @@ Chris Cleveland:
 Benson Margulies:
   * Reported #467: Unwanted POJO's embedded in tree via serialization to tree
    (2.4.0)
+  * Reported #562: Allow `@JsonAnySetter` to flow through Creators
+   (2.18.0)
   * Reported #601: ClassCastException for a custom serializer for enum key in `EnumMap`
    (2.4.4)
   * Contributed 944: Failure to use custom deserializer for key deserializer
@@ -311,6 +322,9 @@ Michal Letynski (mletynski@github)
 Jeff Schnitzer (stickfigure@github)
   * Suggested #504: Add `DeserializationFeature.USE_LONG_FOR_INTS`
    (2.6.0)
+  * Requested #4533: Add `MapperFeature.REQUIRE_HANDLERS_FOR_JAVA8_TIMES` to disable
+    the "Java 8 date/time XYZ not supported by default" error
+   (2.19.0)
 
 Jerry Yang (islanderman@github)
   * Contributed #820: Add new method for `ObjectReader`, to bind from JSON Pointer position
@@ -415,6 +429,8 @@ Jonas Konrad (yawkat@github)
   * Contributed fix for #3655: `ObjectMapper` default heap consumption increased significantly
     from 2.13.x to 2.14.0
    (2.14.1)
+  * Contributed fix for #4848: Avoid type pollution in `StringCollectionDeserializer`
+   (2.18.3)
 
 Jirka Kremser (Jiri-Kremser@github)
   * Suggested #924: SequenceWriter.writeAll() could accept Iterable
@@ -811,6 +827,9 @@ Freddy Boucher (freddyboucher@github)
 Ondrej Zizka (OndraZizk@github)
   * Reported #1999: "Duplicate property" issue should mention which class it complains about
    (2.9.6)
+  * Repoted #4145: NPE when transforming a tree to a model class object,
+    at `ArrayNode.elements()`
+   (2.16.0)
 
 Jakub Skierbiszewski (jskierbi@github)
   * Reported, contributed fix for #2001: Deserialization issue with `@JsonIgnore` and
@@ -833,6 +852,11 @@ Carter Kozak (carterkozak@github)
   * Contributed #3624: Legacy `ALLOW_COERCION_OF_SCALARS` interacts poorly with Integer to
    Float coercion
    (2.14.0)
+  * Contributed #3876: `TypeFactory` cache performance degradation with
+    `constructSpecializedType()`
+   (2.15.0)
+  * Contributed #4688: Should allow deserializing with no-arg `@JsonCreator(mode = DELEGATING)`
+   (2.18.0)
 
 Reinhard Prechtl (dnno@github)
   * Reported #2034: Serialization problem with type specialization of nested generic types
@@ -1027,18 +1051,26 @@ Andrey Kulikov (ankulikov@github)
    (2.10.1)
 
 João Guerra (joca-bt@github)
-  * Reported #2473: Array index missing in path of `JsonMappingException` for `Collection<String>`,
+ * Reported #2473: Array index missing in path of `JsonMappingException` for `Collection<String>`,
     with custom deserializer
   (2.10.1)
-  * Reported #2567: Incorrect target type for arrays when providing nulls and nulls are disabled
+ * Reported #2567: Incorrect target type for arrays when providing nulls and nulls are disabled
   (2.10.2)
-  * Reported #2635: JsonParser cannot getText() for input stream on MismatchedInputException
+ * Reported #2635: JsonParser cannot getText() for input stream on MismatchedInputException
   (2.11.0)
-  * Reported #2770: JsonParser from MismatchedInputException cannot getText() for
+ * Reported #2770: JsonParser from MismatchedInputException cannot getText() for
     floating-point value
   (2.11.1)
-  * Reported #3227: Content `null` handling not working for root values
+ * Reported #3227: Content `null` handling not working for root values
   (2.13.0)
+ * Reported #3241: `constructorDetector` seems to invalidate `defaultSetterInfo`
+   for nullability
+  (2.18.0)
+* Reported #3690: Incorrect target type for arrays when disabling coercion
+  (2.15.0)
+ * Reported #3924: Incorrect target type when disabling coercion, trying to deserialize
+    String from Array/Object
+  (2.16.0)
 
 Ryan Bohn (bohnman@github)
   * Reported #2475: `StringCollectionSerializer` calls `JsonGenerator.setCurrentValue(value)`,
@@ -1087,20 +1119,23 @@ Tobias Preuss (johnjohndoe@github)
   (2.10.3)
 
 Eduard Tudenhöfner (nastra@github)
-  * Reported #2602, contributed fix for: ByteBufferSerializer produces unexpected results with
-    a duplicated ByteBuffer and a position > 0
+ * Reported #2602, contributed fix for: ByteBufferSerializer produces unexpected results with
+   a duplicated ByteBuffer and a position > 0
   (2.10.3)
 
 Alexander Shilov (ashlanderr@github)
-  * Reported, suggested fix for #2610: `EXTERNAL_PROPERTY` doesn't work with `@JsonIgnoreProperties`
+ * Reported, suggested fix for #2610: `EXTERNAL_PROPERTY` doesn't work with `@JsonIgnoreProperties`
   (2.10.3)
 
 Endre Stølsvik (stolsvik@github)
-  * Reported #2679: `ObjectMapper.readValue("123", Void.TYPE)` throws "should never occur"
+ * Reported #2679: `ObjectMapper.readValue("123", Void.TYPE)` throws "should never occur"
   (2.10.4)
+ * Reported #3906: Regression: 2.15.0 breaks deserialization for records when
+   `mapper.setVisibility(PropertyAccessor.ALL, Visibility.NONE)`
+  (2.16.0)
 
 Denis Kostousov (kostousov-ds@github)
-  * Reported #2787 (partial fix): NPE after add mixin for enum
+ * Reported #2787 (partial fix): NPE after add mixin for enum
   (2.10.5)
 
 Máté Rédecsi (rmatesz@github)
@@ -1181,10 +1216,13 @@ Oleg Chtchoukine (oshatrk@github)
     to incorrect output
   (2.11.1)
 
-Joshua Shannon (retrodaredevil@github)
+Lavender Shannon (retrodaredevil@github)
   * Reported, contributed fix for #2785: Polymorphic subtypes not registering on copied
     ObjectMapper (2.11.1)
   (2.11.2)
+  * Requested #3072: Allow specifying `@JacksonInject` does not fail when there's no
+    corresponding value
+  (2.20.0)
 
 Daniel Hrabovcak (TheSpiritXIII@github)
   * Reported #2796: `TypeFactory.constructType()` does not take `TypeBindings` correctly
@@ -1488,6 +1526,9 @@ PJ Fanning (pjfanning@github)
   (2.14.0)
   * Contributed #3530: Change LRUMap to just evict one entry when maxEntries reached
   (2.14.0)
+  * Contributed #3837: Set transformer factory attributes to improve protection against XXE
+  (2.14.3
+  - And NUMEROUS other contributions not listed here! (for 2.15 and above)
 
 Igor Shymko (ancane@github)
   * Contributed #3500: Add optional explicit `JsonSubTypes` repeated names check
@@ -1529,6 +1570,415 @@ Moritz Halbritter (mhalbritter@github)
     from 2.13.x to 2.14.0
   (2.14.1)
 
+Philippe Marschall (marschall@github)
+  * Contributed #3699: Allow custom `JsonNode` implementations
+  (2.14.2)
+
+Gili Tzabari (cowwoc@github)
+  * Reported #3063: `@JsonValue` fails for Java Record
+  (2.14.2)
+
+Yury Molchan (yurkom@github)
+  * Contributed #4121: Preserve the original component type in merging to an array
+  (2.14.4)
+
+Joo Hyuk Kim (JooHyukKim@github)
+  * Contributed #2536: Add `EnumFeature.READ_ENUM_KEYS_USING_INDEX` to work with
+    existing "WRITE_ENUM_KEYS_USING_INDEX"
+   (2.15.0)
+  * Contributed #2667: Add `@EnumNaming`, `EnumNamingStrategy` to allow use of naming
+    strategies for Enums
+   (2.15.0)
+  * Contributed fix for #2968: Deserialization of `@JsonTypeInfo` annotated type fails with
+    missing type id even for explicit concrete subtypes
+   (2.15.0)
+  * Contributed #3053: Allow serializing enums to lowercase (`EnumFeature.WRITE_ENUMS_TO_LOWERCASE`)
+   (2.15.0)
+  * Contributed #3566: Cannot use both `JsonCreator.Mode.DELEGATING` and `JsonCreator.Mode.PROPERTIES`
+    static creator factory methods for Enums
+   (2.15.0)
+  * Contributed #3638: Case-insensitive and number-based enum deserialization are
+    (unnecessarily) mutually exclusive
+   (2.15.0)
+  * Contributed #3814: Enhance `StdNodeBasedDeserializer` to support `readerForUpdating`
+   (2.15.0)
+  * Contributed #3819: Add convenience method `SimpleBeanPropertyFilter.filterOutAll()` as
+    counterpart of `serializeAll()`
+   (2.15.0)
+  - And NUMEROUS other contributions not listed here! (for 2.16 and above)
+
+Vojtěch Knyttl (knyttl@github)
+  * Requested #3053: Allow serializing enums to lowercase (`EnumFeature.WRITE_ENUMS_TO_LOWERCASE`)
+   (2.15.0)
+
+Phil Gref (pgrefviau@github)
+  * Reported #3638: Case-insensitive and number-based enum deserialization are
+   (unnecessarily) mutually exclusive
+  (2.15.0)
+
 Hervé Boutemy (hboutemy@github)
   * Contributed fix for #3680: Timestamp in classes inside jar showing 02/01/1980
   (2.15.0)
+
+Sim Yih Tsern (yihtsern@github)
+ * Contributed fix for #2974: Null coercion with `@JsonSetter` does not work with `java.lang.Record`
+  (2.15.0)
+ * Contributed fix for #2992: Properties naming strategy do not work with Record
+  (2.15.0)
+ * Contributed fix for #3180: Support `@JsonCreator` annotation on record classes
+  (2.15.0)
+ * Contributed fix for #3297: `@JsonDeserialize(converter = ...)` does not work with Records
+  (2.15.0)
+ * Contributed fix for #3342: `JsonTypeInfo.As.EXTERNAL_PROPERTY` does not work with record wrappers
+  (2.15.0)
+ * Contributed fix for #3894: Only avoid Records fields detection for deserialization
+  (2.15.1)
+ * Contributed fix for #3897: 2.15.0 breaks deserialization when POJO/Record only has a
+   single field and is marked `Access.WRITE_ONLY`
+  (2.15.1)
+ * Contributed fix for #3968: Records with additional constructors failed to deserialize
+  (2.15.3)
+ ... and many more (as of 2.18)
+
+Ajay Siwach (Siwach16@github)
+  * Contributed #3637: Add enum features into `@JsonFormat.Feature`
+   (2.15.0)
+
+Zhenyu Luo (luozhenyu@github)
+  * Contributed #3745: Deprecate classes in package `com.fasterxml.jackson.databind.jsonschema`
+   (2.15.0)
+
+Christoph Schulz (ciis0@github)
+  * Reported #3771: Classloader leak: DEFAULT_ANNOTATION_INTROSPECTOR holds annotation reference
+   (2.15.0)
+
+Patrick Strawderman (kilink@github)
+  * Requested #2968: Deserialization of `@JsonTypeInfo` annotated type fails with
+  missing type id even for explicit concrete subtypes
+   (2.15.0)
+  * Reported #3816: TokenBuffer does not implement writeString(Reader reader, int len)
+   (2.15.0)
+
+Matt Nelson (mattnelson@github)
+  * Requested #3814: Enhance `StdNodeBasedDeserializer` to support `readerForUpdating`
+   (2.15.0)
+
+Steve Storey (stevestorey@github)
+  * Contributed #3853: Add `MapperFeature.REQUIRE_TYPE_ID_FOR_SUBTYPES` to enable/disable
+    strict subtype Type Id handling
+   (2.15.0)
+
+Matteo Bertozzi (matteobertozzi@github)
+  * Reported #3895: 2.15.0 breaking behaviour change for records and Getter Visibility
+   (2.15.1)
+
+Antti Lampinen (arlampin@github)
+ * Reported #3897: 2.15.0 breaks deserialization when POJO/Record only has a single field
+   and is marked `Access.WRITE_ONLY`
+  (2.15.1)
+  * Reported #3897: 2.15.0 breaks deserialization when POJO/Record only has a single field
+    and is marked `Access.WRITE_ONLY`
+   (2.15.1)
+  * Reported #4724: Deserialization behavior change with Records, `@JsonCreator` and
+   `@JsonValue` between 2.17 and 2.18
+   (2.18.1)
+
+Dmitry Bolotin (dbolotin@github)
+  * Reported #1172: `@JsonView` doesn't work with `@JsonCreator`
+   (2.15.4)
+
+Kevin Baes (BaesKevin@github)
+ * Reported #3251: Generic class with generic field of runtime type `Double` is deserialized
+   as `BigDecimal` when used with `@JsonTypeInfo` and `JsonTypeInfo.As.EXISTING_PROPERTY`
+ (2.16.0)
+
+John Hendrikx (hjohn@github)
+ * Reported #3277: Combination of `@JsonUnwrapped` and `@JsonAnySetter` results in `BigDecimal`
+  instead of `Double`
+ (2.16.0)
+
+David Schlosnagle (schlosna@github)
+ * Contributed #4008: Optimize `ObjectNode` findValue(s) and findParent(s) fast paths
+  (2.16.0)
+
+Philipp Kräutli (pkraeutli@github)
+ * Reported #4009: Locale "" is deserialised as `null` if `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`
+   is enabled
+  (2.16.0)
+
+iProdigy (iProdigy@github)
+ * Contributed #4036: Use `@JsonProperty` for Enum values also when `READ_ENUMS_USING_TO_STRING`
+   enabled
+  (2.16.0)
+ * Contributed #4037: Fix `Enum` deserialization to use `@JsonProperty`, `@JsonAlias` even if
+   `EnumNamingStrategy` used
+  (2.16.0)
+ * Contributed #4039: Use `@JsonProperty` and lowercase feature when serializing Enums despite
+   using toString()
+  (2.16.0)
+ * Contributed #4040: Use `@JsonProperty` over `EnumNamingStrategy` for Enum serialization
+  (2.16.0)
+ * Contributed fix #4041: Actually cache EnumValues#internalMap
+  (2.16.0)
+
+Jason Laber (jlaber@github)
+ * Reported #3948: `@JsonIgnore` no longer works for transient backing fields
+  (2.16.0)
+
+Andreas Zahnen (azahnen@github)
+ * Reported #4078: `java.desktop` module is no longer optional
+  (2.16.0)
+
+Omar Aloraini (ooraini@github)
+ * Requested #4061: Add JsonTypeInfo.Id.SIMPLE_NAME which defaults type id
+   to `Class.getSimpleName()`
+  (2.16.0)
+
+Naoki Takezoe (takezoe@github)
+ * Contributed #4144: Log WARN if deprecated subclasses of `PropertyNamingStrategy`
+   is used
+  (2.16.0)
+
+Garret Wilson (garretwilson@github)
+ * Reported #4153: Deprecated `ObjectReader.withType(Type)` has no direct
+   replacement; need `forType(Type)`
+  (2.16.0)
+
+Jan Pachol (janpacho@github)
+ * Reported #4175: Exception when deserialization of `private` record with
+   default constructor
+  (2.16.0)
+
+Pieter Dirk Soels (Badbond@github)
+ * Reported #4302: Problem deserializing some type of Enums when using
+  `PropertyNamingStrategy`
+  (2.16.2)
+
+Stephane Bailliez (sbailliez@github)
+ * Reported #4409: Deserialization of enums with name defined with different cases
+   leads to `InvalidDefinitionException`: Multiple fields representing property
+  (2.16.2)
+
+Guillaume Jardillier (Mugiwara84@github)
+ * Reported #4564: Possible 2.16.0 Enum-as-JSON-Object serialization regression
+  (2.16.3)
+
+Muhammad Khalikov (mukham12@github)
+ * Contributed fix for #4209: Make `BeanDeserializerModifier`/`BeanSerializerModifier`
+   implement `java.io.Serializable`
+  (2.17.0)
+
+Eduard Dudar (edudar@github)
+ * Contributed #4299: Some `Collection` and `Map` fallbacks don't work in GraalVM native image
+  (2.17.0)
+
+Jesper Blomquist (jebl01@github)
+ * Contributed #4393: Deserialize `java.util.UUID` encoded as Base64 and base64Url with or
+   without padding
+  (2.17.0)
+
+András Péteri (apeteri@github)
+ * Suggested #4416: Deprecate `JsonNode.asText(String)`
+  (2.17.0)
+
+Kyrylo Merzlikin (kirmerzlikin@github)
+ * Contributed fix for #2543: Introspection includes delegating ctor's
+   only parameter as a property in `BeanDescription`
+  (2.17.0)
+
+Miguel Mendes Ruiz (migmruiz@github)
+ * Reported #4428: `ByteBuddy` scope went beyond `test` in version 2.17.0
+  (2.17.1)
+
+Oddbjørn Kvalsund (oddbjornkvalsund@github)
+ * Reported, contributed fix for #4430: Use `ReentrantLock` instead of `synchronized`
+   in `DeserializerCache` to avoid deadlock on pinning
+  (2.17.1)
+
+Peter Levart (plevart@github)
+ * Reported, contributed fix for #4575: StdDelegatingSerializer does not consider
+   a Converter that may return null for a non-null input
+  (2.17.2)
+
+Susan Witts (susanw1@github)
+ * Reported #4607: `MismatchedInput`: No Object Id found for an instance of X to
+   assign to property '@id'
+  (2.17.2)
+
+Ulf Dreyer (@u3r)
+ * Reported #4085: `@JsonView` does not work on class-level for records
+  (2.18.0)
+
+Mark Herkrath (@herkrath)
+ * Reported #4356: `BeanDeserializerModifier::updateBuilder()` doesn't work for
+   beans with Creator methods
+  (2.18.0)
+
+David Moten (@davidmoten)
+ * Contributed #4453: Allow JSON Integer to deserialize into a single-arg constructor of
+   parameter type `double`
+  (2.18.0)
+
+Teodor Danciu (@teodord)
+ * Reported #4464: When `Include.NON_DEFAULT` setting is used, `isEmpty()` method is
+   not called on the serializer
+  (2.18.0)
+
+Matthew Luckam (@mluckam)
+ * Contributed #4483: Remove `final` on method BeanSerializer.serialize()
+  (2.18.0)
+
+Alexandre Jacob (@ajacob)
+ * Reported #4545: Unexpected deserialization behavior with `@JsonCreator`,
+   `@JsonProperty` and javac `-parameters`
+  (2.18.0)
+
+Eduard Gomoliako (@Gems)
+ * Reported #4602: Possible wrong use of _arrayDelegateDeserializer in
+   BeanDeserializerBase::deserializeFromObjectUsingNonDefault()
+  (2.18.0)
+ * Reported #4772: Serialization and deserialization issue of sub-types used with
+  `JsonTypeInfo.Id.DEDUCTION` where sub-types are Object and Array
+  (2.19.0)
+
+Mathijs Vogelzang (@mathijs81)
+ * Reported #4678: Java records don't serialize with `MapperFeature.REQUIRE_SETTERS_FOR_GETTERS`
+  (2.18.0)
+
+Rikkarth (@rikkarth)
+ * Contributed #4709: Add `JacksonCollectors` with `toArrayNode()` implementation
+  (2.18.0)
+
+Maxim Valeev (@MaximValeev)
+ * Reported #4508: Deserialized JsonAnySetter field in Kotlin data class is null
+  (2.18.1)
+
+wrongwrong (@k163377)
+ * Contributed #4749: Fixed problem in StdDelegatingSerializer#serializeWithType where final
+   serializer lookup was done on the pre-converted value when _delegateSerializer was null
+  (2.18.1)
+ * Reported #4878: When serializing a Map via Converter(StdDelegatingSerializer),
+   a NullPointerException is thrown due to missing key serializer
+  (2.18.3)
+ * Contributed fix for #4444: The `KeyDeserializer` specified in the class with
+   `@JsonDeserialize(keyUsing = ...)` is overwritten by the `KeyDeserializer`
+    specified in the `ObjectMapper`.
+  (2.18.3)
+ * Contributed fix for #5139: In `CollectionDeserializer`, `JsonSetter.contentNulls`
+   is sometimes ignored
+  (2.19.1)
+ * Contributed fix for #5202: `JsonSetter.contentNulls` ignored for `Object[]`,
+  `String[]` and `Collection<String>`
+  (2.19.2)
+ * Reported #4218: If `@JacksonInject` is specified for field and deserialized by
+   the Creator, the inject process will be executed twice
+  (2.20.0)
+ - And many other contributions not listed here! (for 2.21 and above)
+
+Bernd Ahlers (@bernd)
+ * Reported #4742: Deserialization with Builder, External type id, `@JsonCreator` failing
+  (2.18.2)
+
+Mike Minicki (@martel)
+ * Reported #4788: `EnumFeature.WRITE_ENUMS_TO_LOWERCASE` overrides `@JsonProperty` values
+  (2.18.2)
+
+Jonathan Mesny (@jmesny)
+ * Reported #4810: Deserialization using `@JsonCreator` with renamed property failing (since 2.18)
+  (2.18.2)
+
+Stanislav Shcherbakov (@glorrian)
+ * Contributed #4844: Fix wrapped array hanlding wrt `null` by `StdDeserializer`
+  (2.18.3)
+
+Tomáš Poledný (@Saljack)
+ * Reported #4860: `ConstructorDetector.USE_PROPERTIES_BASED` does not work with
+   multiple constructors since 2.18
+  (2.18.3)
+
+Gustavo Bazan (@gssbzn)
+ * Reported #4908: Deserialization behavior change with @JsonCreator and
+   @ConstructorProperties between 2.17 and 2.18
+  (2.18.3)
+
+Zhen Lin Low (@zhenlin-pay2)
+ * Reported, fixed #4920: Creator properties are ignored on abstract types
+   when collecting bean properties, breaking AsExternalTypeDeserializer
+  (2.18.3)
+
+Fawzi Essam (@iifawzi)
+ * Contributed fix or #4628: `@JsonIgnore` and `@JsonProperty.access=READ_ONLY`
+   on Record property
+  (2.18.4)
+ * Contributed fix for #5049: Duplicate creator property "b" (index 0 vs 1)
+   on simple java record
+  (2.18.4)
+
+Liam Feid (@fxshlein)
+ * Contributed #1467: Support `@JsonUnwrapped` with `@JsonCreator`
+  (2.19.0)
+
+@SandeepGaur2016
+ * Contributed fix for #2461: Nested `@JsonUnwrapped` property names not correctly handled
+  (2.19.0)
+
+Geoffrey Grebert (@ggrebert)
+ * Contributed #2951: Allow inverting `@JsonProperty(access=)` so it can work differently
+   on server side and client side
+  (2.19.0)
+
+Konstantin Maliuga (@badoken)
+ * Contributed #4674: Allow setting global enum naming strategy similar to property naming strategy
+  (2.19.0)
+
+Lars Benedetto (@lbenedetto)
+ * Contributed #4676: Support other enum naming strategies than camelCase
+  (2.19.0)
+
+Floris Westerman (@FWest98)
+ * Reported #4934: `DeserializationContext.readTreeAsValue()` handles null nodes
+   differently from `ObjectMapper.treeToValue()`
+  (2.19.0)
+
+Joren Inghelbrecht (@jin-harmoney)
+ * Contributed #4953: Allow clearing all caches to avoid classloader leaks
+  (2.19.0)
+
+Will Paul (@dropofwill)
+ * Contributed #4979: Allow default enums with `@JsonCreator`
+  (2.19.0)
+
+Ryan Schmitt (@rschmitt)
+ * Contributed #5099: Fix regression in `ObjectNode.with()`
+  (2.19.0)
+
+Eddú Meléndez Gonzales (@eddumelendez)
+ * Reported #5215: `@JsonAnyGetter` serialization order change from 2.18.4 to 2.19.0
+  (2.19.2)
+
+Giulio Longfils (@giulong)
+ * Contributed fix for #2678: `@JacksonInject` added to property overrides value
+   from the JSON even if `useInput` is `OptBoolean.TRUE`
+  (2.20.0)
+ * Contributed #3072: Allow specifying `@JacksonInject` does not fail when there's no
+   corresponding value
+  (2.20.0)
+ * Contributed #4218: If `@JacksonInject` is specified for field and deserialized by
+   the Creator, the inject process will be executed twice
+  (2.20.0)
+ * Contributed #1381: Add a way to specify "inject-only" with `@JacksonInject`
+  (2.21.0)
+
+Plamen Tanov (@ptanov)
+ * Reported #2678: `@JacksonInject` added to property overrides value from the JSON
+   even if `useInput` is `OptBoolean.TRUE`
+  (2.20.0)
+
+Michael Reiche (@mikereiche)
+ * Reported #5271: `EnumDeserializer` fails to deserialize Enums with @JsonValue - uses table
+   with name() key instead of @JsonValue key
+  (2.20.0)
+
+Johnny Lim (@izeye)
+ * Reported #5293: Fix minor typo in `PropertyBindingException.getMessageSuffix()`
+  (2.21.0)

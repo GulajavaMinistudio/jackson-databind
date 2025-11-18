@@ -13,26 +13,13 @@ import tools.jackson.core.tree.ArrayTreeNode;
 import tools.jackson.core.tree.ObjectTreeNode;
 import tools.jackson.core.type.ResolvedType;
 import tools.jackson.core.type.TypeReference;
-
 import tools.jackson.core.util.JacksonFeatureSet;
-import tools.jackson.databind.cfg.CoercionAction;
-import tools.jackson.databind.cfg.CoercionInputShape;
-import tools.jackson.databind.cfg.ContextAttributes;
-import tools.jackson.databind.cfg.DatatypeFeature;
+import tools.jackson.databind.cfg.*;
 import tools.jackson.databind.deser.*;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.deser.impl.TypeWrappedDeserializer;
-import tools.jackson.databind.exc.InvalidDefinitionException;
-import tools.jackson.databind.exc.InvalidFormatException;
-import tools.jackson.databind.exc.InvalidTypeIdException;
-import tools.jackson.databind.exc.MismatchedInputException;
-import tools.jackson.databind.exc.UnrecognizedPropertyException;
-import tools.jackson.databind.exc.ValueInstantiationException;
-import tools.jackson.databind.introspect.Annotated;
-import tools.jackson.databind.introspect.AnnotatedClass;
-import tools.jackson.databind.introspect.AnnotatedMember;
-import tools.jackson.databind.introspect.BeanPropertyDefinition;
-import tools.jackson.databind.introspect.ClassIntrospector;
+import tools.jackson.databind.exc.*;
+import tools.jackson.databind.introspect.*;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.jsontype.TypeIdResolver;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -201,9 +188,14 @@ public abstract class DeserializationContext
         return _config.isEnabled(feature);
     }
 
-    @Override // @since 2.14
+    @Override
     public final boolean isEnabled(DatatypeFeature feature) {
         return _config.isEnabled(feature);
+    }
+
+    @Override
+    public final DatatypeFeatures getDatatypeFeatures() {
+        return _config.getDatatypeFeatures();
     }
 
     @Override
@@ -381,11 +373,11 @@ public abstract class DeserializationContext
 
     @Override
     public <T> T readValue(JsonParser p, ResolvedType type) throws JacksonException {
-        if (!(type instanceof JavaType)) {
-            throw new UnsupportedOperationException(
-"Only support `JavaType` implementation of `ResolvedType`, not: "+type.getClass().getName());
+        if (type instanceof JavaType jt) {
+            return readValue(p, jt);
         }
-        return readValue(p, (JavaType) type);
+        throw new UnsupportedOperationException(
+                "Only support `JavaType` implementation of `ResolvedType`, not: "+type.getClass().getName());
     }
 
     @SuppressWarnings("unchecked")
@@ -395,7 +387,23 @@ public abstract class DeserializationContext
             reportBadDefinition(type,
                     "Could not find `ValueDeserializer` for type "+ClassUtil.getTypeDescription(type));
         }
-        return (T) deser.deserialize(p, this);
+        return (T) _readValue(p, deser);
+    }
+
+    /**
+     * Helper method that should handle special cases for deserialization; most
+     * notably handling {@code null} (and possibly absent values).
+     */
+    private Object _readValue(JsonParser p, ValueDeserializer<Object> deser) throws JacksonException
+    {
+        // 12-Oct-2025, tatu: As per [databind#5344], need to ensure parser points to token
+        if (!p.hasCurrentToken()) {
+            p.nextToken();
+        }
+        if (p.hasToken(JsonToken.VALUE_NULL)) {
+             return deser.getNullValue(this);
+        }
+        return deser.deserialize(p, this);
     }
 
     /*
@@ -463,15 +471,16 @@ public abstract class DeserializationContext
      * to the active parser, that should be used instead.
      */
     public final JsonParser getParser() { return _parser; }
-    
+
     public final Object findInjectableValue(Object valueId,
-            BeanProperty forProperty, Object beanInstance)
+            BeanProperty forProperty, Object beanInstance, Boolean optional, Boolean useInput)
     {
-        if (_injectableValues == null) {
-            return reportBadDefinition(ClassUtil.classOf(valueId), String.format(
-"No 'injectableValues' configured, cannot inject value with id [%s]", valueId));
+        InjectableValues injectables = _injectableValues;
+        if (injectables == null) {
+            injectables = InjectableValues.empty();
         }
-        return _injectableValues.findInjectableValue(valueId, this, forProperty, beanInstance);
+        return injectables.findInjectableValue(this, valueId, forProperty, beanInstance,
+                optional, useInput);
     }
 
     /**
@@ -511,18 +520,52 @@ public abstract class DeserializationContext
     }
 
     @Override
-    public BeanDescription introspectBeanDescription(JavaType type) {
-        return classIntrospector().introspectForDeserialization(type);
+    public BeanDescription introspectBeanDescription(JavaType type, AnnotatedClass ac) {
+        return classIntrospector().introspectForDeserialization(type, ac);
     }
 
     public BeanDescription introspectBeanDescriptionForCreation(JavaType type) {
-        return classIntrospector().introspectForCreation(type);
+        return introspectBeanDescriptionForCreation(type,
+                classIntrospector().introspectClassAnnotations(type));
+    }
+
+    public BeanDescription introspectBeanDescriptionForCreation(JavaType type, AnnotatedClass ac) {
+        return classIntrospector().introspectForCreation(type, ac);
+    }
+
+    public BeanDescription.Supplier lazyIntrospectBeanDescriptionForCreation(JavaType type) {
+        return new BeanDescription.LazySupplier(getConfig(), type) {
+            @Override
+            protected BeanDescription _construct(JavaType forType, AnnotatedClass ac) {
+                return introspectBeanDescriptionForCreation(forType, ac);
+            }
+
+            @Override
+            protected AnnotatedClass _introspect(JavaType forType) {
+                return introspectClassAnnotations(forType);
+            }
+        };
     }
 
     public BeanDescription introspectBeanDescriptionForBuilder(JavaType builderType,
             BeanDescription valueTypeDesc) {
         return classIntrospector().introspectForDeserializationWithBuilder(builderType,
                 valueTypeDesc);
+    }
+
+    public BeanDescription.Supplier lazyIntrospectBeanDescriptionForBuilder(final JavaType builderType,
+            final BeanDescription valueTypeDesc) {
+        return new BeanDescription.LazySupplier(getConfig(), builderType) {
+            @Override
+            protected BeanDescription _construct(JavaType forType, AnnotatedClass ac) {
+                return introspectBeanDescriptionForBuilder(forType, valueTypeDesc);
+            }
+
+            @Override
+            protected AnnotatedClass _introspect(JavaType forType) {
+                return introspectClassAnnotations(forType);
+            }
+        };
     }
 
     /*
@@ -818,10 +861,23 @@ public abstract class DeserializationContext
             kd = null;
         }
         // Second: contextualize?
-        if (kd instanceof ContextualKeyDeserializer) {
-            kd = ((ContextualKeyDeserializer) kd).createContextual(this, prop);
+        if (kd instanceof ContextualKeyDeserializer ckd) {
+            kd = ckd.createContextual(this, prop);
         }
         return kd;
+    }
+
+    /**
+     * Method that will drop all dynamically constructed deserializers (ones that
+     * are counted as result value for {@link DeserializerCache#cachedDeserializersCount}).
+     * This can be used to remove memory usage (in case some deserializers are
+     * only used once or so), or to force re-construction of deserializers after
+     * configuration changes for mapper than owns the provider.
+
+     * @since 2.19
+     */
+    public void flushCachedDeserializers() {
+        _cache.flushCachedDeserializers();
     }
 
     /*
@@ -1042,17 +1098,22 @@ public abstract class DeserializationContext
      * Method to call in case incoming shape is Object Value (and parser thereby
      * points to {@link tools.jackson.core.JsonToken#START_OBJECT} token),
      * but a Scalar value (potentially coercible from String value) is expected.
-     * This would typically be used to deserializer a Number, Boolean value or some other
+     * This would typically be used to deserialize a Number, Boolean value or some other
      * "simple" unstructured value type.
-     * 
+     *<p>
+     * Note that expected behavior in case of extraction not succeeding changed in
+     * Jackson 2.20: now {@code null} is expected to be returned in that case (in 2.19
+     * and before, exception was to be thrown, but this prevented fallback handling
+     * via {@link DeserializationProblemHandler#handleUnexpectedToken}.
+     *
      * @param p Actual parser to read content from
      * @param deser Deserializer that needs extracted String value
      * @param scalarType Immediate type of scalar to extract; usually type deserializer
      *    handles but not always (for example, deserializer for {@code int[]} would pass
      *    scalar type of {@code int})
      *
-     * @return String value found; not {@code null} (exception should be thrown if no suitable
-     *     value found)
+     * @return String value found, if any; {@code null} if none (note: changed in 2.20;
+     *   before that in 2.19 and before exception throwing was expected)
      *
      * @throws JacksonException If there are problems either reading content (underlying parser
      *    problem) or finding expected scalar value
@@ -1061,7 +1122,10 @@ public abstract class DeserializationContext
             Class<?> scalarType)
         throws JacksonException
     {
-        return (String) handleUnexpectedToken(constructType(scalarType), p);
+        // 17-May-2025, tatu: [databind#4656] must NOT call `handleUnexpectedToken`
+        //    since that can return value other than {@code String}
+        // return (String) handleUnexpectedToken(constructType(scalarType), p);
+        return null;
     }
 
     /*
@@ -1101,7 +1165,7 @@ public abstract class DeserializationContext
                     "Could not find `ValueDeserializer` for type %s (via property %s)",
                     ClassUtil.getTypeDescription(type), ClassUtil.nameOf(prop)));
         }
-        return (T) deser.deserialize(p, this);
+        return (T) _readValue(p, deser);
     }
 
     /**
@@ -1126,7 +1190,7 @@ public abstract class DeserializationContext
     public <T> T readTreeAsValue(JsonNode n, Class<T> targetType)
         throws JacksonException
     {
-        if (n == null) {
+        if (n == null || n.isMissingNode()) {
             return null;
         }
         try (TreeTraversingParser p = _treeAsTokens(n)) {
@@ -1149,7 +1213,7 @@ public abstract class DeserializationContext
     public <T> T readTreeAsValue(JsonNode n, JavaType targetType)
         throws JacksonException
     {
-        if (n == null) {
+        if (n == null || n.isMissingNode()) {
             return null;
         }
         try (TreeTraversingParser p = _treeAsTokens(n)) {
@@ -1164,7 +1228,7 @@ public abstract class DeserializationContext
         p.nextToken();
         return p;
     }
-
+    
     /*
     /**********************************************************************
     /* Methods for problem handling
@@ -1236,7 +1300,7 @@ public abstract class DeserializationContext
                     return key;
                 }
                 throw weirdStringException(keyValue, keyClass, String.format(
-                        "DeserializationProblemHandler.handleWeirdStringValue() for type %s returned value of type %s",
+                        "DeserializationProblemHandler.handleWeirdKey() for type %s returned value of type %s",
                         ClassUtil.getClassDescription(keyClass),
                         ClassUtil.getClassDescription(key)
                 ));
@@ -1545,7 +1609,7 @@ public abstract class DeserializationContext
         }
         // 18-Jun-2020, tatu: to resolve [databind#2770], force access to `getText()` for scalars
         if ((t != null) && t.isScalarValue()) {
-            p.getText();
+            p.getString();
         }
         reportInputMismatch(targetType, msg);
         return null; // never gets here
@@ -1821,10 +1885,17 @@ public abstract class DeserializationContext
             JsonParser p, JsonToken trailingToken)
         throws DatabindException
     {
-        throw MismatchedInputException.from(p, targetType, String.format(
-"Trailing token (of type %s) found after value (bound as %s): not allowed as per `DeserializationFeature.FAIL_ON_TRAILING_TOKENS`",
-trailingToken, ClassUtil.nameOf(targetType)
-                ));
+        // 05-Mar-2025, tatu: [databind#5001] Handle non-blocking case separately to give better message
+        if (trailingToken == JsonToken.NOT_AVAILABLE) {
+            throw MismatchedInputException.from(p, targetType,
+("Incomplete content (`JsonToken.NOT_AVAILABLE`) after value (bound as %s):"
++" not allowed as per `DeserializationFeature.FAIL_ON_TRAILING_TOKENS`"
++" (missing call to `InputFeeder.endOfInput()`?)")
+            .formatted(ClassUtil.nameOf(targetType)));
+        }
+        throw MismatchedInputException.from(p, targetType,
+"Trailing token (`JsonToken.%s`) found after value (bound as %s): not allowed as per `DeserializationFeature.FAIL_ON_TRAILING_TOKENS`"
+                .formatted(trailingToken, ClassUtil.nameOf(targetType)));
     }
 
     /*
@@ -1839,12 +1910,12 @@ trailingToken, ClassUtil.nameOf(targetType)
      * regarding specific Java type, unrelated to actual JSON content to map.
      * Default behavior is to construct and throw a {@link DatabindException}.
      */
+    @Override
     public <T> T reportBadTypeDefinition(BeanDescription bean,
             String msg, Object... msgArgs) throws DatabindException
     {
-        msg = _format(msg, msgArgs);
         String beanDesc = ClassUtil.nameOf(bean.getBeanClass());
-        msg = String.format("Invalid type definition for type %s: %s", beanDesc, msg);
+        msg = String.format("Invalid type definition for type %s: %s", beanDesc, _format(msg, msgArgs));
         throw InvalidDefinitionException.from(_parser, msg, bean, null);
     }
 
@@ -1853,8 +1924,15 @@ trailingToken, ClassUtil.nameOf(targetType)
      * regarding specific property (of a type), unrelated to actual JSON content to map.
      * Default behavior is to construct and throw a {@link DatabindException}.
      */
+    public <T> T reportBadPropertyDefinition(BeanDescription.Supplier beanDescRef,
+            BeanPropertyDefinition prop, String msg, Object... msgArgs)
+        throws DatabindException
+    {
+        return reportBadPropertyDefinition(beanDescRef.get(), prop, msg, msgArgs);
+    }
+
     public <T> T reportBadPropertyDefinition(BeanDescription bean, BeanPropertyDefinition prop,
-            String msg, Object... msgArgs)
+        String msg, Object... msgArgs)
         throws DatabindException
     {
         msg = _format(msg, msgArgs);
@@ -1959,7 +2037,7 @@ trailingToken, ClassUtil.nameOf(targetType)
      * Helper method for constructing exception to indicate that input JSON
      * token of type "native value" (see {@link JsonToken#VALUE_EMBEDDED_OBJECT})
      * is of incompatible type (and there is no delegating creator or such to use)
-     * and can not be used to construct value of specified type (usually POJO).
+     * and cannot be used to construct value of specified type (usually POJO).
      * Note that most of the time this method should NOT be called; instead,
      * {@link #handleWeirdNativeValue} should be called which will call this method
      */
@@ -2027,6 +2105,13 @@ trailingToken, ClassUtil.nameOf(targetType)
         return InvalidTypeIdException.from(_parser, _colonConcat(msg, extraDesc), baseType, null);
     }
 
+    public DatabindException missingInjectableValueException(String msg,
+            Object valueId,
+            BeanProperty forProperty, Object beanInstance) {
+        return MissingInjectableValueExcepion.from(_parser, msg,
+                valueId, forProperty, beanInstance);
+    }
+
     /*
     /**********************************************************************
     /* Other internal methods
@@ -2058,41 +2143,6 @@ trailingToken, ClassUtil.nameOf(targetType)
      * {@link JsonToken} encountered.
      */
     protected String _shapeForToken(JsonToken t) {
-        if (t != null) {
-            switch (t) {
-            // Likely Object values
-            case START_OBJECT:
-            case END_OBJECT:
-            case PROPERTY_NAME:
-                return "Object value";
-
-            // Likely Array values
-            case START_ARRAY:
-            case END_ARRAY:
-                return "Array value";
-
-            case VALUE_FALSE:
-            case VALUE_TRUE:
-                return "Boolean value";
-
-            case VALUE_EMBEDDED_OBJECT:
-                return "Embedded Object";
-
-            case VALUE_NUMBER_FLOAT:
-                return "Floating-point value";
-            case VALUE_NUMBER_INT:
-                return "Integer value";
-            case VALUE_STRING:
-                return "String value";
-
-            case VALUE_NULL:
-                return "Null value";
-
-            case NOT_AVAILABLE:
-            default:
-                return "[Unavailable value]";
-            }
-        }
-        return "<end of input>";
+        return JsonToken.valueDescFor(t);
     }
 }

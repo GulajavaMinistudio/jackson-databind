@@ -2,9 +2,10 @@ package tools.jackson.databind.node;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import tools.jackson.core.*;
-
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.util.RawValue;
 
@@ -31,14 +32,16 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
 
     protected ContainerNode() { _nodeFactory = null; } // only for JDK ser
 
+    @Override
+    public boolean isContainer() {
+        return true;
+    }
+
     // all containers are mutable: can't define:
 //    @Override public abstract <T extends JsonNode> T deepCopy();
 
     @Override
     public abstract JsonToken asToken();
-
-    @Override
-    public String asText() { return ""; }
 
     /*
     /**********************************************************************
@@ -54,6 +57,10 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
 
     @Override
     public abstract JsonNode get(String fieldName);
+
+    // Both ArrayNode and ObjectNode must re-implement
+    @Override // @since 2.19
+    public abstract Stream<JsonNode> valueStream();
 
     @Override
     protected abstract ObjectNode _withObject(JsonPointer origPtr,
@@ -82,7 +89,7 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
     /* JsonNodeCreator implementation, just dispatch to real creator
     /**********************************************************************
      */
-    
+
     /**
      * Factory method that constructs and returns an empty {@link ArrayNode}
      * Construction is done using registered {@link JsonNodeFactory}.
@@ -141,7 +148,7 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
     public final ValueNode numberNode(Double v) { return _nodeFactory.numberNode(v); }
 
     @Override
-    public final TextNode textNode(String text) { return _nodeFactory.textNode(text); }
+    public final StringNode stringNode(String text) { return _nodeFactory.stringNode(text); }
 
     @Override
     public final BinaryNode binaryNode(byte[] data) { return _nodeFactory.binaryNode(data); }
@@ -166,4 +173,32 @@ public abstract class ContainerNode<T extends ContainerNode<T>>
      * @return Container node itself (to allow method call chaining)
      */
     public abstract T removeAll();
+
+    /**
+     * Method for removing matching those children (value) nodes container has that
+     * match given predicate.
+     *
+     * @param predicate Predicate to use for matching: anything matching will be removed
+     *
+     * @return Container node itself (to allow method call chaining)
+     *
+     * @since 2.19
+     */
+    public abstract T removeIf(Predicate<? super JsonNode> predicate);
+
+    /**
+     * Method for removing {@code null} children (value) nodes container has (that is,
+     * children for which {@code isNull()} returns true).
+     * Short-cut for:
+     *<pre>
+     *     removeIf(JsonNode::isNull);
+     *</pre>
+     *
+     * @return Container node itself (to allow method call chaining)
+     *
+     * @since 2.19
+     */
+    public T removeNulls() {
+        return removeIf(JsonNode::isNull);
+    }
 }

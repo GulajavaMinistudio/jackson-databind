@@ -7,7 +7,6 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import tools.jackson.core.*;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
 import tools.jackson.databind.cfg.CoercionAction;
@@ -21,11 +20,11 @@ import tools.jackson.databind.util.AccessPattern;
 import tools.jackson.databind.util.ObjectBuffer;
 
 /**
- * Basic serializer that can serialize non-primitive arrays.
+ * Serializer that can serialize non-primitive arrays.
  */
 @JacksonStdImpl
 public class ObjectArrayDeserializer
-    extends ContainerDeserializerBase<Object[]>
+    extends ContainerDeserializerBase<Object>
 {
     // // Configuration
 
@@ -170,7 +169,7 @@ public class ObjectArrayDeserializer
     // need to override as we can't expose ValueInstantiator
     @Override
     public Object getEmptyValue(DeserializationContext ctxt) {
-        // 03-Jul-2020, tatu: Must be assignment-compatible; can not just return `new Object[0]`
+        // 03-Jul-2020, tatu: Must be assignment-compatible; cannot just return `new Object[0]`
         //   if element type is different
         return _emptyValue;
     }
@@ -180,10 +179,10 @@ public class ObjectArrayDeserializer
     /* ValueDeserializer API
     /**********************************************************************
      */
-    
+
     @Override
-    public Object[] deserialize(JsonParser p, DeserializationContext ctxt)
-        throws JacksonException
+    public Object deserialize(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
     {
         // Ok: must point to START_ARRAY (or equivalent)
         if (!p.isExpectedStartArrayToken()) {
@@ -194,23 +193,29 @@ public class ObjectArrayDeserializer
         Object[] chunk = buffer.resetAndStart();
         int ix = 0;
         JsonToken t;
-        final TypeDeserializer typeDeser = _elementTypeDeserializer;
 
         try {
             while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
                 // Note: must handle null explicitly here; value deserializers won't
                 Object value;
-                
+
                 if (t == JsonToken.VALUE_NULL) {
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (typeDeser == null) {
-                    value = _elementDeserializer.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = _elementDeserializer.deserializeWithType(p, ctxt, typeDeser);
+                    value = _deserializeNoNullChecks(p, ctxt);
                 }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+
+                    if (value == null && _skipNullValues) {
+                        continue;
+                    }
+                }
+
                 if (ix >= chunk.length) {
                     chunk = buffer.appendCompletedChunk(chunk);
                     ix = 0;
@@ -218,7 +223,8 @@ public class ObjectArrayDeserializer
                 chunk[ix++] = value;
             }
         } catch (Exception e) {
-            throw DatabindException.wrapWithPath(e, chunk, buffer.bufferedSize() + ix);
+            throw DatabindException.wrapWithPath(ctxt, e,
+                    new JacksonException.Reference(chunk, buffer.bufferedSize() + ix));
         }
 
         Object[] result;
@@ -233,7 +239,7 @@ public class ObjectArrayDeserializer
     }
 
     @Override
-    public Object[] deserializeWithType(JsonParser p, DeserializationContext ctxt,
+    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
             TypeDeserializer typeDeserializer)
         throws JacksonException
     {
@@ -243,11 +249,13 @@ public class ObjectArrayDeserializer
     }
 
     @Override
-    public Object[] deserialize(JsonParser p, DeserializationContext ctxt,
-            Object[] intoValue) throws JacksonException
+    public Object deserialize(JsonParser p, DeserializationContext ctxt,
+            Object intoValue0)
+        throws JacksonException
     {
+        final Object[] intoValue = (Object[]) intoValue0;
         if (!p.isExpectedStartArrayToken()) {
-            Object[] arr = handleNonArray(p, ctxt);
+            Object[] arr = (Object[]) handleNonArray(p, ctxt);
             if (arr == null) {
                 return intoValue;
             }
@@ -261,22 +269,28 @@ public class ObjectArrayDeserializer
         int ix = intoValue.length;
         Object[] chunk = buffer.resetAndStart(intoValue, ix);
         JsonToken t;
-        final TypeDeserializer typeDeser = _elementTypeDeserializer;
 
         try {
             while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
                 Object value;
-                
+
                 if (t == JsonToken.VALUE_NULL) {
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (typeDeser == null) {
-                    value = _elementDeserializer.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = _elementDeserializer.deserializeWithType(p, ctxt, typeDeser);
+                    value = _deserializeNoNullChecks(p, ctxt);
                 }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+
+                    if (value == null && _skipNullValues) {
+                        continue;
+                    }
+                }
+
                 if (ix >= chunk.length) {
                     chunk = buffer.appendCompletedChunk(chunk);
                     ix = 0;
@@ -284,7 +298,8 @@ public class ObjectArrayDeserializer
                 chunk[ix++] = value;
             }
         } catch (Exception e) {
-            throw DatabindException.wrapWithPath(e, chunk, buffer.bufferedSize() + ix);
+            throw DatabindException.wrapWithPath(ctxt, e,
+                    new JacksonException.Reference(chunk, buffer.bufferedSize() + ix));
         }
 
         Object[] result;
@@ -303,7 +318,7 @@ public class ObjectArrayDeserializer
     /* Internal methods
     /**********************************************************************
      */
-    
+
     protected Byte[] deserializeFromBase64(JsonParser p, DeserializationContext ctxt)
         throws JacksonException
     {
@@ -312,12 +327,12 @@ public class ObjectArrayDeserializer
         // But then need to convert to wrappers
         Byte[] result = new Byte[b.length];
         for (int i = 0, len = b.length; i < len; ++i) {
-            result[i] = Byte.valueOf(b[i]);
+            result[i] = b[i];
         }
         return result;
     }
 
-    protected Object[] handleNonArray(JsonParser p, DeserializationContext ctxt)
+    protected Object handleNonArray(JsonParser p, DeserializationContext ctxt)
         throws JacksonException
     {
         // Can we do implicit coercion to a single-element array still?
@@ -335,20 +350,20 @@ public class ObjectArrayDeserializer
                 // Second: empty (and maybe blank) String
                 return _deserializeFromString(p, ctxt);
             }
-            return (Object[]) ctxt.handleUnexpectedToken(_containerType, p);
+            return ctxt.handleUnexpectedToken(_containerType, p);
         }
         JsonToken t = p.currentToken();
         Object value;
-        
+
         if (t == JsonToken.VALUE_NULL) {
             // 03-Feb-2017, tatu: Should this be skipped or not?
             if (_skipNullValues) {
                 return _emptyValue;
             }
-            value = _nullProvider.getNullValue(ctxt);
+            value = null;
         } else {
             if (p.hasToken(JsonToken.VALUE_STRING)) {
-                String textValue = p.getText();
+                String textValue = p.getString();
                 // https://github.com/FasterXML/jackson-dataformat-xml/issues/513
                 if (textValue.isEmpty()) {
                     final CoercionAction act = ctxt.findCoercionAction(logicalType(), handledType(),
@@ -368,12 +383,17 @@ public class ObjectArrayDeserializer
                 // if coercion failed, we can still add it to a list
             }
 
-            if (_elementTypeDeserializer == null) {
-                value = _elementDeserializer.deserialize(p, ctxt);
-            } else {
-                value = _elementDeserializer.deserializeWithType(p, ctxt, _elementTypeDeserializer);
+            value = _deserializeNoNullChecks(p, ctxt);
+        }
+
+        if (value == null) {
+            value = _nullProvider.getNullValue(ctxt);
+
+            if (value == null && _skipNullValues) {
+                return _emptyValue;
             }
         }
+
         // Ok: bit tricky, since we may want T[], not just Object[]
         Object[] result;
 
@@ -385,5 +405,19 @@ public class ObjectArrayDeserializer
         result[0] = value;
         return result;
     }
-}
 
+    /**
+     * Deserialize the content of the map.
+     * If _elementTypeDeserializer is null, use _elementDeserializer.deserialize; if non-null,
+     * use _elementDeserializer.deserializeWithType to deserialize value.
+     * This method only performs deserialization and does not consider _skipNullValues, _nullProvider, etc.
+     */
+    protected Object _deserializeNoNullChecks(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
+    {
+        if (_elementTypeDeserializer == null) {
+            return _elementDeserializer.deserialize(p, ctxt);
+        }
+        return _elementDeserializer.deserializeWithType(p, ctxt, _elementTypeDeserializer);
+    }
+}

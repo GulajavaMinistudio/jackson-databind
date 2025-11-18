@@ -35,7 +35,7 @@ public final class BooleanSerializer
     }
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider serializers,
+    public ValueSerializer<?> createContextual(SerializationContext serializers,
             BeanProperty property)
     {
         // 16-Mar-2021, tatu: As per [databind#3080], was passing wrapper type
@@ -55,13 +55,13 @@ public final class BooleanSerializer
     }
 
     @Override
-    public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(Object value, JsonGenerator g, SerializationContext provider)
             throws JacksonException {
         g.writeBoolean(Boolean.TRUE.equals(value));
     }
 
     @Override
-    public final void serializeWithType(Object value, JsonGenerator g, SerializerProvider provider,
+    public final void serializeWithType(Object value, JsonGenerator g, SerializationContext provider,
             TypeSerializer typeSer) throws JacksonException
     {
         g.writeBoolean(Boolean.TRUE.equals(value));
@@ -91,7 +91,7 @@ public final class BooleanSerializer
         }
 
         @Override
-        public ValueSerializer<?> createContextual(SerializerProvider serializers,
+        public ValueSerializer<?> createContextual(SerializationContext serializers,
                 BeanProperty property)
         {
             JsonFormat.Value format = findFormatOverrides(serializers,
@@ -106,18 +106,18 @@ public final class BooleanSerializer
         }
 
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator g, SerializationContext provider)
                 throws JacksonException
         {
             g.writeNumber((Boolean.FALSE.equals(value)) ? 0 : 1);
         }
 
         @Override
-        public final void serializeWithType(Object value, JsonGenerator g, SerializerProvider provider,
+        public final void serializeWithType(Object value, JsonGenerator g, SerializationContext provider,
                 TypeSerializer typeSer)
             throws JacksonException
         {
-            // 27-Mar-2017, tatu: Actually here we CAN NOT serialize as number without type,
+            // 27-Mar-2017, tatu: Actually here we CANNOT serialize as number without type,
             //    since with natural types that would map to number, not boolean. So choice
             //    comes to between either add type id, or serialize as boolean. Choose
             //    latter at this point

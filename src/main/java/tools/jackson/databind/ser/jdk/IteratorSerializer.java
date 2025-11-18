@@ -43,7 +43,7 @@ public class IteratorSerializer
      */
 
     @Override
-    public boolean isEmpty(SerializerProvider prov, Iterator<?> value) {
+    public boolean isEmpty(SerializationContext prov, Iterator<?> value) {
         return !value.hasNext();
     }
 
@@ -55,7 +55,7 @@ public class IteratorSerializer
 
     @Override
     public final void serialize(Iterator<?> value, JsonGenerator gen,
-            SerializerProvider provider)
+            SerializationContext provider)
         throws JacksonException
     {
         // 02-Dec-2016, tatu: As per comments above, can't determine single element so...
@@ -73,10 +73,10 @@ public class IteratorSerializer
         serializeContents(value, gen, provider);
         gen.writeEndArray();
     }
-    
+
     @Override
     public void serializeContents(Iterator<?> value, JsonGenerator g,
-            SerializerProvider provider)
+            SerializationContext provider)
         throws JacksonException
     {
         if (!value.hasNext()) {
@@ -99,9 +99,9 @@ public class IteratorSerializer
             }
         } while (value.hasNext());
     }
-    
+
     protected void _serializeDynamicContents(Iterator<?> value, JsonGenerator g,
-            SerializerProvider ctxt)
+            SerializationContext ctxt)
         throws JacksonException
     {
         final TypeSerializer typeSer = _valueTypeSerializer;

@@ -1,6 +1,7 @@
 package tools.jackson.databind.cfg;
 
 import tools.jackson.core.TokenStreamFactory;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationConfig;
 import tools.jackson.databind.ser.SerializationContextExt;
@@ -9,13 +10,13 @@ import tools.jackson.databind.ser.SerializerFactory;
 
 /**
  * Factory/builder class that replaces Jackson 2.x concept of "blueprint" instance
- * of {@link tools.jackson.databind.SerializerProvider}. It will be constructed and configured during
+ * of {@link tools.jackson.databind.SerializationContext}. It will be constructed and configured during
  * {@link ObjectMapper} building phase, and will be called once per {@code writeValue}
- * call to construct actual stateful {@link tools.jackson.databind.SerializerProvider} to use during
+ * call to construct actual stateful {@link tools.jackson.databind.SerializationContext} to use during
  * serialization.
  *<p>
  * Note that since this object has to be serializable (to allow JDK serialization of
- * mapper instances), {@link tools.jackson.databind.SerializerProvider} need not be serializable any more.
+ * mapper instances), {@link tools.jackson.databind.SerializationContext} need not be serializable any more.
  *
  * @since 3.0
  */
@@ -34,7 +35,7 @@ public abstract class SerializationContexts
     // get passed via `forMapper(...)` call; all we want to serialize is identity
     // of this class (and possibly whatever sub-classes may want to retain).
     // Hence `transient` modifiers
-    
+
     /**
      * Low-level {@link TokenStreamFactory} that may be used for constructing
      * embedded generators.
@@ -72,33 +73,22 @@ public abstract class SerializationContexts
      * Necessary usually to initialize non-configuration state, such as caching.
      */
     public SerializationContexts forMapper(Object mapper,
+            SerializationConfig config,
             TokenStreamFactory tsf, SerializerFactory serializerFactory) {
-        return forMapper(mapper, tsf, serializerFactory, _defaultCache());
+        return forMapper(mapper, tsf, serializerFactory,
+                new SerializerCache(config.getCacheProvider().forSerializerCache(config)));
     }
 
     protected abstract SerializationContexts forMapper(Object mapper,
             TokenStreamFactory tsf, SerializerFactory serializerFactory,
             SerializerCache cache);
-    
+
     /**
      * Factory method for constructing context object for individual {@code writeValue()}
      * calls.
      */
     public abstract SerializationContextExt createContext(SerializationConfig config,
             GeneratorSettings genSettings);
-
-    /*
-    /**********************************************************************
-    /* Overridable default methods
-    /**********************************************************************
-     */
-
-    /**
-     * Factory method for constructing per-mapper serializer cache to use.
-     */
-    protected SerializerCache _defaultCache() {
-        return new SerializerCache();
-    }
 
     /*
     /**********************************************************************
@@ -113,7 +103,7 @@ public abstract class SerializationContexts
      * Exact count depends on what kind of serializers get cached;
      * default implementation caches all serializers, including ones that
      * are eagerly constructed (for optimal access speed)
-     *<p> 
+     *<p>
      * The main use case for this method is to allow conditional flushing of
      * serializer cache, if certain number of entries is reached.
      */
@@ -160,5 +150,8 @@ public abstract class SerializationContexts
             return new SerializationContextExt.Impl(_streamFactory,
                     config, genSettings, _serializerFactory, _cache);
         }
+
+        // As per name, just for testing
+        public SerializerCache cacheForTests() { return _cache; }
     }
 }

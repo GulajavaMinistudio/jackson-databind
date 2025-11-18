@@ -1,5 +1,7 @@
 package tools.jackson.databind.jsontype.ext;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
@@ -7,12 +9,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 // for [databind#1341]
-public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
+public class TestSubtypesExternalPropertyMissingProperty extends DatabindTestUtil
 {
     /**
      * Base class - external property for Fruit subclasses.
@@ -25,7 +27,7 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
         public Box() {
         }
 
-        public Box(String type, Fruit fruit) {
+        protected Box(String type, Fruit fruit) {
             this.type = type;
             this.fruit = fruit;
         }
@@ -43,7 +45,7 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
         public ReqBox() {
         }
 
-        public ReqBox(String type, Fruit fruit) {
+        protected ReqBox(String type, Fruit fruit) {
             this.type = type;
             this.fruit = fruit;
         }
@@ -70,7 +72,7 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
         public Apple() {
         }
 
-        public Apple(String name, int b) {
+        protected Apple(String name, int b) {
             super(name);
             seedCount = b;
         }
@@ -82,7 +84,7 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
         public Orange() {
         }
 
-        public Orange(String name, String c) {
+        protected Orange(String name, String c) {
             super(name);
             color = c;
         }
@@ -99,9 +101,9 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
     private static final Orange orange = new Orange("Orange", "orange");
     private static final Box orangeBox = new Box("orange", orange);
     private static final String orangeBoxJson = "{\"type\":\"orange\",\"fruit\":{\"name\":\"Orange\",\"color\":\"orange\"}}";
-    private static final String orangeBoxNullJson = "{\"type\":\"orange\",\"fruit\":null}}";
-    private static final String orangeBoxEmptyJson = "{\"type\":\"orange\",\"fruit\":{}}}";
-    private static final String orangeBoxMissingJson = "{\"type\":\"orange\"}}";
+    private static final String orangeBoxNullJson = "{\"type\":\"orange\",\"fruit\":null}";
+    private static final String orangeBoxEmptyJson = "{\"type\":\"orange\",\"fruit\":{}}";
+    private static final String orangeBoxMissingJson = "{\"type\":\"orange\"}";
 
     private static final Apple apple = new Apple("Apple", 16);
     private static final Box appleBox = new Box("apple", apple);
@@ -116,10 +118,6 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
     /**********************************************************
      */
 
-    protected static JsonMapper.Builder jsonMapperBuilder() {
-        return JsonMapper.builder();
-    }
-    
     /**
      * Deserialization tests for external type id property present
      */
@@ -259,4 +257,4 @@ public class TestSubtypesExternalPropertyMissingProperty extends BaseMapTest
             verifyException(e, "Missing property 'fruit' for external type id 'type'");
         }
     }
-}    
+}

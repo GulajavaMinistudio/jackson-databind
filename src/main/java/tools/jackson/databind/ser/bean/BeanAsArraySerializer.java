@@ -49,14 +49,14 @@ public class BeanAsArraySerializer
      * cases where array output cannot be used.
      */
     protected final BeanSerializerBase _defaultSerializer;
-    
+
     /*
     /**********************************************************************
     /* Life-cycle: constructors
     /**********************************************************************
      */
 
-    public BeanAsArraySerializer(BeanSerializerBase src) {    
+    public BeanAsArraySerializer(BeanSerializerBase src) {
         super(src, (ObjectIdWriter) null);
         _defaultSerializer = src;
     }
@@ -89,7 +89,7 @@ public class BeanAsArraySerializer
         }
         return new BeanAsArraySerializer(src);
     }
-    
+
     @Override
     public ValueSerializer<Object> unwrappingSerializer(NameTransformer transformer) {
         // If this gets called, we will just need delegate to the default
@@ -141,7 +141,7 @@ public class BeanAsArraySerializer
     // Re-defined from base class, due to differing prefixes
     @Override
     public void serializeWithType(Object bean, JsonGenerator gen,
-            SerializerProvider ctxt, TypeSerializer typeSer)
+            SerializationContext ctxt, TypeSerializer typeSer)
         throws JacksonException
     {
         // 10-Dec-2014, tatu: Not sure if this can be made to work reliably;
@@ -168,7 +168,7 @@ public class BeanAsArraySerializer
      * {@link BeanPropertyWriter} instances.
      */
     @Override
-    public final void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
+    public final void serialize(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         final boolean filtered = (_filteredProps != null && provider.getActiveView() != null);
@@ -194,12 +194,12 @@ public class BeanAsArraySerializer
     /**********************************************************************
      */
 
-    private boolean hasSingleElement(SerializerProvider provider) {
+    private boolean hasSingleElement(SerializationContext provider) {
         return _props.length == 1;
     }
 
     protected final void serializeNonFiltered(Object bean, JsonGenerator gen,
-            SerializerProvider provider)
+            SerializationContext provider)
         throws JacksonException
     {
         final BeanPropertyWriter[] props = _props;
@@ -245,7 +245,7 @@ public class BeanAsArraySerializer
         }
     }
 
-    protected final void serializeFiltered(Object bean, JsonGenerator gen, SerializerProvider provider)
+    protected final void serializeFiltered(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         final BeanPropertyWriter[] props = _filteredProps;
@@ -311,10 +311,6 @@ public class BeanAsArraySerializer
                     prop.serializeAsElement(bean, gen, provider);
                 }
             }
-            // NOTE: any getters cannot be supported either
-            //if (_anyGetterWriter != null) {
-            //    _anyGetterWriter.getAndSerialize(bean, gen, provider);
-            //}
         } catch (Exception e) {
             wrapAndThrow(provider, e, bean, prop.getName());
         } catch (StackOverflowError e) {

@@ -1,22 +1,24 @@
 package tools.jackson.databind.deser;
 
+import java.util.*;
+
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.IgnoredPropertyException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
 
 /**
  * This unit test suite that tests use of {@link com.fasterxml.jackson.annotation.JsonIncludeProperties}
  * annotation with deserialization.
  */
 public class IncludeWithDeserTest
-        extends BaseMapTest
 {
     @JsonIncludeProperties({"y", "z"})
     static class OnlyYAndZ
@@ -83,7 +85,7 @@ public class IncludeWithDeserTest
     static class MapWrapper
     {
         @JsonIncludeProperties({"a"})
-        public final HashMap<String, Integer> value = new HashMap<String, Integer>();
+        public HashMap<String, Integer> value;
     }
 
     @JsonIncludeProperties({"foo", "bar"})
@@ -107,8 +109,9 @@ public class IncludeWithDeserTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSimpleInclude() throws Exception
     {
         OnlyYAndZ result = MAPPER.readValue(
@@ -119,9 +122,10 @@ public class IncludeWithDeserTest
         assertEquals(3, result._z);
     }
 
+    @Test
     public void testIncludeIgnoredAndUnrecognizedField() throws Exception
     {
-        ObjectReader r = MAPPER.readerFor(OnlyY.class);
+        ObjectReader r = MAPPER.readerFor(OnlyY.class).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
         // First, fine to get "y" only:
         OnlyY result = r.readValue(a2q("{'x':3, 'y': 4}"));
@@ -152,7 +156,7 @@ public class IncludeWithDeserTest
         assertEquals(4, result.y);
     }
 
-
+    @Test
     public void testMergeInclude() throws Exception
     {
         OnlyYWrapperForOnlyYAndZ onlyY = MAPPER.readValue(
@@ -164,6 +168,7 @@ public class IncludeWithDeserTest
         assertEquals(0, onlyY.onlyY._z);
     }
 
+    @Test
     public void testListInclude() throws Exception
     {
         IncludeForListValuesY result = MAPPER.readValue(
@@ -174,13 +179,16 @@ public class IncludeWithDeserTest
         assertEquals(0, result.onlyYs.get(0)._z);
     }
 
+    @Test
     public void testMapWrapper() throws Exception
     {
         MapWrapper result = MAPPER.readValue(a2q("{'value': {'a': 2, 'b': 3}}"), MapWrapper.class);
+        assertNotNull(result.value);
         assertEquals(2, result.value.get("a").intValue());
         assertFalse(result.value.containsKey("b"));
     }
 
+    @Test
     public void testMyMap() throws Exception
     {
         MyMap result = MAPPER.readValue(a2q("{'a': 2, 'b': 3}"), MyMap.class);
@@ -188,6 +196,7 @@ public class IncludeWithDeserTest
         assertFalse(result.containsKey("b"));
     }
 
+    @Test
     public void testForwardReferenceAnySetterComboWithInclude() throws Exception
     {
         String json = a2q("{'@id':1, 'foo':2, 'foo2':2, 'bar':{'@id':2, 'foo':1}}");

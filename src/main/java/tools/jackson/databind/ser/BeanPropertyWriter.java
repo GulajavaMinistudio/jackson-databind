@@ -1,6 +1,8 @@
 package tools.jackson.databind.ser;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -23,6 +25,11 @@ import tools.jackson.databind.ser.impl.PropertySerializerMap;
 import tools.jackson.databind.util.Annotations;
 import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.NameTransformer;
+import tools.jackson.databind.util.internal.UnreflectHandleSupplier;
+
+import static java.lang.invoke.MethodType.methodType;
+
+import static tools.jackson.databind.util.ClassUtil.sneakyThrow;
 
 /**
  * Base bean property handler class, which implements common parts of
@@ -37,8 +44,6 @@ import tools.jackson.databind.util.NameTransformer;
 public class BeanPropertyWriter
     extends PropertyWriter // which extends `ConcreteBeanPropertyBase`
 {
-    private static final long serialVersionUID = 3L;
-
     /**
      * Marker object used to indicate "do not serialize if empty"
      */
@@ -108,20 +113,10 @@ public class BeanPropertyWriter
     protected final AnnotatedMember _member;
 
     /**
-     * Accessor method used to get property value, for method-accessible
-     * properties. Null if and only if {@link #_field} is null.
-     * <p>
-     * `transient` (and non-final) only to support JDK serializability.
+     * Accessor method used to get property value.
+     * Wrapped in a holder since MethodHandle is not serializable.
      */
-    protected transient Method _accessorMethod;
-
-    /**
-     * Field that contains the property value for field-accessible properties.
-     * Null if and only if {@link #_accessorMethod} is null.
-     * <p>
-     * `transient` (and non-final) only to support JDK serializability.
-     */
-    protected transient Field _field;
+    protected final GetterHolder _accessor = new GetterHolder();
 
     /*
     /**********************************************************************
@@ -214,23 +209,10 @@ public class BeanPropertyWriter
 
         _declaredType = declaredType;
         _serializer = (ValueSerializer<Object>) ser;
-        _dynamicSerializers = (ser == null) ? PropertySerializerMap
-                .emptyForProperties() : null;
+        _dynamicSerializers = (ser == null) ? PropertySerializerMap.emptyForProperties() : null;
         _typeSerializer = typeSer;
         _cfgSerializationType = serType;
 
-        if (member instanceof AnnotatedField) {
-            _accessorMethod = null;
-            _field = (Field) member.getMember();
-        } else if (member instanceof AnnotatedMethod) {
-            _accessorMethod = (Method) member.getMember();
-            _field = null;
-        } else {
-            // 01-Dec-2014, tatu: Used to be illegal, but now explicitly allowed
-            // for virtual props
-            _accessorMethod = null;
-            _field = null;
-        }
         _suppressNulls = suppressNulls;
         _suppressableValue = suppressableValue;
 
@@ -259,8 +241,6 @@ public class BeanPropertyWriter
         _typeSerializer = null;
         _cfgSerializationType = null;
 
-        _accessorMethod = null;
-        _field = null;
         _suppressNulls = false;
         _suppressableValue = null;
 
@@ -287,8 +267,6 @@ public class BeanPropertyWriter
         _declaredType = base._declaredType;
 
         _member = base._member;
-        _accessorMethod = base._accessorMethod;
-        _field = base._field;
 
         _serializer = base._serializer;
         _nullSerializer = base._nullSerializer;
@@ -298,7 +276,7 @@ public class BeanPropertyWriter
                     base._internalSettings);
         }
         _cfgSerializationType = base._cfgSerializationType;
-        _dynamicSerializers = base._dynamicSerializers;
+        _dynamicSerializers = PropertySerializerMap.emptyForProperties();
         _suppressNulls = base._suppressNulls;
         _suppressableValue = base._suppressableValue;
         _includeInViews = base._includeInViews;
@@ -314,8 +292,6 @@ public class BeanPropertyWriter
         _member = base._member;
         _contextAnnotations = base._contextAnnotations;
         _declaredType = base._declaredType;
-        _accessorMethod = base._accessorMethod;
-        _field = base._field;
         _serializer = base._serializer;
         _nullSerializer = base._nullSerializer;
         if (base._internalSettings != null) {
@@ -323,7 +299,7 @@ public class BeanPropertyWriter
                     base._internalSettings);
         }
         _cfgSerializationType = base._cfgSerializationType;
-        _dynamicSerializers = base._dynamicSerializers;
+        _dynamicSerializers = PropertySerializerMap.emptyForProperties();
         _suppressNulls = base._suppressNulls;
         _suppressableValue = base._suppressableValue;
         _includeInViews = base._includeInViews;
@@ -411,31 +387,6 @@ public class BeanPropertyWriter
 
     /*
     /**********************************************************************
-    /* JDK Serializability
-    /**********************************************************************
-     */
-
-    /*
-     * Ideally would not require mutable state, and instead would re-create with
-     * final settings. However, as things are, with sub-types and all, simplest
-     * to just change Field/Method value directly.
-     */
-    Object readResolve() {
-        if (_member instanceof AnnotatedField) {
-            _accessorMethod = null;
-            _field = (Field) _member.getMember();
-        } else if (_member instanceof AnnotatedMethod) {
-            _accessorMethod = (Method) _member.getMember();
-            _field = null;
-        }
-        if (_serializer == null) {
-            _dynamicSerializers = PropertySerializerMap.emptyForProperties();
-        }
-        return this;
-    }
-
-    /*
-    /**********************************************************************
     /* BeanProperty impl
     /**********************************************************************
      */
@@ -494,7 +445,7 @@ public class BeanPropertyWriter
 
     /**
      * Method for accessing value of specified internal setting.
-     * 
+     *
      * @return Value of the setting, if any; null if none.
      */
     public Object getInternalSetting(Object key) {
@@ -503,7 +454,7 @@ public class BeanPropertyWriter
 
     /**
      * Method for setting specific internal setting to given value
-     * 
+     *
      * @return Old value of the setting, if any (null if none)
      */
     public Object setInternalSetting(Object key, Object value) {
@@ -515,7 +466,7 @@ public class BeanPropertyWriter
 
     /**
      * Method for removing entry for specified internal setting.
-     * 
+     *
      * @return Existing value of the setting, if any (null if none)
      */
     public Object removeInternalSetting(Object key) {
@@ -607,12 +558,10 @@ public class BeanPropertyWriter
      * serializer.
      */
     @Override
-    public void serializeAsProperty(Object bean, JsonGenerator g, SerializerProvider ctxt)
+    public void serializeAsProperty(Object bean, JsonGenerator g, SerializationContext ctxt)
         throws Exception
     {
-        // inlined 'get()'
-        final Object value = (_accessorMethod == null) ? _field.get(bean)
-                : _accessorMethod.invoke(bean, (Object[]) null);
+        final Object value = get(bean);
 
         // Null handling is bit different, check that first
         if (value == null) {
@@ -668,7 +617,7 @@ public class BeanPropertyWriter
      * omission.
      */
     @Override
-    public void serializeAsOmittedProperty(Object bean, JsonGenerator g, SerializerProvider ctxt)
+    public void serializeAsOmittedProperty(Object bean, JsonGenerator g, SerializationContext ctxt)
         throws Exception
     {
         if (!g.canOmitProperties()) {
@@ -682,16 +631,14 @@ public class BeanPropertyWriter
      * the difference is that no property names are written.
      */
     @Override
-    public void serializeAsElement(Object bean, JsonGenerator g, SerializerProvider ctxt)
+    public void serializeAsElement(Object bean, JsonGenerator g, SerializationContext ctxt)
         throws Exception
     {
-        // inlined 'get()'
-        final Object value = (_accessorMethod == null) ? _field.get(bean)
-                : _accessorMethod.invoke(bean, (Object[]) null);
+        final Object value = get(bean);
         if (value == null) { // nulls need specialized handling
             if (_nullSerializer != null) {
                 _nullSerializer.serialize(null, g, ctxt);
-            } else { // can NOT suppress entries in tabular output
+            } else { // CANNOT suppress entries in tabular output
                 g.writeNull();
             }
             return;
@@ -709,13 +656,12 @@ public class BeanPropertyWriter
         // and then see if we must suppress certain values (default, empty)
         if (_suppressableValue != null) {
             if (MARKER_FOR_EMPTY == _suppressableValue) {
-                if (ser.isEmpty(ctxt, value)) { // can NOT suppress entries in
-                                                // tabular output
+                if (ser.isEmpty(ctxt, value)) { // CANNOT suppress entries in tabular output
                     serializeAsOmittedElement(bean, g, ctxt);
                     return;
                 }
             } else if (_suppressableValue.equals(value)) {
-                // can NOT suppress entries in tabular output
+                // CANNOT suppress entries in tabular output
                 serializeAsOmittedElement(bean, g, ctxt);
                 return;
             }
@@ -741,7 +687,7 @@ public class BeanPropertyWriter
      */
     @Override
     public void serializeAsOmittedElement(Object bean, JsonGenerator g,
-            SerializerProvider prov)
+            SerializationContext prov)
         throws Exception
     {
         if (_nullSerializer != null) {
@@ -760,7 +706,7 @@ public class BeanPropertyWriter
     // Also part of BeanProperty implementation
     @Override
     public void depositSchemaProperty(JsonObjectFormatVisitor v,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         if (v != null) {
             if (isRequired()) {
@@ -778,7 +724,7 @@ public class BeanPropertyWriter
      */
 
     protected ValueSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
-            Class<?> rawType, SerializerProvider provider)
+            Class<?> rawType, SerializationContext provider)
     {
         JavaType t;
         if (_nonTrivialBaseType != null) {
@@ -798,14 +744,13 @@ public class BeanPropertyWriter
     /**
      * Method that can be used to access value of the property this Object
      * describes, from given bean instance.
-     * <p>
-     * Note: method is final as it should not need to be overridden -- rather,
-     * calling method(s) ({@link #serializeAsProperty}) should be overridden to
-     * change the behavior
      */
     public final Object get(Object bean) throws Exception {
-        return (_accessorMethod == null) ? _field.get(bean) : _accessorMethod
-                .invoke(bean, (Object[]) null);
+        try {
+            return _accessor.get().invokeExact(bean);
+        } catch (Throwable e) {
+            throw sneakyThrow(e);
+        }
     }
 
     /**
@@ -823,21 +768,33 @@ public class BeanPropertyWriter
      *         is no way handle it
      */
     protected boolean _handleSelfReference(Object bean, JsonGenerator g,
-            SerializerProvider ctxt, ValueSerializer<?> ser)
+            SerializationContext ctxt, ValueSerializer<?> ser)
         throws JacksonException
     {
         if (!ser.usesObjectId()) {
+            boolean writeAsNull = false;
+
             if (ctxt.isEnabled(SerializationFeature.FAIL_ON_SELF_REFERENCES)) {
                 // 05-Feb-2013, tatu: Usually a problem, but NOT if we are handling
                 // object id; this may be the case for BeanSerializers at least.
                 if (ser instanceof BeanSerializerBase) {
-                    ctxt.reportBadDefinition(getType(), "Direct self-reference leading to cycle");
+                    // 09-Jul-2025, tatu: [databind#5194] Let's suppress specific case
+                    //   of "cause" for Throwables
+                    if (_isThrowableFieldCause(ctxt, bean)) {
+                        writeAsNull = true;
+                    } else {
+                        ctxt.reportBadDefinition(getType(), "Direct self-reference leading to cycle");
+                    }
                 }
-            } else if (ctxt.isEnabled(SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL)) {
+            } else {
+                writeAsNull = ctxt.isEnabled(SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL);
+            }
+
+            if (writeAsNull) {
                 if (_nullSerializer != null) {
                     // 23-Oct-2019, tatu: Tricky part -- caller does not specify if it's
                     //   "as property" (in JSON Object) or "as element" (JSON array, via
-                    //   'POJO-as-array'). And since Afterburner calls method can not easily
+                    //   'POJO-as-array'). And since Afterburner calls method cannot easily
                     //   start passing info either. So check generator to see...
                     //   (note: not considering ROOT context as possibility, does not seem legal)
                     if (!g.streamWriteContext().inArray()) {
@@ -851,17 +808,24 @@ public class BeanPropertyWriter
         return false;
     }
 
+    // Helper method to recognize `Throwable.cause` Field, which has "this" as initialized
+    // value to mean "not set" (`Throwable.getCause()` translates this to `null`).
+    //
+    // @since 2.20
+    private boolean _isThrowableFieldCause(SerializationContext ctxt, Object bean) {
+        return bean instanceof Throwable
+                && _member instanceof AnnotatedField
+                && "cause".equals(_name.getValue())
+                ;
+    }
+    
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(40);
         sb.append("property '").append(getName()).append("' (");
-        if (_accessorMethod != null) {
-            sb.append("via method ")
-                    .append(_accessorMethod.getDeclaringClass().getName())
-                    .append("#").append(_accessorMethod.getName());
-        } else if (_field != null) {
-            sb.append("field \"").append(_field.getDeclaringClass().getName())
-                    .append("#").append(_field.getName());
+        if (_accessor != null) {
+            sb.append("via methodhandle ")
+                    .append(_accessor);
         } else {
             sb.append("virtual");
         }
@@ -873,5 +837,26 @@ public class BeanPropertyWriter
         }
         sb.append(')');
         return sb.toString();
+    }
+
+    class GetterHolder extends UnreflectHandleSupplier {
+        private static final long serialVersionUID = 1L;
+
+        public GetterHolder() {
+            super(methodType(Object.class, Object.class));
+        }
+
+        @Override
+        protected MethodHandle unreflect() throws IllegalAccessException {
+            if (_member instanceof AnnotatedField) {
+                return MethodHandles.lookup().unreflectGetter((Field) _member.getMember());
+            } else if (_member instanceof AnnotatedMethod method) {
+                return MethodHandles.lookup().unreflect(method.getMember());
+            } else {
+                // 01-Dec-2014, tatu: Used to be illegal, but now explicitly allowed
+                // for virtual props
+                return null;
+            }
+        }
     }
 }

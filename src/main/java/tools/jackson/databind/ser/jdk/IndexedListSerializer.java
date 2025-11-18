@@ -34,7 +34,7 @@ public final class IndexedListSerializer
 
     @Override
     protected StdContainerSerializer<?> _withValueTypeSerializer(TypeSerializer vts) {
-        return new IndexedListSerializer(this, 
+        return new IndexedListSerializer(this,
                 vts, _elementSerializer, _unwrapSingle, _property);
     }
 
@@ -50,9 +50,9 @@ public final class IndexedListSerializer
     /* Accessors
     /**********************************************************************
      */
-    
+
     @Override
-    public boolean isEmpty(SerializerProvider prov, Object value) {
+    public boolean isEmpty(SerializationContext prov, Object value) {
         return ((List<?>)value).isEmpty();
     }
 
@@ -62,7 +62,7 @@ public final class IndexedListSerializer
     }
 
     @Override
-    public final void serialize(Object value0, JsonGenerator gen, SerializerProvider provider)
+    public final void serialize(Object value0, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         final List<?> value = (List<?>) value0;
@@ -79,9 +79,9 @@ public final class IndexedListSerializer
         serializeContents(value, gen, provider);
         gen.writeEndArray();
     }
-    
+
     @Override
-    public void serializeContents(Object value0, JsonGenerator g, SerializerProvider ctxt)
+    public void serializeContents(Object value0, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
         final List<?> value = (List<?>) value0;
@@ -122,8 +122,8 @@ public final class IndexedListSerializer
             wrapAndThrow(ctxt, e, value, i);
         }
     }
-    
-    public void serializeContentsUsing(List<?> value, JsonGenerator jgen, SerializerProvider provider,
+
+    public void serializeContentsUsing(List<?> value, JsonGenerator jgen, SerializationContext provider,
             ValueSerializer<Object> ser)
         throws JacksonException
     {
@@ -149,7 +149,7 @@ public final class IndexedListSerializer
         }
     }
 
-    public void serializeTypedContents(List<?> value, JsonGenerator g, SerializerProvider ctxt)
+    public void serializeTypedContents(List<?> value, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
         final int len = value.size();

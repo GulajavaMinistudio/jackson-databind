@@ -6,7 +6,6 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
@@ -33,18 +32,15 @@ public abstract class DOMDeserializer<T> extends FromStringDeserializer<T>
             parserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         } catch(ParserConfigurationException pce) {
             // not much point to do anything; could log but...
-        } catch (Error e) {
-            // 14-Jul-2016, tatu: Not sure how or why, but during code coverage runs
-            //   (via Cobertura) we get `java.lang.AbstractMethodError` so... ignore that too
         }
 
         // [databind#2589] add two more settings just in case
         try {
             parserFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        } catch (Throwable t) { } // as per previous one, nothing much to do
+        } catch (Exception t) { } // as per previous one, nothing much to do
         try {
             parserFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        } catch (Throwable t) { } // as per previous one, nothing much to do
+        } catch (Exception t) { } // as per previous one, nothing much to do
         DEFAULT_PARSER_FACTORY = parserFactory;
     }
 
@@ -76,14 +72,14 @@ public abstract class DOMDeserializer<T> extends FromStringDeserializer<T>
     /* Concrete deserializers
     /**********************************************************
      */
-    
+
     public static class NodeDeserializer extends DOMDeserializer<Node> {
         public NodeDeserializer() { super(Node.class); }
         @Override
         public Node _deserialize(String value, DeserializationContext ctxt) throws IllegalArgumentException {
             return parse(value);
         }
-    }    
+    }
 
     public static class DocumentDeserializer extends DOMDeserializer<Document> {
         public DocumentDeserializer() { super(Document.class); }
@@ -91,5 +87,5 @@ public abstract class DOMDeserializer<T> extends FromStringDeserializer<T>
         public Document _deserialize(String value, DeserializationContext ctxt) throws IllegalArgumentException {
             return parse(value);
         }
-    }    
+    }
 }

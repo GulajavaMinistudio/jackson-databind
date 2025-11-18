@@ -28,7 +28,7 @@ public class StringCollectionSerializer
     /* Life-cycle
     /**********************************************************************
      */
-    
+
     protected StringCollectionSerializer() {
         super(Collection.class);
     }
@@ -37,7 +37,7 @@ public class StringCollectionSerializer
             Boolean unwrapSingle)
     {
         super(src, unwrapSingle);
-    }        
+    }
 
     @Override
     public ValueSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
@@ -48,7 +48,7 @@ public class StringCollectionSerializer
     protected JsonNode contentSchema() {
         return createSchemaNode("string", true);
     }
-    
+
     @Override
     protected void acceptContentVisitor(JsonArrayFormatVisitor visitor) {
         visitor.itemsFormat(JsonFormatTypes.STRING);
@@ -59,10 +59,10 @@ public class StringCollectionSerializer
     /* Actual serialization
     /**********************************************************************
      */
-    
+
     @Override
     public void serialize(Collection<String> value, JsonGenerator g,
-            SerializerProvider provider) throws JacksonException
+            SerializationContext provider) throws JacksonException
     {
         final int len = value.size();
         if (len == 1) {
@@ -80,7 +80,7 @@ public class StringCollectionSerializer
 
     @Override
     public void serializeWithType(Collection<String> value, JsonGenerator g,
-            SerializerProvider ctxt, TypeSerializer typeSer)
+            SerializationContext ctxt, TypeSerializer typeSer)
         throws JacksonException
     {
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
@@ -91,7 +91,7 @@ public class StringCollectionSerializer
     }
 
     private final void serializeContents(Collection<String> value, JsonGenerator g,
-            SerializerProvider provider)
+            SerializationContext provider)
         throws JacksonException
     {
         int i = 0;

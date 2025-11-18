@@ -1,5 +1,7 @@
 package tools.jackson.databind.deser.creators;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -12,14 +14,20 @@ import tools.jackson.databind.introspect.AnnotatedParameter;
 import tools.jackson.databind.introspect.JacksonAnnotationIntrospector;
 import tools.jackson.databind.introspect.VisibilityChecker;
 
-public class MultiArgConstructorTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+import static tools.jackson.databind.testutil.DatabindTestUtil.verifyException;
+
+public class MultiArgConstructorTest
 {
     static class MultiArgCtorBean
     {
         protected int _a, _b;
 
         public int c;
-        
+
         public MultiArgCtorBean(int a, int b) {
             _a = a;
             _b = b;
@@ -31,13 +39,13 @@ public class MultiArgConstructorTest extends BaseMapTest
         protected int _a, _b;
 
         public int c;
-        
+
         public MultiArgCtorBeanWithAnnotations(int a, @JsonProperty("b2") int b) {
             _a = a;
             _b = b;
         }
     }
-    
+
     /* Before JDK8, we won't have parameter names available, so let's
      * fake it before that...
      */
@@ -46,8 +54,7 @@ public class MultiArgConstructorTest extends BaseMapTest
     {
         @Override
         public String findImplicitPropertyName(MapperConfig<?> config, AnnotatedMember param) {
-            if (param instanceof AnnotatedParameter) {
-                AnnotatedParameter ap = (AnnotatedParameter) param;
+            if (param instanceof AnnotatedParameter ap) {
                 switch (ap.getIndex()) {
                 case 0: return "a";
                 case 1: return "b";
@@ -58,13 +65,14 @@ public class MultiArgConstructorTest extends BaseMapTest
             return super.findImplicitPropertyName(config, param);
         }
     }
-    
+
     /*
-    /********************************************************************** 
+    /**********************************************************************
     /* Test methods
-    /********************************************************************** 
+    /**********************************************************************
      */
 
+    @Test
     public void testMultiArgVisible() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -79,6 +87,7 @@ public class MultiArgConstructorTest extends BaseMapTest
     }
 
     // But besides visibility, also allow overrides
+    @Test
     public void testMultiArgWithPartialOverride() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -94,6 +103,7 @@ public class MultiArgConstructorTest extends BaseMapTest
 
     // but let's also ensure that it is possible to prevent use of that constructor
     // with different visibility
+    @Test
     public void testMultiArgNotVisible() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()

@@ -4,10 +4,11 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonToken;
 import tools.jackson.core.type.WritableTypeId;
 import tools.jackson.databind.BeanProperty;
 import tools.jackson.databind.DatabindContext;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsontype.TypeIdResolver;
 import tools.jackson.databind.jsontype.TypeSerializer;
 
@@ -34,33 +35,64 @@ public abstract class TypeSerializerBase extends TypeSerializer
 
     @Override
     public String getPropertyName() { return null; }
-    
+
     @Override
     public TypeIdResolver getTypeIdResolver() { return _idResolver; }
 
     @Override
-    public WritableTypeId writeTypePrefix(JsonGenerator g, SerializerProvider ctxt,
+    public WritableTypeId writeTypePrefix(JsonGenerator g, SerializationContext ctxt,
             WritableTypeId idMetadata) throws JacksonException
     {
         _generateTypeId(ctxt, idMetadata);
         // 16-Jan-2022, tatu: As per [databind#3373], skip for null typeId.
-        //    And return "null" so that matching "writeTypeSuffix" call should
-        //    be avoided as well.
+        //    And return "null" to avoid matching "writeTypeSuffix" as well.
+        // 15-Jun-2024, tatu: [databind#4407] Not so fast! Output wrappers
         if (idMetadata.id == null) {
-            return null;
+            return _writeTypePrefixForNull(g, idMetadata);
         }
         return g.writeTypePrefix(idMetadata);
     }
 
     @Override
-    public WritableTypeId writeTypeSuffix(JsonGenerator g, SerializerProvider ctxt,
+    public WritableTypeId writeTypeSuffix(JsonGenerator g, SerializationContext ctxt,
             WritableTypeId idMetadata) throws JacksonException
     {
         // 16-Jan-2022, tatu: As per [databind#3373], skip for null:
+        // 15-Jun-2024, tatu: [databind#4407] except no, write closing wrapper
         if (idMetadata == null) {
-            return null;
+            return _writeTypeSuffixfixForNull(g, idMetadata);
         }
         return g.writeTypeSuffix(idMetadata);
+    }
+
+    private WritableTypeId _writeTypePrefixForNull(JsonGenerator g,
+            WritableTypeId typeIdDef) throws JacksonException
+    {
+        // copied from `jackson-core`, `JsonGenerator.writeTypePrefix()`
+        final JsonToken valueShape = typeIdDef.valueShape;
+        typeIdDef.wrapperWritten = false;
+        if (valueShape == JsonToken.START_OBJECT) {
+            g.writeStartObject(typeIdDef.forValue);
+        } else if (valueShape == JsonToken.START_ARRAY) {
+            // should we now set the current object?
+            g.writeStartArray(typeIdDef.forValue);
+        }
+
+        return typeIdDef;
+    }
+
+    private WritableTypeId _writeTypeSuffixfixForNull(JsonGenerator g,
+            WritableTypeId typeIdDef) throws JacksonException
+    {
+        // copied from `jackson-core`, `JsonGenerator.writeTypeSuffix()`
+        final JsonToken valueShape = typeIdDef.valueShape;
+        // First: does value need closing?
+        if (valueShape == JsonToken.START_OBJECT) {
+            g.writeEndObject();
+        } else if (valueShape == JsonToken.START_ARRAY) {
+            g.writeEndArray();
+        }
+        return typeIdDef;
     }
 
     /**

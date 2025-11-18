@@ -3,12 +3,16 @@ package tools.jackson.databind.node;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
-
 import tools.jackson.databind.*;
+import tools.jackson.databind.json.JsonMapper;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Basic tests for {@link JsonNode} implementations that
@@ -17,7 +21,8 @@ import tools.jackson.databind.*;
 public class NumberNodesTest extends NodeTestBase
 {
     private final ObjectMapper MAPPER = objectMapper();
-    
+
+    @Test
     public void testShort()
     {
         ShortNode n = ShortNode.valueOf((short) 1);
@@ -29,7 +34,7 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(1L, n.longValue());
         assertEquals(BigDecimal.ONE, n.decimalValue());
         assertEquals(BigInteger.ONE, n.bigIntegerValue());
-        assertEquals("1", n.asText());
+        assertEquals("1", n.asString());
 
         assertNodeNumbers(n, 1, 1.0);
 
@@ -40,8 +45,11 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(ShortNode.valueOf((short) 0).canConvertToLong());
         assertTrue(ShortNode.valueOf(Short.MAX_VALUE).canConvertToLong());
         assertTrue(ShortNode.valueOf(Short.MIN_VALUE).canConvertToLong());
+
+        assertNonContainerStreamMethods(n);
     }
 
+    @Test
     public void testIntViaMapper() throws Exception
     {
         int value = -90184;
@@ -54,7 +62,7 @@ public class NumberNodesTest extends NodeTestBase
         assertFalse(result.isFloatingPointNumber());
         assertFalse(result.isDouble());
         assertFalse(result.isNull());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
         assertFalse(result.isMissingNode());
 
         assertTrue(result.canConvertToInt());
@@ -63,7 +71,7 @@ public class NumberNodesTest extends NodeTestBase
 
         assertEquals(value, result.numberValue().intValue());
         assertEquals(value, result.intValue());
-        assertEquals(String.valueOf(value), result.asText());
+        assertEquals(String.valueOf(value), result.asString());
         assertEquals((double) value, result.doubleValue());
         assertEquals((long) value, result.longValue());
 
@@ -71,6 +79,7 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(result, IntNode.valueOf(value));
     }
 
+    @Test
     public void testInt()
     {
         IntNode n = IntNode.valueOf(1);
@@ -82,10 +91,10 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(1L, n.longValue());
         assertEquals(BigDecimal.ONE, n.decimalValue());
         assertEquals(BigInteger.ONE, n.bigIntegerValue());
-        assertEquals("1", n.asText());
+        assertEquals("1", n.asString());
         // 2.4
-        assertEquals("1", n.asText("foo"));
-        
+        assertEquals("1", n.asString("foo"));
+
         assertNodeNumbers(n, 1, 1.0);
 
         assertTrue(IntNode.valueOf(0).canConvertToInt());
@@ -96,8 +105,10 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(IntNode.valueOf(Integer.MAX_VALUE).canConvertToLong());
         assertTrue(IntNode.valueOf(Integer.MIN_VALUE).canConvertToLong());
 
+        assertNonContainerStreamMethods(n);
     }
 
+    @Test
     public void testLong()
     {
         LongNode n = LongNode.valueOf(1L);
@@ -109,7 +120,7 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(1L, n.longValue());
         assertEquals(BigDecimal.ONE, n.decimalValue());
         assertEquals(BigInteger.ONE, n.bigIntegerValue());
-        assertEquals("1", n.asText());
+        assertEquals("1", n.asString());
 
         assertNodeNumbers(n, 1, 1.0);
 
@@ -124,8 +135,11 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(LongNode.valueOf(0L).canConvertToLong());
         assertTrue(LongNode.valueOf(Long.MAX_VALUE).canConvertToLong());
         assertTrue(LongNode.valueOf(Long.MIN_VALUE).canConvertToLong());
+
+        assertNonContainerStreamMethods(n);
     }
 
+    @Test
     public void testLongViaMapper() throws Exception
     {
         // need to use something beyond 32-bit value space
@@ -139,12 +153,12 @@ public class NumberNodesTest extends NodeTestBase
         assertFalse(result.isFloatingPointNumber());
         assertFalse(result.isDouble());
         assertFalse(result.isNull());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
         assertFalse(result.isMissingNode());
 
         assertEquals(value, result.numberValue().longValue());
         assertEquals(value, result.longValue());
-        assertEquals(String.valueOf(value), result.asText());
+        assertEquals(String.valueOf(value), result.asString());
         assertEquals((double) value, result.doubleValue());
 
         assertFalse(result.canConvertToInt());
@@ -155,6 +169,7 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(result, LongNode.valueOf(value));
     }
 
+    @Test
     public void testDouble() throws Exception
     {
         DoubleNode n = DoubleNode.valueOf(0.25);
@@ -162,13 +177,15 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(0 != n.hashCode());
         assertEquals(JsonToken.VALUE_NUMBER_FLOAT, n.asToken());
         assertEquals(JsonParser.NumberType.DOUBLE, n.numberType());
-        assertEquals(0, n.intValue());
+        // No longer legal in 3.0 due to fractional part
+        //assertEquals(0, n.intValue());
         assertEquals(0.25, n.doubleValue());
         assertNotNull(n.decimalValue());
-        assertEquals(BigInteger.ZERO, n.bigIntegerValue());
-        assertEquals("0.25", n.asText());
+        assertEquals("0.25", n.asString());
 
-        assertNodeNumbers(DoubleNode.valueOf(4.5), 4, 4.5);
+        // No longer legal in 3.0 due to fractional part
+        //assertEquals(BigInteger.ZERO, n.bigIntegerValue());
+        //assertNodeNumbers(DoubleNode.valueOf(4.5), 4, 4.5);
 
         assertTrue(DoubleNode.valueOf(0).canConvertToInt());
         assertTrue(DoubleNode.valueOf(Integer.MAX_VALUE).canConvertToInt());
@@ -185,8 +202,11 @@ public class NumberNodesTest extends NodeTestBase
         n = (DoubleNode) num;
         assertEquals(-0.0, n.doubleValue());
         assertEquals("-0.0", String.valueOf(n.doubleValue()));
+
+        assertNonContainerStreamMethods(n);
     }
 
+    @Test
     public void testDoubleViaMapper() throws Exception
     {
         double value = 3.04;
@@ -201,20 +221,24 @@ public class NumberNodesTest extends NodeTestBase
         assertFalse(result.isInt());
         assertFalse(result.isLong());
         assertFalse(result.isIntegralNumber());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
         assertFalse(result.isMissingNode());
 
         assertEquals(value, result.doubleValue());
         assertEquals(value, result.numberValue().doubleValue());
-        assertEquals((int) value, result.intValue());
-        assertEquals((long) value, result.longValue());
-        assertEquals(String.valueOf(value), result.asText());
+
+        // CANNOT convert to int due to fractional part
+        //assertEquals((int) value, result.intValue());
+        //assertEquals((long) value, result.longValue());
+
+        assertEquals(String.valueOf(value), result.asString());
 
         // also, equality should work ok
         assertEquals(result, DoubleNode.valueOf(value));
     }
 
     // @since 2.2
+    @Test
     public void testFloat()
     {
         FloatNode n = FloatNode.valueOf(0.45f);
@@ -222,26 +246,25 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(0 != n.hashCode());
         assertEquals(JsonToken.VALUE_NUMBER_FLOAT, n.asToken());
         assertEquals(JsonParser.NumberType.FLOAT, n.numberType());
-        assertEquals(0, n.intValue());
+        assertEquals(0, n.intValue(0));
         assertTrue(n.isFloatingPointNumber());
         assertFalse(n.isIntegralNumber());
         assertFalse(n.canConvertToExactIntegral());
 
         // NOTE: conversion to double NOT as simple as with exact numbers like 0.25:
         assertEquals(0.45f, n.floatValue());
-        assertEquals("0.45", n.asText());
+        assertEquals("0.45", n.asString());
 
         // so; as double we'll get more complex number; however, should round-trip
         // to something that gets printed the same way. But not exact value, alas, hence:
         assertEquals("0.45",  String.valueOf((float) n.doubleValue()));
 
         assertNotNull(n.decimalValue());
-        // possibly surprisingly, however, this will produce same output:
-        assertEquals(BigInteger.ZERO, n.bigIntegerValue());
-        assertEquals("0.45", n.asText());
+        assertEquals("0.45", n.asString());
 
-        // 1.6:
-        assertNodeNumbers(FloatNode.valueOf(4.5f), 4, 4.5f);
+        // No longer legal to convert to integral numbers, due to fractional part
+        // assertEquals(BigInteger.ZERO, n.bigIntegerValue());
+        //assertNodeNumbers(FloatNode.valueOf(4.5f), 4, 4.5f);
 
         assertTrue(FloatNode.valueOf(0).canConvertToInt());
         assertTrue(FloatNode.valueOf(Integer.MAX_VALUE).canConvertToInt());
@@ -254,8 +277,11 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(FloatNode.valueOf(0L).canConvertToLong());
         assertTrue(FloatNode.valueOf(Integer.MAX_VALUE).canConvertToLong());
         assertTrue(FloatNode.valueOf(Integer.MIN_VALUE).canConvertToLong());
+
+        assertNonContainerStreamMethods(n);
     }
-    
+
+    @Test
     public void testDecimalNode() throws Exception
     {
         DecimalNode n = DecimalNode.valueOf(BigDecimal.ONE);
@@ -271,7 +297,7 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(1, n.intValue());
         assertEquals(1L, n.longValue());
         assertEquals(BigDecimal.ONE, n.decimalValue());
-        assertEquals("1", n.asText());
+        assertEquals("1", n.asString());
 
         assertNodeNumbers(n, 1, 1.0);
 
@@ -299,45 +325,46 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(result.isBigDecimal());
         assertFalse(result.isDouble());
         assertFalse(result.isNull());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
         assertFalse(result.isMissingNode());
 
         assertFalse(result.canConvertToExactIntegral());
-        assertTrue(result.canConvertToInt());
-        assertTrue(result.canConvertToLong());
-        
+        // Cannot convert in 3.0, due to fraction
+        assertFalse(result.canConvertToInt());
+        assertFalse(result.canConvertToLong());
+
         assertEquals(value, result.numberValue());
-        assertEquals(value.toString(), result.asText());
+        assertEquals(value.toString(), result.asString());
 
         // also, equality should work ok
         assertEquals(result, DecimalNode.valueOf(value));
+
+        assertNonContainerStreamMethods(n);
     }
-    
+
+    @Test
     public void testDecimalNodeEqualsHashCode()
     {
-        // We want DecimalNodes with equivalent _numeric_ values to be equal;
-        // this is not the case for BigDecimal where "1.0" and "1" are not
-        // equal!
+        // NOTE! Equality rules looser in 3.x than 2.x: we won't
+        // try to normalize values.
+
         BigDecimal b1 = BigDecimal.ONE;
-        BigDecimal b2 = new BigDecimal("1.0");
+        BigDecimal b2 = new BigDecimal("1");
         BigDecimal b3 = new BigDecimal("0.01e2");
-        BigDecimal b4 = new BigDecimal("1000e-3");
 
         DecimalNode node1 = new DecimalNode(b1);
         DecimalNode node2 = new DecimalNode(b2);
         DecimalNode node3 = new DecimalNode(b3);
-        DecimalNode node4 = new DecimalNode(b4);
 
         assertEquals(node1.hashCode(), node2.hashCode());
         assertEquals(node2.hashCode(), node3.hashCode());
-        assertEquals(node3.hashCode(), node4.hashCode());
 
         assertEquals(node1, node2);
         assertEquals(node2, node1);
         assertEquals(node2, node3);
-        assertEquals(node3, node4);
     }
 
+    @Test
     public void testBigIntegerNode() throws Exception
     {
         BigIntegerNode n = BigIntegerNode.valueOf(BigInteger.ONE);
@@ -352,11 +379,11 @@ public class NumberNodesTest extends NodeTestBase
         assertEquals(1, n.intValue());
         assertEquals(1L, n.longValue());
         assertEquals(BigInteger.ONE, n.bigIntegerValue());
-        assertEquals("1", n.asText());
+        assertEquals("1", n.asString());
         assertNodeNumbers(n, 1, 1.0);
 
         BigInteger maxLong = BigInteger.valueOf(Long.MAX_VALUE);
-        
+
         n = BigIntegerNode.valueOf(maxLong);
         assertEquals(Long.MAX_VALUE, n.longValue());
 
@@ -378,11 +405,14 @@ public class NumberNodesTest extends NodeTestBase
         assertTrue(BigIntegerNode.valueOf(BigInteger.ZERO).canConvertToLong());
         assertTrue(BigIntegerNode.valueOf(BigInteger.valueOf(Long.MAX_VALUE)).canConvertToLong());
         assertTrue(BigIntegerNode.valueOf(BigInteger.valueOf(Long.MIN_VALUE)).canConvertToLong());
+
+        assertNonContainerStreamMethods(n);
     }
 
+    @Test
     public void testBigDecimalAsPlain() throws Exception
     {
-        ObjectMapper mapper = jsonMapperBuilder(JsonFactory.builder()
+        ObjectMapper mapper = JsonMapper.builder(JsonFactory.builder()
                 .enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN)
                 .build())
                 .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -402,6 +432,7 @@ public class NumberNodesTest extends NodeTestBase
     }
 
     // Related to [databind#333]
+    @Test
     public void testCanonicalNumbers() throws Exception
     {
         JsonNodeFactory f = new JsonNodeFactory();

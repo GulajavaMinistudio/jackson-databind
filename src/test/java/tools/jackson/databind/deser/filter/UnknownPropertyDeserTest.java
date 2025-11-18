@@ -2,18 +2,23 @@ package tools.jackson.databind.deser.filter;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.*;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.DeserializationProblemHandler;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for checking handling of unknown properties
  */
-public class UnknownPropertyDeserTest
-    extends BaseMapTest
+public class UnknownPropertyDeserTest extends DatabindTestUtil
 {
     final static class TestBean
     {
@@ -73,7 +78,7 @@ public class UnknownPropertyDeserTest
     static class IgnoreUnknownAnySetter {
 
         Map<String, Object> props = new HashMap<>();
-        
+
         @JsonAnySetter
         public void addProperty(String key, Object value) {
             props.put(key, value);
@@ -87,10 +92,10 @@ public class UnknownPropertyDeserTest
 
     @JsonIgnoreProperties(ignoreUnknown=true)
     static class IgnoreUnknownUnwrapped {
-      
+
       @JsonUnwrapped
       UnwrappedChild child;
-      
+
       static class UnwrappedChild {
         public int a, b;
       }
@@ -146,15 +151,18 @@ public class UnknownPropertyDeserTest
     private final ObjectMapper MAPPER = newJsonMapper();
 
     final static String JSON_UNKNOWN_FIELD = "{ \"a\" : 1, \"foo\" : [ 1, 2, 3], \"b\" : -1 }";
-    
+
     /**
      * By default we should just get an exception if an unknown property
      * is encountered
      */
+    @Test
     public void testUnknownHandlingDefault() throws Exception
     {
         try {
-            MAPPER.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
+            MAPPER.readerFor(TestBean.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .readValue(JSON_UNKNOWN_FIELD);
             fail("Should not pass");
         } catch (UnrecognizedPropertyException jex) {
             verifyException(jex, "Unrecognized property \"foo\"");
@@ -165,6 +173,7 @@ public class UnknownPropertyDeserTest
      * Test that verifies that it is possible to ignore unknown properties using
      * {@link DeserializationProblemHandler}.
      */
+    @Test
     public void testUnknownHandlingIgnoreWithHandler() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -181,6 +190,7 @@ public class UnknownPropertyDeserTest
      * Test that verifies that it is possible to ignore unknown properties using
      * {@link DeserializationProblemHandler} and an ObjectReader.
      */
+    @Test
     public void testUnknownHandlingIgnoreWithHandlerAndObjectReader() throws Exception
     {
         ObjectMapper mapper = newJsonMapper();
@@ -196,23 +206,20 @@ public class UnknownPropertyDeserTest
      * Test for checking that it is also possible to simply suppress
      * error reporting for unknown properties.
      */
+    @Test
     public void testUnknownHandlingIgnoreWithFeature() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
-        TestBean result = null;
-        try {
-            result = mapper.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
-        } catch (JacksonException jex) {
-            fail("Did not expect a problem, got: "+jex.getMessage());
-        }
+        TestBean result = mapper.readValue(JSON_UNKNOWN_FIELD, TestBean.class);
         assertNotNull(result);
         assertEquals(1, result._a);
         assertNull(result._unknown);
         assertEquals(-1, result._b);
     }
 
+    @Test
     public void testWithClassIgnore() throws Exception
     {
         IgnoreSome result = MAPPER.readValue("{ \"a\":1,\"b\":2,\"c\":\"x\",\"d\":\"y\"}",
@@ -225,6 +232,7 @@ public class UnknownPropertyDeserTest
         assertNull(result.c());
     }
 
+    @Test
     public void testClassIgnoreWithMap() throws Exception
     {
         // Let's actually use incompatible types for "a" and "d"; should not matter when ignored
@@ -242,6 +250,7 @@ public class UnknownPropertyDeserTest
         assertFalse(result.containsKey("d"));
     }
 
+    @Test
     public void testClassWithIgnoreUnknown() throws Exception
     {
         IgnoreUnknown result = MAPPER.readValue
@@ -249,6 +258,7 @@ public class UnknownPropertyDeserTest
         assertEquals(-3, result.a);
     }
 
+    @Test
     public void testAnySetterWithFailOnUnknownDisabled() throws Exception
     {
         IgnoreUnknownAnySetter value = MAPPER.readValue("{\"x\":\"y\", \"a\":\"b\"}",  IgnoreUnknownAnySetter.class);
@@ -256,6 +266,7 @@ public class UnknownPropertyDeserTest
         assertEquals(2, value.props.size());
     }
 
+    @Test
     public void testUnwrappedWithFailOnUnknownDisabled() throws Exception
     {
       IgnoreUnknownUnwrapped value = MAPPER.readValue("{\"a\":1, \"b\":2}",  IgnoreUnknownUnwrapped.class);
@@ -268,6 +279,7 @@ public class UnknownPropertyDeserTest
      * Test that verifies that use of {@link JsonIgnore} will add implicit
      * skipping of matching properties.
      */
+    @Test
     public void testClassWithUnknownAndIgnore() throws Exception
     {
         // should be ok: "a" and "b" ignored, "c" mapped:
@@ -277,12 +289,13 @@ public class UnknownPropertyDeserTest
 
         // but "d" is not defined, so should still error
         try {
-            MAPPER.readValue("{\"a\":1,\"b\":2,\"c\":3,\"d\":4 }", ImplicitIgnores.class);            
+            MAPPER.readValue("{\"a\":1,\"b\":2,\"c\":3,\"d\":4 }", ImplicitIgnores.class);
         } catch (UnrecognizedPropertyException e) {
             verifyException(e, "Unrecognized property \"d\"");
         }
     }
 
+    @Test
     public void testPropertyIgnoral() throws Exception
     {
         XYZWrapper1 result = MAPPER.readValue("{\"value\":{\"y\":2,\"x\":1,\"z\":3}}", XYZWrapper1.class);
@@ -290,6 +303,7 @@ public class UnknownPropertyDeserTest
         assertEquals(3, result.value.z);
     }
 
+    @Test
     public void testPropertyIgnoralWithClass() throws Exception
     {
         XYZWrapper2 result = MAPPER.readValue("{\"value\":{\"y\":2,\"x\":1,\"z\":3}}",
@@ -297,6 +311,7 @@ public class UnknownPropertyDeserTest
         assertEquals(1, result.value.x);
     }
 
+    @Test
     public void testPropertyIgnoralForMap() throws Exception
     {
         MapWithoutX result = MAPPER.readValue("{\"values\":{\"x\":1,\"y\":2}}", MapWithoutX.class);
@@ -305,6 +320,7 @@ public class UnknownPropertyDeserTest
         assertEquals(Integer.valueOf(2), result.values.get("y"));
     }
 
+    @Test
     public void testIssue987() throws Exception
     {
         ObjectMapper jsonMapper = jsonMapperBuilder()

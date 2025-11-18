@@ -2,29 +2,37 @@ package tools.jackson.databind.deser;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.*;
 import tools.jackson.core.io.ContentReference;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.*;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.type.TypeFactory;
 import tools.jackson.databind.util.TokenBuffer;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
 
 /**
  * Unit tests for those Jackson types we want to ensure can be deserialized.
  */
 public class JacksonTypesDeserTest
-    extends tools.jackson.databind.BaseMapTest
 {
     private final ObjectMapper MAPPER = sharedMapper();
 
-    public void testJsonLocation() throws Exception
+    @Test
+    public void testTokenStreamLocation() throws Exception
     {
         // note: source reference is untyped, only String guaranteed to work
-        JsonLocation loc = new JsonLocation(ContentReference.rawReference("whatever"),
+        TokenStreamLocation loc = new TokenStreamLocation(ContentReference.rawReference("whatever"),
                 -1, -1, 100, 13);
         // Let's use serializer here; goal is round-tripping
         String ser = MAPPER.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(loc);
-        JsonLocation result = MAPPER.readValue(ser, JsonLocation.class);
+        TokenStreamLocation result = MAPPER.readValue(ser, TokenStreamLocation.class);
         assertNotNull(result);
         // 14-Mar-2021, tatu: Should NOT count on this being retained actually,
         //   after 2.13 (will retain for now)...
@@ -36,9 +44,10 @@ public class JacksonTypesDeserTest
     }
 
     // doesn't really belong here but...
-    public void testJsonLocationProps()
+    @Test
+    public void testTokenStreamLocationProps()
     {
-        JsonLocation loc = new JsonLocation(null,  -1, -1, 100, 13);
+        TokenStreamLocation loc = new TokenStreamLocation(null,  -1, -1, 100, 13);
         assertTrue(loc.equals(loc));
         assertFalse(loc.equals(null));
         final Object value = "abx";
@@ -48,9 +57,10 @@ public class JacksonTypesDeserTest
         loc.hashCode();
     }
 
+    @Test
     public void testJavaType() throws Exception
     {
-        TypeFactory tf = TypeFactory.defaultInstance();
+        TypeFactory tf = defaultTypeFactory();
         // first simple type:
         String json = MAPPER.writeValueAsString(tf.constructType(String.class));
         assertEquals(q(java.lang.String.class.getName()), json);
@@ -64,23 +74,29 @@ public class JacksonTypesDeserTest
      * Verify that {@link TokenBuffer} can be properly deserialized
      * automatically, using the "standard" JSON sample document
      */
+    @Test
     public void testTokenBufferWithSample() throws Exception
     {
         // First, try standard sample doc:
-        TokenBuffer result = MAPPER.readValue(SAMPLE_DOC_JSON_SPEC, TokenBuffer.class);
-        verifyJsonSpecSampleDoc(result.asParser(ObjectReadContext.empty()), true);
-        result.close();
+        try (TokenBuffer result = MAPPER.readValue(SAMPLE_DOC_JSON_SPEC, TokenBuffer.class)) {
+            verifyJsonSpecSampleDoc(result.asParser(ObjectReadContext.empty()), true);
+        }
     }
 
     @SuppressWarnings("resource")
+    @Test
     public void testTokenBufferWithSequence() throws Exception
     {
+        final ObjectMapper mapper = jsonMapperBuilder()
+                .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
+        
         // and then sequence of other things
-        JsonParser p = createParserUsingReader("[ 32, [ 1 ], \"abc\", { \"a\" : true } ]");
+        JsonParser p = mapper.createParser("[ 32, [ 1 ], \"abc\", { \"a\" : true } ]");
         assertToken(JsonToken.START_ARRAY, p.nextToken());
 
         assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
-        TokenBuffer buf = MAPPER.readValue(p, TokenBuffer.class);
+        TokenBuffer buf = mapper.readValue(p, TokenBuffer.class);
 
         // check manually...
         JsonParser bufParser = buf.asParser(ObjectReadContext.empty());
@@ -89,7 +105,7 @@ public class JacksonTypesDeserTest
         assertNull(bufParser.nextToken());
 
         // then bind to another
-        buf = MAPPER.readValue(p, TokenBuffer.class);
+        buf = mapper.readValue(p, TokenBuffer.class);
         bufParser = buf.asParser(ObjectReadContext.empty());
         assertToken(JsonToken.START_ARRAY, bufParser.nextToken());
         assertToken(JsonToken.VALUE_NUMBER_INT, bufParser.nextToken());
@@ -98,16 +114,16 @@ public class JacksonTypesDeserTest
         assertNull(bufParser.nextToken());
 
         // third one, with automatic binding
-        buf = MAPPER.readValue(p, TokenBuffer.class);
-        String str = MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), String.class);
+        buf = mapper.readValue(p, TokenBuffer.class);
+        String str = mapper.readValue(buf.asParser(ObjectReadContext.empty()), String.class);
         assertEquals("abc", str);
 
         // and ditto for last one
-        buf = MAPPER.readValue(p, TokenBuffer.class);
-        Map<?,?> map = MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), Map.class);
+        buf = mapper.readValue(p, TokenBuffer.class);
+        Map<?,?> map = mapper.readValue(buf.asParser(ObjectReadContext.empty()), Map.class);
         assertEquals(1, map.size());
         assertEquals(Boolean.TRUE, map.get("a"));
-        
+
         assertEquals(JsonToken.END_ARRAY, p.nextToken());
         assertNull(p.nextToken());
     }
@@ -115,10 +131,9 @@ public class JacksonTypesDeserTest
     // 10k does it, 5k not, but use bit higher values just in case
     private final static int RECURSION_2398 = 25000;
 
-    // [databind#2398]
-    public void testDeeplyNestedArrays() throws Exception
+    public void testJavaTypeDeser() throws Exception
     {
-        TypeFactory tf = TypeFactory.defaultInstance();
+        TypeFactory tf = defaultTypeFactory();
         // first simple type:
         String json = MAPPER.writeValueAsString(tf.constructType(String.class));
         assertEquals(q(java.lang.String.class.getName()), json);
@@ -128,10 +143,15 @@ public class JacksonTypesDeserTest
         assertEquals(String.class, t.getRawClass());
     }
 
-    public void testDeeplyNestedObjects() throws Exception
+    // [databind#2398]
+    @Test
+    public void testDeeplyNestedArrays() throws Exception
     {
-        try (JsonParser p = MAPPER.createParser(_createNested(RECURSION_2398,
-                "{\"a\":", "42", "}"))) {
+        JsonFactory jsonFactory = JsonFactory.builder()
+                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(Integer.MAX_VALUE).build())
+                .build();
+        try (JsonParser p = JsonMapper.builder(jsonFactory).build().createParser(
+                _createNested(RECURSION_2398 * 2, "[", " 123 ", "]"))) {
             p.nextToken();
             TokenBuffer b = TokenBuffer.forGeneration();
             b.copyCurrentStructure(p);
@@ -139,7 +159,22 @@ public class JacksonTypesDeserTest
         }
     }
 
-    private String _createNested(int nesting, String open, String middle, String close) 
+    @Test
+    public void testDeeplyNestedObjects() throws Exception
+    {
+        JsonFactory jsonFactory = JsonFactory.builder()
+                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(Integer.MAX_VALUE).build())
+                .build();
+        try (JsonParser p = JsonMapper.builder(jsonFactory).build().createParser(
+                _createNested(RECURSION_2398, "{\"a\":", "42", "}"))) {
+            p.nextToken();
+            TokenBuffer b = TokenBuffer.forGeneration();
+            b.copyCurrentStructure(p);
+            b.close();
+        }
+    }
+
+    private String _createNested(int nesting, String open, String middle, String close)
     {
         StringBuilder sb = new StringBuilder(2 * nesting);
         for (int i = 0; i < nesting; ++i) {

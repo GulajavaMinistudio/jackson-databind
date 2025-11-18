@@ -29,7 +29,7 @@ public class StdDelegatingSerializer
      * Fully resolved delegate type, with generic information if any available.
      */
     protected final JavaType _delegateType;
-    
+
     /**
      * Underlying serializer for type <code>T</code>.
      */
@@ -43,7 +43,7 @@ public class StdDelegatingSerializer
      * @since 3.0
      */
     protected PropertySerializerMap _dynamicValueSerializers = PropertySerializerMap.emptyForProperties();
-    
+
     /*
     /**********************************************************************
     /* Life-cycle
@@ -84,7 +84,7 @@ public class StdDelegatingSerializer
         _delegateSerializer = (ValueSerializer<Object>) delegateSerializer;
         _property = prop;
     }
-    
+
     /**
      * Method used for creating resolved contextual instances. Must be
      * overridden when sub-classing.
@@ -104,7 +104,7 @@ public class StdDelegatingSerializer
      */
 
     @Override
-    public void resolve(SerializerProvider ctxt)
+    public void resolve(SerializationContext ctxt)
     {
         if (_delegateSerializer != null) {
             _delegateSerializer.resolve(ctxt);
@@ -112,7 +112,7 @@ public class StdDelegatingSerializer
     }
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt, BeanProperty property)
+    public ValueSerializer<?> createContextual(SerializationContext ctxt, BeanProperty property)
     {
         ValueSerializer<?> delSer = _delegateSerializer;
         JavaType delegateType = _delegateType;
@@ -144,7 +144,7 @@ public class StdDelegatingSerializer
     /**********************************************************************
      */
 
-    protected Converter<Object, ?> getConverter() {
+    public Converter<Object, ?> getConverter() {
         return _converter;
     }
 
@@ -160,10 +160,10 @@ public class StdDelegatingSerializer
      */
 
     @Override
-    public void serialize(Object value, JsonGenerator gen, SerializerProvider ctxt)
+    public void serialize(Object value, JsonGenerator gen, SerializationContext ctxt)
         throws JacksonException
     {
-        Object delegateValue = convertValue(value);
+        Object delegateValue = convertValue(ctxt, value);
         // should we accept nulls?
         if (delegateValue == null) {
             ctxt.defaultSerializeNullValue(gen);
@@ -178,24 +178,29 @@ public class StdDelegatingSerializer
     }
 
     @Override
-    public void serializeWithType(Object value, JsonGenerator gen, SerializerProvider ctxt,
+    public void serializeWithType(Object value, JsonGenerator gen, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
         // 03-Oct-2012, tatu: This is actually unlikely to work ok... but for now,
         //    let's give it a chance?
-        Object delegateValue = convertValue(value);
+        Object delegateValue = convertValue(ctxt, value);
+        // consider null (to be consistent with serialize method above)
+        if (delegateValue == null) {
+            ctxt.defaultSerializeNullValue(gen);
+            return;
+        }
         ValueSerializer<Object> ser = _delegateSerializer;
         if (ser == null) {
-            ser = _findSerializer(value, ctxt);
+            ser = _findSerializer(delegateValue, ctxt);
         }
         ser.serializeWithType(delegateValue, gen, ctxt, typeSer);
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider ctxt, Object value)
+    public boolean isEmpty(SerializationContext ctxt, Object value)
     {
-        Object delegateValue = convertValue(value);
+        Object delegateValue = convertValue(ctxt, value);
         if (delegateValue == null) {
             return true;
         }
@@ -236,13 +241,13 @@ public class StdDelegatingSerializer
      *<P>
      * The default implementation uses configured {@link Converter} to do
      * conversion.
-     * 
+     *
      * @param value Value to convert
-     * 
+     *
      * @return Result of conversion
      */
-    protected Object convertValue(Object value) {
-        return _converter.convert(value);
+    protected Object convertValue(SerializationContext ctxt,Object value) {
+        return _converter.convert(ctxt, value);
     }
 
     /**
@@ -251,7 +256,7 @@ public class StdDelegatingSerializer
      * {@link java.lang.Object}, and where serializer needs to be located dynamically
      * based on actual value type.
      */
-    protected ValueSerializer<Object> _findSerializer(Object value, SerializerProvider ctxt)
+    protected ValueSerializer<Object> _findSerializer(Object value, SerializationContext ctxt)
     {
         // 17-Apr-2018, tatu: Basically inline `_findAndAddDynamic(...)`
         // 17-Apr-2018, tatu: difficult to know if these are primary or secondary serializers...

@@ -3,15 +3,11 @@ package tools.jackson.databind.introspect;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
-import com.fasterxml.jackson.annotation.JacksonInject;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.OptBoolean;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.Version;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.deser.jdk.NumberDeserializers;
@@ -20,10 +16,13 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.NamedType;
 import tools.jackson.databind.ser.jdk.StringSerializer;
 import tools.jackson.databind.ser.std.ToStringSerializer;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 // started with [databind#1025] in mind
 @SuppressWarnings("serial")
-public class IntrospectorPairTest extends BaseMapTest
+public class IntrospectorPairTest extends DatabindTestUtil
 {
     static class Introspector1 extends AnnotationIntrospector {
         @Override
@@ -115,7 +114,7 @@ public class IntrospectorPairTest extends BaseMapTest
         /******************************************************
         /* General class annotations
         /******************************************************
-         */        
+         */
 
         @Override
         public PropertyName findRootName(MapperConfig<?> config, AnnotatedClass ac) {
@@ -136,7 +135,7 @@ public class IntrospectorPairTest extends BaseMapTest
         public Object findFilterId(MapperConfig<?> config, Annotated ann) {
             return (Object) values.get("findFilterId");
         }
-        
+
         @Override
         public Object findNamingStrategy(MapperConfig<?> config, AnnotatedClass ac) {
             return (Object) values.get("findNamingStrategy");
@@ -182,6 +181,17 @@ public class IntrospectorPairTest extends BaseMapTest
 
         /*
         /******************************************************
+        /* General member (field, method/constructor) annotations
+        /******************************************************
+         */
+
+        @Override
+        public PropertyName findWrapperName(MapperConfig<?> config, Annotated ann) {
+            return (PropertyName) values.get("findWrapperName");
+        }
+
+        /*
+        /******************************************************
         /* Serialization introspection
         /******************************************************
          */
@@ -216,7 +226,7 @@ public class IntrospectorPairTest extends BaseMapTest
         /******************************************************
         /* Helper methods
         /******************************************************
-         */        
+         */
 
         private boolean _boolean(String key) {
             Object ob = values.get(key);
@@ -232,6 +242,7 @@ public class IntrospectorPairTest extends BaseMapTest
 
     private final AnnotationIntrospector NO_ANNOTATIONS = AnnotationIntrospector.nopInstance();
 
+    @Test
     public void testVersion() throws Exception
     {
         Version v = new Version(1, 2, 3, null,
@@ -245,6 +256,7 @@ public class IntrospectorPairTest extends BaseMapTest
                 new AnnotationIntrospectorPair(noVersion, withVersion).version());
     }
 
+    @Test
     public void testAccess() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap();
@@ -257,6 +269,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertSame(NO_ANNOTATIONS, it.next());
     }
 
+    @Test
     public void testAnnotationBundle() throws Exception
     {
         IntrospectorWithMap isBundle = new IntrospectorWithMap()
@@ -275,6 +288,7 @@ public class IntrospectorPairTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testFindRootName() throws Exception
     {
         PropertyName name = new PropertyName("test");
@@ -285,6 +299,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertEquals(name, new AnnotationIntrospectorPair(intr, NO_ANNOTATIONS).findRootName(null, null));
     }
 
+    @Test
     public void testPropertyIgnorals() throws Exception
     {
         JsonIgnoreProperties.Value incl = JsonIgnoreProperties.Value.forIgnoredProperties("foo");
@@ -299,6 +314,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertEquals(incl, new AnnotationIntrospectorPair(intr, intrEmpty).findPropertyIgnoralByName(null, null));
     }
 
+    @Test
     public void testIsIgnorableType() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -310,6 +326,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertEquals(Boolean.FALSE, new AnnotationIntrospectorPair(intr2, intr1).isIgnorableType(null, null));
     }
 
+    @Test
     public void testFindFilterId() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -321,6 +338,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertEquals("b", new AnnotationIntrospectorPair(intr2, intr1).findFilterId(null, null));
     }
 
+    @Test
     public void testFindNamingStrategy() throws Exception
     {
         // shouldn't be bogus Classes for real use, but works here
@@ -335,6 +353,7 @@ public class IntrospectorPairTest extends BaseMapTest
                 new AnnotationIntrospectorPair(intr2, intr1).findNamingStrategy(null, null));
     }
 
+    @Test
     public void testFindClassDescription() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -352,10 +371,47 @@ public class IntrospectorPairTest extends BaseMapTest
 
     /*
     /**********************************************************
+    /* Test methods, general member annotations
+    /**********************************************************
+     */
+
+    @Test
+    public void testFindWrapperName() throws Exception
+    {
+        final PropertyName NAME_WITH_NS = PropertyName.construct("simple", "ns");
+        final PropertyName NAME_NO_NS = PropertyName.construct("other", null);
+
+        assertNull(new AnnotationIntrospectorPair(NO_ANNOTATIONS, NO_ANNOTATIONS)
+                .findClassDescription(null, null));
+
+        // First: basic merging of namespace/localname info
+        IntrospectorWithMap intr1 = new IntrospectorWithMap()
+                .add("findWrapperName", NAME_WITH_NS);
+        IntrospectorWithMap intr2 = new IntrospectorWithMap()
+                .add("findWrapperName", NAME_NO_NS);
+        assertSame(NAME_WITH_NS,
+                new AnnotationIntrospectorPair(intr1, intr2).findWrapperName(null, null));
+        assertEquals(PropertyName.construct("other", "ns"),
+                new AnnotationIntrospectorPair(intr2, intr1).findWrapperName(null, null));
+
+        // [databind#4595]: NO_NAME should be retained, not merged
+        intr1 = new IntrospectorWithMap()
+                .add("findWrapperName", PropertyName.NO_NAME);
+        intr2 = new IntrospectorWithMap()
+                .add("findWrapperName", NAME_WITH_NS);
+        assertSame(PropertyName.NO_NAME,
+                new AnnotationIntrospectorPair(intr1, intr2).findWrapperName(null, null));
+        assertSame(NAME_WITH_NS,
+                new AnnotationIntrospectorPair(intr2, intr1).findWrapperName(null, null));
+    }
+
+    /*
+    /**********************************************************
     /* Test methods, ser/deser
     /**********************************************************
      */
 
+    @Test
     public void testFindSerializer() throws Exception
     {
         final ValueSerializer<?> serString = new StringSerializer();
@@ -382,6 +438,7 @@ public class IntrospectorPairTest extends BaseMapTest
         assertNull(new AnnotationIntrospectorPair(nop2, nop).findSerializer(null, null));
     }
 
+    @Test
     public void testHasAsValue() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -405,6 +462,7 @@ public class IntrospectorPairTest extends BaseMapTest
                 .hasAsValue(null, null));
     }
 
+    @Test
     public void testHasAsKey() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -428,6 +486,7 @@ public class IntrospectorPairTest extends BaseMapTest
                 .hasAsKey(null, null));
     }
 
+    @Test
     public void testHasAnyGetter() throws Exception
     {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
@@ -457,6 +516,7 @@ public class IntrospectorPairTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testFindDeserializer() throws Exception
     {
         final ValueDeserializer<?> deserString = StringDeserializer.instance;
@@ -488,6 +548,7 @@ public class IntrospectorPairTest extends BaseMapTest
     /******************************************************
      */
 
+    @Test
     public void testFindAutoDetectVisibility() throws Exception
     {
         VisibilityChecker vc = VisibilityChecker.defaultInstance();
@@ -508,6 +569,7 @@ public class IntrospectorPairTest extends BaseMapTest
     /******************************************************
      */
 
+    @Test
     public void testFindTypeResolver() throws Exception
     {
         /*
@@ -516,15 +578,19 @@ public class IntrospectorPairTest extends BaseMapTest
         return (TypeResolverBuilder<?>) values.get("findTypeResolver");
         */
     }
+    @Test
     public void testFindPropertyTypeResolver() {
     }
 
+    @Test
     public void testFindPropertyContentTypeResolver() {
     }
 
+    @Test
     public void testFindSubtypes() {
     }
 
+    @Test
     public void testFindTypeName() {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
                 .add("findTypeName", "type1");
@@ -544,6 +610,7 @@ public class IntrospectorPairTest extends BaseMapTest
      */
 
     // for [databind#1672]
+    @Test
     public void testHasAnySetter() {
         IntrospectorWithMap intr1 = new IntrospectorWithMap()
                 .add("hasAnySetter", Boolean.TRUE);
@@ -573,6 +640,7 @@ public class IntrospectorPairTest extends BaseMapTest
         = new AnnotationIntrospectorPair(new Introspector2(), new Introspector1());
 
     // for [databind#1025]
+    @Test
     public void testInclusionMerging() throws Exception
     {
         // argument is ignored by test introspectors, may be null
@@ -604,7 +672,10 @@ public class IntrospectorPairTest extends BaseMapTest
 
     static class TestInjector extends InjectableValues {
         @Override
-        public Object findInjectableValue(Object valueId, DeserializationContext ctxt, BeanProperty forProperty, Object beanInstance) {
+        public Object findInjectableValue(DeserializationContext ctxt,
+                Object valueId, 
+                BeanProperty forProperty, Object beanInstance,
+                Boolean optional, Boolean useInput) {
             if (valueId == "jjj") {
                 UnreadableBean bean = new UnreadableBean();
                 bean.setValue(1);
@@ -613,6 +684,7 @@ public class IntrospectorPairTest extends BaseMapTest
             return null;
         }
 
+        @Deprecated // since 2.20
         @Override
         public InjectableValues snapshot() {
             return this;
@@ -657,6 +729,7 @@ public class IntrospectorPairTest extends BaseMapTest
         private UnreadableBean injectBean;
     }
 
+    @Test
     public void testMergingIntrospectorsForInjection() throws Exception {
         AnnotationIntrospector testIntrospector = new TestIntrospector();
         ObjectMapper mapper = JsonMapper.builder()

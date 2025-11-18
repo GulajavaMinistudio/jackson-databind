@@ -2,14 +2,19 @@ package tools.jackson.databind.misc;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class CaseInsensitiveDeserTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class CaseInsensitiveDeserTest extends DatabindTestUtil
 {
     // [databind#1036]
     static class BaseResponse {
@@ -122,16 +127,18 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
             .build();
 
     // [databind#566]
+    @Test
     public void testCaseInsensitiveDeserialization() throws Exception
     {
         final String JSON = "{\"Value1\" : {\"nAme\" : \"fruit\", \"vALUe\" : \"apple\"}, \"valUE2\" : {\"NAME\" : \"color\", \"value\" : \"red\"}}";
-        
+
         // first, verify default settings which do not accept improper case
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = jsonMapperBuilder()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
         assertFalse(mapper.isEnabled(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES));
         try {
             mapper.readValue(JSON, Issue476Bean.class);
-            
+
             fail("Should not accept improper case properties by default");
         } catch (UnrecognizedPropertyException e) {
             verifyException(e, "Unrecognized property");
@@ -146,6 +153,7 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
     }
 
     // [databind#1036]
+    @Test
     public void testCaseInsensitive1036() throws Exception
     {
         final String json = "{\"ErrorCode\":2,\"DebugMessage\":\"Signature not valid!\"}";
@@ -157,6 +165,7 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
     }
 
     // [databind#1232]: allow per-property case-insensitivity
+    @Test
     public void testCaseInsensitiveWithFormat() throws Exception {
         CaseInsensitiveRoleWrapper w = MAPPER.readValue
                 (a2q("{'role':{'id':'12','name':'Foo'}}"),
@@ -165,8 +174,9 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
         assertEquals("12", w.role.ID);
         assertEquals("Foo", w.role.Name);
     }
-    
+
     // [databind#1438]
+    @Test
     public void testCreatorWithInsensitive() throws Exception
     {
         final String json = a2q("{'VALUE':3}");
@@ -175,6 +185,7 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
     }
 
     // And allow config overrides too
+    @Test
     public void testCaseInsensitiveViaConfigOverride() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -190,6 +201,7 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
         assertEquals("Foo", role.Name);
     }
 
+    @Test
     public void testIssue1854() throws Exception
     {
         final String DOC = a2q("{'ID': 1, 'Items': [ { 'ChildID': 10 } ]}");
@@ -202,6 +214,7 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
 
 
     // [databind#1886]: allow case-insensitivity by default on a class
+    @Test
     public void testCaseInsensitiveViaClassAnnotation() throws Exception
     {
         final String CONTAINED = a2q("{'role': {'id':'3','name':'Bob'}}");
@@ -221,8 +234,9 @@ public class CaseInsensitiveDeserTest extends BaseMapTest
 
         // and finally, more complicated; should be possible to force sensitivity:
         try {
-            /*CaseSensitiveRoleContainer r =*/ MAPPER.readValue(CONTAINED,
-                    CaseSensitiveRoleContainer.class);
+            /*CaseSensitiveRoleContainer r =*/ jsonMapperBuilder()
+                    .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build()
+                    .readValue(CONTAINED, CaseSensitiveRoleContainer.class);
             fail("Should not pass");
         } catch (UnrecognizedPropertyException e) {
             verifyException(e, "Unrecognized ");

@@ -3,11 +3,13 @@ package tools.jackson.databind.node;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import tools.jackson.core.*;
 import tools.jackson.core.tree.ObjectTreeNode;
 import tools.jackson.core.type.WritableTypeId;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.jsontype.TypeSerializer;
@@ -26,34 +28,50 @@ public class ObjectNode
     // Note: LinkedHashMap for backwards compatibility
     protected final Map<String, JsonNode> _children;
 
+    /*
+    /**********************************************************************
+    /* Construction
+    /**********************************************************************
+     */
+
     public ObjectNode(JsonNodeFactory nc) {
         super(nc);
         _children = new LinkedHashMap<String, JsonNode>();
     }
 
-    public ObjectNode(JsonNodeFactory nc, Map<String, JsonNode> kids) {
+    public ObjectNode(JsonNodeFactory nc, Map<String, JsonNode> children) {
         super(nc);
-        _children = kids;
+        _children = Objects.requireNonNull(children,
+                "Must not pass `null` for 'children' argument");
     }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods
+    /**********************************************************************
+     */
 
     @Override
     protected JsonNode _at(JsonPointer ptr) {
         return get(ptr.getMatchingProperty());
     }
 
+    @Override
+    protected String _valueDesc() {
+        return "{...(" + _children.size() + " properties}]";
+    }
+
     /* Question: should this delegate to `JsonNodeFactory`? It does not absolutely
      * have to, as long as sub-types override the method but...
      */
     // note: co-variant for type safety
-    @SuppressWarnings("unchecked")
     @Override
     public ObjectNode deepCopy()
     {
-        ObjectNode ret = new ObjectNode(_nodeFactory);
-
-        for (Map.Entry<String, JsonNode> entry: _children.entrySet())
+        ObjectNode ret = objectNode();
+        for (Map.Entry<String, JsonNode> entry: _children.entrySet()) {
             ret._children.put(entry.getKey(), entry.getValue().deepCopy());
-
+        }
         return ret;
     }
 
@@ -62,6 +80,52 @@ public class ObjectNode
     /* Support for withArray()/withObject()
     /**********************************************************************
      */
+
+    @Override
+    public ObjectNode withObject(String exprOrProperty) {
+        JsonPointer ptr = _jsonPointerIfValid(exprOrProperty);
+        if (ptr != null) {
+            return withObject(ptr);
+        }
+        return withObjectProperty(exprOrProperty);
+    }
+
+    @Override
+    public ObjectNode withObjectProperty(String propName) {
+        JsonNode child = _children.get(propName);
+        if (child == null || child.isNull()) {
+            return putObject(propName);
+        }
+        if (child.isObject()) {
+            return (ObjectNode) child;
+        }
+        return _reportWrongNodeType(
+"Cannot replace `JsonNode` of type `%s` with `ObjectNode` for property \"%s\" (default mode `OverwriteMode.%s`)",
+child.getClass().getName(), propName, OverwriteMode.NULLS);
+    }
+
+    @Override
+    public ArrayNode withArray(String exprOrProperty) {
+        JsonPointer ptr = _jsonPointerIfValid(exprOrProperty);
+        if (ptr != null) {
+            return withArray(ptr);
+        }
+        return withArrayProperty(exprOrProperty);
+    }
+
+    @Override
+    public ArrayNode withArrayProperty(String propName) {
+        JsonNode child = _children.get(propName);
+        if (child == null || child.isNull()) {
+            return putArray(propName);
+        }
+        if (child.isArray()) {
+            return (ArrayNode) child;
+        }
+        return _reportWrongNodeType(
+"Cannot replace `JsonNode` of type `%s` with `ArrayNode` for property \"%s\" with (default mode `OverwriteMode.%s`)",
+child.getClass().getName(), propName, OverwriteMode.NULLS);
+    }
 
     @Override
     protected ObjectNode _withObject(JsonPointer origPtr,
@@ -146,7 +210,7 @@ public class ObjectNode
         return putObject(propName)._withArrayAddTailProperty(tail, preferIndex);
     }
 
-    
+
     /*
     /**********************************************************************
     /* Overrides for JacksonSerializable.Base
@@ -154,13 +218,13 @@ public class ObjectNode
      */
 
     @Override
-    public boolean isEmpty(SerializerProvider serializers) {
+    public boolean isEmpty(SerializationContext serializers) {
         return _children.isEmpty();
     }
 
     /*
     /**********************************************************************
-    /* Implementation of core JsonNode API
+    /* Implementation of core JsonNode API: simple accessors
     /**********************************************************************
      */
 
@@ -183,11 +247,6 @@ public class ObjectNode
 
     @Override
     public boolean isEmpty() { return _children.isEmpty(); }
-    
-    @Override
-    public Iterator<JsonNode> elements() {
-        return _children.values().iterator();
-    }
 
     @Override
     public JsonNode get(int index) { return null; }
@@ -198,8 +257,8 @@ public class ObjectNode
     }
 
     @Override
-    public Iterator<String> propertyNames() {
-        return _children.keySet().iterator();
+    public Optional<JsonNode> optional(String propertyName) {
+        return Optional.ofNullable(get(propertyName));
     }
 
     @Override
@@ -226,13 +285,44 @@ public class ObjectNode
         return _reportRequiredViolation("No value for property '%s' of `ObjectNode`", propertyName);
     }
 
+    /*
+    /**********************************************************************
+    /* Implementation of core JsonNode API: content traversal
+    /**********************************************************************
+     */
+
+    @Override
+    public Collection<JsonNode> values() {
+        return _children.values();
+    }
+
+    @Override // @since 2.19
+    public Stream<JsonNode> valueStream() {
+        return _children.values().stream();
+    }
+
+    @Override
+    public Collection<String> propertyNames() {
+        return _children.keySet();
+    }
+
     /**
      * Method to use for accessing all properties (with both names
      * and values) of this JSON Object.
      */
     @Override
-    public Iterator<Map.Entry<String, JsonNode>> fields() {
-        return _children.entrySet().iterator();
+    public Set<Map.Entry<String, JsonNode>> properties() {
+        return _children.entrySet();
+    }
+
+    @Override // @since 2.19
+    public Stream<Map.Entry<String, JsonNode>> propertyStream() {
+        return _children.entrySet().stream();
+    }
+
+    @Override // @since 2.19
+    public void forEachEntry(BiConsumer<? super String, ? super JsonNode> action) {
+        _children.forEach(action);
     }
 
     @Override
@@ -264,22 +354,24 @@ public class ObjectNode
     /* Public API, finding value nodes
     /**********************************************************************
      */
-    
+
     @Override
     public JsonNode findValue(String propertyName)
     {
-        for (Map.Entry<String, JsonNode> entry : _children.entrySet()) {
-            if (propertyName.equals(entry.getKey())) {
-                return entry.getValue();
-            }
-            JsonNode value = entry.getValue().findValue(propertyName);
+        JsonNode jsonNode = _children.get(propertyName);
+        if (jsonNode != null) {
+            return jsonNode;
+        }
+
+        for (JsonNode child : _children.values()) {
+            JsonNode value = child.findValue(propertyName);
             if (value != null) {
                 return value;
             }
         }
         return null;
     }
-    
+
     @Override
     public List<JsonNode> findValues(String propertyName, List<JsonNode> foundSoFar)
     {
@@ -297,30 +389,31 @@ public class ObjectNode
     }
 
     @Override
-    public List<String> findValuesAsText(String propertyName, List<String> foundSoFar)
+    public List<String> findValuesAsString(String propertyName, List<String> foundSoFar)
     {
         for (Map.Entry<String, JsonNode> entry : _children.entrySet()) {
             if (propertyName.equals(entry.getKey())) {
                 if (foundSoFar == null) {
                     foundSoFar = new ArrayList<String>();
                 }
-                foundSoFar.add(entry.getValue().asText());
+                foundSoFar.add(entry.getValue().asString());
             } else { // only add children if parent not added
-                foundSoFar = entry.getValue().findValuesAsText(propertyName,
+                foundSoFar = entry.getValue().findValuesAsString(propertyName,
                     foundSoFar);
             }
         }
         return foundSoFar;
     }
-    
+
     @Override
     public ObjectNode findParent(String propertyName)
     {
-        for (Map.Entry<String, JsonNode> entry : _children.entrySet()) {
-            if (propertyName.equals(entry.getKey())) {
-                return this;
-            }
-            JsonNode value = entry.getValue().findParent(propertyName);
+        JsonNode jsonNode = _children.get(propertyName);
+        if (jsonNode != null) {
+            return this;
+        }
+        for (JsonNode child : _children.values()) {
+            JsonNode value = child.findParent(propertyName);
             if (value != null) {
                 return (ObjectNode) value;
             }
@@ -357,7 +450,7 @@ public class ObjectNode
      */
     @SuppressWarnings("deprecation")
     @Override
-    public void serialize(JsonGenerator g, SerializerProvider ctxt)
+    public void serialize(JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
         final int len = _children.size();
@@ -371,14 +464,16 @@ public class ObjectNode
             boolean trimEmptyArray = !ctxt.isEnabled(SerializationFeature.WRITE_EMPTY_JSON_ARRAYS);
             boolean skipNulls = !ctxt.isEnabled(JsonNodeFeature.WRITE_NULL_PROPERTIES);
             if (trimEmptyArray || skipNulls) {
-                g.writeStartObject(this, _children.size());
+                // NOTE! Must NOT pass size since some entries may be filtered
+                g.writeStartObject(this);
                 serializeFilteredContents(g, ctxt, trimEmptyArray, skipNulls);
                 g.writeEndObject();
                 return;
             }
         }
-        g.writeStartObject(this, _children.size());
-        for (Map.Entry<String, JsonNode> en : _children.entrySet()) {
+        final var contents = _contentsToSerialize(ctxt);
+        g.writeStartObject(this, contents.size());
+        for (Map.Entry<String, JsonNode> en : contents.entrySet()) {
             g.writeName(en.getKey());
             en.getValue().serialize(g, ctxt);
         }
@@ -387,7 +482,7 @@ public class ObjectNode
 
     @SuppressWarnings("deprecation")
     @Override
-    public void serializeWithType(JsonGenerator g, SerializerProvider ctxt,
+    public void serializeWithType(JsonGenerator g, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -404,7 +499,7 @@ public class ObjectNode
         if (trimEmptyArray || skipNulls) {
             serializeFilteredContents(g, ctxt, trimEmptyArray, skipNulls);
         } else {
-            for (Map.Entry<String, JsonNode> en : _children.entrySet()) {
+            for (Map.Entry<String, JsonNode> en : _contentsToSerialize(ctxt).entrySet()) {
                 g.writeName(en.getKey());
                 en.getValue().serialize(g, ctxt);
             }
@@ -416,16 +511,16 @@ public class ObjectNode
      * Helper method shared and called by {@link #serialize} and {@link #serializeWithType}
      * in cases where actual filtering is needed based on configuration.
      */
-    protected void serializeFilteredContents(final JsonGenerator g, final SerializerProvider ctxt,
+    protected void serializeFilteredContents(final JsonGenerator g, final SerializationContext ctxt,
             final boolean trimEmptyArray, final boolean skipNulls)
         throws JacksonException
     {
-        for (Map.Entry<String, JsonNode> en : _children.entrySet()) {
+        for (Map.Entry<String, JsonNode> en : _contentsToSerialize(ctxt).entrySet()) {
             // 17-Feb-2009, tatu: Can we trust that all nodes will always
-            //   extend BaseJsonNode? Or if not, at least implement
-            //   JsonSerializable? Let's start with former, change if
-            //   we must.
-            BaseJsonNode value = (BaseJsonNode) en.getValue();
+            //   extend BaseJsonNode? Or if not, at least implement JsonSerializable?
+            //   Let's start with former, change if we must.
+            // 19-Jun-2023, tatu: Actually `JsonNode` is enough
+            JsonNode value = en.getValue();
 
             // as per [databind#867], see if WRITE_EMPTY_JSON_ARRAYS feature is disabled,
             // if the feature is disabled, then should not write an empty array
@@ -439,6 +534,23 @@ public class ObjectNode
             g.writeName(en.getKey());
             value.serialize(g, ctxt);
         }
+    }
+
+    /**
+     * Helper method for encapsulating details of accessing child node entries
+     * to serialize.
+     *
+     * @since 2.16
+     */
+    protected Map<String, JsonNode> _contentsToSerialize(SerializationContext ctxt) {
+        if (ctxt.isEnabled(JsonNodeFeature.WRITE_PROPERTIES_SORTED)) {
+            if (!_children.isEmpty()
+                    // 02-Jun-2024, tatu: Avoid unnecessary copy for custom impls
+                    && !(_children instanceof TreeMap<?,?>)) {
+                return new TreeMap<>(_children);
+            }
+        }
+        return _children;
     }
 
     /*
@@ -464,16 +576,18 @@ public class ObjectNode
         if (value == null) {
             value = nullNode();
         }
-        _children.put(propertyName, value);
-        return this;
+        return _put(propertyName, value);
     }
 
     /**
      * Method for adding given properties to this object node, overriding
      * any existing values for those properties.
-     * 
+     *<p>
+     * NOTE: {@code null} keys are not allowed; ({@code null} values get
+     * converted to a {@link NullNode}).
+     *
      * @param properties Properties to add
-     * 
+     *
      * @return This node after adding/replacing property values (to allow chaining)
      */
     public ObjectNode setAll(Map<String,? extends JsonNode> properties)
@@ -483,7 +597,7 @@ public class ObjectNode
             if (n == null) {
                 n = nullNode();
             }
-            _children.put(en.getKey(), n);
+            _put(en.getKey(), n);
         }
         return this;
     }
@@ -491,7 +605,7 @@ public class ObjectNode
     /**
      * Method for adding all properties of the given Object, overriding
      * any existing values for those properties.
-     * 
+     *
      * @param other Object of which properties to add to this object
      *
      * @return This node after addition (to allow chaining)
@@ -506,9 +620,9 @@ public class ObjectNode
      * Method for replacing value of specific property with passed
      * value, and returning previous value (or null if none).
      *
-     * @param propertyName Property of which value to replace
+     * @param propertyName Property of which value to replace: must not be {@code null}
      * @param value Value to set property to, replacing old value if any
-     * 
+     *
      * @return Old value of the property; null if there was no such property
      *   with value
      */
@@ -517,27 +631,27 @@ public class ObjectNode
         if (value == null) { // let's not store 'raw' nulls but nodes
             value = nullNode();
         }
-        return _children.put(propertyName, value);
+        return _children.put(Objects.requireNonNull(propertyName), value);
     }
 
     /**
      * Method for removing property from this ObjectNode, and
      * returning instance after removal.
-     * 
+     *
      * @return This node after removing property (if any)
      */
-    public ObjectNode without(String fieldName)
+    public ObjectNode without(String propertyName)
     {
-        _children.remove(fieldName);
+        _children.remove(propertyName);
         return this;
     }
 
     /**
-     * Method for removing specified field properties out of
+     * Method for removing specified properties out of
      * this ObjectNode.
-     * 
+     *
      * @param propertyNames Names of properties to remove
-     * 
+     *
      * @return This node after removing entries
      */
     public ObjectNode without(Collection<String> propertyNames)
@@ -566,7 +680,7 @@ public class ObjectNode
      *  }
      *</code>
      *
-     * @param propertyName Name of property to set
+     * @param propertyName Name of property to set (must not be {@code null})
      * @param value Value to set to property (if and only if it had no value previously);
      *  if null, will be converted to a {@link NullNode} first.
      *
@@ -578,14 +692,14 @@ public class ObjectNode
         if (value == null) { // let's not store 'raw' nulls but nodes
             value = nullNode();
         }
-        return _children.putIfAbsent(propertyName, value);
+        return _children.putIfAbsent(Objects.requireNonNull(propertyName), value);
     }
 
     /**
      * Method for removing a property from this {@code ObjectNode}.
      * Will return previous value of the property, if such property existed;
      * null if not.
-     * 
+     *
      * @return Value of specified property, if it existed; null if not
      */
     public JsonNode remove(String propertyName) {
@@ -593,11 +707,11 @@ public class ObjectNode
     }
 
     /**
-     * Method for removing specified field properties out of
+     * Method for removing specified properties out of
      * this ObjectNode.
-     * 
-     * @param propertyNames Names of fields to remove
-     * 
+     *
+     * @param propertyNames Names of properties to remove
+     *
      * @return This node after removing entries
      */
     public ObjectNode remove(Collection<String> propertyNames)
@@ -605,11 +719,11 @@ public class ObjectNode
         _children.keySet().removeAll(propertyNames);
         return this;
     }
-    
+
     /**
      * Method for removing all properties, such that this
      * ObjectNode will contain no properties after call.
-     * 
+     *
      * @return This node after removing all entries
      */
     @Override
@@ -619,12 +733,18 @@ public class ObjectNode
         return this;
     }
 
+    @Override
+    public ObjectNode removeIf(Predicate<? super JsonNode> predicate) {
+        _children.values().removeIf(predicate);
+        return this;
+    }
+
     /**
-     * Method for removing all field properties out of this ObjectNode
+     * Method for removing all properties out of this ObjectNode
      * <b>except</b> for ones specified in argument.
-     * 
-     * @param propertyNames Fields to <b>retain</b> in this ObjectNode
-     * 
+     *
+     * @param propertyNames Properties to <b>retain</b> in this ObjectNode
+     *
      * @return This node (to allow call chaining)
      */
     public ObjectNode retain(Collection<String> propertyNames)
@@ -636,9 +756,9 @@ public class ObjectNode
     /**
      * Method for removing all properties out of this ObjectNode
      * <b>except</b> for ones specified in argument.
-     * 
-     * @param propertyNames Fields to <b>retain</b> in this ObjectNode
-     * 
+     *
+     * @param propertyNames Properties to <b>retain</b> in this ObjectNode
+     *
      * @return This node (to allow call chaining)
      */
     public ObjectNode retain(String... propertyNames) {
@@ -715,20 +835,19 @@ public class ObjectNode
 
     /**
      * Method for setting value of a property to explicit {@code null} value.
-     * 
+     *
      * @param propertyName Name of property to set.
      *
      * @return This {@code ObjectNode} (to allow chaining)
      */
     public ObjectNode putNull(String propertyName)
     {
-        _children.put(propertyName, nullNode());
-        return this;
+        return _put(propertyName, nullNode());
     }
 
     /**
      * Method for setting value of a property to specified numeric value.
-     * 
+     *
      * @return This node (to allow chaining)
      */
     public ObjectNode put(String propertyName, short v) {
@@ -738,53 +857,53 @@ public class ObjectNode
     /**
      * Alternative method that we need to avoid bumping into NPE issues
      * with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Short v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Short v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v.shortValue()));
     }
 
     /**
-     * Method for setting value of a field to specified numeric value.
+     * Method for setting value of a property to specified numeric value.
      * The underlying {@link JsonNode} that will be added is constructed
      * using {@link JsonNodeFactory#numberNode(int)}, and may be
      *  "smaller" (like {@link ShortNode}) in cases where value fits within
      *  range of a smaller integral numeric value.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, int v) {
-        return _put(fieldName, numberNode(v));
+    public ObjectNode put(String propertyName, int v) {
+        return _put(propertyName, numberNode(v));
     }
 
     /**
      * Alternative method that we need to avoid bumping into NPE issues
      * with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Integer v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Integer v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v.intValue()));
     }
-    
+
     /**
-     * Method for setting value of a field to specified numeric value.
+     * Method for setting value of a property to specified numeric value.
      * The underlying {@link JsonNode} that will be added is constructed
      * using {@link JsonNodeFactory#numberNode(long)}, and may be
      *  "smaller" (like {@link IntNode}) in cases where value fits within
      *  range of a smaller integral numeric value.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, long v) {
-        return _put(fieldName, numberNode(v));
+    public ObjectNode put(String propertyName, long v) {
+        return _put(propertyName, numberNode(v));
     }
 
     /**
-     * Method for setting value of a field to specified numeric value.
+     * Method for setting value of a property to specified numeric value.
      * The underlying {@link JsonNode} that will be added is constructed
      * using {@link JsonNodeFactory#numberNode(Long)}, and may be
      *  "smaller" (like {@link IntNode}) in cases where value fits within
@@ -792,111 +911,111 @@ public class ObjectNode
      * <p>
      * Note that this is alternative to {@link #put(String, long)} needed to avoid
      * bumping into NPE issues with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Long v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Long v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v.longValue()));
     }
-    
+
     /**
-     * Method for setting value of a field to specified numeric value.
-     * 
+     * Method for setting value of a property to specified numeric value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, float v) {
-        return _put(fieldName, numberNode(v));
+    public ObjectNode put(String propertyName, float v) {
+        return _put(propertyName, numberNode(v));
     }
 
     /**
      * Alternative method that we need to avoid bumping into NPE issues
      * with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Float v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Float v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v.floatValue()));
     }
-    
+
     /**
-     * Method for setting value of a field to specified numeric value.
-     * 
+     * Method for setting value of a property to specified numeric value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, double v) {
-        return _put(fieldName, numberNode(v));
+    public ObjectNode put(String propertyName, double v) {
+        return _put(propertyName, numberNode(v));
     }
 
     /**
      * Alternative method that we need to avoid bumping into NPE issues
      * with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Double v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Double v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v.doubleValue()));
     }
-    
+
     /**
-     * Method for setting value of a field to specified numeric value.
-     * 
+     * Method for setting value of a property to specified numeric value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, BigDecimal v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, BigDecimal v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v));
     }
 
     /**
-     * Method for setting value of a field to specified numeric value.
-     * 
+     * Method for setting value of a property to specified numeric value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, BigInteger v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, BigInteger v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : numberNode(v));
     }
 
     /**
-     * Method for setting value of a field to specified String value.
-     * 
+     * Method for setting value of a property to specified String value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, String v) {
-        return _put(fieldName, (v == null) ? nullNode()
-                : textNode(v));
+    public ObjectNode put(String propertyName, String v) {
+        return _put(propertyName, (v == null) ? nullNode()
+                : stringNode(v));
     }
 
     /**
-     * Method for setting value of a field to specified String value.
-     * 
+     * Method for setting value of a property to specified String value.
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, boolean v) {
-        return _put(fieldName, booleanNode(v));
+    public ObjectNode put(String propertyName, boolean v) {
+        return _put(propertyName, booleanNode(v));
     }
 
     /**
      * Alternative method that we need to avoid bumping into NPE issues
      * with auto-unboxing.
-     * 
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, Boolean v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, Boolean v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : booleanNode(v.booleanValue()));
     }
-    
+
     /**
-     * Method for setting value of a field to specified binary value
-     * 
+     * Method for setting value of a property to specified binary value
+     *
      * @return This node (to allow chaining)
      */
-    public ObjectNode put(String fieldName, byte[] v) {
-        return _put(fieldName, (v == null) ? nullNode()
+    public ObjectNode put(String propertyName, byte[] v) {
+        return _put(propertyName, (v == null) ? nullNode()
                 : binaryNode(v));
     }
 
@@ -920,7 +1039,7 @@ public class ObjectNode
     protected boolean _childrenEqual(ObjectNode other) {
         return _children.equals(other._children);
     }
-    
+
     @Override
     public int hashCode() {
         return _children.hashCode();
@@ -932,9 +1051,9 @@ public class ObjectNode
     /**********************************************************************
      */
 
-    protected ObjectNode _put(String fieldName, JsonNode value)
+    protected ObjectNode _put(String propertyName, JsonNode value)
     {
-        _children.put(fieldName, value);
+        _children.put(Objects.requireNonNull(propertyName), value);
         return this;
     }
 }

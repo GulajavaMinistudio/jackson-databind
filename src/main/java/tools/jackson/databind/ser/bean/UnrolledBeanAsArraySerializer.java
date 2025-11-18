@@ -47,7 +47,7 @@ public class UnrolledBeanAsArraySerializer
     /**********************************************************************
      */
 
-    public UnrolledBeanAsArraySerializer(BeanSerializerBase src) {    
+    public UnrolledBeanAsArraySerializer(BeanSerializerBase src) {
         super(src, (ObjectIdWriter) null);
         _defaultSerializer = src;
         _propCount = _props.length;
@@ -66,7 +66,7 @@ public class UnrolledBeanAsArraySerializer
         BeanPropertyWriter[] oProps = new BeanPropertyWriter[6];
         int offset = 6 - _propCount;
         System.arraycopy(_props, 0, oProps, offset, _propCount);
-        
+
         _prop1 = oProps[0];
         _prop2 = oProps[1];
         _prop3 = oProps[2];
@@ -77,7 +77,7 @@ public class UnrolledBeanAsArraySerializer
 
     /**
      * Factory method that will construct optimized instance if all the constraints
-     * are obeyed; or, if not, return `null` to indicate that instance can not be
+     * are obeyed; or, if not, return `null` to indicate that instance cannot be
      * created.
      */
     public static UnrolledBeanAsArraySerializer tryConstruct(BeanSerializerBase src)
@@ -140,7 +140,7 @@ public class UnrolledBeanAsArraySerializer
     }
 
     @Override
-    public void resolve(SerializerProvider provider)
+    public void resolve(SerializationContext provider)
     {
         super.resolve(provider);
         _calcUnrolled();
@@ -155,7 +155,7 @@ public class UnrolledBeanAsArraySerializer
     // Re-defined from base class, due to differing prefixes
     @Override
     public void serializeWithType(Object bean, JsonGenerator gen,
-            SerializerProvider ctxt, TypeSerializer typeSer)
+            SerializationContext ctxt, TypeSerializer typeSer)
         throws JacksonException
     {
         WritableTypeId typeIdDef = _typeIdDef(typeSer, bean, JsonToken.START_ARRAY);
@@ -171,7 +171,7 @@ public class UnrolledBeanAsArraySerializer
      * {@link BeanPropertyWriter} instances.
      */
     @Override
-    public final void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
+    public final void serialize(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         if (provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
@@ -195,12 +195,12 @@ public class UnrolledBeanAsArraySerializer
     /**********************************************************************
      */
 
-    private boolean hasSingleElement(SerializerProvider provider) {
+    private boolean hasSingleElement(SerializationContext provider) {
         return _props.length == 1;
     }
 
     protected final void serializeNonFiltered(Object bean, JsonGenerator gen,
-            SerializerProvider provider)
+            SerializationContext provider)
         throws JacksonException
     {
         BeanPropertyWriter prop = null;

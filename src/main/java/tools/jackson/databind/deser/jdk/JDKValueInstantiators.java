@@ -1,13 +1,13 @@
 package tools.jackson.databind.deser.jdk;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.JsonLocation;
+import tools.jackson.core.TokenStreamLocation;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.deser.ValueInstantiator;
-import tools.jackson.databind.deser.jackson.JsonLocationInstantiator;
+import tools.jackson.databind.deser.jackson.TokenStreamLocationInstantiator;
 
 /**
  * Container for a set of {@link ValueInstantiator}s used for certain critical
@@ -19,20 +19,33 @@ public abstract class JDKValueInstantiators
     public static ValueInstantiator findStdValueInstantiator(DeserializationConfig config,
             Class<?> raw)
     {
-        if (raw == JsonLocation.class) {
-            return new JsonLocationInstantiator();
+        if (raw == TokenStreamLocation.class) {
+            return new TokenStreamLocationInstantiator();
         }
         // [databind#1868]: empty List/Set/Map
         // [databind#2416]: optimize commonly needed default creators
         if (Collection.class.isAssignableFrom(raw)) {
-            if (raw == ArrayList.class) {
+            if (raw == ArrayList.class) { // default impl, pre-constructed instance
                 return ArrayListInstantiator.INSTANCE;
             }
-            if (Collections.EMPTY_SET.getClass() == raw) {
-                return new ConstantValueInstantiator(Collections.EMPTY_SET);
+            if (raw == HashSet.class) { // default impl, pre-constructed instance
+                return HashSetInstantiator.INSTANCE;
             }
-            if (Collections.EMPTY_LIST.getClass() == raw) {
-                return new ConstantValueInstantiator(Collections.EMPTY_LIST);
+            if (raw == LinkedList.class) {
+                return new LinkedListInstantiator();
+            }
+            if (raw == TreeSet.class) {
+                return new TreeSetInstantiator();
+            }
+            // 01-May-2025, tatu: was missing
+            if (raw == LinkedHashSet.class) { // default impl, pre-constructed instance
+                return new LinkedHashSetInstantiator();
+            }
+            if (raw == Collections.emptySet().getClass()) {
+                return new ConstantValueInstantiator(Collections.emptySet());
+            }
+            if (raw == Collections.emptyList().getClass()) {
+                return new ConstantValueInstantiator(Collections.emptyList());
             }
         } else if (Map.class.isAssignableFrom(raw)) {
             if (raw == LinkedHashMap.class) {
@@ -41,77 +54,189 @@ public abstract class JDKValueInstantiators
             if (raw == HashMap.class) {
                 return HashMapInstantiator.INSTANCE;
             }
-            if (Collections.EMPTY_MAP.getClass() == raw) {
-                return new ConstantValueInstantiator(Collections.EMPTY_MAP);
+            if (raw == ConcurrentHashMap.class) {
+                return new ConcurrentHashMapInstantiator();
+            }
+            if (raw == TreeMap.class) {
+                return new TreeMapInstantiator();
+            }
+            // 01-May-2025, tatu: was missing
+            if (Properties.class.isAssignableFrom(raw)) {
+                return new PropertiesInstantiator();
+            }
+            if (raw == Collections.emptyMap().getClass()) {
+                return new ConstantValueInstantiator(Collections.emptyMap());
             }
         }
         return null;
     }
 
-    private static class ArrayListInstantiator
+    // @since 2.17
+    abstract static class JDKValueInstantiator
         extends ValueInstantiator.Base
     {
-        public final static ArrayListInstantiator INSTANCE = new ArrayListInstantiator();
+        public JDKValueInstantiator(Class<?> type) {
+            super(type);
+        }
+
+        @Override
+        public final boolean canInstantiate() { return true; }
+
+        @Override
+        public final boolean canCreateUsingDefault() {  return true; }
+
+        // Make abstract to force (re)implementation
+        @Override
+        public abstract Object createUsingDefault(DeserializationContext ctxt);
+    }
+
+    private static class ArrayListInstantiator
+        extends JDKValueInstantiator
+    {
+        static final ArrayListInstantiator INSTANCE = new ArrayListInstantiator();
+
         public ArrayListInstantiator() {
             super(ArrayList.class);
         }
 
         @Override
-        public boolean canInstantiate() { return true; }
-
-        @Override
-        public boolean canCreateUsingDefault() {  return true; }
-
-        @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws JacksonException {
+        public Object createUsingDefault(DeserializationContext ctxt) {
             return new ArrayList<>();
         }
     }
 
-    private static class HashMapInstantiator
-        extends ValueInstantiator.Base
+    // @since 2.17 [databind#4299] Instantiators for additional container classes
+    private static class LinkedListInstantiator
+        extends JDKValueInstantiator
     {
-        public final static HashMapInstantiator INSTANCE = new HashMapInstantiator();
+        public LinkedListInstantiator() {
+            super(LinkedList.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new LinkedList<>();
+        }
+    }
+
+    // @since 2.17 [databind#4299] Instantiators for additional container classes
+    private static class HashSetInstantiator
+        extends JDKValueInstantiator
+    {
+        static final HashSetInstantiator INSTANCE = new HashSetInstantiator();
+
+        public HashSetInstantiator() {
+            super(HashSet.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new HashSet<>();
+        }
+    }
+
+    // @since 2.17 [databind#4299] Instantiators for additional container classes
+    private static class TreeSetInstantiator
+        extends JDKValueInstantiator
+    {
+        public TreeSetInstantiator() {
+            super(TreeSet.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new TreeSet<>();
+        }
+    }
+
+    // @since 2.19: was missing
+    private static class LinkedHashSetInstantiator
+        extends JDKValueInstantiator
+    {
+        public LinkedHashSetInstantiator() {
+            super(LinkedHashSet.class);
+        }
+    
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new LinkedHashSet<>();
+        }
+    }
+
+    // @since 2.17 [databind#4299] Instantiators for additional container classes
+    private static class ConcurrentHashMapInstantiator
+        extends JDKValueInstantiator
+    {
+        public ConcurrentHashMapInstantiator() {
+            super(ConcurrentHashMap.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new ConcurrentHashMap<>();
+        }
+    }
+
+    private static class HashMapInstantiator
+        extends JDKValueInstantiator
+    {
+        static final HashMapInstantiator INSTANCE = new HashMapInstantiator();
 
         public HashMapInstantiator() {
             super(HashMap.class);
         }
 
         @Override
-        public boolean canInstantiate() { return true; }
-
-        @Override
-        public boolean canCreateUsingDefault() {  return true; }
-
-        @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws JacksonException {
+        public Object createUsingDefault(DeserializationContext ctxt) {
             return new HashMap<>();
         }
     }
 
     private static class LinkedHashMapInstantiator
-        extends ValueInstantiator.Base
+        extends JDKValueInstantiator
     {
-        public final static LinkedHashMapInstantiator INSTANCE = new LinkedHashMapInstantiator();
+        static final LinkedHashMapInstantiator INSTANCE = new LinkedHashMapInstantiator();
 
         public LinkedHashMapInstantiator() {
             super(LinkedHashMap.class);
         }
 
         @Override
-        public boolean canInstantiate() { return true; }
-
-        @Override
-        public boolean canCreateUsingDefault() {  return true; }
-
-        @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws JacksonException {
+        public Object createUsingDefault(DeserializationContext ctxt) {
             return new LinkedHashMap<>();
         }
     }
 
+    // @since 2.17 [databind#4299] Instantiators for additional container classes
+    private static class TreeMapInstantiator
+        extends JDKValueInstantiator
+    {
+        public TreeMapInstantiator() {
+            super(TreeMap.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new TreeMap<>();
+        }
+    }
+
+    // @since 2.19: was missing
+    private static class PropertiesInstantiator
+        extends JDKValueInstantiator
+    {
+        public PropertiesInstantiator() {
+            super(Properties.class);
+        }
+
+        @Override
+        public Object createUsingDefault(DeserializationContext ctxt) {
+            return new Properties();
+        }
+    }
+
     private static class ConstantValueInstantiator
-        extends ValueInstantiator.Base
+        extends JDKValueInstantiator
     {
         protected final Object _value;
 
@@ -120,16 +245,9 @@ public abstract class JDKValueInstantiators
             _value = value;
         }
 
-        @Override // yes, since default ctor works
-        public boolean canInstantiate() { return true; }
-
         @Override
-        public boolean canCreateUsingDefault() {  return true; }
-
-        @Override
-        public Object createUsingDefault(DeserializationContext ctxt) throws JacksonException {
+        public final Object createUsingDefault(DeserializationContext ctxt) {
             return _value;
         }
     }
-
 }

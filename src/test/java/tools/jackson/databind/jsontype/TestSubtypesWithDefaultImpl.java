@@ -1,14 +1,19 @@
 package tools.jackson.databind.jsontype;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
+
 import tools.jackson.core.Version;
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestSubtypesWithDefaultImpl extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestSubtypesWithDefaultImpl extends DatabindTestUtil
 {
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=As.PROPERTY,
             property="#type",
@@ -25,7 +30,7 @@ public class TestSubtypesWithDefaultImpl extends BaseMapTest
     static class DefaultImpl505 extends SuperTypeWithoutDefault {
         public int a;
     }
-    
+
     /*
     /**********************************************************************
     /* Unit tests
@@ -34,6 +39,7 @@ public class TestSubtypesWithDefaultImpl extends BaseMapTest
 
     private final ObjectMapper MAPPER = new ObjectMapper();
 
+    @Test
     public void testDefaultImpl() throws Exception
     {
         // first, test with no type information
@@ -55,11 +61,11 @@ public class TestSubtypesWithDefaultImpl extends BaseMapTest
         assertEquals(0, ((DefaultImpl) bean).a);
     }
 
-    // [JACKSON-505]: ok to also default to mapping there might be for base type
+    @Test
     public void testDefaultImplViaModule() throws Exception
     {
         final String JSON = "{\"a\":123}";
-        
+
         // first: without registration etc, epic fail:
         try {
             MAPPER.readValue(JSON, SuperTypeWithoutDefault.class);

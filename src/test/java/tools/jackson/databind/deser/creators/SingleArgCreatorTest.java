@@ -3,6 +3,8 @@ package tools.jackson.databind.deser.creators;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
@@ -10,8 +12,12 @@ import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.introspect.AnnotatedParameter;
 import tools.jackson.databind.introspect.JacksonAnnotationIntrospector;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class SingleArgCreatorTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+public class SingleArgCreatorTest extends DatabindTestUtil
 {
     // [databind#430]: single arg BUT named; should not delegate
     static class SingleNamedStringBean {
@@ -36,7 +42,7 @@ public class SingleArgCreatorTest extends BaseMapTest
 
         public String getFoobar() { return "x"; }
     }
-    
+
     // For [databind#557]
     static class StringyBean
     {
@@ -65,13 +71,12 @@ public class SingleArgCreatorTest extends BaseMapTest
     static class MyParamIntrospector extends JacksonAnnotationIntrospector
     {
         private final String name;
-        
+
         public MyParamIntrospector(String n) { name = n; }
-        
+
         @Override
         public String findImplicitPropertyName(MapperConfig<?> config, AnnotatedMember param) {
-            if (param instanceof AnnotatedParameter) {
-                AnnotatedParameter ap = (AnnotatedParameter) param;
+            if (param instanceof AnnotatedParameter ap) {
                 switch (ap.getIndex()) {
                 case 0: return name;
                 }
@@ -122,7 +127,7 @@ public class SingleArgCreatorTest extends BaseMapTest
     static class XY {
         public int x, y;
     }
-    
+
     // [databind#1383]
     static class SingleArgWithImplicit {
         protected XY _value;
@@ -162,6 +167,7 @@ public class SingleArgCreatorTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testNamedSingleArg() throws Exception
     {
         SingleNamedStringBean bean = MAPPER.readValue(a2q("{'value':'foobar'}"),
@@ -169,16 +175,23 @@ public class SingleArgCreatorTest extends BaseMapTest
         assertEquals("foobar", bean._ss);
     }
 
+    @Test
     public void testSingleStringArgWithImplicitName() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .annotationIntrospector(new MyParamIntrospector("value"))
                 .build();
-        StringyBean bean = mapper.readValue(q("foobar"), StringyBean.class);
+        // 23-May-2024, tatu: [databind#4515] Clarifies handling to make
+        //   1-param Constructor with implicit name auto-discoverable
+        //   This is compatibility change so hopefully won't bite us but...
+        //   it seems like the right thing to do.
+//        StringyBean bean = mapper.readValue(q("foobar"), StringyBean.class);
+        StringyBean bean = mapper.readValue(a2q("{'value':'foobar'}"), StringyBean.class);
         assertEquals("foobar", bean.getValue());
-    }    
+    }
 
     // [databind#714]
+    @Test
     public void testSingleImplicitlyNamedNotDelegating() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -186,9 +199,10 @@ public class SingleArgCreatorTest extends BaseMapTest
                 .build();
         StringyBeanWithProps bean = mapper.readValue("{\"value\":\"x\"}", StringyBeanWithProps.class);
         assertEquals("x", bean.getValue());
-    }    
+    }
 
     // [databind#714]
+    @Test
     public void testSingleExplicitlyNamedButDelegating() throws Exception
     {
         SingleNamedButStillDelegating bean = MAPPER.readValue(q("xyz"),
@@ -196,6 +210,7 @@ public class SingleArgCreatorTest extends BaseMapTest
         assertEquals("xyz", bean.value);
     }
 
+    @Test
     public void testExplicitFactory660a() throws Exception
     {
         // First, explicit override for factory
@@ -204,6 +219,7 @@ public class SingleArgCreatorTest extends BaseMapTest
         assertEquals("abc", bean.value());
     }
 
+    @Test
     public void testExplicitFactory660b() throws Exception
     {
         // and then one for private constructor
@@ -213,6 +229,7 @@ public class SingleArgCreatorTest extends BaseMapTest
     }
 
     // [databind#1383]
+    @Test
     public void testSingleImplicitDelegating() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -227,11 +244,12 @@ public class SingleArgCreatorTest extends BaseMapTest
     }
 
     // [databind#3062]
+    @Test
     public void testMultipleDoubleCreators3062() throws Exception
     {
         DecVector3062 vector = new DecVector3062(Arrays.asList(1.0, 2.0, 3.0));
         String result = MAPPER.writeValueAsString(vector);
         DecVector3062 deser = MAPPER.readValue(result, DecVector3062.class);
-        assertEquals(vector.elems, deser.elems);        
+        assertEquals(vector.elems, deser.elems);
     }
 }

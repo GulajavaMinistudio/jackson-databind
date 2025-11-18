@@ -22,11 +22,11 @@ public class JavaUtilDateSerializer
      * is needed.
      */
     public static final JavaUtilDateSerializer instance = new JavaUtilDateSerializer();
-    
+
     public JavaUtilDateSerializer() {
         this(null, null);
     }
-        
+
     public JavaUtilDateSerializer(Boolean useTimestamp, DateFormat customFormat) {
         super(Date.class, useTimestamp, customFormat);
     }
@@ -42,7 +42,7 @@ public class JavaUtilDateSerializer
     }
 
     @Override
-    public void serialize(Date value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(Date value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         if (_asTimestamp(provider)) {

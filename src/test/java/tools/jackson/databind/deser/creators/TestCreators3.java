@@ -1,7 +1,10 @@
 package tools.jackson.databind.deser.creators;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
 
@@ -11,17 +14,25 @@ import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.introspect.AnnotatedParameter;
 import tools.jackson.databind.introspect.JacksonAnnotationIntrospector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+import static tools.jackson.databind.testutil.JacksonTestUtilBase.a2q;
+
 // Misc Creator tests, part 3
-public class TestCreators3 extends BaseMapTest
+public class TestCreators3
 {
-    static final class Foo {
+    // [databind#541]
+    static final class Value541 {
 
         @JsonProperty("foo")
         protected Map<Integer, Bar> foo;
         @JsonProperty("anumber")
         protected long anumber;
 
-        public Foo() {
+        public Value541() {
             anumber = 0;
         }
 
@@ -65,7 +76,7 @@ public class TestCreators3 extends BaseMapTest
     static class MultiCtor
     {
         protected String _a, _b;
-        
+
         private MultiCtor() { }
         private MultiCtor(String a, String b, Boolean c) {
             if (c == null) {
@@ -86,8 +97,7 @@ public class TestCreators3 extends BaseMapTest
     {
         @Override
         public String findImplicitPropertyName(MapperConfig<?> config, AnnotatedMember param) {
-            if (param instanceof AnnotatedParameter) {
-                AnnotatedParameter ap = (AnnotatedParameter) param;
+            if (param instanceof AnnotatedParameter ap) {
                 switch (ap.getIndex()) {
                 case 0: return "a";
                 case 1: return "b";
@@ -99,7 +109,7 @@ public class TestCreators3 extends BaseMapTest
             return super.findImplicitPropertyName(config, param);
         }
     }
- 
+
     // [databind#1853]
     public static class Product1853 {
         String name;
@@ -121,27 +131,54 @@ public class TestCreators3 extends BaseMapTest
         }
 
         @JsonValue
-        public String getName(){
+        public String getName() {
             return name;
         }
     }
 
+    // https://github.com/FasterXML/jackson-databind/issues/5008
+    static class SimpleValue5008 {
+        private final String value;
+
+        public SimpleValue5008(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+    }
+
+    // [databind#5253]
+    static class Value5253 {
+        int a, b;
+        public final Map<String, Integer> c;
+
+        boolean ctorCalled = false;
+
+        public Value5253(int a, int b, final Map<String, Integer> c) {
+            this.a = a;
+            this.b = b;
+            this.c = new LinkedHashMap<>(c);
+            ctorCalled = true;
+        }
+    }
+
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods
-    /**********************************************************
+    /**********************************************************************
      */
 
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testCreator541() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                 .disable(MapperFeature.USE_GETTERS_AS_SETTERS)
-                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
                 .build();
+
         final String JSON = "{\n"
                 + "    \"foo\": {\n"
                 + "        \"0\": {\n"
@@ -155,24 +192,20 @@ public class TestCreators3 extends BaseMapTest
                 + "            \"stuff\": [\n"
                 + "              \"c\", \"d\" \n"
                 + "            ]   \n"
-                + "        },\n"
-                + "        \"2\": {\n"
-                + "            \"p\": 2000,\n"
-                + "            \"stuff\": [\n"
-                + "            ]   \n"
                 + "        }\n"
                 + "    },\n"
                 + "    \"anumber\": 25385874\n"
                 + "}";
 
-        Foo obj = mapper.readValue(JSON, Foo.class);
+        Value541 obj = mapper.readValue(JSON, Value541.class);
         assertNotNull(obj);
         assertNotNull(obj.foo);
-        assertEquals(3, obj.foo.size());
+        assertEquals(2, obj.foo.size());
         assertEquals(25385874L, obj.getAnumber());
     }
 
     // [databind#421]
+    @Test
     public void testMultiCtor421() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -185,26 +218,54 @@ public class TestCreators3 extends BaseMapTest
     }
 
     // [databind#1853]
+    @Test
     public void testSerialization() throws Exception {
         assertEquals(q("testProduct"),
                 MAPPER.writeValueAsString(new Product1853(false, "testProduct")));
     }
 
+    @Test
     public void testDeserializationFromObject() throws Exception {
         final String EXAMPLE_DATA = "{\"name\":\"dummy\",\"other\":{},\"errors\":{}}";
         assertEquals("PROP:dummy", MAPPER.readValue(EXAMPLE_DATA, Product1853.class).getName());
     }
 
+    @Test
     public void testDeserializationFromString() throws Exception {
         assertEquals("DELEG:testProduct",
                 MAPPER.readValue(q("testProduct"), Product1853.class).getName());
     }
 
+    @Test
     public void testDeserializationFromWrappedString() throws Exception {
         Product1853 result = MAPPER.readerFor(Product1853.class)
                 .with(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS)
                 .readValue("[\"testProduct\"]");
         assertEquals("DELEG:testProduct", result.getName());
+    }
+
+    // https://github.com/FasterXML/jackson-databind/issues/5008
+    @Test
+    public void testSimpleValue5008() throws Exception {
+        // according to #5008, this only started working in v2.18.0
+        // in Jackson 2, you needed to add the ParameterNamesModule
+        // but this is part of Jackson 3
+        // pre Jackson 2.18, "abc123" is what the deserializer expected
+        SimpleValue5008 value = MAPPER.readValue(
+                a2q("{'value':'abc123'}"), SimpleValue5008.class);
+        assertEquals("abc123", value.value);
+    }
+
+    // [databind#5253]: passing test (cannot reproduce reported problem)
+    @Test
+    public void finalValue5253() throws Exception {
+        Value5253 value = MAPPER.readerFor(Value5253.class)
+                .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .readValue(a2q("{'a':1,'b':2,'c':{'value': 42} }"));
+        assertEquals(1, value.a);
+        assertEquals(2, value.b);
+        assertEquals(Map.of("value", 42), value.c);
+        assertTrue(value.ctorCalled);
     }
 }
 

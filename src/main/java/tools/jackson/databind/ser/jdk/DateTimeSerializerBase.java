@@ -8,10 +8,12 @@ import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.jsonFormatVisitors.*;
 import tools.jackson.databind.ser.std.StdScalarSerializer;
 import tools.jackson.databind.util.StdDateFormat;
@@ -54,7 +56,7 @@ public abstract class DateTimeSerializerBase<T>
     public abstract DateTimeSerializerBase<T> withFormat(Boolean timestamp, DateFormat customFormat);
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider serializers,
+    public ValueSerializer<?> createContextual(SerializationContext serializers,
             BeanProperty property)
     {
         // Note! Should not skip if `property` null since that'd skip check
@@ -134,7 +136,7 @@ df0.getClass().getName()));
      */
 
     @Override
-    public boolean isEmpty(SerializerProvider serializers, T value) {
+    public boolean isEmpty(SerializationContext serializers, T value) {
         // 09-Mar-2017, tatu: as per [databind#1550] timestamp 0 is NOT "empty"; but
         //   with versions up to 2.8.x this was the case. Fixed for 2.9.
 //        return _timestamp(value) == 0L;
@@ -146,7 +148,7 @@ df0.getClass().getName()));
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
     {
-        _acceptJsonFormatVisitor(visitor, typeHint, _asTimestamp(visitor.getProvider()));
+        _acceptJsonFormatVisitor(visitor, typeHint, _asTimestamp(visitor.getContext()));
     }
 
     /*
@@ -156,7 +158,7 @@ df0.getClass().getName()));
      */
 
     @Override
-    public abstract void serialize(T value, JsonGenerator gen, SerializerProvider serializers)
+    public abstract void serialize(T value, JsonGenerator gen, SerializationContext serializers)
         throws JacksonException;
 
     /*
@@ -164,18 +166,18 @@ df0.getClass().getName()));
     /* Helper methods
     /**********************************************************
      */
-    
-    protected boolean _asTimestamp(SerializerProvider serializers)
+
+    protected boolean _asTimestamp(SerializationContext serializers)
     {
         if (_useTimestamp != null) {
-            return _useTimestamp.booleanValue();
+            return _useTimestamp;
         }
         if (_customFormat == null) {
             if (serializers != null) {
-                return serializers.isEnabled(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                return serializers.isEnabled(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
             }
             // 12-Jun-2014, tatu: Is it legal not to have provider? Was NPE:ing earlier so leave a check
-            throw new IllegalArgumentException("Null SerializerProvider passed for "+handledType().getName());
+            throw new IllegalArgumentException("Null SerializationContext passed for "+handledType().getName());
         }
         return false;
     }
@@ -191,7 +193,7 @@ df0.getClass().getName()));
         }
     }
 
-    protected void _serializeAsString(Date value, JsonGenerator g, SerializerProvider provider)
+    protected void _serializeAsString(Date value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         if (_customFormat == null) {
@@ -203,9 +205,9 @@ df0.getClass().getName()));
         //    reusing formatter instance. This is our second attempt, after initially trying simple
         //    synchronization (which turned out to be bottleneck for some users in production...).
         //    While `ThreadLocal` could alternatively be used, it is likely that it would lead to
-        //    higher memory footprint, but without much upside -- if we can not reuse, we'll just
+        //    higher memory footprint, but without much upside -- if we cannot reuse, we'll just
         //    clone(), which has some overhead but not drastic one.
-        
+
         DateFormat f = _reusedCustomFormat.getAndSet(null);
         if (f == null) {
             f = (DateFormat) _customFormat.clone();

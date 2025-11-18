@@ -14,6 +14,9 @@ import tools.jackson.core.JsonParser;
 import tools.jackson.core.io.NumberInput;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
+import tools.jackson.databind.cfg.EnumFeature;
+import tools.jackson.databind.cfg.MapperConfig;
+import tools.jackson.databind.introspect.AnnotatedClass;
 import tools.jackson.databind.introspect.AnnotatedMethod;
 import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.EnumResolver;
@@ -54,7 +57,7 @@ public class JDKKeyDeserializer extends KeyDeserializer
      * Some types that are deserialized using a helper deserializer.
      */
     protected final JDKFromStringDeserializer _deser;
-    
+
     protected JDKKeyDeserializer(int kind, Class<?> cls) {
         this(kind, cls, null);
     }
@@ -139,7 +142,7 @@ public class JDKKeyDeserializer extends KeyDeserializer
                     ClassUtil.exceptionMessage(re));
         }
         if (ClassUtil.isEnumType(_keyClass)
-                && ctxt.getConfig().isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
+                && ctxt.getConfig().isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
             return null;
         }
         return ctxt.handleWeirdKey(_keyClass, key, "not a valid representation");
@@ -195,11 +198,6 @@ public class JDKKeyDeserializer extends KeyDeserializer
         case TYPE_DOUBLE:
             return _parseDouble(key);
         case TYPE_LOCALE:
-            try {
-                return _deser._deserialize(key, ctxt);
-            } catch (IllegalArgumentException | IOException e) {
-                return _weirdKey(ctxt, key, e);
-            }
         case TYPE_CURRENCY:
             try {
                 return _deser._deserialize(key, ctxt);
@@ -260,10 +258,9 @@ public class JDKKeyDeserializer extends KeyDeserializer
     }
 
     protected double _parseDouble(String key) throws IllegalArgumentException {
-        return NumberInput.parseDouble(key);
+        return NumberInput.parseDouble(key, false);
     }
 
-    // @since 2.9
     protected Object _weirdKey(DeserializationContext ctxt, String key, Exception e) throws JacksonException {
         return ctxt.handleWeirdKey(_keyClass, key, "problem: %s",
                 ClassUtil.exceptionMessage(e));
@@ -280,7 +277,7 @@ public class JDKKeyDeserializer extends KeyDeserializer
     {
         private final static StringKD sString = new StringKD(String.class);
         private final static StringKD sObject = new StringKD(Object.class);
-        
+
         private StringKD(Class<?> nominalType) { super(-1, nominalType); }
 
         public static StringKD forType(Class<?> nominalType)
@@ -298,7 +295,7 @@ public class JDKKeyDeserializer extends KeyDeserializer
         public Object deserializeKey(String key, DeserializationContext ctxt) throws JacksonException {
             return key;
         }
-    }    
+    }
 
     /*
     /**********************************************************************
@@ -317,7 +314,7 @@ public class JDKKeyDeserializer extends KeyDeserializer
         final protected Class<?> _keyClass;
 
         protected final ValueDeserializer<?> _delegate;
-        
+
         protected DelegatingKD(Class<?> cls, ValueDeserializer<?> deser) {
             _keyClass = cls;
             _delegate = deser;
@@ -358,21 +355,37 @@ public class JDKKeyDeserializer extends KeyDeserializer
         protected final AnnotatedMethod _factory;
 
         /**
-         * Lazily constructed alternative in case there is need to
-         * use 'toString()' method as the source.
-         *
-         * @since 2.7.3
+         * Alternative resolver to parse enums with {@code toString()} method as the source.
+         * Works when {@link EnumFeature#READ_ENUMS_USING_TO_STRING} is enabled.
          */
-        protected EnumResolver _byToStringResolver;
+        protected final EnumResolver _byToStringResolver;
+
+        /**
+         * Alternative resolver to parse enums with {@link Enum#ordinal()} method as the source.
+         * Works when {@link EnumFeature#READ_ENUM_KEYS_USING_INDEX} is enabled.
+         */
+        protected final EnumResolver _byIndexResolver;
+
+        /**
+         * Look up map with <b>key</b> as <code>Enum.name()</code> converted by
+         * {@link EnumNamingStrategy#convertEnumToExternalName(MapperConfig, AnnotatedClass, String)}
+         * and <b>value</b> as Enums.
+         */
+        protected final EnumResolver _byEnumNamingResolver;
 
         protected final Enum<?> _enumDefaultValue;
-        
-        protected EnumKD(EnumResolver er, AnnotatedMethod factory) {
+
+        protected EnumKD(EnumResolver er, AnnotatedMethod factory, EnumResolver byEnumNamingResolver, 
+                         EnumResolver byToStringResolver, EnumResolver byIndexResolver) {
             super(-1, er.getEnumClass());
             _byNameResolver = er;
             _factory = factory;
             _enumDefaultValue = er.getDefaultValue();
+            _byEnumNamingResolver = byEnumNamingResolver;
+            _byToStringResolver = byToStringResolver;
+            _byIndexResolver = byIndexResolver;
         }
+        
 
         @Override
         public Object _parse(String key, DeserializationContext ctxt)
@@ -385,14 +398,20 @@ public class JDKKeyDeserializer extends KeyDeserializer
                     ClassUtil.unwrapAndThrowAsIAE(e);
                 }
             }
-            EnumResolver res = ctxt.isEnabled(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
-                    ? _getToStringResolver(ctxt) : _byNameResolver;
+
+            EnumResolver res = _resolveCurrentResolver(ctxt);
             Enum<?> e = res.findEnum(key);
+            // If enum is found, no need to try deser using index
+            if (e == null && ctxt.isEnabled(EnumFeature.READ_ENUM_KEYS_USING_INDEX)) {
+                if (_byIndexResolver != null) {
+                    e = _byIndexResolver.findEnum(key);
+                }
+            }
             if (e == null) {
                 if ((_enumDefaultValue != null)
-                        && ctxt.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)) {
+                        && ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)) {
                     e = _enumDefaultValue;
-                } else if (!ctxt.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
+                } else if (!ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
                     return ctxt.handleWeirdKey(_keyClass, key, "not one of the values accepted for Enum class: %s",
                         res.getEnumIds());
                 }
@@ -401,20 +420,18 @@ public class JDKKeyDeserializer extends KeyDeserializer
             return e;
         }
 
-        private EnumResolver _getToStringResolver(DeserializationContext ctxt)
-        {
-            EnumResolver res = _byToStringResolver;
-            if (res == null) {
-                synchronized (this) {
-                    res = EnumResolver.constructUsingToString(ctxt.getConfig(),
-                            _byNameResolver.getEnumClass());
-                    _byToStringResolver = res;
-                }
+        protected EnumResolver _resolveCurrentResolver(DeserializationContext ctxt) {
+            if (_byEnumNamingResolver != null) {
+                return _byEnumNamingResolver;
             }
-            return res;
+            if (_byNameResolver.hasAsValueAnnotation()
+                    || !ctxt.isEnabled(EnumFeature.READ_ENUMS_USING_TO_STRING)) {
+                return _byNameResolver;
+            }
+            return  _byToStringResolver;
         }
     }
-    
+
     /**
      * Key deserializer that calls a single-string-arg constructor
      * to instantiate desired key type.

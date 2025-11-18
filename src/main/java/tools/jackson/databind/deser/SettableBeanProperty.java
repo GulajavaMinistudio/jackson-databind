@@ -2,7 +2,12 @@ package tools.jackson.databind.deser;
 
 import java.lang.annotation.Annotation;
 
+import java.lang.reflect.InvocationTargetException;
+
+import com.fasterxml.jackson.annotation.JacksonInject;
+
 import tools.jackson.core.*;
+import tools.jackson.core.util.InternCache;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.bean.BeanDeserializer;
 import tools.jackson.databind.deser.impl.FailingDeserializer;
@@ -12,6 +17,7 @@ import tools.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.util.Annotations;
 import tools.jackson.databind.util.ClassUtil;
+import tools.jackson.databind.util.NameTransformer;
 import tools.jackson.databind.util.ViewMatcher;
 
 /**
@@ -21,10 +27,8 @@ import tools.jackson.databind.util.ViewMatcher;
  * setter-backed properties, as well as a few more esoteric variations,
  * can be handled.
  */
-@SuppressWarnings("serial")
 public abstract class SettableBeanProperty
     extends ConcreteBeanPropertyBase
-    implements java.io.Serializable
 {
     /**
      * To avoid nasty NPEs, let's use a placeholder for _valueDeserializer,
@@ -158,7 +162,7 @@ public abstract class SettableBeanProperty
     /**
      * Constructor only used by {@link tools.jackson.databind.deser.impl.ObjectIdValueProperty}.
      */
-    protected SettableBeanProperty(PropertyName propName, JavaType type, 
+    protected SettableBeanProperty(PropertyName propName, JavaType type,
             PropertyMetadata metadata, ValueDeserializer<Object> valueDeser)
     {
         super(metadata);
@@ -193,6 +197,7 @@ public abstract class SettableBeanProperty
         _managedReferenceName = src._managedReferenceName;
         _propertyIndex = src._propertyIndex;
         _viewMatcher = src._viewMatcher;
+        _objectIdInfo = src._objectIdInfo;
         _nullProvider = src._nullProvider;
     }
 
@@ -218,6 +223,7 @@ public abstract class SettableBeanProperty
             _valueDeserializer = (ValueDeserializer<Object>) deser;
         }
         _viewMatcher = src._viewMatcher;
+        _objectIdInfo = src._objectIdInfo;
         // 29-Jan-2017, tatu: Bit messy, but for now has to do...
         if (nuller == MISSING_VALUE_DESERIALIZER) {
             nuller = _valueDeserializer;
@@ -240,6 +246,7 @@ public abstract class SettableBeanProperty
         _managedReferenceName = src._managedReferenceName;
         _propertyIndex = src._propertyIndex;
         _viewMatcher = src._viewMatcher;
+        _objectIdInfo = src._objectIdInfo;
         _nullProvider = src._nullProvider;
     }
 
@@ -262,6 +269,7 @@ public abstract class SettableBeanProperty
         _managedReferenceName = src._managedReferenceName;
         _propertyIndex = src._propertyIndex;
         _viewMatcher = src._viewMatcher;
+        _objectIdInfo = src._objectIdInfo;
         _nullProvider = src._nullProvider;
     }
 
@@ -269,9 +277,9 @@ public abstract class SettableBeanProperty
      * Fluent factory method for constructing and returning a new instance
      * with specified value deserializer.
      * Note that this method should NOT change configuration of this instance.
-     * 
+     *
      * @param deser Deserializer to assign to the new property instance
-     * 
+     *
      * @return Newly constructed instance, if value deserializer differs from the
      *   one used for this instance; or 'this' if not.
      */
@@ -281,9 +289,9 @@ public abstract class SettableBeanProperty
      * Fluent factory method for constructing and returning a new instance
      * with specified property name.
      * Note that this method should NOT change configuration of this instance.
-     * 
+     *
      * @param newName Name to use for the new instance.
-     * 
+     *
      * @return Newly constructed instance, if property name differs from the
      *   one used for this instance; or 'this' if not.
      */
@@ -344,12 +352,22 @@ public abstract class SettableBeanProperty
 
     public boolean isIgnorable() { return false; }
 
+    /**
+     * Whether this property requires merging of values (read-then-write)
+     *
+     * @since 2.20
+     */
+    public boolean isMerging() {
+        // Most are not merging so default to this implementation
+        return false;
+    }
+
     /*
     /**********************************************************************
     /* BeanProperty impl
     /**********************************************************************
      */
-    
+
     @Override
     public final String getName() {
         return _propName.getSimpleName();
@@ -367,7 +385,7 @@ public abstract class SettableBeanProperty
     public PropertyName getWrapperName() {
         return _wrapperName;
     }
-    
+
     @Override
     public abstract AnnotatedMember getMember();
 
@@ -381,10 +399,10 @@ public abstract class SettableBeanProperty
 
     @Override
     public void depositSchemaProperty(JsonObjectFormatVisitor objectVisitor,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         if (isRequired()) {
-            objectVisitor.property(this); 
+            objectVisitor.property(this);
         } else {
             objectVisitor.optionalProperty(this);
         }
@@ -427,12 +445,12 @@ public abstract class SettableBeanProperty
     }
 
     public boolean hasViews() { return _viewMatcher != null; }
-    
+
     /**
      * Method for accessing unique index of this property; indexes are
      * assigned once all properties of a {@link BeanDeserializer} have
      * been collected.
-     * 
+     *
      * @return Index of this property
      */
     public int getPropertyIndex() { return _propertyIndex; }
@@ -453,6 +471,12 @@ public abstract class SettableBeanProperty
      * value injection.
      */
     public Object getInjectableValueId() { return null; }
+
+    /**
+     * Accessor for injection definition, if this bean property supports
+     * value injection.
+     */
+    public JacksonInject.Value getInjectionDefinition() { return null; }
 
     /**
      * Accessor for checking whether this property is injectable, and if so,
@@ -497,7 +521,8 @@ public abstract class SettableBeanProperty
      * implementations, creator-backed properties for example do not
      * support this method.
      */
-    public abstract void set(Object instance, Object value);
+    public abstract void set(DeserializationContext ctxt,
+            Object instance, Object value);
 
     /**
      * Method called to assign given value to this property, on
@@ -508,7 +533,8 @@ public abstract class SettableBeanProperty
      * implementations, creator-backed properties for example do not
      * support this method.
      */
-    public abstract Object setAndReturn(Object instance, Object value);
+    public abstract Object setAndReturn(DeserializationContext ctxt,
+            Object instance, Object value);
 
     /**
      * This method is needed by some specialized bean deserializers,
@@ -517,7 +543,7 @@ public abstract class SettableBeanProperty
      * Pre-condition is that passed parser must point to the first token
      * that should be consumed to produce the value (the only value for
      * scalars, multiple for Objects and Arrays).
-     *<p> 
+     *<p>
      * Note that this method is final for performance reasons: to override
      * functionality you must override other methods that call this method;
      * this method should also not be called directly unless you really know
@@ -573,13 +599,35 @@ public abstract class SettableBeanProperty
         return value;
     }
 
+    /**
+     * Returns a copy of this property, unwrapped using given {@link NameTransformer}.
+     *
+     * @since 2.19
+     */
+    public SettableBeanProperty unwrapped(DeserializationContext ctxt, NameTransformer xf)
+    {
+        String newName = xf.transform(getName());
+        newName = InternCache.instance.intern(newName);
+        SettableBeanProperty renamed = withSimpleName(newName);
+        ValueDeserializer<?> deser = renamed.getValueDeserializer();
+        if (deser != null) {
+            @SuppressWarnings("unchecked")
+            ValueDeserializer<Object> newDeser = (ValueDeserializer<Object>)
+                    deser.unwrappingDeserializer(ctxt, xf);
+            if (newDeser != deser) {
+                renamed = renamed.withValueDeserializer(newDeser);
+            }
+        }
+        return renamed;
+    }
+
     /*
     /**********************************************************************
     /* Helper methods
     /**********************************************************************
      */
 
-    protected void _throwAsJacksonE(JsonParser p, Exception e, Object value)
+    protected void _throwAsJacksonE(JsonParser p, Throwable e, Object value)
         throws JacksonException
     {
         if (e instanceof IllegalArgumentException) {
@@ -602,19 +650,23 @@ public abstract class SettableBeanProperty
         _throwAsJacksonE(p, e);
     }
 
-    protected void _throwAsJacksonE(JsonParser p, Exception e) throws JacksonException
+    protected void _throwAsJacksonE(JsonParser p, Throwable e) throws JacksonException
     {
+        ClassUtil.throwIfError(e);
         ClassUtil.throwIfRTE(e);
         ClassUtil.throwIfJacksonE(e);
-        // let's wrap the innermost problem
-        Throwable th = ClassUtil.getRootCause(e);
-        throw DatabindException.from(p, ClassUtil.exceptionMessage(th), th);
-    }
 
-    // 10-Oct-2015, tatu: _Should_ be deprecated, too, but its remaining
-    //   callers cannot actually provide a JsonParser
-    protected void _throwAsJacksonE(Exception e, Object value) throws JacksonException {
-        _throwAsJacksonE((JsonParser) null, e, value);
+        // 10-Apr-2025: [databind#4603] no more unwrapping, retain exception
+        // Throwable th = ClassUtil.getRootCause(e);
+        // ... except for InvocationTargetException which we still unwrap as it
+        // adds no value
+        if (e instanceof InvocationTargetException ite) {
+            Throwable t = ite.getTargetException();
+            ClassUtil.throwIfRTE(t);
+            ClassUtil.throwIfJacksonE(t);
+            throw DatabindException.from(p, ClassUtil.exceptionMessage(t), t);
+        }
+        throw DatabindException.from(p, ClassUtil.exceptionMessage(e), e);
     }
 
     @Override public String toString() { return "[property '"+getName()+"']"; }
@@ -655,7 +707,7 @@ public abstract class SettableBeanProperty
             }
             return withDelegate(newDelegate);
         }
-        
+
         @Override
         public SettableBeanProperty withValueDeserializer(ValueDeserializer<?> deser) {
             return _with(delegate.withValueDeserializer(deser));
@@ -701,7 +753,7 @@ public abstract class SettableBeanProperty
 
         @Override
         public boolean hasValueTypeDeserializer() { return delegate.hasValueTypeDeserializer(); }
-        
+
         @Override
         public ValueDeserializer<Object> getValueDeserializer() { return delegate.getValueDeserializer(); }
 
@@ -769,13 +821,13 @@ public abstract class SettableBeanProperty
         }
 
         @Override
-        public void set(Object instance, Object value) {
-            delegate.set(instance, value);
+        public void set(DeserializationContext ctxt, Object instance, Object value) {
+            delegate.set(ctxt, instance, value);
         }
 
         @Override
-        public Object setAndReturn(Object instance, Object value) {
-            return delegate.setAndReturn(instance, value);
+        public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) {
+            return delegate.setAndReturn(ctxt, instance, value);
         }
     }
 }

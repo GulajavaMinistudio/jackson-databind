@@ -1,15 +1,22 @@
 package tools.jackson.databind.deser.builder;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.annotation.JsonPOJOBuilder;
 
-public class BuilderWithUnwrappedTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+
+public class BuilderWithUnwrappedTest
 {
     final static class Name {
         private final String first;
@@ -188,11 +195,11 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
 
             Builder() { }
 
-            @JsonProperty("animal_id") 
+            @JsonProperty("animal_id")
             public void setId(long i) {
                 id = i;
             }
-            
+
             @JsonUnwrapped
             void setName(Name name) {
                 this.name = name;
@@ -215,6 +222,7 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testWithUnwrappedAndCreatorSingleParameterAtBeginning() throws Exception {
         final String json = a2q("{'person_id':1234,'first_name':'John','last_name':'Doe','years_old':30,'living':true}");
 
@@ -225,9 +233,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", person.getName().getFirst());
         assertEquals("Doe", person.getName().getLast());
         assertEquals(30, person.getAge());
-        assertEquals(true, person.isAlive());
+        assertTrue(person.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedAndCreatorSingleParameterInMiddle() throws Exception {
         final String json = a2q("{'first_name':'John','last_name':'Doe','person_id':1234,'years_old':30,'living':true}");
 
@@ -238,9 +247,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", person.getName().getFirst());
         assertEquals("Doe", person.getName().getLast());
         assertEquals(30, person.getAge());
-        assertEquals(true, person.isAlive());
+        assertTrue(person.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedAndCreatorSingleParameterAtEnd() throws Exception {
         final String json = a2q("{'first_name':'John','last_name':'Doe','years_old':30,'living':true,'person_id':1234}");
 
@@ -251,9 +261,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", person.getName().getFirst());
         assertEquals("Doe", person.getName().getLast());
         assertEquals(30, person.getAge());
-        assertEquals(true, person.isAlive());
+        assertTrue(person.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedAndCreatorMultipleParametersAtBeginning() throws Exception {
         final String json = a2q("{'animal_id':1234,'living':true,'first_name':'John','last_name':'Doe','years_old':30}");
 
@@ -264,9 +275,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", animal.getName().getFirst());
         assertEquals("Doe", animal.getName().getLast());
         assertEquals(30, animal.getAge());
-        assertEquals(true, animal.isAlive());
+        assertTrue(animal.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedAndCreatorMultipleParametersInMiddle() throws Exception {
         final String json = a2q("{'first_name':'John','animal_id':1234,'last_name':'Doe','living':true,'years_old':30}");
 
@@ -277,9 +289,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", animal.getName().getFirst());
         assertEquals("Doe", animal.getName().getLast());
         assertEquals(30, animal.getAge());
-        assertEquals(true, animal.isAlive());
+        assertTrue(animal.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedAndCreatorMultipleParametersAtEnd() throws Exception {
         final String json = a2q("{'first_name':'John','last_name':'Doe','years_old':30,'living':true,'animal_id':1234}");
 
@@ -290,9 +303,10 @@ public class BuilderWithUnwrappedTest extends BaseMapTest
         assertEquals("John", animal.getName().getFirst());
         assertEquals("Doe", animal.getName().getLast());
         assertEquals(30, animal.getAge());
-        assertEquals(true, animal.isAlive());
+        assertTrue(animal.isAlive());
     }
 
+    @Test
     public void testWithUnwrappedNoCreator() throws Exception {
         final String json = a2q("{'first_name':'John','last_name':'Doe','years_old':'30','animal_id':1234}");
 

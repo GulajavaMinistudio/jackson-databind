@@ -34,7 +34,7 @@ public abstract class DeserializationContexts
     // get passed via `forMapper(...)` call; all we want to serialize is identity
     // of this class (and possibly whatever sub-classes may want to retain).
     // Hence `transient` modifiers
-    
+
     /**
      * Low-level {@link TokenStreamFactory} that may be used for constructing
      * embedded generators.
@@ -72,14 +72,17 @@ public abstract class DeserializationContexts
      * Necessary usually to initialize non-configuration state, such as caching.
      */
     public DeserializationContexts forMapper(Object mapper,
-            TokenStreamFactory tsf, DeserializerFactory deserializerFactory) {
-        return forMapper(mapper, tsf, deserializerFactory, _defaultCache());
+            DeserializationConfig config,
+            TokenStreamFactory tsf,
+            DeserializerFactory deserializerFactory) {
+        return forMapper(mapper, tsf, deserializerFactory,
+                new DeserializerCache(config.getCacheProvider().forDeserializerCache(config)));
     }
 
     protected abstract DeserializationContexts forMapper(Object mapper,
             TokenStreamFactory tsf, DeserializerFactory deserializerFactory,
             DeserializerCache cache);
-    
+
     /**
      * Factory method for constructing context object for individual {@code writeValue} call.
      */
@@ -88,16 +91,17 @@ public abstract class DeserializationContexts
 
     /*
     /**********************************************************************
-    /* Overridable default methods
+    /* Extended API
     /**********************************************************************
      */
 
     /**
-     * Factory method for constructing per-mapper serializer cache to use.
+     * Method that will drop all dynamically constructed deserializers (ones that
+     * are counted as result value for {@link DeserializerCache#cachedDeserializersCount}).
      */
-    protected DeserializerCache _defaultCache() {
-        return new DeserializerCache();
-    }
+    public void flushCachedDeserializers() {
+        _cache.flushCachedDeserializers();
+    }    
 
     /*
     /**********************************************************************

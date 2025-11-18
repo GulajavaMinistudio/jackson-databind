@@ -21,7 +21,7 @@ final class UntypedObjectDeserializerNR
 
     // @since 2.9
     protected final boolean _nonMerging;
-    
+
     public UntypedObjectDeserializerNR() { this(false); }
 
     protected UntypedObjectDeserializerNR(boolean nonMerging) {
@@ -65,17 +65,14 @@ final class UntypedObjectDeserializerNR
             return _deserializeNR(p, ctxt, Scope.rootArrayScope());
 
         case JsonTokenId.ID_STRING:
-            return p.getText();
+            return p.getString();
         case JsonTokenId.ID_NUMBER_INT:
             if (ctxt.hasSomeOfFeatures(F_MASK_INT_COERCIONS)) {
                 return _coerceIntegral(p, ctxt);
             }
             return p.getNumberValue();
         case JsonTokenId.ID_NUMBER_FLOAT:
-            if (ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
-                return p.getDecimalValue();
-            }
-            return p.getNumberValue();
+            return _deserializeFP(p, ctxt);
         case JsonTokenId.ID_TRUE:
             return Boolean.TRUE;
         case JsonTokenId.ID_FALSE:
@@ -229,14 +226,13 @@ final class UntypedObjectDeserializerNR
                         // but for arrays need to go to main loop
                         continue outer_loop;
                     case JsonTokenId.ID_STRING:
-                        value = p.getText();
+                        value = p.getString();
                         break;
                     case JsonTokenId.ID_NUMBER_INT:
                         value = intCoercions ?  _coerceIntegral(p, ctxt) : p.getNumberValue();
                         break;
                     case JsonTokenId.ID_NUMBER_FLOAT:
-                        value = ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-                            ? p.getDecimalValue() : p.getNumberValue();
+                        value = _deserializeFP(p, ctxt);
                         break;
                     case JsonTokenId.ID_TRUE:
                         value = Boolean.TRUE;
@@ -283,14 +279,13 @@ final class UntypedObjectDeserializerNR
                         currScope = currScope.finishBranchArray(useJavaArray);
                         break arrayLoop;
                     case JsonTokenId.ID_STRING:
-                        value = p.getText();
+                        value = p.getString();
                         break;
                     case JsonTokenId.ID_NUMBER_INT:
                         value = intCoercions ?  _coerceIntegral(p, ctxt) : p.getNumberValue();
                         break;
                     case JsonTokenId.ID_NUMBER_FLOAT:
-                        value = ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-                            ? p.getDecimalValue() : p.getNumberValue();
+                        value = _deserializeFP(p, ctxt);
                         break;
                     case JsonTokenId.ID_TRUE:
                         value = Boolean.TRUE;
@@ -314,12 +309,12 @@ final class UntypedObjectDeserializerNR
     }
 
     private Object _deserializeAnyScalar(JsonParser p, DeserializationContext ctxt,
-            int tokenType) 
+            int tokenType)
         throws JacksonException
     {
         switch (tokenType) {
         case JsonTokenId.ID_STRING:
-            return p.getText();
+            return p.getString();
         case JsonTokenId.ID_NUMBER_INT:
             if (ctxt.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
                 return p.getBigIntegerValue();
@@ -327,17 +322,14 @@ final class UntypedObjectDeserializerNR
             return p.getNumberValue();
 
         case JsonTokenId.ID_NUMBER_FLOAT:
-            if (ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
-                return p.getDecimalValue();
-            }
-            return p.getNumberValue();
+            return _deserializeFP(p, ctxt);
         case JsonTokenId.ID_TRUE:
             return Boolean.TRUE;
         case JsonTokenId.ID_FALSE:
             return Boolean.FALSE;
         case JsonTokenId.ID_EMBEDDED_OBJECT:
             return p.getEmbeddedObject();
-        
+
         case JsonTokenId.ID_NULL: // should not get this far really but...
             return null;
         // Caller should check for anything else
@@ -346,6 +338,24 @@ final class UntypedObjectDeserializerNR
         return ctxt.handleUnexpectedToken(getValueType(ctxt), p);
     }
 
+    protected Object _deserializeFP(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
+    {
+        JsonParser.NumberTypeFP nt = p.getNumberTypeFP();
+        if (nt == JsonParser.NumberTypeFP.BIG_DECIMAL) {
+            return p.getDecimalValue();
+        }
+        if (!p.isNaN()) {
+            if (ctxt.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                return p.getDecimalValue();
+            }
+        }
+        if (nt == JsonParser.NumberTypeFP.FLOAT32) {
+            return p.getFloatValue();
+        }
+        return p.getDoubleValue();
+    }
+    
     // NOTE: copied from above (alas, no easy way to share/reuse)
     // @since 2.12 (wrt [databind#2733]
     protected Object _mapObjectWithDups(JsonParser p, DeserializationContext ctxt,
@@ -386,7 +396,7 @@ final class UntypedObjectDeserializerNR
             l.add(newValue);
             result.put(key, l);
         }
-    }    
+    }
 
     /*
     /**********************************************************************
@@ -606,7 +616,7 @@ final class UntypedObjectDeserializerNR
                     l.add(newValue);
                     _map.put(key, l);
                 }
-                
+
             }
         }
 

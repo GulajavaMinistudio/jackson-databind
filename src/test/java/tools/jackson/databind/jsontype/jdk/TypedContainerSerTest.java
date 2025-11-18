@@ -2,8 +2,7 @@ package tools.jackson.databind.jsontype.jdk;
 
 import java.util.*;
 
-import org.junit.Assert;
-
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
@@ -11,13 +10,15 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TypedContainerSerTest
-	extends BaseMapTest
+	extends DatabindTestUtil
 {
     @JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "object-type")
     @JsonSubTypes( { @Type(value = Dog.class, name = "doggy"),
@@ -104,7 +105,8 @@ public class TypedContainerSerTest
     /* Test methods
     /**********************************************************
      */
-	
+
+	@Test
     public void testPolymorphicWithContainer() throws Exception
     {
 		Dog dog = new Dog("medor");
@@ -112,15 +114,16 @@ public class TypedContainerSerTest
 		Container1 c1 = new Container1();
 		c1.setAnimal(dog);
 		String s1 = mapper.writeValueAsString(c1);
-		Assert.assertTrue("polymorphic type info is kept (1)", s1
-				.indexOf("\"object-type\":\"doggy\"") >= 0);
+		assertTrue(s1.indexOf("\"object-type\":\"doggy\"") >= 0,
+				"polymorphic type info is kept (1)");
 		Container2<Animal> c2 = new Container2<Animal>();
 		c2.setAnimal(dog);
 		String s2 = mapper.writeValueAsString(c2);
-		Assert.assertTrue("polymorphic type info is kept (2)", s2
-				.indexOf("\"object-type\":\"doggy\"") >= 0);
+		assertTrue(s2.indexOf("\"object-type\":\"doggy\"") >= 0,
+				"polymorphic type info is kept (2)");
     }
 
+	@Test
     public void testIssue329() throws Exception
     {
         ArrayList<Animal> animals = new ArrayList<Animal>();
@@ -132,6 +135,7 @@ public class TypedContainerSerTest
         }
     }
 
+	@Test
     public void testIssue508() throws Exception
     {
         List<List<Issue508A>> l = new ArrayList<List<Issue508A>>();

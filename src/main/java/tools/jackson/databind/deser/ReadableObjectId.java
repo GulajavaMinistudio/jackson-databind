@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.fasterxml.jackson.annotation.ObjectIdResolver;
 
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.JsonLocation;
+import tools.jackson.core.TokenStreamLocation;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JavaType;
 
@@ -52,7 +52,7 @@ public class ReadableObjectId
      * Method called to assign actual POJO to which ObjectId refers to: will
      * also handle referring properties, if any, by assigning POJO.
      */
-    public void bindItem(Object ob) throws JacksonException
+    public void bindItem(DeserializationContext ctxt, Object ob) throws JacksonException
     {
         _resolver.bindItem(_key, ob);
         _item = ob;
@@ -61,7 +61,7 @@ public class ReadableObjectId
             Iterator<Referring> it = _referringProperties.iterator();
             _referringProperties = null;
             while (it.hasNext()) {
-                it.next().handleResolvedForwardReference(id, ob);
+                it.next().handleResolvedForwardReference(ctxt, id, ob);
             }
         }
     }
@@ -89,7 +89,7 @@ public class ReadableObjectId
      * {@link ReadableObjectId} and overriding this method.
      *<p>
      * Default implementation simply returns <code>false</code> to indicate that resolution
-     * attempt did not succeed. 
+     * attempt did not succeed.
      *
      * @return True, if resolution succeeded (and no error needs to be reported); false to
      *   indicate resolution did not succeed.
@@ -103,11 +103,11 @@ public class ReadableObjectId
 
     /**
      * Allow access to the resolver in case anybody wants to use it directly, for
-     * examples from 
+     * examples from
      * {@link tools.jackson.databind.deser.DeserializationContextExt#tryToResolveUnresolvedObjectId}.
      *
      * @return The registered resolver
-     * 
+     *
      * @since 2.7
      */
     public ObjectIdResolver getResolver() {
@@ -139,11 +139,13 @@ public class ReadableObjectId
             _beanType = beanType.getRawClass();
         }
 
-        public JsonLocation getLocation() { return _reference.getLocation(); }
+        public TokenStreamLocation getLocation() { return _reference.getLocation(); }
         public Class<?> getBeanType() { return _beanType; }
 
-        public abstract void handleResolvedForwardReference(Object id, Object value)
+        public abstract void handleResolvedForwardReference(DeserializationContext ctxt,
+                Object id, Object value)
             throws JacksonException;
+
         public boolean hasId(Object id) {
             return id.equals(_reference.getUnresolvedId());
         }

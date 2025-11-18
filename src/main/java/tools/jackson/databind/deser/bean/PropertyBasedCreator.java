@@ -4,10 +4,13 @@ import java.util.*;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.deser.SettableAnyProperty;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.ValueInstantiator;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
+import tools.jackson.databind.util.NameTransformer;
 
 /**
  * Object that is used to collect arguments for non-default creator
@@ -43,6 +46,14 @@ public final class PropertyBasedCreator
      */
     protected final SettableBeanProperty[] _propertiesInOrder;
 
+    /**
+     * Indexes of properties with associated Injectable values, if any:
+     * {@code null} if none.
+     *
+     * @since 2.21
+     */
+    protected final BitSet _injectablePropIndexes;
+
     /*
     /**********************************************************************
     /* Construction, initialization
@@ -59,10 +70,8 @@ public final class PropertyBasedCreator
         if (caseInsensitive) {
             _propertyLookup = CaseInsensitiveMap.construct(ctxt.getConfig().getLocale());
         } else {
-            _propertyLookup = new HashMap<String, SettableBeanProperty>();
+            _propertyLookup = new HashMap<>();
         }
-        final int len = creatorProps.length;
-        _propertyCount = len;
 
         // 26-Feb-2017, tatu: Let's start by aliases, so that there is no
         //    possibility of accidental override of primary names
@@ -80,7 +89,11 @@ public final class PropertyBasedCreator
                 }
             }
         }
+        final int len = creatorProps.length;
+        _propertyCount = len;
         _propertiesInOrder = new SettableBeanProperty[len];
+        BitSet injectablePropIndexes = null;
+
         for (int i = 0; i < len; ++i) {
             SettableBeanProperty prop = creatorProps[i];
             _propertiesInOrder[i] = prop;
@@ -88,7 +101,26 @@ public final class PropertyBasedCreator
             if (!prop.isIgnorable()) {
                 _propertyLookup.put(prop.getName(), prop);
             }
+            if (prop.getInjectionDefinition() != null) {
+                if (injectablePropIndexes == null) {
+                    injectablePropIndexes = new BitSet(len);
+                }
+                injectablePropIndexes.set(i);
+            }
         }
+
+        _injectablePropIndexes = injectablePropIndexes;
+    }
+
+    protected PropertyBasedCreator(PropertyBasedCreator base,
+            HashMap<String, SettableBeanProperty> propertyLookup,
+            SettableBeanProperty[] allProperties)
+    {
+        _propertyCount = base._propertyCount;
+        _valueInstantiator = base._valueInstantiator;
+        _injectablePropIndexes = base._injectablePropIndexes;
+        _propertyLookup = propertyLookup;
+        _propertiesInOrder = allProperties;
     }
 
     /**
@@ -138,8 +170,49 @@ public final class PropertyBasedCreator
             }
             creatorProps[i] = prop;
         }
-        return new PropertyBasedCreator(ctxt, valueInstantiator, creatorProps, 
+        return new PropertyBasedCreator(ctxt, valueInstantiator, creatorProps,
                 caseInsensitive, false);
+    }
+
+    /**
+     * Mutant factory method for constructing a map where the names of all properties
+     * are transformed using the given {@link NameTransformer}.
+     *
+     * @since 2.19
+     */
+    public PropertyBasedCreator renameAll(DeserializationContext ctxt,
+            NameTransformer transformer)
+    {
+        if (transformer == null || (transformer == NameTransformer.NOP)) {
+            return this;
+        }
+
+        final int len = _propertiesInOrder.length;
+        HashMap<String, SettableBeanProperty> newLookup = new HashMap<>(_propertyLookup);
+        List<SettableBeanProperty> newProps = new ArrayList<>(len);
+
+        for (SettableBeanProperty prop : _propertiesInOrder) {
+            if (prop == null) {
+                newProps.add(null);
+                continue;
+            }
+
+            SettableBeanProperty renamedProperty = prop.unwrapped(ctxt, transformer);
+            String oldName = prop.getName();
+            String newName = renamedProperty.getName();
+
+            newProps.add(renamedProperty);
+
+            if (!oldName.equals(newName) && newLookup.containsKey(oldName)) {
+                newLookup.remove(oldName);
+                newLookup.put(newName, renamedProperty);
+            }
+        }
+
+        return new PropertyBasedCreator(this,
+                newLookup,
+                newProps.toArray(new SettableBeanProperty[0])
+        );
     }
 
     /*
@@ -176,7 +249,20 @@ public final class PropertyBasedCreator
      */
     public PropertyValueBuffer startBuilding(JsonParser p, DeserializationContext ctxt,
             ObjectIdReader oir) {
-        return new PropertyValueBuffer(p, ctxt, _propertyCount, oir);
+        return new PropertyValueBuffer(p, ctxt, _propertyCount, oir, null,
+                _injectablePropIndexes);
+    }
+
+    /**
+     * Method called when starting to build a bean instance.
+     *
+     * @since 2.18 (added SettableAnyProperty parameter)
+     */
+    public PropertyValueBuffer startBuildingWithAnySetter(JsonParser p, DeserializationContext ctxt,
+            ObjectIdReader oir, SettableAnyProperty anySetter
+    ) {
+        return new PropertyValueBuffer(p, ctxt, _propertyCount, oir, anySetter,
+                _injectablePropIndexes);
     }
 
     public Object build(DeserializationContext ctxt, PropertyValueBuffer buffer)
@@ -188,10 +274,10 @@ public final class PropertyBasedCreator
         if (bean != null) {
             // Object Id to handle?
             bean = buffer.handleIdValue(ctxt, bean);
-            
+
             // Anything buffered?
             for (PropertyValue pv = buffer.buffered(); pv != null; pv = pv.next) {
-                pv.assign(bean);
+                pv.assign(ctxt, bean);
             }
         }
         return bean;
@@ -224,7 +310,7 @@ public final class PropertyBasedCreator
         public static CaseInsensitiveMap construct(Locale l) {
             return new CaseInsensitiveMap(l);
         }
-        
+
         @Override
         public SettableBeanProperty get(Object key0) {
             return super.get(((String) key0).toLowerCase(_locale));

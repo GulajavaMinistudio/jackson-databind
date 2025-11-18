@@ -3,13 +3,19 @@ package tools.jackson.databind.ext.jdk8;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonParser.NumberType;
 import tools.jackson.databind.*;
 import tools.jackson.databind.jsonFormatVisitors.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 // trivial tests visitor used (mostly) for JSON Schema generation
-public class SchemaVisitorTest extends BaseMapTest
+public class SchemaVisitorTest
+    extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = newJsonMapper();
 
@@ -33,6 +39,7 @@ public class SchemaVisitorTest extends BaseMapTest
     }
 
     // for [datatype-jdk8#25]
+    @Test
     public void testOptionalLong() throws Exception
     {
         final AtomicReference<Object> result = new AtomicReference<>();
@@ -50,8 +57,9 @@ public class SchemaVisitorTest extends BaseMapTest
         });
         assertEquals(JsonParser.NumberType.LONG, result.get());
     }
-    
+
     // for [datatype-jdk8#25]
+    @Test
     public void testOptionalDouble() throws Exception
     {
         final AtomicReference<Object> result = new AtomicReference<>();

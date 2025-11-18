@@ -30,7 +30,7 @@ public class CoercionConfigs
      * by logical or physical type.
      */
     protected final MutableCoercionConfig _defaultCoercions;
-    
+
     /**
      * Coercion definitions by logical type ({@link LogicalType})
      */
@@ -158,8 +158,6 @@ public class CoercionConfigs
      * @param inputShape Input shape to coerce from
      *
      * @return CoercionAction configured for specified coercion
-     *
-     * @since 2.12
      */
     public CoercionAction findCoercion(DeserializationConfig config,
             LogicalType targetType,
@@ -208,7 +206,7 @@ public class CoercionConfigs
             break;
         case Integer:
             if (targetType == LogicalType.Enum) {
-                if (config.isEnabled(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)) {
+                if (config.isEnabled(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)) {
                     return CoercionAction.Fail;
                 }
             }
@@ -221,7 +219,7 @@ public class CoercionConfigs
         final boolean baseScalar = _isScalarType(targetType);
 
         if (baseScalar
-                // Default for setting in 2.x is true
+                // Default for setting in 2.x and 3.x is true
                 && !config.isEnabled(MapperFeature.ALLOW_COERCION_OF_SCALARS)
                 // 12-Oct-2022, carterkozak: As per [databind#3624]: Coercion from integer-shaped
                 // data into a floating point type is not banned by the
@@ -232,17 +230,19 @@ public class CoercionConfigs
         }
 
         if (inputShape == CoercionInputShape.EmptyString) {
+            // 09-Jun-2020, tatu: Seems necessary to support backwards-compatibility with
+            //     2.11, wrt "FromStringDeserializer" supported types
+            // 06-Jul-2023, tatu: For 2.16, moved before the other check to prevent coercion
+            //     to null where conversion allowed/expected
+            if (targetType == LogicalType.OtherScalar) {
+                return CoercionAction.TryConvert;
+            }
             // Since coercion of scalar must be enabled (see check above), allow empty-string
             // coercions by default even without this setting
             if (baseScalar
                     // Default for setting is false
                     || config.isEnabled(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)) {
                 return CoercionAction.AsNull;
-            }
-            // 09-Jun-2020, tatu: Seems necessary to support backwards-compatibility with
-            //     2.11, wrt "FromStringDeserializer" supported types
-            if (targetType == LogicalType.OtherScalar) {
-                return CoercionAction.TryConvert;
             }
             // But block from allowing structured types like POJOs, Maps etc
             return CoercionAction.Fail;
@@ -329,6 +329,8 @@ public class CoercionConfigs
         return actionIfBlankNotAllowed;
     }
 
+    // Whether this is "classic" scalar; a strict small subset and does NOT
+    // include "OtherScalar"
     protected boolean _isScalarType(LogicalType targetType) {
         return (targetType == LogicalType.Float)
                 || (targetType == LogicalType.Integer)

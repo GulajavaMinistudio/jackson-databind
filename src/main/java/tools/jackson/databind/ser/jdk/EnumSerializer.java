@@ -1,8 +1,8 @@
 package tools.jackson.databind.ser.jdk;
 
 import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.Objects;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonFormat.Shape;
@@ -10,6 +10,9 @@ import com.fasterxml.jackson.annotation.JsonFormat.Shape;
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
+import tools.jackson.databind.cfg.EnumFeature;
+import tools.jackson.databind.introspect.AnnotatedClass;
+import tools.jackson.databind.introspect.EnumNamingStrategyFactory;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import tools.jackson.databind.jsonFormatVisitors.JsonStringFormatVisitor;
 import tools.jackson.databind.ser.std.StdScalarSerializer;
@@ -37,17 +40,33 @@ public class EnumSerializer
      */
     protected final Boolean _serializeAsIndex;
 
+    /**
+     * Map with key as converted property class defined implementation of {@link EnumNamingStrategy}
+     * and with value as Enum names collected using <code>Enum.name()</code>.
+     */
+    protected final EnumValues _valuesByEnumNaming;
+
+    /**
+     * Map that contains pre-resolved values for {@link Enum#toString} to use for serialization,
+     * while respecting {@link com.fasterxml.jackson.annotation.JsonProperty}
+     * and {@link tools.jackson.databind.cfg.EnumFeature#WRITE_ENUMS_TO_LOWERCASE}.
+     */
+    protected final EnumValues _valuesByToString;
+
     /*
     /**********************************************************************
     /* Life-cycle
     /**********************************************************************
      */
 
-    public EnumSerializer(EnumValues v, Boolean serializeAsIndex)
+    public EnumSerializer(EnumValues v, Boolean serializeAsIndex, EnumValues valuesByEnumNaming,
+            EnumValues valuesByToString)
     {
         super(v.getEnumClass(), false);
         _values = v;
         _serializeAsIndex = serializeAsIndex;
+        _valuesByEnumNaming = valuesByEnumNaming;
+        _valuesByToString = valuesByToString;
     }
 
     /**
@@ -61,9 +80,11 @@ public class EnumSerializer
         // 08-Apr-2015, tatu: As per [databind#749], we cannot statically determine
         //   between name() and toString(), need to construct `EnumValues` with names,
         //   handle toString() case dynamically (for example)
-        EnumValues v = EnumValues.constructFromName(config, (Class<Enum<?>>) enumClass);
+        EnumValues v = EnumValues.constructFromName(config, beanDesc.getClassInfo());
+        EnumValues valuesByEnumNaming = constructEnumNamingStrategyValues(config, (Class<Enum<?>>) enumClass, beanDesc.getClassInfo());
+        EnumValues valuesByToString = EnumValues.constructFromToString(config, beanDesc.getClassInfo());
         Boolean serializeAsIndex = _isShapeWrittenUsingIndex(enumClass, format, true, null);
-        return new EnumSerializer(v, serializeAsIndex);
+        return new EnumSerializer(v, serializeAsIndex, valuesByEnumNaming, valuesByToString);
     }
 
     /**
@@ -72,7 +93,7 @@ public class EnumSerializer
      * choice here, however.
      */
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property)
     {
         JsonFormat.Value format = findFormatOverrides(ctxt,
@@ -82,7 +103,8 @@ public class EnumSerializer
             Boolean serializeAsIndex = _isShapeWrittenUsingIndex(type,
                     format, false, _serializeAsIndex);
             if (!Objects.equals(serializeAsIndex, _serializeAsIndex)) {
-                return new EnumSerializer(_values, serializeAsIndex);
+                return new EnumSerializer(_values, serializeAsIndex,
+                        _valuesByEnumNaming, _valuesByToString);
             }
         }
         return this;
@@ -93,7 +115,7 @@ public class EnumSerializer
     /* Extended API for Jackson databind core
     /**********************************************************************
      */
-    
+
     public EnumValues getEnumValues() { return _values; }
 
     /*
@@ -101,19 +123,23 @@ public class EnumSerializer
     /* Actual serialization
     /**********************************************************************
      */
-    
+
     @Override
-    public final void serialize(Enum<?> en, JsonGenerator g, SerializerProvider ctxt)
+    public final void serialize(Enum<?> en, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
+        if (_valuesByEnumNaming != null) {
+            g.writeString(_valuesByEnumNaming.serializedValueFor(en));
+            return;
+        }
         // Serialize as index?
         if (_serializeAsIndex(ctxt)) {
             g.writeNumber(en.ordinal());
             return;
         }
         // [databind#749]: or via toString()?
-        if (ctxt.isEnabled(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)) {
-            g.writeString(en.toString());
+        if (ctxt.isEnabled(EnumFeature.WRITE_ENUMS_USING_TO_STRING)) {
+            g.writeString(_valuesByToString.serializedValueFor(en));
             return;
         }
         g.writeString(_values.serializedValueFor(en));
@@ -128,7 +154,7 @@ public class EnumSerializer
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
     {
-        SerializerProvider serializers = visitor.getProvider();
+        SerializationContext serializers = visitor.getContext();
         if (_serializeAsIndex(serializers)) {
             visitIntFormat(visitor, typeHint, JsonParser.NumberType.INT);
             return;
@@ -136,12 +162,12 @@ public class EnumSerializer
         JsonStringFormatVisitor stringVisitor = visitor.expectStringFormat(typeHint);
         if (stringVisitor != null) {
             Set<String> enums = new LinkedHashSet<String>();
-            
+
             // Use toString()?
-            if ((serializers != null) && 
-                    serializers.isEnabled(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)) {
-                for (Enum<?> e : _values.enums()) {
-                    enums.add(e.toString());
+            if ((serializers != null) &&
+                    serializers.isEnabled(EnumFeature.WRITE_ENUMS_USING_TO_STRING)) {
+                for (SerializableString value : _valuesByToString.values()) {
+                    enums.add(value.getValue());
                 }
             } else {
                 // No, serialize using name() or explicit overrides
@@ -158,13 +184,13 @@ public class EnumSerializer
     /* Helper methods
     /**********************************************************************
      */
-    
-    protected final boolean _serializeAsIndex(SerializerProvider ctxt)
+
+    protected final boolean _serializeAsIndex(SerializationContext ctxt)
     {
         if (_serializeAsIndex != null) {
-            return _serializeAsIndex.booleanValue();
+            return _serializeAsIndex;
         }
-        return ctxt.isEnabled(SerializationFeature.WRITE_ENUMS_USING_INDEX);
+        return ctxt.isEnabled(EnumFeature.WRITE_ENUMS_USING_INDEX);
     }
 
     /**
@@ -195,5 +221,18 @@ public class EnumSerializer
         throw new IllegalArgumentException(String.format(
                 "Unsupported serialization shape (%s) for Enum %s, not supported as %s annotation",
                     shape, enumClass.getName(), (fromClass? "class" : "property")));
+    }
+
+    /**
+     * Factory method used to resolve an instance of {@link EnumValues}
+     * with {@link EnumNamingStrategy} applied for the target class.
+     */
+    protected static EnumValues constructEnumNamingStrategyValues(SerializationConfig config, Class<Enum<?>> enumClass,
+            AnnotatedClass annotatedClass) {
+        Object namingDef = config.getAnnotationIntrospector().findEnumNamingStrategy(config, annotatedClass);
+        EnumNamingStrategy enumNamingStrategy = EnumNamingStrategyFactory.createEnumNamingStrategyInstance(
+            namingDef, config.canOverrideAccessModifiers(), config.getEnumNamingStrategy());
+        return enumNamingStrategy == null ? null : EnumValues.constructUsingEnumNamingStrategy(
+            config, annotatedClass, enumNamingStrategy);
     }
 }

@@ -1,20 +1,32 @@
 package tools.jackson.databind.jsontype.ext;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonTypeIdResolver;
 import tools.jackson.databind.jsontype.impl.TypeIdResolverBase;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-// [databind#2588] / [databind#2610]
-public class ExternalTypeId2588Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+// [databind#2588] / [databind#2610] / [databind#4354]
+public class ExternalTypeId2588Test extends DatabindTestUtil
 {
     // [databind#2588]
     interface Animal { }
 
-    static class Cat implements Animal { }
+    static class Cat implements Animal {
+        public int lives = 9;
+    }
 
     public static class Dog implements Animal { }
+
+    static class Wolf implements Animal {
+        public boolean alive;
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Pet {
@@ -35,6 +47,8 @@ public class ExternalTypeId2588Test extends BaseMapTest
     }
 
     static class AnimalTypeIdResolver extends TypeIdResolverBase {
+        private static final long serialVersionUID = 1L;
+
         @Override
         public String idFromValue(DatabindContext context, Object value) {
             return idFromValueAndType(context, value, value.getClass());
@@ -47,6 +61,8 @@ public class ExternalTypeId2588Test extends BaseMapTest
                 return "cat";
             } else if (suggestedType.isAssignableFrom(Dog.class)) {
                 return "dog";
+            } else if (suggestedType.isAssignableFrom(Wolf.class)) {
+                return "wolf";
             }
             return null;
         }
@@ -67,35 +83,44 @@ public class ExternalTypeId2588Test extends BaseMapTest
         }
     }
 
+    private final ObjectMapper MAPPER = newJsonMapper();
+
     // [databind#2588]
-    public void testExternalTypeId2588() throws Exception
+    @Test
+    public void testExternalTypeId2588Read() throws Exception
     {
-        final ObjectMapper mapper = newJsonMapper();
         Pet pet;
 
         // works?
-        
-        pet = mapper.readValue(a2q(
-"{\n" + 
-"  'type': 'cat',\n" + 
-"  'animal': { },\n" + 
-"  'ignoredObject\": {\n" + 
-"    'someField': 'someValue'\n" + 
+
+        pet = MAPPER.readValue(a2q(
+"{\n" +
+"  'type': 'cat',\n" +
+"  'animal': { },\n" +
+"  'ignoredObject\": {\n" +
+"    'someField': 'someValue'\n" +
 "  }"+
 "}"
                 ), Pet.class);
         assertNotNull(pet);
-        
+
         // fails:
-        pet = mapper.readValue(a2q(
-"{\n" + 
-"  'animal\": { },\n" + 
-"  'ignoredObject': {\n" + 
-"    'someField': 'someValue'\n" + 
-"  },\n" + 
-"  'type': 'cat'\n" + 
+        pet = MAPPER.readValue(a2q(
+"{\n" +
+"  'animal\": { },\n" +
+"  'ignoredObject': {\n" +
+"    'someField': 'someValue'\n" +
+"  },\n" +
+"  'type': 'cat'\n" +
 "}"
                 ), Pet.class);
         assertNotNull(pet);
+    }
+
+    @Test
+    public void testExternalTypeId2588Write() throws Exception
+    {
+        String json = MAPPER.writeValueAsString(new Pet("cat", new Wolf()));
+        assertEquals(a2q("{'animal':{'alive':false},'type':'wolf'}"), json);
     }
 }

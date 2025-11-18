@@ -2,13 +2,18 @@ package tools.jackson.databind.introspect;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonSetter;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidDefinitionException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 // mostly for [databind#1033]
-public class SetterConflictTest extends BaseMapTest
+public class SetterConflictTest extends DatabindTestUtil
 {
     // Should prefer primitives over Strings, more complex types, by default
     static class Issue1033Bean {
@@ -38,7 +43,7 @@ public class SetterConflictTest extends BaseMapTest
     // in favor of `String` but code up until 2.12 short-circuited early fail
     static class DupSetter3125Bean {
         String str;
-        
+
         public void setValue(Integer value) { throw new RuntimeException("Integer: wrong!"); }
         public void setValue(Boolean value) { throw new RuntimeException("Boolean: wrong!"); }
         public void setValue(String value) { str = value; }
@@ -55,10 +60,11 @@ public class SetterConflictTest extends BaseMapTest
     /* Test methods
     /**********************************************************************
      */
-    
+
     private final ObjectMapper MAPPER = newJsonMapper();
 
     // [databind#1033]
+    @Test
     public void testSetterPriority() throws Exception
     {
         Issue1033Bean bean = MAPPER.readValue(a2q("{'value':42}"),
@@ -67,6 +73,7 @@ public class SetterConflictTest extends BaseMapTest
     }
 
     // [databind#2979]
+    @Test
     public void testConflictingSetters() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -78,6 +85,7 @@ public class SetterConflictTest extends BaseMapTest
     }
 
     // [databind#3125]
+    @Test
     public void testDuplicateSetterResolutionOk() throws Exception
     {
         // 11-May-2021, tatu: 2.x tested underlying `POJOPropertiesCollector`
@@ -89,6 +97,7 @@ public class SetterConflictTest extends BaseMapTest
     }
 
     // [databind#3125]: caught case
+    @Test
     public void testDuplicateSetterResolutionFail() throws Exception
     {
         try {

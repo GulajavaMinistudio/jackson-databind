@@ -16,9 +16,11 @@ import tools.jackson.databind.deser.std.FromStringDeserializer;
  */
 public class CoreXMLDeserializers
 {
+    protected final static QName EMPTY_QNAME = QName.valueOf("");
+
     /**
      * Data type factories are thread-safe after instantiation (and
-     * configuration, if any); and since instantion (esp. implementation
+     * configuration, if any); and since instantiation (esp. implementation
      * introspection) can be expensive we better reuse the instance.
      */
     final static DatatypeFactory _dataTypeFactory;
@@ -82,14 +84,48 @@ public class CoreXMLDeserializers
         public Object deserialize(JsonParser p, DeserializationContext ctxt)
             throws JacksonException
         {
-            // For most types, use super impl; but GregorianCalendar also allows
-            // integer value (timestamp), which needs separate handling
+            // GregorianCalendar also allows integer value (timestamp),
+            // which needs separate handling
             if (_kind == TYPE_G_CALENDAR) {
                 if (p.hasToken(JsonToken.VALUE_NUMBER_INT)) {
                     return _gregorianFromDate(ctxt, _parseDate(p, ctxt));
                 }
             }
+            // QName also allows object value, which needs separate handling
+            if (_kind == TYPE_QNAME) {
+                if (p.hasToken(JsonToken.START_OBJECT)) {
+                    return _parseQNameObject(p, ctxt);
+                }
+            }
             return super.deserialize(p, ctxt);
+        }
+
+        private QName _parseQNameObject(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
+        {
+            JsonNode tree = ctxt.readTree(p);
+
+            JsonNode localPart = tree.get("localPart");
+            if (localPart == null) {
+                ctxt.reportInputMismatch(this,
+                        "Object value for `QName` is missing required property 'localPart'");
+            }
+
+            if (!localPart.isString()) {
+                ctxt.reportInputMismatch(this,
+                        "Object value property 'localPart' for `QName` must be of type STRING, not %s",
+                        localPart.getNodeType());
+            }
+
+            JsonNode namespaceURI = tree.get("namespaceURI");
+            if (namespaceURI != null) {
+                if (tree.has("prefix")) {
+                    JsonNode prefix = tree.get("prefix");
+                    return new QName(namespaceURI.asString(), localPart.asString(), prefix.asString());
+                }
+                return new QName(namespaceURI.asString(), localPart.asString());
+            }
+            return new QName(localPart.asString());
         }
 
         @Override
@@ -113,6 +149,14 @@ public class CoreXMLDeserializers
                 return _gregorianFromDate(ctxt, d);
             }
             throw new IllegalStateException();
+        }
+
+        @Override
+        protected Object _deserializeFromEmptyString(DeserializationContext ctxt) {
+            if (_kind == TYPE_QNAME) {
+                return EMPTY_QNAME;
+            }
+            return super._deserializeFromEmptyString(ctxt);
         }
 
         protected XMLGregorianCalendar _gregorianFromDate(DeserializationContext ctxt,

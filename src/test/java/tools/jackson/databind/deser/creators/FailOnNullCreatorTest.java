@@ -1,16 +1,23 @@
 package tools.jackson.databind.deser.creators;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 /**
  * Tests to ensure that deserialization fails when a bean property has a null value
  * Relates to <a href="https://github.com/FasterXML/jackson-databind/issues/988">issue #988</a>
  */
-public class FailOnNullCreatorTest extends BaseMapTest
+public class FailOnNullCreatorTest
 {
     static class Person {
         String name;
@@ -25,18 +32,21 @@ public class FailOnNullCreatorTest extends BaseMapTest
         }
     }
 
-    private final ObjectReader POINT_READER = objectMapper().readerFor(Person.class);
+    private final ObjectReader PERSON_READER = sharedMapper()
+            .readerFor(Person.class)
+            .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
 
+    @Test
     public void testRequiredNonNullParam() throws Exception
     {
         Person p;
         // First: fine if feature is not enabled
-        p = POINT_READER.readValue(a2q("{}"));
+        p = PERSON_READER.readValue(a2q("{}"));
         assertEquals(null, p.name);
         assertEquals(Integer.valueOf(0), p.age);
 
         // Second: fine if feature is enabled but default value is not null
-        ObjectReader r = POINT_READER.with(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES);
+        ObjectReader r = PERSON_READER.with(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES);
         p = r.readValue(a2q("{'name':'John', 'age': null}"));
         assertEquals("John", p.name);
         assertEquals(Integer.valueOf(0), p.age);

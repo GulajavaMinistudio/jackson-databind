@@ -1,15 +1,27 @@
 package tools.jackson.databind.ser.jdk;
 
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import tools.jackson.core.JsonEncoding;
+import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class UUIDSerializationTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class UUIDSerializationTest extends DatabindTestUtil
 {
+    private final static String nullUUIDStr = "00000000-0000-0000-0000-000000000000";
+    private final static UUID nullUUID = UUID.fromString(nullUUIDStr);
+
     static class UUIDWrapperVanilla {
         public UUID uuid;
 
@@ -23,11 +35,13 @@ public class UUIDSerializationTest extends BaseMapTest
 
         public UUIDWrapperBinary(UUID u) { uuid = u; }
     }
-    
+
     private final ObjectMapper MAPPER = sharedMapper();
+    private final ObjectWriter WRITER = MAPPER.writer();
 
     // Verify that efficient UUID codec won't mess things up:
-    public void testBasicUUIDs() throws IOException
+    @Test
+    public void testBasicUUIDs() throws Exception
     {
         // first, couple of generated UUIDs:
         for (String value : new String[] {
@@ -46,7 +60,7 @@ public class UUIDSerializationTest extends BaseMapTest
             String str = MAPPER.convertValue(uuid, String.class);
             assertEquals(value, str);
         }
-        
+
         // then use templating; note that these are not exactly valid UUIDs
         // wrt spec (type bits etc), but JDK UUID should deal ok
         final String TEMPL = "00000000-0000-0000-0000-000000000000";
@@ -60,11 +74,9 @@ public class UUIDSerializationTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testShapeOverrides() throws Exception
     {
-        final String nullUUIDStr = "00000000-0000-0000-0000-000000000000";
-        final UUID nullUUID = UUID.fromString(nullUUIDStr);
-
         // First, see that Binary per-property override works:
         assertEquals("{\"uuid\":\"AAAAAAAAAAAAAAAAAAAAAA==\"}",
                 MAPPER.writeValueAsString(new UUIDWrapperBinary(nullUUID)));
@@ -72,7 +84,7 @@ public class UUIDSerializationTest extends BaseMapTest
         // but that without one we'd get String
         assertEquals("{\"uuid\":\""+nullUUIDStr+"\"}",
                 MAPPER.writeValueAsString(new UUIDWrapperVanilla(nullUUID)));
-        
+
         // but can also override by type
         ObjectMapper m = JsonMapper.builder()
                 .withConfigOverride(UUID.class,
@@ -81,5 +93,78 @@ public class UUIDSerializationTest extends BaseMapTest
                 .build();
         assertEquals("{\"uuid\":\"AAAAAAAAAAAAAAAAAAAAAA==\"}",
                 m.writeValueAsString(new UUIDWrapperVanilla(nullUUID)));
+    }
+
+    // [databind#5225]: problem with tree conversion
+    @Test
+    public void testTreeConversion() throws Exception
+    {
+        // First, reported issue
+        JsonNode node = MAPPER.valueToTree(nullUUID);
+        assertEquals(nullUUIDStr, node.asString());
+
+        // and then a variations
+        Object ob = MAPPER.convertValue(nullUUID, Object.class);
+        assertEquals(String.class, ob.getClass());
+    }
+
+    // [databind#5323]: problem via JsonGenerator
+    @Test
+    public void testSerialization5323Mapper1() throws Exception
+    {
+        StringWriter sw = new StringWriter();
+        _write5323(MAPPER.createGenerator(sw));
+        _assert5323(sw.toString());
+    }
+
+    @Test
+    public void testSerialization5323Mapper2() throws Exception
+    {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        _write5323(MAPPER.createGenerator(b));
+        _assert5323(b.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void testSerialization5323Mapper2b() throws Exception
+    {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        _write5323(MAPPER.createGenerator(b, JsonEncoding.UTF8));
+        _assert5323(b.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void testSerialization5323ObjectWriter1() throws Exception
+    {
+        StringWriter sw = new StringWriter();
+        _write5323(WRITER.createGenerator(sw));
+        _assert5323(sw.toString());
+    }
+
+    @Test
+    public void testSerialization5323ObjectWriter2() throws Exception
+    {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        _write5323(WRITER.createGenerator(b));
+        _assert5323(b.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void testSerialization5323ObjectWriter2b() throws Exception
+    {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        _write5323(WRITER.createGenerator(b, JsonEncoding.UTF8));
+        _assert5323(b.toString(StandardCharsets.UTF_8));
+    }
+
+    private void _write5323(JsonGenerator g) {
+        g.writeStartObject();
+        g.writePOJOProperty("id", nullUUID);
+        g.writeEndObject();
+        g.close();
+    }
+
+    private void _assert5323(String json) {
+        assertEquals("{\"id\":\""+nullUUIDStr+"\"}", json);
     }
 }

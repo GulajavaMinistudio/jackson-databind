@@ -5,12 +5,18 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.TimeZone;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
+import tools.jackson.core.json.JsonWriteFeature;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class ContextualOptionalTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class ContextualOptionalTest extends DatabindTestUtil
 {
     // [datatypes-java8#17]
     @JsonPropertyOrder({ "date", "date1", "date2" })
@@ -31,11 +37,13 @@ public class ContextualOptionalTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testContextualOptionals() throws Exception
     {
         SimpleDateFormat df = new SimpleDateFormat("yyyy/MM/dd");
         df.setTimeZone(TimeZone.getTimeZone("UTC"));
         ObjectMapper mapper = jsonMapperBuilder()
+                .disable(JsonWriteFeature.ESCAPE_FORWARD_SLASHES)
                 .defaultDateFormat(df)
                 .build();
         ContextualOptionals input = new ContextualOptionals();
@@ -47,5 +55,5 @@ public class ContextualOptionalTest extends BaseMapTest
         assertEquals(a2q(
                 "{'date':'1970/01/01','date1':'1970+01+01','date2':'1970*01*01'}"),
                 json);
-    }        
+    }
 }

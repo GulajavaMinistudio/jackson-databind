@@ -1,12 +1,16 @@
 package tools.jackson.databind.jsontype;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class Generic1128Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class Generic1128Test extends DatabindTestUtil
 {
     @SuppressWarnings("rawtypes")
     static abstract class HObj<M extends HObj> {
@@ -23,7 +27,7 @@ public class Generic1128Test extends BaseMapTest
 
         // for some reason, setter is needed to expose this...
         public void setTag(String t) { tag = t; }
-        
+
         //public String getTag() { return tag; }
     }
 
@@ -47,6 +51,7 @@ public class Generic1128Test extends BaseMapTest
 
     static class DevMContainer extends ContainerBase<DevM>{ }
 
+    @Test
     public void testIssue1128() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -58,7 +63,7 @@ public class Generic1128Test extends BaseMapTest
         parent.id = 2L;
         entity.parent = parent;
         devMContainer1.entity = entity;
-    
+
         String json = mapper.writeValueAsString(devMContainer1);
 
 //        System.out.println("serializedContainer = " + json);

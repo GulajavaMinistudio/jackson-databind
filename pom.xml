@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <!-- This module was also published with a richer model, Gradle metadata,  -->
   <!-- which should be used instead. Do not delete the following line which  -->
   <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
   <!-- that they should prefer consuming it instead. -->
   <!-- do_not_remove: published-with-gradle-metadata -->
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <groupId>tools.jackson</groupId>
     <artifactId>jackson-base</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>3.1.0-SNAPSHOT</version>
   </parent>
-
   <groupId>tools.jackson.core</groupId>
   <artifactId>jackson-databind</artifactId>
-  <version>3.0.0-SNAPSHOT</version>
+  <version>3.1.0-SNAPSHOT</version>
   <name>jackson-databind</name>
-
   <description>General data-binding functionality for Jackson: works on core streaming API</description>
   <url>https://github.com/FasterXML/jackson</url>
   <inceptionYear>2008</inceptionYear>
@@ -38,17 +34,39 @@
   </scm>
 
   <properties>
+    <!-- [databind#4820]: Java 17 baseline -->
+    <javac.src.version>17</javac.src.version>
+    <javac.target.version>17</javac.target.version>
+
+    <!-- 27-Feb-2025, tatu: [databind#4995] define common argline to avoid
+           issues with Eclipse/Idea/surefire-plugin
+      -->
+    <argLine>--add-opens=java.base/java.lang=tools.jackson.databind
+             --add-opens=java.base/java.util=tools.jackson.databind
+    </argLine>
+
     <!-- 12-Nov-2022, tatu: [databind#3659] Verify Android SDK compatibility.
 
       Baseline compatibility:
 
       * Jackson 2.13: compatible with Android SDK 24 and up
-      * Jackson 2.14: compatible with Android SDK 26 and up
-      * Jackson 3.0:  compatible with Android SDK 28 and up
+      * Jackson 2.14 - 2.18: compatible with Android SDK 26 and up
+      * Jackson 3.0: compatible with Android SDK 34 and up (need Record access)
       -->
 
-    <version.android.sdk>28</version.android.sdk>
-    <version.android.sdk.signature>0.5.0</version.android.sdk.signature>
+    <version.android.sdk>34</version.android.sdk>
+    <!-- 24-Mar-2025, tatu: Latest as of now:
+	 https://mvnrepository.com/artifact/com.toasttab.android/gummy-bears-api-34
+      -->
+    <version.android.sdk.signature>0.12.0</version.android.sdk.signature>
+
+    <version.bytebuddy>1.17.7</version.bytebuddy>
+    <version.mockito>5.20.0</version.mockito>
+
+    <!-- 07-Mar-2025, tatu: For some reason, release fails due to missing
+           jacoco... so disable for now
+      -->
+    <jacocoStrict>false</jacocoStrict>
 
     <!-- Can not use default, since group id != Java package name here -->
     <osgi.export>tools.jackson.databind.*;version=${project.version}</osgi.export>
@@ -62,11 +80,26 @@
     <packageVersion.dir>tools/jackson/databind/cfg</packageVersion.dir>
     <packageVersion.package>tools.jackson.databind.cfg</packageVersion.package>
 
-    <version.powermock>2.0.9</version.powermock>
-
     <!-- for Reproducible Builds -->
-    <project.build.outputTimestamp>2022-09-18T00:00:00Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2025-10-22T02:00:47Z</project.build.outputTimestamp>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- We need to specify later Bytebuddy version because Mockito 4.11.0 depends on earlier
+           Bytebuddy which does not support JDK 21, since 2.17-->
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>${version.bytebuddy}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-agent</artifactId>
+        <version>${version.bytebuddy}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- Builds on core streaming API; also needs core annotations -->
@@ -86,53 +119,56 @@
       <version>${jackson.version.core}</version>
     </dependency>
 
-    <!-- and for testing we need a few libraries
-         libs for which we use reflection for code, but direct dep for testing
+    <!-- Test dependencies -->
+
+    <!-- 13-Jan-2025, tatu: Use the new (in 3.0) shared core test-jar
+        for some shared test functionality.
       -->
+    <!-- 29-Jan-2025, tatu: Alas! Just does not seem to work, comment out
+      -->
+    <!--
     <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-core</artifactId>
-      <version>${version.powermock}</version>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version.core}</version>
+      <classifier>tests</classifier>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-module-junit4</artifactId>
-      <version>${version.powermock}</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-api-mockito2</artifactId>
-      <version>${version.powermock}</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <version>3.9.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava-testlib</artifactId>
-      <version>31.1-jre</version>
-      <scope>test</scope>
-    </dependency>
-    
-    <!-- For testing TestNoClassDefFoundDeserializer -->
-    <dependency>
-      <groupId>javax.measure</groupId>
-      <artifactId>jsr-275</artifactId>
-      <version>0.9.1</version>
+      <version>32.0.1-jre</version>
       <scope>test</scope>
     </dependency>
 
-    <!-- For heap usage testing see https://github.com/FasterXML/jackson-databind/pull/3675 -->
+    <!-- Since 2.17, started using Mockito instead of Powermock -->
+    <!-- For testing with static methods -->
     <dependency>
-      <groupId>org.openjdk.jol</groupId>
-      <artifactId>jol-core</artifactId>
-      <version>0.16</version>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>${version.mockito}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -140,72 +176,27 @@
   <!-- Alas, need to include snapshot reference since otherwise can not find
        snapshot of parent... -->
   <repositories>
+    <!-- 13-May-2025, tatu: and now moving to Central Portal -->
     <repository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+      <id>central-snapshots</id>
+      <name>Sonatype Central Portal (snapshots)</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots</url>
       <releases><enabled>false</enabled></releases>
       <snapshots><enabled>true</enabled></snapshots>
     </repository>
-    <repository>
-      <id>sonatype-old-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots (old)</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      <releases><enabled>false</enabled></releases>
-      <snapshots><enabled>true</enabled></snapshots>
-    </repository>
-
   </repositories>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <version>${version.plugin.surefire}</version>
-        <artifactId>maven-surefire-plugin</artifactId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <inherited>true</inherited>
         <configuration>
-          <classpathDependencyExcludes>
-            <exclude>javax.measure:jsr-275</exclude>
-          </classpathDependencyExcludes>
-          <excludes>
-            <exclude>tools.jackson.databind.MapperFootprintTest</exclude>
-            <exclude>**/failing/**/*.java</exclude>
-          </excludes>
-          <!-- 26-Nov-2019, tatu: moar parallelism! Per-class basis, safe, efficient enough
-                  ... although not 100% sure this makes much difference TBH
-            -->
-          <threadCount>4</threadCount>
-          <parallel>classes</parallel>
-        </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <configuration>
-          <links combine.children="append">
-            <link>https://fasterxml.github.io/jackson-annotations/javadoc/3.0.2021-01</link>
-            <link>https://fasterxml.github.io/jackson-core/javadoc/3.0.2021-01</link>
-          </links>
+          <compilerArgs>
+            <!-- Must ensure parameter names compiled (for tests) -->
+            <arg>-parameters</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
 
@@ -213,35 +204,60 @@
         <!-- Inherited from oss-base. Generate PackageVersion.java.-->
         <groupId>com.google.code.maven-replacer-plugin</groupId>
         <artifactId>replacer</artifactId>
-        <executions>
-          <execution>
-            <id>generate-package-version-java</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>replace</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
 
-      <!-- 17-Sep-2017, tatu: With 3.0 need to ensure parameter names compiled in
-        -->
+      <!-- 28-Apr-2025, tatu: SBOM generation [JSTEP-14] -->
+      <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+      </plugin>      
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <inherited>true</inherited>
+        <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
-          <optimize>true</optimize>
-          <compilerArgs>
-            <arg>-parameters</arg>
-          </compilerArgs>
+          <links combine.children="append">
+            <!-- 08-Aug-2025, tatu: 3.x retains dep to annotations 2.x -->
+            <link>https://javadoc.io/doc/com.fasterxml.jackson.core/jackson-annotations/latest</link>
+            <link>https://javadoc.io/doc/tools.jackson.core/jackson-core/latest</link>
+          </links>
         </configuration>
       </plugin>
 
       <plugin>
-        <groupId>org.moditect</groupId>
-        <artifactId>moditect-maven-plugin</artifactId>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
       </plugin>
+
+      <!-- Important: enable enforcer plug-in: -->
+      <plugin>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions> <!-- or?  combine.children="merge"> -->
+          <execution>
+            <id>enforce-properties</id>
+         <phase>validate</phase>
+            <goals><goal>enforce</goal></goals>
+          </execution>
+          <execution>
+            <id>enforce-jacoco-exec</id>
+            <phase>verify</phase>
+            <goals>
+                <goal>enforce</goal>
+            </goals>
+            <configuration>
+                <rules>
+                    <requireFilesExist>
+                        <files>
+                            <file>${project.build.directory}/jacoco.exec</file>
+                        </files>
+                    </requireFilesExist>
+                </rules>
+                <fail>${jacocoStrict}</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
       <!-- 03-Nov-2020, tatu: Add LICENSE from main level -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -249,7 +265,7 @@
       </plugin>
 
       <plugin>
-        <groupId>de.jjohannes</groupId>
+        <groupId>org.gradlex</groupId>
         <artifactId>gradle-module-metadata-maven-plugin</artifactId>
       </plugin>
 
@@ -262,22 +278,25 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>1.22</version>
+        <version>1.24</version>
         <configuration>
           <signature>
             <groupId>com.toasttab.android</groupId>
             <artifactId>gummy-bears-api-${version.android.sdk}</artifactId>
             <version>${version.android.sdk.signature}</version>
           </signature>
-           <ignores>
-           <!-- These are only accessed (safely) via "Java7SupportImpl.java" so ignore
-             -->
+          <ignores>
+            <!-- These are only accessed (safely) via "Java7SupportImpl.java" so ignore
+              -->
             <ignore>java.beans.ConstructorProperties</ignore>
             <ignore>java.beans.Transient</ignore>
-            <ignore>java.nio.file.FileSystemNotFoundException</ignore>
-            <ignore>java.nio.file.Path</ignore>
-            <ignore>java.nio.file.Paths</ignore>
-            <ignore>java.nio.file.spi.FileSystemProvider</ignore>
+            <!-- 08-Dec-2024, tatu: [databind#2593] need to ignore "StackTraceElement"
+                constructor(s)
+            -->
+            <ignore>java.lang.StackTraceElement</ignore>
+            <!-- 2025-03-24 scs: AnimalSniffer does not support @PolymorphicSignature
+                 https://github.com/mojohaus/animal-sniffer/issues/67 -->
+            <ignore>java.lang.invoke.MethodHandle</ignore>
           </ignores>
         </configuration>
       </plugin>
@@ -292,11 +311,11 @@
         <skipTests>true</skipTests>
       </properties>
     </profile>
-    <!-- 07-Dec-2021, tatu: This is a huge mess, sorry folks... -->
     <profile>
-      <id>java14</id>
+      <!-- Different set up for JDK 21 tests (baseline JDK 17) -->
+      <id>java21</id>
       <activation>
-        <jdk>14</jdk>
+        <jdk>[21,)</jdk>
       </activation>
       <build>
         <plugins>
@@ -312,7 +331,7 @@
                 </goals>
                 <configuration>
                   <sources>
-                    <source>src/test-jdk14/java</source>
+                    <source>src/test-jdk21/java</source>
                   </sources>
                 </configuration>
               </execution>
@@ -323,79 +342,18 @@
             <artifactId>maven-compiler-plugin</artifactId>
             <inherited>true</inherited>
             <configuration>
-              <optimize>true</optimize>
-              <!-- Enable Java 14+ for all sources so that Intellij picks the right language level -->
-              <source>14</source>
-              <release>14</release>
+              <!-- Enable Java 21 for all sources so that Intellij picks the right language level -->
+              <source>21</source>
+              <release>21</release>
               <compilerArgs>
                 <arg>-parameters</arg>
-                <arg>--enable-preview</arg>
               </compilerArgs>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <argLine>--enable-preview</argLine>
             </configuration>
           </plugin>
         </plugins>
       </build>
     </profile>
-    <profile>
-      <!-- And different set up for JDK 17 -->
-      <id>java17</id>
-      <activation>
-        <jdk>17</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>build-helper-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>add-test-source</id>
-                <phase>generate-test-sources</phase>
-                <goals>
-                  <goal>add-test-source</goal>
-                </goals>
-                <configuration>
-                  <sources>
-                    <source>src/test-jdk14/java</source>
-                  </sources>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <inherited>true</inherited>
-            <configuration>
-              <optimize>true</optimize>
-              <!-- Enable Java 17 for all sources so that Intellij picks the right language level -->
-              <source>17</source>
-              <release>17</release>
-              <compilerArgs>
-                <arg>-parameters</arg>
-                <arg>--add-opens=java.base/java.lang=ALL-UNNAMED</arg>
-                <arg>--add-opens=java.base/java.util=ALL-UNNAMED</arg>
-              </compilerArgs>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <argLine>--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED</argLine>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
+ 
     <!-- 10-Nov-2020, tatu: Added via [databind#2931] -->
     <profile>
       <id>errorprone</id>
@@ -486,7 +444,7 @@
                 <path>
                   <groupId>com.google.errorprone</groupId>
                   <artifactId>error_prone_core</artifactId>
-                  <version>2.4.0</version>
+                  <version>2.36.0</version>
                 </path>
               </annotationProcessorPaths>
             </configuration>

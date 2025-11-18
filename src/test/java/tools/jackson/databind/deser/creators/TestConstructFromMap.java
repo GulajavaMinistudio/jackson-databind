@@ -3,9 +3,15 @@ package tools.jackson.databind.deser.creators;
 import java.math.BigDecimal;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil.Point;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * This unit test suite that tests use of {@link JsonCreator}
@@ -15,7 +21,6 @@ import tools.jackson.databind.*;
  * {@link java.util.Map} as the intermediate form.
  */
 public class TestConstructFromMap
-    extends BaseMapTest
 {
     static class ConstructorFromMap
     {
@@ -49,7 +54,7 @@ public class TestConstructFromMap
     // Also: let's test BigDecimal-from-JSON-String factory
     static class FactoryFromDecimalString
     {
-	int _value;
+        int _value;
 
         private FactoryFromDecimalString(BigDecimal d) {
 	    _value = d.intValue();
@@ -68,6 +73,7 @@ public class TestConstructFromMap
     /**********************************************************
      */
 
+    @Test
     public void testViaConstructor() throws Exception
     {
         ObjectMapper m = new ObjectMapper();
@@ -77,6 +83,7 @@ public class TestConstructFromMap
         assertEquals("abc", result._y);
     }
 
+    @Test
     public void testViaFactory() throws Exception
     {
         ObjectMapper m = new ObjectMapper();
@@ -85,6 +92,7 @@ public class TestConstructFromMap
         assertEquals(4, result._y);
     }
 
+    @Test
     public void testViaFactoryUsingString() throws Exception
     {
         ObjectMapper m = new ObjectMapper();

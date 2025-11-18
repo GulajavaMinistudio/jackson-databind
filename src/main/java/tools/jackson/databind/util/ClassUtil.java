@@ -5,11 +5,12 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Stream;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.StreamWriteFeature;
-import tools.jackson.core.exc.WrappedIOException;
+import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.util.Named;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.PropertyName;
@@ -21,7 +22,14 @@ public final class ClassUtil
 
     private final static Ctor[] NO_CTORS = new Ctor[0];
 
-    private final static Iterator<?> EMPTY_ITERATOR = Collections.emptyIterator();
+    private final static Iterator<Object> EMPTY_ITERATOR = Collections.emptyIterator();
+
+    private final static List<String> JDK_PREFIXES = Arrays.asList(
+            "java.",
+            "javax.",
+            "jdk.",
+            "sun.",
+            "com.sun.");
 
     /*
     /**********************************************************************
@@ -32,6 +40,16 @@ public final class ClassUtil
     @SuppressWarnings("unchecked")
     public static <T> Iterator<T> emptyIterator() {
         return (Iterator<T>) EMPTY_ITERATOR;
+    }
+
+    /**
+     * @since 2.19
+     */
+    public static <T> Stream<T> emptyStream() {
+        // Looking at its implementation, seems there ought to be simpler/more
+        // efficient way to create and return a shared singleton but... no luck
+        // so far. So just use this for convenience for now:
+        return Stream.empty();
     }
 
     /*
@@ -117,7 +135,7 @@ public final class ClassUtil
         // Anything else? Seems valid, then
         return null;
     }
-    
+
     public static String isLocalType(Class<?> type, boolean allowNonStatic)
     {
         /* As per [JACKSON-187], GAE seems to throw SecurityExceptions
@@ -205,7 +223,7 @@ public final class ClassUtil
         int mod = member.getModifiers();
         return (mod & (Modifier.INTERFACE | Modifier.ABSTRACT)) == 0;
     }
-    
+
     public static boolean isCollectionMapOrArray(Class<?> type)
     {
         if (type.isArray()) return true;
@@ -219,11 +237,10 @@ public final class ClassUtil
     }
 
     /**
-     * Helper method for detecting Java14-added new {@code Record} types
+     * Helper method for detecting Java14-added {@code Record} types
      */
     public static boolean isRecordType(Class<?> cls) {
-        Class<?> parent = cls.getSuperclass();
-        return (parent != null) && "java.lang.Record".equals(parent.getName());
+        return cls.isRecord();
     }
 
     public static boolean isObjectOrPrimitive(Class<?> cls) {
@@ -290,7 +307,7 @@ public final class ClassUtil
     /* Exception handling; other
     /**********************************************************************
      */
-    
+
     /**
      * Method that can be used to find the "root cause", innermost
      * of chained (wrapped) exceptions.
@@ -352,6 +369,14 @@ public final class ClassUtil
     }
 
     /**
+     * Throw an exception even if it's checked and not declared.
+     */
+    @SuppressWarnings("unchecked")
+    public static <E extends Throwable> RuntimeException sneakyThrow(Throwable throwable) throws E {
+        throw (E) throwable;
+    }
+
+    /**
      * Helper method that encapsulate logic in trying to close output generator
      * in case of failure; useful mostly in forcing flush()ing as otherwise
      * error conditions tend to be hard to diagnose. However, it is often the
@@ -360,7 +385,7 @@ public final class ClassUtil
      *<p>
      * Note that exception is thrown as-is if unchecked (likely case); if it is
      * checked, however, {@link RuntimeException} is thrown (except for
-     * {@link IOException} which will be wrapped as {@link WrappedIOException}.
+     * {@link IOException} which will be wrapped as {@link JacksonIOException}.
      *
      * @since 3.0 (with this name)
      */
@@ -378,7 +403,7 @@ public final class ClassUtil
         throwIfJacksonE(fail);
         throwIfRTE(fail);
         if (fail instanceof IOException) {
-            throw WrappedIOException.construct((IOException) fail, g);
+            throw JacksonIOException.construct((IOException) fail, g);
         }
         throw new RuntimeException(fail);
     }
@@ -391,7 +416,7 @@ public final class ClassUtil
      * secondary exception without masking original one.
      */
     public static void closeOnFailAndThrowAsJacksonE(JsonGenerator g,
-            Closeable toClose, Exception fail)
+            AutoCloseable toClose, Exception fail)
         throws JacksonException
     {
         if (g != null) {
@@ -412,7 +437,7 @@ public final class ClassUtil
         throwIfJacksonE(fail);
         throwIfRTE(fail);
         if (fail instanceof IOException) {
-            throw WrappedIOException.construct((IOException) fail, g);
+            throw JacksonIOException.construct((IOException) fail, g);
         }
         throw new RuntimeException(fail);
     }
@@ -467,7 +492,7 @@ public final class ClassUtil
             }
             return ctor;
         } catch (NoSuchMethodException e) {
-            ;
+            return null;
         } catch (Exception e) {
             ClassUtil.unwrapAndThrowAsIAE(e, "Failed to find default constructor of class "+cls.getName()
                 +", problem: "+exceptionMessage(e));
@@ -555,8 +580,19 @@ public final class ClassUtil
         if (fullType == null) {
             return "[null]";
         }
+        // 07-Dec-2023, tatu: Instead of cryptic notation for array types
+        //    (JLS-specified for JDK deserialization), let's use trailing "[]"s
+        //    to indicate dimensions instead
+        int arrays = 0;
+        while (fullType.isArrayType()) {
+            ++arrays;
+            fullType = fullType.getContentType();
+        }
         StringBuilder sb = new StringBuilder(80).append('`');
         sb.append(fullType.toCanonical());
+        while (arrays-- > 0) {
+            sb.append("[]");
+        }
         return sb.append('`').toString();
     }
 
@@ -618,7 +654,7 @@ public final class ClassUtil
         }
         return apostrophed(name);
     }
-    
+
     /**
      * Returns either single-quoted (apostrophe) {@code 'name'} (if {@code name} not null),
      * or "[null]" if {@code name} is null.
@@ -760,7 +796,7 @@ public final class ClassUtil
         if (type.isPrimitive()) {
             return type;
         }
-        
+
         if (type == Integer.class) {
             return Integer.TYPE;
         }
@@ -798,7 +834,7 @@ public final class ClassUtil
      * Method that is called if a {@link Member} may need forced access,
      * to force a field, method or constructor to be accessible: this
      * is done by calling {@link AccessibleObject#setAccessible(boolean)}.
-     * 
+     *
      * @param member Accessor to call <code>setAccessible()</code> on.
      * @param evenIfAlreadyPublic Whether to always try to make accessor
      *   accessible, even if {@code public} (true),
@@ -809,38 +845,28 @@ public final class ClassUtil
         // We know all members are also accessible objects...
         AccessibleObject ao = (AccessibleObject) member;
 
-        // 14-Jan-2009, tatu: It seems safe and potentially beneficial to
-        //   always to make it accessible (latter because it will force
-        //   skipping checks we have no use for...), so let's always call it.
         try {
             // 15-Apr-2021, tatu: With JDK 14+ we will be hitting access limitations
             //    esp. wrt JDK types so let's change a bit
             final Class<?> declaringClass = member.getDeclaringClass();
             boolean isPublic = Modifier.isPublic(member.getModifiers())
                     && Modifier.isPublic(declaringClass.getModifiers());
-            if (!isPublic || (evenIfAlreadyPublic && !isJDKClass(declaringClass))) {
+            if (!isJDKClass(declaringClass) && (!isPublic || evenIfAlreadyPublic)) {
                 ao.setAccessible(true);
             }
-        } catch (SecurityException se) {
-            // 17-Apr-2009, tatu: This can fail on platforms like
-            // Google App Engine); so let's only fail if we really needed it...
-            if (!ao.isAccessible()) {
-                Class<?> declClass = member.getDeclaringClass();
-                throw new IllegalArgumentException("Cannot access "+member+" (from class "+declClass.getName()
-                    +"; failed to set access: "+exceptionMessage(se));
+        } catch (SecurityException ignore) {
+        } catch (RuntimeException e) {
+            // 2025-03-24, scs: Since Java module system, it is common to be unable to see
+            // members of other modules. We can't assume we can crack open arbitrary types anymore.
+            // We'd love to catch this more explicitly, but Android... >:(
+            if ("InaccessibleObjectException".equals(e.getClass().getSimpleName())) {
+                return;
             }
-            // 14-Apr-2021, tatu: [databind#3118] Java 9/JPMS causes new fails...
-            //    But while our baseline is Java 8, must check name
-        } catch (RuntimeException se) {
-            if ("InaccessibleObjectException".equals(se.getClass().getSimpleName())) {
-                throw new IllegalArgumentException(String.format(
-"Failed to call `setAccess()` on %s '%s' (of class %s) due to `%s`, problem: %s",
-member.getClass().getSimpleName(), member.getName(),
-nameOf(member.getDeclaringClass()),
-se.getClass().getName(), se.getMessage()),
-                        se);
-            }
-            throw se;
+            throw new IllegalArgumentException(String.format(
+                    "Failed to call `setAccess()` on %s '%s' (of class %s) due to `%s`, problem: %s",
+                    member.getClass().getSimpleName(), member.getName(),
+                    nameOf(member.getDeclaringClass()),
+                    e.getClass().getName(), e.getMessage()), e);
         }
     }
 
@@ -917,39 +943,6 @@ se.getClass().getName(), se.getMessage()),
         return (Class<? extends Enum<?>>) cls;
     }
 
-    /**
-     * A method that will look for the first Enum value annotated with the given Annotation.
-     * <p>
-     * If there's more than one value annotated, the first one found will be returned. Which one exactly is used is undetermined.
-     *
-     * @param enumClass0 The Enum class to scan for a value with the given annotation
-     * @param annotationClass The annotation to look for.
-     * @return the Enum value annotated with the given Annotation or {@code null} if none is found.
-     *
-     * @throws IllegalArgumentException if there's a reflection issue accessing the Enum
-     */
-    public static <T extends Annotation> Enum<?> findFirstAnnotatedEnumValue(Class<?> enumClass0,
-            Class<T> annotationClass)
-    {
-        @SuppressWarnings("unchecked")
-        final Class<Enum<?>> enumClass = (Class<Enum<?>>) enumClass0;
-        Field[] fields = enumClass.getDeclaredFields();
-        for (Field field : fields) {
-            if (field.isEnumConstant()) {
-                Annotation defaultValueAnnotation = field.getAnnotation(annotationClass);
-                if (defaultValueAnnotation != null) {
-                    final String name = field.getName();
-                    for (Enum<?> enumValue : enumClass.getEnumConstants()) {
-                        if (name.equals(enumValue.name())) {
-                            return enumValue;
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
     /*
     /**********************************************************************
     /* Methods for detecting special class categories
@@ -976,24 +969,37 @@ se.getClass().getName(), se.getMessage()),
 
     /**
      * Accessor for checking whether given {@code Class} is under Java package
-     * of {@code java.*} or {@code javax.*} (including all sub-packages).
+     * of {@code java.*}, {@code javax.*} or {@code sun.*} (including all sub-packages).
      *<p>
      * Added since some aspects of handling need to be changed for JDK types (and
-     * possibly some extensions under {@code javax.}?): for example, forcing of access
-     * will not work well for future JDKs (12 and later).
-     *<p>
-     * Note: in Jackson 2.11 only returned true for {@code java.*} (and not {@code javax.*});
-     * was changed in 2.12.
+     * possibly some extensions under {@code javax. and sun.}: for example, forcing of access
+     * will not work well for future JDKs.
      */
     public static boolean isJDKClass(Class<?> rawType) {
         final String clsName = rawType.getName();
-        return clsName.startsWith("java.") || clsName.startsWith("javax.");
+        for (String prefix : JDK_PREFIXES) {
+            if (clsName.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Similar to {@link #isJDKClass(Class)}, but for JDK core classes: those in
+     * packages under {@code java.*} but NOT under {@code javax.*} (or {@code sun.*}).
+     *
+     * @since 2.20
+     */
+    public static boolean isJDKCoreClass(Class<?> rawType) {
+        final String clsName = rawType.getName();
+        return clsName.startsWith("java.");
     }
 
     /**
      * Convenience method for:
      *<pre>
-     *   return getJDKMajorVersion() >= 17
+     *   return getJDKMajorVersion() &gt;= 17
      *</pre>
      * that also catches any possible exceptions so it is safe to call
      * from static contexts.
@@ -1007,6 +1013,7 @@ se.getClass().getName(), se.getMessage()),
         try {
             return getJDKMajorVersion() >= 17;
         } catch (Throwable t) {
+            ExceptionUtil.rethrowIfFatal(t);
             System.err.println("Failed to determine JDK major version, assuming pre-JDK-17; problem: "+t);
             return false;
         }
@@ -1085,10 +1092,10 @@ se.getClass().getName(), se.getMessage()),
             }
             try {
                 return contextClass.getDeclaredMethods(); // Cross fingers
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 return _failGetClassMethods(cls, t);
             }
-        } catch (Throwable t) {
+        } catch (Exception t) {
             return _failGetClassMethods(cls, t);
         }
     }
@@ -1102,12 +1109,12 @@ se.getClass().getName(), se.getMessage()),
 cls.getName(), rootCause.getClass().getName(), rootCause.getMessage()),
                 rootCause);
     }
-    
+
     /**
      * @since 2.7
      */
     public static Ctor[] getConstructors(Class<?> cls) {
-        // Note: can NOT skip abstract classes as they may be used with mix-ins
+        // Note: CANNOT skip abstract classes as they may be used with mix-ins
         // and for regular use shouldn't really matter.
         if (cls.isInterface() || isObjectOrPrimitive(cls)) {
             return NO_CTORS;
@@ -1236,9 +1243,9 @@ cls.getName(), rootCause.getClass().getName(), rootCause.getMessage()),
         private transient Annotation[] _annotations;
 
         private transient Annotation[][] _paramAnnotations;
-        
+
         private int _paramCount = -1;
-        
+
         public Ctor(Constructor<?> ctor) {
             _ctor = ctor;
         }

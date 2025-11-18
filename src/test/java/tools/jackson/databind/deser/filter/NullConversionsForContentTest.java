@@ -2,15 +2,22 @@ package tools.jackson.databind.deser.filter;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidNullException;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 // For [databind#1402]; configurable null handling, for contents of
 // Collections, Maps, arrays
-public class NullConversionsForContentTest extends BaseMapTest
+public class NullConversionsForContentTest
 {
     static class NullContentFail<T> {
         public T nullsOk;
@@ -43,6 +50,7 @@ public class NullConversionsForContentTest extends BaseMapTest
     private final ObjectMapper MAPPER = newJsonMapper();
 
     // Tests to verify that we can set default settings for failure
+    @Test
     public void testFailOnNullFromDefaults() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
@@ -79,7 +87,8 @@ public class NullConversionsForContentTest extends BaseMapTest
             assertEquals(String.class, e.getTargetType());
         }
     }
-    
+
+    @Test
     public void testFailOnNullWithCollections() throws Exception
     {
         TypeReference<NullContentFail<List<Integer>>> typeRef = new TypeReference<NullContentFail<List<Integer>>>() { };
@@ -92,7 +101,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         assertNull(result.nullsOk.get(0));
 
         // and then see that nulls are not ok for non-nullable.
-        
+
         // List<Integer>
         final String JSON = a2q("{'noNulls':[null]}");
         try {
@@ -113,6 +122,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testFailOnNullWithArrays() throws Exception
     {
         final String JSON = a2q("{'noNulls':[null]}");
@@ -135,6 +145,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testFailOnNullWithPrimitiveArrays() throws Exception
     {
         final String JSON = a2q("{'noNulls':[null]}");
@@ -165,6 +176,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testFailOnNullWithMaps() throws Exception
     {
         // Then: Map<String,String>
@@ -193,7 +205,7 @@ public class NullConversionsForContentTest extends BaseMapTest
     /* Test methods, null-as-empty
     /**********************************************************
      */
-
+    @Test
     public void testNullsAsEmptyWithCollections() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
@@ -215,6 +227,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNullsAsEmptyUsingDefaults() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
@@ -236,8 +249,9 @@ public class NullConversionsForContentTest extends BaseMapTest
         result = mapper.readValue(JSON, listType);
         assertEquals(1, result.values.size());
         assertEquals(Integer.valueOf(0), result.values.get(0));
-    }        
-    
+    }
+
+    @Test
     public void testNullsAsEmptyWithArrays() throws Exception
     {
         // Note: skip `Object[]`, no default empty value at this point
@@ -252,41 +266,48 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNullsAsEmptyWithPrimitiveArrays() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
+        ObjectReader r = MAPPER.reader()
+                .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
 
         // int[]
         {
-            NullContentAsEmpty<int[]> result = MAPPER.readValue(JSON,
-                    new TypeReference<NullContentAsEmpty<int[]>>() { });
+            NullContentAsEmpty<int[]> result = r.forType
+                    (new TypeReference<NullContentAsEmpty<int[]>>() { })
+                    .readValue(JSON);
             assertEquals(1, result.values.length);
             assertEquals(0, result.values[0]);
         }
 
         // long[]
         {
-            NullContentAsEmpty<long[]> result = MAPPER.readValue(JSON,
-                    new TypeReference<NullContentAsEmpty<long[]>>() { });
+            NullContentAsEmpty<long[]> result = r.forType
+                    (new TypeReference<NullContentAsEmpty<long[]>>() { })
+                    .readValue(JSON);
             assertEquals(1, result.values.length);
             assertEquals(0L, result.values[0]);
         }
 
         // boolean[]
         {
-            NullContentAsEmpty<boolean[]> result = MAPPER.readValue(JSON,
-                    new TypeReference<NullContentAsEmpty<boolean[]>>() { });
+            NullContentAsEmpty<boolean[]> result = r.forType
+                    (new TypeReference<NullContentAsEmpty<boolean[]>>() { })
+                    .readValue(JSON);
             assertEquals(1, result.values.length);
-            assertEquals(false, result.values[0]);
+            assertFalse(result.values[0]);
         }
-}
-    
+    }
+
+    @Test
     public void testNullsAsEmptyWithMaps() throws Exception
     {
         // Then: Map<String,String>
         final String MAP_JSON = a2q("{'values':{'A':null}}");
         {
-            NullContentAsEmpty<Map<String,String>> result 
+            NullContentAsEmpty<Map<String,String>> result
                 = MAPPER.readValue(MAP_JSON, new TypeReference<NullContentAsEmpty<Map<String,String>>>() { });
             assertEquals(1, result.values.size());
             assertEquals("A", result.values.entrySet().iterator().next().getKey());
@@ -295,7 +316,7 @@ public class NullConversionsForContentTest extends BaseMapTest
 
         // Then: EnumMap<Enum,String>
         {
-            NullContentAsEmpty<EnumMap<ABC,String>> result 
+            NullContentAsEmpty<EnumMap<ABC,String>> result
                 = MAPPER.readValue(MAP_JSON, new TypeReference<NullContentAsEmpty<EnumMap<ABC,String>>>() { });
             assertEquals(1, result.values.size());
             assertEquals(ABC.A, result.values.entrySet().iterator().next().getKey());
@@ -309,6 +330,7 @@ public class NullConversionsForContentTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testNullsSkipUsingDefaults() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
@@ -328,9 +350,10 @@ public class NullConversionsForContentTest extends BaseMapTest
                 .build();
         result = mapper.readValue(JSON, listType);
         assertEquals(0, result.values.size());
-    }        
+    }
 
     // Test to verify that per-property setting overrides defaults:
+    @Test
     public void testNullsSkipWithOverrides() throws Exception
     {
         final String JSON = a2q("{'values':[null]}");
@@ -350,8 +373,9 @@ public class NullConversionsForContentTest extends BaseMapTest
                 .build();
         result = mapper.readValue(JSON, listType);
         assertEquals(0, result.values.size());
-    }        
+    }
 
+    @Test
     public void testNullsSkipWithCollections() throws Exception
     {
         // List<Integer>
@@ -375,6 +399,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNullsSkipWithArrays() throws Exception
     {
         final String JSON = a2q("{'values':['a',null,'xy']}");
@@ -396,6 +421,7 @@ public class NullConversionsForContentTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNullsSkipWithPrimitiveArrays() throws Exception
     {
         // int[]
@@ -424,17 +450,18 @@ public class NullConversionsForContentTest extends BaseMapTest
             NullContentSkip<boolean[]> result = MAPPER.readValue(JSON,
                     new TypeReference<NullContentSkip<boolean[]>>() { });
             assertEquals(2, result.values.length);
-            assertEquals(true, result.values[0]);
-            assertEquals(true, result.values[1]);
+            assertTrue(result.values[0]);
+            assertTrue(result.values[1]);
         }
     }
-    
+
+    @Test
     public void testNullsSkipWithMaps() throws Exception
     {
         // Then: Map<String,String>
         final String MAP_JSON = a2q("{'values':{'A':'foo','B':null,'C':'bar'}}");
         {
-            NullContentSkip<Map<String,String>> result 
+            NullContentSkip<Map<String,String>> result
                 = MAPPER.readValue(MAP_JSON, new TypeReference<NullContentSkip<Map<String,String>>>() { });
             assertEquals(2, result.values.size());
             assertEquals("foo", result.values.get("A"));
@@ -443,7 +470,7 @@ public class NullConversionsForContentTest extends BaseMapTest
 
         // Then: EnumMap<Enum,String>
         {
-            NullContentSkip<EnumMap<ABC,String>> result 
+            NullContentSkip<EnumMap<ABC,String>> result
                 = MAPPER.readValue(MAP_JSON, new TypeReference<NullContentSkip<EnumMap<ABC,String>>>() { });
             assertEquals(2, result.values.size());
             assertEquals("foo", result.values.get(ABC.A));

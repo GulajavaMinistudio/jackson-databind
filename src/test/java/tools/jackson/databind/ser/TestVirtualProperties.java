@@ -2,21 +2,25 @@ package tools.jackson.databind.ser;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import tools.jackson.core.JsonGenerator;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonAppend;
 import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.AnnotatedClass;
 import tools.jackson.databind.introspect.BeanPropertyDefinition;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.util.Annotations;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for verifying that one can append virtual properties after regular ones.
  */
-public class TestVirtualProperties extends BaseMapTest
+public class TestVirtualProperties extends DatabindTestUtil
 {
     @JsonAppend(attrs={ @JsonAppend.Attr("id"),
         @JsonAppend.Attr(value="internal", propName="extra", required=true)
@@ -56,7 +60,7 @@ public class TestVirtualProperties extends BaseMapTest
         }
 
         @Override
-        protected Object value(Object bean, JsonGenerator jgen, SerializerProvider prov) {
+        protected Object value(Object bean, JsonGenerator jgen, SerializationContext prov) {
             if (_name.toString().equals("id")) {
                 return "abc123";
             }
@@ -82,7 +86,7 @@ public class TestVirtualProperties extends BaseMapTest
     {
         public int value = 72;
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
@@ -91,6 +95,7 @@ public class TestVirtualProperties extends BaseMapTest
 
     private final ObjectWriter WRITER = objectWriter();
 
+    @Test
     public void testAttributeProperties() throws Exception
     {
         Map<String,Object> stuff = new LinkedHashMap<String,Object>();
@@ -108,6 +113,7 @@ public class TestVirtualProperties extends BaseMapTest
         assertEquals(a2q("{'id':'abc123','extra':{'x':3,'y':'B'},'value':13}"), json);
     }
 
+    @Test
     public void testAttributePropInclusion() throws Exception
     {
         // first, with desc
@@ -125,6 +131,7 @@ public class TestVirtualProperties extends BaseMapTest
         assertEquals(a2q("{'value':28}"), json);
     }
 
+    @Test
     public void testCustomProperties() throws Exception
     {
         String json = WRITER.withAttribute("desc", "nice")

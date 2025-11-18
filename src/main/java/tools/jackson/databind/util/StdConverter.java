@@ -1,25 +1,36 @@
 package tools.jackson.databind.util;
 
+import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JavaType;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.type.TypeFactory;
 
 /**
  * Standard implementation of {@link Converter} that supports explicit
  * type access, instead of relying type detection of generic type
- * parameters. 
- * 
+ * parameters.
+ *
  * @since 2.2
  */
 public abstract class StdConverter<IN,OUT>
     implements Converter<IN,OUT>
 {
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Partial Converter API implementation
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override
+    public OUT convert(DeserializationContext ctxt, IN value) {
+        return convert(value);
+    }
+
+    @Override
+    public OUT convert(SerializationContext ctxt, IN value) {
+        return convert(value);
+    }
+
     public abstract OUT convert(IN value);
 
     @Override

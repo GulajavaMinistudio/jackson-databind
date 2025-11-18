@@ -43,7 +43,7 @@ public class BeanDeserializerBuilder
     /**
      * Introspected information about POJO for deserializer to handle
      */
-    protected final BeanDescription _beanDesc;
+    protected final BeanDescription.Supplier _beanDescRef;
 
     /*
     /**********************************************************************
@@ -56,6 +56,13 @@ public class BeanDeserializerBuilder
      */
     protected final Map<String, SettableBeanProperty> _properties
         = new LinkedHashMap<String, SettableBeanProperty>();
+
+    /**
+     * Parameters of the primary properties-based Creator, if any.
+     *
+     * @since 2.18
+     */
+    protected SettableBeanProperty[] _propsBasedCreatorParams;
 
     /**
      * Value injectors for deserialization
@@ -120,10 +127,10 @@ public class BeanDeserializerBuilder
     /**********************************************************************
      */
 
-    public BeanDeserializerBuilder(BeanDescription beanDesc,
-            DeserializationContext ctxt)
-    { 
-        _beanDesc = beanDesc;
+    public BeanDeserializerBuilder(DeserializationContext ctxt,
+            BeanDescription.Supplier beanDescRef)
+    {
+        _beanDescRef = beanDescRef;
         _context = ctxt;
         _config = ctxt.getConfig();
     }
@@ -134,7 +141,7 @@ public class BeanDeserializerBuilder
      */
     protected BeanDeserializerBuilder(BeanDeserializerBuilder src)
     {
-        _beanDesc = src._beanDesc;
+        _beanDescRef = src._beanDescRef;
         _context = src._context;
         _config = src._config;
 
@@ -146,6 +153,7 @@ public class BeanDeserializerBuilder
         _ignorableProps = src._ignorableProps;
         _includableProps = src._includableProps;
         _valueInstantiator = src._valueInstantiator;
+        _propsBasedCreatorParams = src._propsBasedCreatorParams;
         _objectIdReader = src._objectIdReader;
 
         _anySetter = src._anySetter;
@@ -174,7 +182,14 @@ public class BeanDeserializerBuilder
      * Method for adding a new property or replacing a property.
      */
     public void addOrReplaceProperty(SettableBeanProperty prop, boolean allowOverride) {
-        _properties.put(prop.getName(), prop);
+        SettableBeanProperty oldProp = _properties.put(prop.getName(), prop);
+        if ((oldProp != null) && (_propsBasedCreatorParams != null)) {
+            for (int i = 0, len = _propsBasedCreatorParams.length; i < len; ++i) {
+                if (_propsBasedCreatorParams[i] == oldProp) {
+                    _propsBasedCreatorParams[i] = prop;
+                }
+            }
+        }
     }
 
     /**
@@ -186,7 +201,8 @@ public class BeanDeserializerBuilder
     {
         SettableBeanProperty old =  _properties.put(prop.getName(), prop);
         if (old != null && old != prop) { // should never occur...
-            throw new IllegalArgumentException("Duplicate property '"+prop.getName()+"' for "+_beanDesc.getType());
+            throw new IllegalArgumentException("Duplicate property '"+prop.getName()
+            +"' for "+_beanDescRef.getType());
         }
     }
 
@@ -224,10 +240,10 @@ public class BeanDeserializerBuilder
 
     public void addInjectable(PropertyName propName, JavaType propType,
             Annotations contextAnnotations, AnnotatedMember member,
-            Object valueId)
+            Object valueId, Boolean optional, Boolean useInput)
     {
         if (_injectables == null) {
-            _injectables = new ArrayList<ValueInjector>();
+            _injectables = new ArrayList<>();
         }
         if ( _config.canOverrideAccessModifiers()) {
             try {
@@ -236,7 +252,7 @@ public class BeanDeserializerBuilder
                 _handleBadAccess(e);
             }
         }
-        _injectables.add(new ValueInjector(propName, propType, member, valueId));
+        _injectables.add(new ValueInjector(propName, propType, member, valueId, optional, useInput));
     }
 
     /**
@@ -246,15 +262,13 @@ public class BeanDeserializerBuilder
     public void addIgnorable(String propName)
     {
         if (_ignorableProps == null) {
-            _ignorableProps = new HashSet<String>();
+            _ignorableProps = new HashSet<>();
         }
         _ignorableProps.add(propName);
     }
 
     /**
      * Method that will add property name as one of the properties that will be included.
-     *
-     * @since 2.12
      */
     public void addIncludable(String propName)
     {
@@ -293,6 +307,7 @@ public class BeanDeserializerBuilder
 
     public void setValueInstantiator(ValueInstantiator inst) {
         _valueInstantiator = inst;
+        _propsBasedCreatorParams = inst.getFromObjectArguments(_config);
     }
 
     public void setObjectIdReader(ObjectIdReader r) {
@@ -303,13 +318,17 @@ public class BeanDeserializerBuilder
         _buildMethod = buildMethod;
         _builderConfig = config;
     }
-    
+
     /*
     /**********************************************************************
     /* Public accessors
     /**********************************************************************
      */
-    
+
+    public JavaType getType() {
+        return _beanDescRef.getType();
+    }
+
     /**
      * Method that allows accessing all properties that this
      * builder currently contains.
@@ -337,7 +356,7 @@ public class BeanDeserializerBuilder
     public SettableAnyProperty getAnySetter() {
         return _anySetter;
     }
-    
+
     public ValueInstantiator getValueInstantiator() {
         return _valueInstantiator;
     }
@@ -384,7 +403,7 @@ public class BeanDeserializerBuilder
                     new ObjectIdValueProperty(_objectIdReader, PropertyMetadata.STD_REQUIRED));
         }
         return new BeanDeserializer(this,
-                _beanDesc, _constructPropMap(props), _backRefProperties, _ignorableProps, _ignoreAllUnknown, _includableProps,
+                _beanDescRef, _constructPropMap(props), _backRefProperties, _ignorableProps, _ignoreAllUnknown, _includableProps,
                 _anyViews(props));
     }
 
@@ -394,7 +413,7 @@ public class BeanDeserializerBuilder
      * ("polymorphic deserialization")
      */
     public AbstractDeserializer buildAbstract() {
-        return new AbstractDeserializer(this, _beanDesc, _backRefProperties, _properties);
+        return new AbstractDeserializer(this, _backRefProperties, _properties);
     }
 
     /**
@@ -407,9 +426,9 @@ public class BeanDeserializerBuilder
         if (_buildMethod == null) {
             // as per [databind#777], allow empty name
             if (!expBuildMethodName.isEmpty()) {
-                _context.reportBadDefinition(_beanDesc.getType(),
+                _context.reportBadDefinition(_beanDescRef.getType(),
                         String.format("Builder class %s does not have build method (name: '%s')",
-                        ClassUtil.getTypeDescription(_beanDesc.getType()),
+                        ClassUtil.getTypeDescription(_beanDescRef.getType()),
                         expBuildMethodName));
             }
         } else {
@@ -419,7 +438,7 @@ public class BeanDeserializerBuilder
             if ((rawBuildType != rawValueType)
                     && !rawBuildType.isAssignableFrom(rawValueType)
                     && !rawValueType.isAssignableFrom(rawBuildType)) {
-                _context.reportBadDefinition(_beanDesc.getType(),
+                _context.reportBadDefinition(_beanDescRef.getType(),
                         String.format("Build method `%s` has wrong return type (%s), not compatible with POJO type (%s)",
                         _buildMethod.getFullName(),
                         ClassUtil.getClassDescription(rawBuildType),
@@ -447,7 +466,7 @@ public class BeanDeserializerBuilder
     protected ValueDeserializer<?> createBuilderBasedDeserializer(JavaType valueType,
             BeanPropertyMap propertyMap, boolean anyViews) {
         return new BuilderBasedDeserializer(this,
-                _beanDesc, valueType, propertyMap, _backRefProperties, _ignorableProps, _ignoreAllUnknown,
+                _beanDescRef, valueType, propertyMap, _backRefProperties, _ignorableProps, _ignoreAllUnknown,
                 _includableProps, anyViews);
     }
 
@@ -493,7 +512,7 @@ public class BeanDeserializerBuilder
 
         // 15-Sep-2016, tatu: Access via back-ref properties has been done earlier
         //   as it has to, for some reason, so not repeated here.
-/*        
+/*
         if (_backRefProperties != null) {
             for (SettableBeanProperty prop : _backRefProperties.values()) {
                 try {
@@ -506,9 +525,9 @@ public class BeanDeserializerBuilder
         */
 
         // 17-Jun-2020, tatu: Despite [databind#2760], it seems that methods that
-        //    are explicitly defined (any setter via annotation, builder too) can not
+        //    are explicitly defined (any setter via annotation, builder too) cannot
         //    be left as-is? May reconsider based on feedback
-        
+
         if (_anySetter != null) {
             try {
                 _anySetter.fixAccess(_config);
@@ -565,7 +584,7 @@ public class BeanDeserializerBuilder
     {
         // 07-May-2020, tatu: First find combination of per-type config overrides (higher
         //   precedence) and per-type annotations (lower):
-        JsonFormat.Value format = _beanDesc.findExpectedFormat(null);
+        JsonFormat.Value format = _beanDescRef.findExpectedFormat(null);
         // and see if any of those has explicit definition; if not, use global baseline default
         Boolean B = format.getFeature(JsonFormat.Feature.ACCEPT_CASE_INSENSITIVE_PROPERTIES);
         boolean caseInsensitive = (B == null)
@@ -578,24 +597,21 @@ public class BeanDeserializerBuilder
     protected PropertyName[][] _collectAliases(Collection<SettableBeanProperty> props)
     {
         PropertyName[][] result = null;
-        AnnotationIntrospector intr = _config.getAnnotationIntrospector();
-        if (intr != null) {
-            int i = -1;
-            for (SettableBeanProperty prop : props) {
-                ++i;
-                AnnotatedMember member = prop.getMember();
-                if (member == null) {
-                    continue;
-                }
-                List<PropertyName> aliases = intr.findPropertyAliases(_config, member);
-                if ((aliases == null) || aliases.isEmpty()) {
-                    continue;
-                }
-                if (result == null) {
-                    result = new PropertyName[props.size()][];
-                }
-                result[i] = aliases.toArray(new PropertyName[0]);
+        int i = -1;
+        for (SettableBeanProperty prop : props) {
+            ++i;
+            AnnotatedMember member = prop.getMember();
+            if (member == null) {
+                continue;
             }
+            List<PropertyName> aliases = prop.findAliases(_config);
+            if ((aliases == null) || aliases.isEmpty()) {
+                continue;
+            }
+            if (result == null) {
+                result = new PropertyName[props.size()][];
+            }
+            result[i] = aliases.toArray(new PropertyName[0]);
         }
         return result;
     }
@@ -608,7 +624,7 @@ public class BeanDeserializerBuilder
     protected void _handleBadAccess(IllegalArgumentException e0)
     {
         try {
-            _context.reportBadTypeDefinition(_beanDesc, e0.getMessage());
+            _context.reportBadTypeDefinition(_beanDescRef.get(), e0.getMessage());
         } catch (DatabindException e) {
             if (e.getCause() == null) {
                 e.initCause(e0);

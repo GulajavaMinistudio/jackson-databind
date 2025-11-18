@@ -2,9 +2,14 @@ package tools.jackson.databind.jsontype.jdk;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for verifying that types that serialize as JSON Arrays
@@ -12,7 +17,7 @@ import tools.jackson.databind.*;
  * gracefully handling Lists themselves too)
  */
 public class TypedArraySerTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     /*
     /**********************************************************
@@ -31,11 +36,11 @@ public class TypedArraySerTest
     @SuppressWarnings("serial")
     @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY)
     static class TypedListAsProp<T> extends ArrayList<T> { }
-    
+
     @SuppressWarnings("serial")
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.WRAPPER_OBJECT)
     static class TypedListAsWrapper<T> extends LinkedList<T> { }
-    
+
     // Mix-in to force wrapper for things like primitive arrays
     @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.WRAPPER_OBJECT)
     interface WrapperMixIn { }
@@ -70,8 +75,13 @@ public class TypedArraySerTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    // Since one of the tests uses VIEW inclusion, let's specify inclusion
+    // (as default varies between Jackson 2.x and 3.x)
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+            .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+            .build();
 
+    @Test
     public void testListWithPolymorphic() throws Exception
     {
         BeanListWrapper beans = new BeanListWrapper();
@@ -80,7 +90,8 @@ public class TypedArraySerTest
         ObjectWriter w = MAPPER.writerWithView(Object.class);
         assertEquals("{\"beans\":[{\"@type\":\"bean\",\"x\":0}]}", w.writeValueAsString(beans));
     }
-    
+
+    @Test
     public void testIntList() throws Exception
     {
         TypedList<Integer> input = new TypedList<Integer>();
@@ -90,11 +101,12 @@ public class TypedArraySerTest
         assertEquals("[\""+TypedList.class.getName()+"\",[5,13]]",
                 MAPPER.writeValueAsString(input));
     }
-    
+
     // Similar to above, but this time let's request adding type info
     // as property. That would not work (since there's no JSON Object to
     // add property in), so it should revert to method used with
     // ARRAY_WRAPPER method.
+    @Test
     public void testStringListAsProp() throws Exception
     {
         TypedListAsProp<String> input = new TypedListAsProp<String>();
@@ -104,6 +116,7 @@ public class TypedArraySerTest
                 MAPPER.writeValueAsString(input));
     }
 
+    @Test
     public void testStringListAsObjectWrapper() throws Exception
     {
         TypedListAsWrapper<Boolean> input = new TypedListAsWrapper<Boolean>();
@@ -124,6 +137,7 @@ public class TypedArraySerTest
     /**********************************************************
      */
 
+    @Test
     public void testIntArray() throws Exception
     {
         ObjectMapper m = jsonMapperBuilder()
@@ -140,6 +154,7 @@ public class TypedArraySerTest
     /**********************************************************
      */
 
+    @Test
     public void testGenericArray() throws Exception
     {
         final A[] input = new A[] { new B() };

@@ -103,10 +103,10 @@ public class DefaultTypeResolverBuilder
     }
 
     @Override
-    public TypeSerializer buildTypeSerializer(SerializerProvider ctxt,
+    public TypeSerializer buildTypeSerializer(SerializationContext ctxt,
             JavaType baseType, Collection<NamedType> subtypes)
     {
-        return useForType(baseType) ? super.buildTypeSerializer(ctxt, baseType, subtypes) : null;            
+        return useForType(baseType) ? super.buildTypeSerializer(ctxt, baseType, subtypes) : null;
     }
 
     public DefaultTypeResolverBuilder typeIdVisibility(boolean isVisible) {
@@ -131,39 +131,49 @@ public class DefaultTypeResolverBuilder
 
         switch (_appliesFor) {
         case NON_CONCRETE_AND_ARRAYS:
-            while (t.isArrayType()) {
-                t = t.getContentType();
-            }
+            t = _unwrapArrayType(t);
             // fall through
         case OBJECT_AND_NON_CONCRETE:
             // 19-Apr-2016, tatu: ReferenceType like Optional also requires similar handling:
-            while (t.isReferenceType()) {
-                t = t.getReferencedType();
-            }
+            t = _unwrapReferenceType(t);
             return t.isJavaLangObject()
                     || (!t.isConcrete()
                             // [databind#88] Should not apply to JSON tree models:
                             && !TreeNode.class.isAssignableFrom(t.getRawClass()));
 
         case NON_FINAL:
-            while (t.isArrayType()) {
-                t = t.getContentType();
-            }
+            t = _unwrapArrayType(t);
             // ReferenceType like Optional also requires similar handling:
-            while (t.isReferenceType()) {
-                t = t.getReferencedType();
-            }
+            t = _unwrapReferenceType(t);
             // [databind#88] Should not apply to JSON tree models:
             return !t.isFinal() && !TreeNode.class.isAssignableFrom(t.getRawClass());
 
-        case EVERYTHING:
-            // So, excluding primitives (handled earlier) and "Natural types" (handled
-            // before this method is called), applied to everything
-            return true;
+        case NON_FINAL_AND_ENUMS: // since 2.16
+            t = _unwrapArrayType(t);
+            // 19-Apr-2016, tatu: ReferenceType like Optional also requires similar handling:
+            t = _unwrapReferenceType(t);
+            // [databind#88] Should not apply to JSON tree models:
+            return (!t.isFinal() && !TreeNode.class.isAssignableFrom(t.getRawClass()))
+                    // [databind#3569] Allow use of default typing for Enums
+                    || t.isEnumType();
 
         default:
         case JAVA_LANG_OBJECT:
             return t.isJavaLangObject();
         }
+    }
+
+    protected JavaType _unwrapArrayType(JavaType t) {
+        while (t.isArrayType()) {
+            t = t.getContentType();
+        }
+        return t;
+    }
+
+    protected JavaType _unwrapReferenceType(JavaType t) {
+        while (t.isReferenceType()) {
+            t = t.getReferencedType();
+        }
+        return t;
     }
 }

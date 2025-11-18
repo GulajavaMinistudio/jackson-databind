@@ -11,8 +11,17 @@ import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.jsontype.NamedType;
 
+/**
+ * {@link tools.jackson.databind.jsontype.TypeIdResolver} implementation
+ * that converts using explicitly (annotation-) specified type names
+ * and maps to implementation classes; or, in absence of annotated type name,
+ * defaults to fully-qualified {@link Class} names (obtained with {@link Class#getName()}
+ */
 public class TypeNameIdResolver extends TypeIdResolverBase
+    implements java.io.Serializable // @since 2.16.2
 {
+    private static final long serialVersionUID = 3L;
+
     /**
      * Mappings from class name to type id, used for serialization.
      *<p>
@@ -106,6 +115,10 @@ public class TypeNameIdResolver extends TypeIdResolverBase
         if (cls == null) {
             return null;
         }
+        // 04-Nov-2024, tatu: [databind#4733] Need to resolve enum sub-classes
+        //   same way "ClassNameIdResolver" does
+        cls = _resolveToParentAsNecessary(cls);
+
         // 12-Oct-2019, tatu: This looked weird; was done in 2.x to force application
         //   of `TypeModifier`. But that just... does not seem right, at least not in
         //   the sense that raw class would be changed (intent for modifier is to change
@@ -151,7 +164,7 @@ public class TypeNameIdResolver extends TypeIdResolverBase
     public JavaType typeFromId(DatabindContext context, String id) {
         return _typeFromId(id);
     }
-    
+
     protected JavaType _typeFromId(String id) {
         // [databind#1983]: for case-insensitive lookups must canonicalize:
         if (_caseInsensitive) {
@@ -162,7 +175,7 @@ public class TypeNameIdResolver extends TypeIdResolverBase
         // could just try Class.forName)
         // For now let's not add any such workarounds; can add if need be
         return _idToType.get(id);
-    }    
+    }
 
     @Override
     public String getDescForKnownTypeIds() {
@@ -178,18 +191,11 @@ public class TypeNameIdResolver extends TypeIdResolverBase
     }
 
     /*
-    @Override
-    public String toString() {
-        return String.format("[%s; id-to-type=%s]", getClass().getName(), _idToType);
-    }
-    */
-
-    /*
     /**********************************************************************
     /* Helper methods
     /**********************************************************************
      */
-    
+
     /**
      * If no name was explicitly given for a class, we will just
      * use non-qualified class name

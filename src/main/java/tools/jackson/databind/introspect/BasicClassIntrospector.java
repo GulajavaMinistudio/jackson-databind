@@ -44,7 +44,7 @@ public class BasicClassIntrospector
     protected final MixInResolver _mixInResolver;
 
     protected final MapperConfig<?> _config;
-    
+
     /*
     /**********************************************************************
     /* State
@@ -82,7 +82,7 @@ public class BasicClassIntrospector
     }
 
     protected BasicClassIntrospector(MapperConfig<?> config) {
-        _config = Objects.requireNonNull(config, "Can not pass null `config`");
+        _config = Objects.requireNonNull(config, "Cannot pass null `config`");
         _mixInResolver = config;
     }
 
@@ -139,7 +139,7 @@ public class BasicClassIntrospector
     protected AnnotatedClass _resolveAnnotatedWithoutSuperTypes(JavaType type) {
         return AnnotatedClassResolver.resolveWithoutSuperTypes(_config, type, _mixInResolver);
     }
-    
+
     /*
     /**********************************************************************
     /* Factory method impls: bean introspection
@@ -147,7 +147,8 @@ public class BasicClassIntrospector
      */
 
     @Override
-    public BasicBeanDescription introspectForSerialization(JavaType type)
+    public BasicBeanDescription introspectForSerialization(JavaType type,
+            AnnotatedClass classDef)
     {
         // minor optimization: for some JDK types do minimal introspection
         BasicBeanDescription desc = _findStdTypeDesc(type);
@@ -165,8 +166,7 @@ public class BasicClassIntrospector
                     }
                 }
                 desc = BasicBeanDescription.forSerialization(collectProperties(type,
-                        introspectClassAnnotations(type),
-                        true, "set"));
+                        classDef, true, "set"));
                 _resolvedSerBeanDescs.put(type, desc);
             }
         }
@@ -174,7 +174,8 @@ public class BasicClassIntrospector
     }
 
     @Override
-    public BasicBeanDescription introspectForDeserialization(JavaType type)
+    public BasicBeanDescription introspectForDeserialization(JavaType type,
+            AnnotatedClass classDef)
     {
         // minor optimization: for some JDK types do minimal introspection
         BasicBeanDescription desc = _findStdTypeDesc(type);
@@ -192,8 +193,7 @@ public class BasicClassIntrospector
                     }
                 }
                 desc = BasicBeanDescription.forDeserialization(collectProperties(type,
-                        introspectClassAnnotations(type),
-                        false, "set"));
+                        classDef, false, "set"));
                 _resolvedDeserBeanDescs.put(type, desc);
             }
         }
@@ -211,7 +211,8 @@ public class BasicClassIntrospector
     }
 
     @Override
-    public BasicBeanDescription introspectForCreation(JavaType type)
+    public BasicBeanDescription introspectForCreation(JavaType type,
+            AnnotatedClass classDef)
     {
         BasicBeanDescription desc = _findStdTypeDesc(type);
         if (desc == null) {
@@ -220,8 +221,7 @@ public class BasicClassIntrospector
             desc = _findStdJdkCollectionDesc(type);
             if (desc == null) {
                 desc = BasicBeanDescription.forDeserialization(collectProperties(type,
-                        introspectClassAnnotations(type),
-                        false, "set"));
+                        classDef, false, "set"));
             }
         }
         return desc;
@@ -336,6 +336,11 @@ public class BasicClassIntrospector
             //    of matches), or ambitious? Let's do latter for now.
             if (Collection.class.isAssignableFrom(raw)
                     || Map.class.isAssignableFrom(raw)) {
+                // 28-May-2024, tatu: Complications wrt [databind#4515] / [databind#2795]
+                //    mean that partial introspection NOT for inner classes
+                if (raw.toString().indexOf('$') > 0) {
+                    return false;
+                }
                 return true;
             }
         }

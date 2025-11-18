@@ -5,15 +5,22 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.exc.InvalidDefinitionException;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.exc.ValueInstantiationException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestCreators2 extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestCreators2
+    extends DatabindTestUtil
 {
     static class HashTest
     {
@@ -34,7 +41,7 @@ public class TestCreators2 extends BaseMapTest
         @Override
         public byte[] deserialize(JsonParser p, DeserializationContext ctxt)
         {
-            String str = p.getText();
+            String str = p.getString();
             try {
                 return str.getBytes("UTF-8");
             } catch (IOException e) {
@@ -48,7 +55,7 @@ public class TestCreators2 extends BaseMapTest
         protected int x = 3;
         protected double d = -0.5;
         protected boolean b = true;
-        
+
         @JsonCreator
         public Primitives(@JsonProperty("x") int x,
                 @JsonProperty("d") double d,
@@ -59,7 +66,7 @@ public class TestCreators2 extends BaseMapTest
             this.b = b;
         }
     }
-    
+
     protected static class Test431Container {
         protected final List<Item431> items;
 
@@ -67,7 +74,7 @@ public class TestCreators2 extends BaseMapTest
         public Test431Container(@JsonProperty("items") final List<Item431> i) {
             items = i;
         }
-    }    
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     protected static class Item431 {
@@ -91,13 +98,13 @@ public class TestCreators2 extends BaseMapTest
     static class BrokenCreatorBean
     {
         protected String bar;
-        
+
         @JsonCreator
         public BrokenCreatorBean(@JsonProperty("bar") String bar1, @JsonProperty("bar") String bar2) {
             bar = ""+bar1+"/"+bar2;
         }
     }
-    
+
     // For [JACKSON-541]: should not need @JsonCreator if SerializationFeature.AUTO_DETECT_CREATORS is on.
     static class AutoDetectConstructorBean
     {
@@ -139,12 +146,12 @@ public class TestCreators2 extends BaseMapTest
     static class AbstractBaseImpl extends AbstractBase
     {
         protected Map<String,Object> props;
-        
+
         public AbstractBaseImpl(Map<String,Object> props) {
             this.props = props;
         }
     }
-    
+
     static interface Issue700Set extends java.util.Set<Object> { }
 
     static class Issue700Bean
@@ -185,6 +192,37 @@ public class TestCreators2 extends BaseMapTest
         }
     }
 
+    // [databind#4515]
+
+    static class ConstructorBeanPropsExplicit4515 {
+        int x;
+
+        @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+        protected ConstructorBeanPropsExplicit4515(@JsonProperty("x") int x) {
+            this.x = x;
+        }
+    }
+
+    static class ConstructorBeanPropsWithName4515 {
+        int x;
+
+        @JsonCreator
+        protected ConstructorBeanPropsWithName4515(@JsonProperty("x") int x) {
+            this.x = x;
+        }
+    }
+
+    static class FactoryBeanPropsExplicit4515 {
+        double d;
+
+        private FactoryBeanPropsExplicit4515(double value, boolean dummy) { d = value; }
+
+        @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+        protected static FactoryBeanPropsExplicit4515 createIt(@JsonProperty("f") double value) {
+            return new FactoryBeanPropsExplicit4515(value, true);
+        }
+    }
+
     /*
     /**********************************************************
     /* Test methods
@@ -193,6 +231,7 @@ public class TestCreators2 extends BaseMapTest
 
     private final ObjectMapper MAPPER = new ObjectMapper();
 
+    @Test
     public void testExceptionFromConstructor() throws Exception
     {
         try {
@@ -213,6 +252,7 @@ public class TestCreators2 extends BaseMapTest
         }
     }
 
+    @Test
     public void testSimpleConstructor() throws Exception
     {
         HashTest test = MAPPER.readValue("{\"type\":\"custom\",\"bytes\":\"abc\" }", HashTest.class);
@@ -220,27 +260,33 @@ public class TestCreators2 extends BaseMapTest
         assertEquals("abc", new String(test.bytes, "UTF-8"));
     }
 
+    @Test
     public void testMissingPrimitives() throws Exception
     {
-        Primitives p = MAPPER.readValue("{}", Primitives.class);
+        Primitives p = MAPPER
+                .readerFor(Primitives.class)
+                .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .readValue("{}");
         assertFalse(p.b);
         assertEquals(0, p.x);
         assertEquals(0.0, p.d);
     }
 
+    @Test
     public void testJackson431() throws Exception
     {
         final Test431Container foo = MAPPER.readValue(
                 "{\"items\":\n"
                 +"[{\"bar\": 0,\n"
                 +"\"id\": \"id123\",\n"
-                +"\"foo\": 1\n" 
+                +"\"foo\": 1\n"
                 +"}]}",
                 Test431Container.class);
         assertNotNull(foo);
     }
 
     // Catch and re-throw exceptions that Creator methods throw
+    @Test
     public void testJackson438() throws Exception
     {
         Exception e = null;
@@ -263,6 +309,7 @@ public class TestCreators2 extends BaseMapTest
         verifyException(e, "don't like that name");
     }
 
+    @Test
     public void testCreatorWithDupNames() throws Exception
     {
         try {
@@ -275,6 +322,7 @@ public class TestCreators2 extends BaseMapTest
         }
     }
 
+    @Test
     public void testCreatorMultipleArgumentWithoutAnnotation() throws Exception {
         AutoDetectConstructorBean value = MAPPER.readValue("{\"bar\":\"bar\",\"foo\":\"foo\"}",
                 AutoDetectConstructorBean.class);
@@ -282,6 +330,7 @@ public class TestCreators2 extends BaseMapTest
         assertEquals("foo", value.foo);
     }
 
+    @Test
     public void testIgnoredSingleArgCtor() throws Exception
     {
         try {
@@ -292,6 +341,7 @@ public class TestCreators2 extends BaseMapTest
         }
     }
 
+    @Test
     public void testAbstractFactory() throws Exception
     {
         AbstractBase bean = MAPPER.readValue("{\"a\":3}", AbstractBase.class);
@@ -301,6 +351,7 @@ public class TestCreators2 extends BaseMapTest
         assertEquals(Integer.valueOf(3), impl.props.get("a"));
     }
 
+    @Test
     public void testCreatorProperties() throws Exception
     {
         Issue700Bean value = MAPPER.readValue("{ \"item\" : \"foo\" }", Issue700Bean.class);
@@ -308,11 +359,37 @@ public class TestCreators2 extends BaseMapTest
     }
 
     // [databind#1476]
+    @Test
     public void testConstructorChoice() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        MultiPropCreator1476 pojo = mapper.readValue("{ \"intField\": 1, \"stringField\": \"foo\" }",
+        MultiPropCreator1476 pojo = MAPPER.readValue("{ \"intField\": 1, \"stringField\": \"foo\" }",
                 MultiPropCreator1476.class);
         assertEquals(1, pojo.getIntField());
         assertEquals("foo", pojo.getStringField());
+    }
+
+    // [databind#4515]: simple cases, properties-based explicit annotations
+
+    @Test
+    public void testPropsBasedConstructorExplicit() throws Exception
+    {
+        ConstructorBeanPropsExplicit4515 bean = MAPPER.readValue("{ \"x\" : 42 }",
+                ConstructorBeanPropsExplicit4515.class);
+        assertEquals(42, bean.x);
+    }
+
+    @Test
+    public void testPropsBasedConstructorWithName() throws Exception
+    {
+        ConstructorBeanPropsWithName4515 bean = MAPPER.readValue("{ \"x\" : 28 }",
+                ConstructorBeanPropsWithName4515.class);
+        assertEquals(28, bean.x);
+    }
+
+    @Test
+    public void testPropsBasedFactoryExplicit() throws Exception
+    {
+        FactoryBeanPropsExplicit4515 bean = MAPPER.readValue("{ \"f\" : 0.5 }",
+                FactoryBeanPropsExplicit4515.class);
+        assertEquals(0.5, bean.d);
     }
 }

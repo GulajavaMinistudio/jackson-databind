@@ -4,13 +4,14 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import tools.jackson.core.JacksonException;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.bean.PropertyValueBuffer;
 import tools.jackson.databind.introspect.AnnotatedWithParams;
 
 /**
  * Class that defines simple API implemented by objects that create value
- * instances.  Some or all of properties of value instances may 
+ * instances.  Some or all of properties of value instances may
  * be initialized by instantiator, rest being populated by deserializer,
  * to which value instance is passed.
  * Since different kinds of JSON values (structured and scalar)
@@ -64,7 +65,7 @@ public abstract class ValueInstantiator
      * @since 3.0
      */
     public abstract ValueInstantiator createContextual(DeserializationContext ctxt,
-            BeanDescription beanDesc);
+            BeanDescription.Supplier beanDescRef);
 
     /*
     /**********************************************************************
@@ -254,12 +255,12 @@ public abstract class ValueInstantiator
      * behavior with respect to missing properties.
      *<p>
      * The default implementation of this method uses
-     * {@link PropertyValueBuffer#getParameters(SettableBeanProperty[])} to read
+     * {@link PropertyValueBuffer#getParameters} to read
      * and validate all properties in bulk, possibly substituting defaults for
      * missing properties or throwing exceptions for missing properties.  An
      * overridden implementation of this method could, for example, use
-     * {@link PropertyValueBuffer#hasParameter(SettableBeanProperty)} and
-     * {@link PropertyValueBuffer#getParameter(SettableBeanProperty)} to safely
+     * {@link PropertyValueBuffer#hasParameter} and
+     * {@link PropertyValueBuffer#getParameter} to safely
      * read the present properties only, and to have some other behavior for the
      * missing properties.
      */
@@ -267,7 +268,7 @@ public abstract class ValueInstantiator
             SettableBeanProperty[] props, PropertyValueBuffer buffer)
         throws JacksonException
     {
-        return createFromObjectWith(ctxt, buffer.getParameters(props));
+        return createFromObjectWith(ctxt, buffer.getParameters(ctxt, props));
     }
 
     /**
@@ -414,7 +415,7 @@ public abstract class ValueInstantiator
 
         @Override
         public ValueInstantiator createContextual(DeserializationContext ctxt,
-                BeanDescription beanDesc)
+                BeanDescription.Supplier beanDescRef)
         {
             return this;
         }
@@ -448,9 +449,10 @@ public abstract class ValueInstantiator
         }
 
         @Override
-        public ValueInstantiator createContextual(DeserializationContext ctxt,  BeanDescription beanDesc)
+        public ValueInstantiator createContextual(DeserializationContext ctxt,
+                BeanDescription.Supplier beanDescRef)
         {
-            ValueInstantiator d = _delegate.createContextual(ctxt, beanDesc);
+            ValueInstantiator d = _delegate.createContextual(ctxt, beanDescRef);
             return (d == _delegate) ? this : new Delegating(d);
         }
 

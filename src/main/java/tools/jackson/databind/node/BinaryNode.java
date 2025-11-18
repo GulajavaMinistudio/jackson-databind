@@ -1,9 +1,10 @@
 package tools.jackson.databind.node;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 import tools.jackson.core.*;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * Value node that contains Base64 encoded binary value, which will be
@@ -18,9 +19,16 @@ public class BinaryNode
 
     protected final byte[] _data;
 
+    /*
+    /**********************************************************************
+    /* Construction
+    /**********************************************************************
+     */
+
     public BinaryNode(byte[] data)
     {
-        _data = data;
+        // 01-Mar-2024, tatu: [databind#4381] No null-valued JsonNodes
+        _data = Objects.requireNonNull(data);
     }
 
     public BinaryNode(byte[] data, int offset, int length)
@@ -54,6 +62,12 @@ public class BinaryNode
         return new BinaryNode(data, offset, length);
     }
 
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods
+    /**********************************************************************
+     */
+    
     @Override
     public JsonNodeType getNodeType()
     {
@@ -69,6 +83,17 @@ public class BinaryNode
         return JsonToken.VALUE_EMBEDDED_OBJECT;
     }
 
+    @Override
+    protected String _valueDesc() {
+        return "[...(" + _data.length + " bytes)]";
+    }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, scalar access
+    /**********************************************************************
+     */
+
     /**
      *<p>
      * Note: caller is not to modify returned array in any way, since
@@ -82,12 +107,18 @@ public class BinaryNode
      * but will work correctly.
      */
     @Override
-    public String asText() {
+    protected String _asString() {
         return Base64Variants.getDefaultVariant().encode(_data, false);
     }
 
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, other
+    /**********************************************************************
+     */
+
     @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
+    public final void serialize(JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         g.writeBinary(provider.getConfig().getBase64Variant(),
@@ -99,14 +130,15 @@ public class BinaryNode
     {
         if (o == this) return true;
         if (o == null) return false;
-        if (!(o instanceof BinaryNode)) {
-            return false;
+        if (o instanceof BinaryNode) {
+            byte[] otherData = ((BinaryNode) o)._data;
+            return Arrays.equals(_data, otherData);
         }
-        return Arrays.equals(((BinaryNode) o)._data, _data);
+        return false;
     }
 
     @Override
     public int hashCode() {
-        return (_data == null) ? -1 : _data.length;
+        return _data.length;
     }
 }

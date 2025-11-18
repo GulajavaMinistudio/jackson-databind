@@ -3,11 +3,18 @@ package tools.jackson.databind.deser.merge;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 
-public class MapPolymorphicMerge2336Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.sharedMapper;
+
+public class MapPolymorphicMerge2336Test
 {
     private final ObjectMapper MAPPER = sharedMapper();
 
@@ -86,6 +93,7 @@ public class MapPolymorphicMerge2336Test extends BaseMapTest
     }
 
     // [databind#2336]
+    @Test
     public void testPolymorphicMapMerge() throws Exception
     {
         // first let's just get some valid JSON
@@ -95,13 +103,13 @@ public class MapPolymorphicMerge2336Test extends BaseMapTest
         // now create a reader specifically for merging
         ObjectReader reader = MAPPER.readerForUpdating(baseValue);
 
-        
+
         SomeOtherClass toBeMerged = new SomeOtherClass("house");
         toBeMerged.addValue("SOMEKEY", new SomeClassA("jim", null, 2));
         String jsonForMerging = MAPPER.writeValueAsString(toBeMerged);
 
         assertEquals("fred", baseValue.data.get("SOMEKEY").getName());
-        
+
         // now try to do the merge and it blows up
         SomeOtherClass mergedResult = reader.readValue(jsonForMerging);
 

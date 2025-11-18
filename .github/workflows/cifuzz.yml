@@ -2,8 +2,15 @@ name: CIFuzz
 on:
   pull_request:
     branches:
-    - "master"
-    - "3.0"
+    - "2.18"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }} @ ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Fuzzing:
     runs-on: ubuntu-latest
@@ -23,7 +30,7 @@ jobs:
         dry-run: false
         language: jvm
     - name: Upload Crash
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       if: failure() && steps.build.outcome == 'success'
       with:
         name: artifacts

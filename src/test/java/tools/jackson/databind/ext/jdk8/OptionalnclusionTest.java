@@ -2,14 +2,20 @@ package tools.jackson.databind.ext.jdk8;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class OptionalnclusionTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class OptionalnclusionTest
+    extends DatabindTestUtil
 {
     @JsonAutoDetect(fieldVisibility=Visibility.ANY)
     public static final class OptionalData {
@@ -44,6 +50,7 @@ public class OptionalnclusionTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSerOptNonEmpty() throws Exception
     {
         OptionalData data = new OptionalData();
@@ -55,6 +62,7 @@ public class OptionalnclusionTest extends BaseMapTest
         assertEquals("{}", value);
     }
 
+    @Test
     public void testSerOptNonDefault() throws Exception
     {
         OptionalData data = new OptionalData();
@@ -66,6 +74,7 @@ public class OptionalnclusionTest extends BaseMapTest
         assertEquals("{}", value);
     }
 
+    @Test
     public void testSerOptNonAbsent() throws Exception
     {
         OptionalData data = new OptionalData();
@@ -77,6 +86,7 @@ public class OptionalnclusionTest extends BaseMapTest
         assertEquals("{}", value);
     }
 
+    @Test
     public void testExcludeEmptyStringViaOptional() throws Exception
     {
         String json = MAPPER.writeValueAsString(new OptionalNonEmptyStringBean("x"));
@@ -87,6 +97,7 @@ public class OptionalnclusionTest extends BaseMapTest
         assertEquals("{}", json);
     }
 
+    @Test
     public void testSerPropInclusionAlways() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -97,6 +108,7 @@ public class OptionalnclusionTest extends BaseMapTest
                 mapper.writeValueAsString(OptionalGenericData.construct(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonNull() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder().changeDefaultPropertyInclusion(
@@ -106,6 +118,7 @@ public class OptionalnclusionTest extends BaseMapTest
                 mapper.writeValueAsString(OptionalGenericData.construct(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonAbsent() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -116,6 +129,7 @@ public class OptionalnclusionTest extends BaseMapTest
                 mapper.writeValueAsString(OptionalGenericData.construct(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonEmpty() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()

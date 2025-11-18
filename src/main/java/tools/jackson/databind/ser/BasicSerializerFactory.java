@@ -1,7 +1,5 @@
 package tools.jackson.databind.ser;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -19,14 +17,7 @@ import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.cfg.SerializerFactoryConfig;
 import tools.jackson.databind.ext.OptionalHandlerFactory;
-import tools.jackson.databind.ext.jdk8.DoubleStreamSerializer;
-import tools.jackson.databind.ext.jdk8.IntStreamSerializer;
-import tools.jackson.databind.ext.jdk8.Jdk8OptionalSerializer;
-import tools.jackson.databind.ext.jdk8.Jdk8StreamSerializer;
-import tools.jackson.databind.ext.jdk8.LongStreamSerializer;
-import tools.jackson.databind.ext.jdk8.OptionalDoubleSerializer;
-import tools.jackson.databind.ext.jdk8.OptionalIntSerializer;
-import tools.jackson.databind.ext.jdk8.OptionalLongSerializer;
+import tools.jackson.databind.ext.jdk8.*;
 import tools.jackson.databind.introspect.*;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.ser.jackson.JacksonSerializableSerializer;
@@ -52,55 +43,10 @@ public abstract class BasicSerializerFactory
 {
     /*
     /**********************************************************************
-    /* Configuration, lookup tables/maps
-    /**********************************************************************
-     */
-
-    /**
-     * Since these are all JDK classes, we shouldn't have to worry
-     * about ClassLoader used to load them. Rather, we can just
-     * use the class name, and keep things simple and efficient.
-     */
-    protected final static HashMap<String, ValueSerializer<?>> _concrete;
-
-    static {
-        HashMap<String, ValueSerializer<?>> concrete
-            = new HashMap<String, ValueSerializer<?>>();
-
-        
-        /* String and string-like types (note: date types explicitly
-         * not included -- can use either textual or numeric serialization)
-         */
-        concrete.put(String.class.getName(), StringSerializer.instance);
-        final ToStringSerializer sls = ToStringSerializer.instance;
-        concrete.put(StringBuffer.class.getName(), sls);
-        concrete.put(StringBuilder.class.getName(), sls);
-        concrete.put(Character.class.getName(), sls);
-        concrete.put(Character.TYPE.getName(), sls);
-
-        // Primitives/wrappers for primitives (primitives needed for Beans)
-        NumberSerializers.addAll(concrete);
-        concrete.put(Boolean.TYPE.getName(), new BooleanSerializer(true));
-        concrete.put(Boolean.class.getName(), new BooleanSerializer(false));
-
-        // Other numbers, more complicated
-        concrete.put(BigInteger.class.getName(), new NumberSerializer(BigInteger.class));
-        concrete.put(BigDecimal.class.getName(), new NumberSerializer(BigDecimal.class));
-
-        // Other discrete non-container types:
-        // First, Date/Time zoo:
-        concrete.put(Calendar.class.getName(), JavaUtilCalendarSerializer.instance);
-        concrete.put(java.util.Date.class.getName(), JavaUtilDateSerializer.instance);
-
-        _concrete = concrete;
-    }
-
-    /*
-    /**********************************************************************
     /* Configuration
     /**********************************************************************
      */
-    
+
     /**
      * Configuration settings for this factory; immutable instance (just like this
      * factory), new version created via copy-constructor (fluent-style)
@@ -151,7 +97,7 @@ public abstract class BasicSerializerFactory
     public final SerializerFactory withAdditionalKeySerializers(Serializers additional) {
         return withConfig(_factoryConfig.withAdditionalKeySerializers(additional));
     }
-    
+
     /**
      * Convenience method for creating a new factory instance with additional bean
      * serializer modifier.
@@ -176,22 +122,22 @@ public abstract class BasicSerializerFactory
     /* `SerializerFactory` impl
     /**********************************************************************
      */
-    
+
 // Implemented by sub-classes
-//    public abstract ValueSerializer<Object> createSerializer(SerializerProvider ctxt, ....)
+//    public abstract ValueSerializer<Object> createSerializer(SerializationContext ctxt, ....)
 
     @Override
     @SuppressWarnings("unchecked")
-    public ValueSerializer<Object> createKeySerializer(SerializerProvider ctxt, JavaType keyType)
+    public ValueSerializer<Object> createKeySerializer(SerializationContext ctxt, JavaType keyType)
     {
-        BeanDescription beanDesc = ctxt.introspectBeanDescription(keyType);
+        BeanDescription.Supplier beanDescRef = ctxt.lazyIntrospectBeanDescription(keyType);
         final SerializationConfig config = ctxt.getConfig();
         ValueSerializer<?> ser = null;
         // Minor optimization: to avoid constructing beanDesc, bail out if none registered
         if (_factoryConfig.hasKeySerializers()) {
             // Only thing we have here are module-provided key serializers:
             for (Serializers serializers : _factoryConfig.keySerializers()) {
-                ser = serializers.findSerializer(config, keyType, beanDesc, null);
+                ser = serializers.findSerializer(config, keyType, beanDescRef, null);
                 if (ser != null) {
                     break;
                 }
@@ -199,12 +145,13 @@ public abstract class BasicSerializerFactory
         }
         if (ser == null) {
             // [databind#2503]: Support `@Json[De]Serialize(keyUsing)` on key type too
-            ser = _findKeySerializer(ctxt, beanDesc.getClassInfo());
+            ser = _findKeySerializer(ctxt, beanDescRef.getClassInfo());
             if (ser == null) {
                 // If no explicit serializer, see if type is JDK one for which there is
                 // explicit deserializer: if so, can avoid further annotation lookups:
                 ser = JDKKeySerializers.getStdKeySerializer(config, keyType.getRawClass(), false);
                 if (ser == null) {
+                    final BeanDescription beanDesc = beanDescRef.get();
                     // Check `@JsonKey` and `@JsonValue`, in this order
                     AnnotatedMember acc = beanDesc.findJsonKeyAccessor();
                     if (acc == null) {
@@ -218,9 +165,11 @@ public abstract class BasicSerializerFactory
                         }
                         // need to pass both type of key Object (on which accessor called), and actual
                         // value type that `JsonType`-annotated accessor returns (or contains, in case of field)
-                        ser = new JsonValueSerializer(keyType, acc.getType(), false, null, delegate, acc);
+                        ser = JsonValueSerializer.construct(config, keyType, acc.getType(),
+                                false, null, delegate, acc);
                     } else {
-                        ser = JDKKeySerializers.getFallbackKeySerializer(config, keyType.getRawClass());
+                        ser = JDKKeySerializers.getFallbackKeySerializer(config, keyType.getRawClass(),
+                                beanDesc.getClassInfo());
                     }
                 }
             }
@@ -229,7 +178,7 @@ public abstract class BasicSerializerFactory
         // [databind#120]: Allow post-processing
         if (_factoryConfig.hasSerializerModifiers()) {
             for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                ser = mod.modifyKeySerializer(config, keyType, beanDesc, ser);
+                ser = mod.modifyKeySerializer(config, keyType, beanDescRef, ser);
             }
         }
         return (ValueSerializer<Object>) ser;
@@ -262,10 +211,10 @@ public abstract class BasicSerializerFactory
      * return null.
      *
      * @param containerType Declared type of the container to use as the base type for type information serializer
-     * 
+     *
      * @return Type serializer to use for property value contents, if one is needed; null if not.
-     */    
-    public TypeSerializer findPropertyContentTypeSerializer(SerializerProvider ctxt,
+     */
+    public TypeSerializer findPropertyContentTypeSerializer(SerializationContext ctxt,
             JavaType containerType, AnnotatedMember accessor)
     {
         return ctxt.getConfig().getTypeResolverProvider()
@@ -274,26 +223,9 @@ public abstract class BasicSerializerFactory
 
     /*
     /**********************************************************************
-    /* Overridable secondary serializer accessor methods
+    /* Secondary serializer accessor methods
     /**********************************************************************
      */
-
-    /**
-     * Method that will use fast lookup (and identity comparison) methods to
-     * see if we know serializer to use for given type.
-     */
-    protected final ValueSerializer<?> findSerializerByLookup(JavaType type,
-            SerializationConfig config, BeanDescription beanDesc, JsonFormat.Value format,
-            boolean staticTyping)
-    {
-        final Class<?> raw = type.getRawClass();
-        ValueSerializer<?> ser = JDKMiscSerializers.find(raw);
-        if (ser == null) {
-            final String clsName = raw.getName();
-            ser = _concrete.get(clsName);
-        }
-        return ser;
-    }
 
     /**
      * Method called to see if one of primary per-class annotations
@@ -309,16 +241,15 @@ public abstract class BasicSerializerFactory
      *  </li>
      *</ul>
      */
-    protected final ValueSerializer<?> findSerializerByAnnotations(SerializerProvider ctxt, 
-            JavaType type, BeanDescription beanDesc)
+    protected final ValueSerializer<?> findSerializerByAnnotations(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef)
     {
-        Class<?> raw = type.getRawClass();
         // First: serializable by Jackson-specific interface?
-        if (JacksonSerializable.class.isAssignableFrom(raw)) {
+        if (type.isTypeOrSubTypeOf(JacksonSerializable.class)) {
             return JacksonSerializableSerializer.instance;
         }
         // Second: @JsonValue for any type
-        AnnotatedMember valueAccessor = beanDesc.findJsonValueAccessor();
+        AnnotatedMember valueAccessor = beanDescRef.get().findJsonValueAccessor();
         if (valueAccessor != null) {
             if (ctxt.canOverrideAccessModifiers()) {
                 ClassUtil.checkAndFixAccess(valueAccessor.getMember(),
@@ -327,8 +258,8 @@ public abstract class BasicSerializerFactory
             ValueSerializer<Object> ser = findSerializerFromAnnotation(ctxt, valueAccessor);
             JavaType valueType = valueAccessor.getType();
             TypeSerializer vts = ctxt.findTypeSerializer(valueType);
-            return new JsonValueSerializer(type, valueType, /* static typing */ false,
-                    vts, ser, valueAccessor);
+            return JsonValueSerializer.construct(ctxt.getConfig(), type, valueType,
+                    /* static typing */ false, vts, ser, valueAccessor);
         }
         // No well-known annotations...
         return null;
@@ -341,10 +272,24 @@ public abstract class BasicSerializerFactory
      * This does not include "secondary" interfaces, but
      * mostly concrete or abstract base classes.
      */
-    protected final ValueSerializer<?> findSerializerByPrimaryType(SerializerProvider ctxt, 
-            JavaType type, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected final ValueSerializer<?> findSerializerByPrimaryType(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping)
     {
+        // First: simple lookups for concrete types
+        final Class<?> raw = type.getRawClass();
+        ValueSerializer<?> ser;
+        
+        if ((ser = JDKCoreSerializers.find(raw)) != null) {
+             return ser;
+        }
+        if ((ser = JDKStringLikeSerializer.find(raw)) != null) {
+             return ser;
+        }
+        if ((ser = JDKMiscSerializers.find(raw)) != null) {
+             return ser;
+        }
+
         if (type.isTypeOrSubTypeOf(Calendar.class)) {
             return JavaUtilCalendarSerializer.instance;
         }
@@ -352,8 +297,7 @@ public abstract class BasicSerializerFactory
             // 06-Nov-2020, tatu: Strange precedence challenge; need to consider
             //   "java.sql.Date" unfortunately
             if (!type.hasRawClass(Date.class)) {
-                ValueSerializer<?> ser = OptionalHandlerFactory.instance.findSerializer(ctxt.getConfig(), type);
-                if (ser != null) {
+                if ((ser = OptionalHandlerFactory.instance.findSerializer(ctxt.getConfig(), type) ) != null) {
                     return ser;
                 }
             }
@@ -368,8 +312,9 @@ public abstract class BasicSerializerFactory
         }
 
         if (type.isTypeOrSubTypeOf(Number.class)) {
-            JsonFormat.Value format = _calculateEffectiveFormat(beanDesc, Number.class, formatOverrides);
-
+            final Class<?> rawType = type.getRawClass();
+            JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
+                    beanDescRef, rawType, formatOverrides);
             // 21-May-2014, tatu: Couple of alternatives actually
             switch (format.getShape()) {
             case STRING:
@@ -378,21 +323,18 @@ public abstract class BasicSerializerFactory
                 return null;
             default:
             }
-            return NumberSerializer.instance;
+            @SuppressWarnings("unchecked")
+            Class<? extends Number> numberType = (Class<? extends Number>) rawType;
+            return new NumberSerializer(numberType);
         }
-        if (type.isEnumType()) {
-            return buildEnumSerializer(ctxt, type, beanDesc,
-                    _calculateEffectiveFormat(beanDesc, Enum.class, formatOverrides));
-        }
-        Class<?> raw = type.getRawClass();
-        if (Map.Entry.class.isAssignableFrom(raw)) {
+        if (type.isTypeOrSubTypeOf(Map.Entry.class)) {
             // 18-Oct-2015, tatu: With 2.7, need to dig type info:
             JavaType mapEntryType = type.findSuperType(Map.Entry.class);
             // 28-Apr-2015, tatu: TypeFactory does it all for us already so
             JavaType kt = mapEntryType.containedTypeOrUnknown(0);
             JavaType vt = mapEntryType.containedTypeOrUnknown(1);
-            return buildMapEntrySerializer(ctxt, type, beanDesc,
-                    _calculateEffectiveFormat(beanDesc, Map.Entry.class, formatOverrides),
+            return buildMapEntrySerializer(ctxt, type, beanDescRef,
+                    _calculateEffectiveFormat(ctxt, beanDescRef, Map.Entry.class, formatOverrides),
                     staticTyping, kt, vt);
         }
         if (ByteBuffer.class.isAssignableFrom(raw)) {
@@ -420,7 +362,7 @@ public abstract class BasicSerializerFactory
         if (DoubleStream.class.isAssignableFrom(raw)) {
             return DoubleStreamSerializer.INSTANCE;
         }
-        // NOTE: not concrete, can not just add directly via StdJdkSerializers. Also, requires
+        // NOTE: not concrete, cannot just add directly via StdJdkSerializers. Also, requires
         // bit of trickery wrt class name for polymorphic...
         if (Path.class.isAssignableFrom(raw)) {
             return JDKStringLikeSerializer.find(Path.class);
@@ -429,7 +371,7 @@ public abstract class BasicSerializerFactory
         if (ClassLoader.class.isAssignableFrom(raw)) {
             return new ToEmptyObjectSerializer(type);
         }
-        // Then check for optional/external serializers 
+        // Then check for optional/external serializers
         return OptionalHandlerFactory.instance.findSerializer(ctxt.getConfig(), type);
     }
 
@@ -441,18 +383,18 @@ public abstract class BasicSerializerFactory
      * bean classes may implement {@link Iterable}, but their main
      * function is usually something else. The reason for
      */
-    protected final ValueSerializer<?> findSerializerByAddonType(SerializerProvider ctxt, 
-            JavaType javaType, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected final ValueSerializer<?> findSerializerByAddonType(SerializationContext ctxt,
+            JavaType javaType, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping)
     {
         final TypeFactory tf = ctxt.getTypeFactory();
         if (javaType.isTypeOrSubTypeOf(Iterator.class)) {
-            return buildIteratorSerializer(ctxt, javaType, beanDesc, formatOverrides,
+            return buildIteratorSerializer(ctxt, javaType, beanDescRef, formatOverrides,
                     staticTyping,
                     tf.findFirstTypeParameter(javaType, Iterator.class));
         }
         if (javaType.isTypeOrSubTypeOf(Iterable.class)) {
-            return buildIterableSerializer(ctxt, javaType, beanDesc, formatOverrides,
+            return buildIterableSerializer(ctxt, javaType, beanDescRef, formatOverrides,
                     staticTyping,
                     tf.findFirstTypeParameter(javaType, Iterable.class));
         }
@@ -470,7 +412,7 @@ public abstract class BasicSerializerFactory
      * Returns null if no such annotation found.
      */
     @SuppressWarnings("unchecked")
-    protected ValueSerializer<Object> findSerializerFromAnnotation(SerializerProvider ctxt,
+    protected ValueSerializer<Object> findSerializerFromAnnotation(SerializationContext ctxt,
             Annotated a)
     {
         Object serDef = ctxt.getAnnotationIntrospector().findSerializer(ctxt.getConfig(), a);
@@ -488,7 +430,7 @@ public abstract class BasicSerializerFactory
      * be used; and if so, to construct and return suitable serializer for it.
      * If not, will simply return given serializer as is.
      */
-    protected ValueSerializer<?> findConvertingSerializer(SerializerProvider ctxt,
+    protected ValueSerializer<?> findConvertingSerializer(SerializationContext ctxt,
             Annotated a, ValueSerializer<?> ser)
     {
         Converter<Object,Object> conv = findConverter(ctxt, a);
@@ -499,7 +441,7 @@ public abstract class BasicSerializerFactory
         return new StdDelegatingSerializer(conv, delegateType, ser, null);
     }
 
-    protected Converter<Object,Object> findConverter(SerializerProvider ctxt,
+    protected Converter<Object,Object> findConverter(SerializationContext ctxt,
             Annotated a)
     {
         Object convDef = ctxt.getAnnotationIntrospector().findSerializationConverter(ctxt.getConfig(), a);
@@ -508,15 +450,15 @@ public abstract class BasicSerializerFactory
         }
         return ctxt.converterInstance(a, convDef);
     }
-    
+
     /*
     /**********************************************************************
     /* Factory methods, container types:
     /**********************************************************************
      */
 
-    protected ValueSerializer<?> buildContainerSerializer(SerializerProvider ctxt,
-            JavaType type, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected ValueSerializer<?> buildContainerSerializer(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping)
     {
         // [databind#23], 15-Mar-2013, tatu: must force static handling of root value type,
@@ -535,7 +477,7 @@ public abstract class BasicSerializerFactory
             staticTyping = false;
         }
         ValueSerializer<Object> elementValueSerializer = _findContentSerializer(ctxt,
-                beanDesc.getClassInfo());
+                beanDescRef.getClassInfo());
         final SerializationConfig config = ctxt.getConfig();
         if (type.isMapLikeType()) { // implements java.util.Map
             MapLikeType mlt = (MapLikeType) type;
@@ -544,10 +486,10 @@ public abstract class BasicSerializerFactory
              *  issues (see [databind#75]). Instead, must be done from 'createContextual()' call.
              *  But we do need to check class annotations.
              */
-            ValueSerializer<Object> keySerializer = _findKeySerializer(ctxt, beanDesc.getClassInfo());
+            ValueSerializer<Object> keySerializer = _findKeySerializer(ctxt, beanDescRef.getClassInfo());
             if (mlt instanceof MapType) {
                 return buildMapSerializer(ctxt, (MapType) mlt,
-                        beanDesc, formatOverrides, staticTyping,
+                        beanDescRef, formatOverrides, staticTyping,
                         keySerializer, elementTypeSerializer, elementValueSerializer);
             }
             // With Map-like, just 2 options: (1) Custom, (2) Annotations
@@ -555,19 +497,19 @@ public abstract class BasicSerializerFactory
             MapLikeType mlType = (MapLikeType) type;
             for (Serializers serializers : customSerializers()) { // (1) Custom
                 ser = serializers.findMapLikeSerializer(config, mlType,
-                        beanDesc, formatOverrides,
+                        beanDescRef, formatOverrides,
                         keySerializer, elementTypeSerializer, elementValueSerializer);
                 if (ser != null) {
                     break;
                 }
             }
             if (ser == null) { // (2) Annotations-based ones:
-                ser = findSerializerByAnnotations(ctxt, type, beanDesc);
+                ser = findSerializerByAnnotations(ctxt, type, beanDescRef);
             }
             if (ser != null) {
                 if (_factoryConfig.hasSerializerModifiers()) {
                     for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                        ser = mod.modifyMapLikeSerializer(config, mlType, beanDesc, ser);
+                        ser = mod.modifyMapLikeSerializer(config, mlType, beanDescRef, ser);
                     }
                 }
             }
@@ -577,27 +519,27 @@ public abstract class BasicSerializerFactory
             CollectionLikeType clt = (CollectionLikeType) type;
             if (clt instanceof CollectionType) {
                 return buildCollectionSerializer(ctxt, (CollectionType) clt,
-                        beanDesc, formatOverrides, staticTyping,
+                        beanDescRef, formatOverrides, staticTyping,
                         elementTypeSerializer, elementValueSerializer);
             }
-            // With Map-like, just 2 options: (1) Custom, (2) Annotations
+            // With Collection-like, just 2 options: (1) Custom, (2) Annotations
             ValueSerializer<?> ser = null;
             CollectionLikeType clType = (CollectionLikeType) type;
             for (Serializers serializers : customSerializers()) { // (1) Custom
                 ser = serializers.findCollectionLikeSerializer(config, clType,
-                        beanDesc, formatOverrides,
+                        beanDescRef, formatOverrides,
                         elementTypeSerializer, elementValueSerializer);
                 if (ser != null) {
                     break;
                 }
             }
             if (ser == null) { // (2) Annotations-based ones:
-                ser = findSerializerByAnnotations(ctxt, type, beanDesc);
+                ser = findSerializerByAnnotations(ctxt, type, beanDescRef);
             }
             if (ser != null) {
                 if (_factoryConfig.hasSerializerModifiers()) {
                     for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                        ser = mod.modifyCollectionLikeSerializer(config, clType, beanDesc, ser);
+                        ser = mod.modifyCollectionLikeSerializer(config, clType, beanDescRef, ser);
                     }
                 }
             }
@@ -605,7 +547,7 @@ public abstract class BasicSerializerFactory
         }
         if (type.isArrayType()) {
             return buildArraySerializer(ctxt, (ArrayType) type,
-                    beanDesc, formatOverrides, staticTyping,
+                    beanDescRef, formatOverrides, staticTyping,
                     elementTypeSerializer, elementValueSerializer);
         }
         return null;
@@ -615,10 +557,10 @@ public abstract class BasicSerializerFactory
      * Helper method that handles configuration details when constructing serializers for
      * {@link java.util.List} types that support efficient by-index access
      */
-    protected ValueSerializer<?> buildCollectionSerializer(SerializerProvider ctxt,
-            CollectionType type, BeanDescription beanDesc,  JsonFormat.Value formatOverrides,
+    protected ValueSerializer<?> buildCollectionSerializer(SerializationContext ctxt,
+            CollectionType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping,
-            TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer) 
+            TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
     {
         SerializationConfig config = ctxt.getConfig();
         ValueSerializer<?> ser = null;
@@ -627,24 +569,24 @@ public abstract class BasicSerializerFactory
         // 2. Annotations (@JsonValue, @JsonDeserialize)
         // 3. Defaults
         for (Serializers serializers : customSerializers()) { // (1) Custom
-            ser = serializers.findCollectionSerializer(config, type, beanDesc, formatOverrides,
+            ser = serializers.findCollectionSerializer(config, type, beanDescRef, formatOverrides,
                     elementTypeSerializer, elementValueSerializer);
             if (ser != null) {
                 break;
             }
         }
 
-        JsonFormat.Value format = _calculateEffectiveFormat(beanDesc, Collection.class, formatOverrides);
         if (ser == null) {
-            ser = findSerializerByAnnotations(ctxt, type, beanDesc); // (2) Annotations
+            ser = findSerializerByAnnotations(ctxt, type, beanDescRef); // (2) Annotations
             if (ser == null) {
+                JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
+                        beanDescRef, Collection.class, formatOverrides);
                 // We may also want to use serialize Collections "as beans", if (and only if)
                 // shape specified as "POJO"
                 if (format.getShape() == JsonFormat.Shape.POJO) {
                     return null;
                 }
-                Class<?> raw = type.getRawClass();
-                if (EnumSet.class.isAssignableFrom(raw)) {
+                if (type.isTypeOrSubTypeOf(EnumSet.class)) {
                     // this may or may not be available (Class doesn't; type of field/method does)
                     JavaType enumType = type.getContentType();
                     // and even if nominally there is something, only use if it really is enum
@@ -654,7 +596,7 @@ public abstract class BasicSerializerFactory
                     ser = buildEnumSetSerializer(enumType);
                 } else {
                     Class<?> elementRaw = type.getContentType().getRawClass();
-                    if (isIndexedList(raw)) {
+                    if (isIndexedList(type.getRawClass())) {
                         if (elementRaw == String.class) {
                             // Only optimize if std implementation, not custom
                             if (ClassUtil.isJacksonStdImpl(elementValueSerializer)) {
@@ -680,7 +622,7 @@ public abstract class BasicSerializerFactory
         // [databind#120]: Allow post-processing
         if (_factoryConfig.hasSerializerModifiers()) {
             for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                ser = mod.modifyCollectionSerializer(config, type, beanDesc, ser);
+                ser = mod.modifyCollectionSerializer(config, type, beanDescRef, ser);
             }
         }
         return ser;
@@ -721,58 +663,61 @@ public abstract class BasicSerializerFactory
      * Helper method that handles configuration details when constructing serializers for
      * {@link java.util.Map} types.
      */
-    protected ValueSerializer<?> buildMapSerializer(SerializerProvider ctxt,
-            MapType type, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected ValueSerializer<?> buildMapSerializer(SerializationContext ctxt,
+            MapType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping, ValueSerializer<Object> keySerializer,
             TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
     {
-        JsonFormat.Value format = _calculateEffectiveFormat(beanDesc, Map.class, formatOverrides);
-
-        // [databind#467]: This is where we could allow serialization "as POJO": But! It's
-        // nasty to undo, and does not apply on per-property basis. So, hardly optimal
-        if (format.getShape() == JsonFormat.Shape.POJO) {
-            return null;
-        }
         ValueSerializer<?> ser = null;
 
         // Order of lookups:
         // 1. Custom serializers
         // 2. Annotations (@JsonValue, @JsonDeserialize)
         // 3. Defaults
-        
+
         final SerializationConfig config = ctxt.getConfig();
         for (Serializers serializers : customSerializers()) { // (1) Custom
-            ser = serializers.findMapSerializer(config, type, beanDesc, formatOverrides,
+            ser = serializers.findMapSerializer(config, type, beanDescRef, formatOverrides,
                     keySerializer, elementTypeSerializer, elementValueSerializer);
             if (ser != null) { break; }
         }
         if (ser == null) {
-            ser = findSerializerByAnnotations(ctxt, type, beanDesc); // (2) Annotations
+            ser = findSerializerByAnnotations(ctxt, type, beanDescRef); // (2) Annotations
             if (ser == null) {
-                Object filterId = findFilterId(config, beanDesc);
+                JsonFormat.Value format = _calculateEffectiveFormat(ctxt,
+                        beanDescRef, Map.class, formatOverrides);
+
+                // [databind#467]: This is where we could allow serialization "as POJO": But! It's
+                // nasty to undo, and does not apply on per-property basis. So, hardly optimal
+                if (format.getShape() == JsonFormat.Shape.POJO) {
+                    return null;
+                }
+
+                Object filterId = findFilterId(config, beanDescRef);
                 // 01-May-2016, tatu: Which base type to use here gets tricky, since
                 //   most often it ought to be `Map` or `EnumMap`, but due to abstract
                 //   mapping it will more likely be concrete type like `HashMap`.
                 //   So, for time being, just pass `Map.class`
+                final AnnotatedClass classInfo = beanDescRef.getClassInfo();
                 JsonIgnoreProperties.Value ignorals = config.getDefaultPropertyIgnorals(Map.class,
-                        beanDesc.getClassInfo());
+                        classInfo);
                 Set<String> ignored = (ignorals == null) ? null
                         : ignorals.findIgnoredForSerialization();
                 JsonIncludeProperties.Value inclusions = config.getDefaultPropertyInclusions(Map.class,
-                        beanDesc.getClassInfo());
+                        classInfo);
                 Set<String> included = (inclusions == null) ? null
                         : inclusions.getIncluded();
                 MapSerializer mapSer = MapSerializer.construct(type,
                         staticTyping, elementTypeSerializer,
                         keySerializer, elementValueSerializer, filterId,
                         ignored, included);
-                ser = _checkMapContentInclusion(ctxt, beanDesc, mapSer);
+                ser = _checkMapContentInclusion(ctxt, beanDescRef, mapSer);
             }
         }
         // [databind#120]: Allow post-processing
         if (_factoryConfig.hasSerializerModifiers()) {
             for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                ser = mod.modifyMapSerializer(config, type, beanDesc, ser);
+                ser = mod.modifyMapSerializer(config, type, beanDescRef, ser);
             }
         }
         return ser;
@@ -782,11 +727,11 @@ public abstract class BasicSerializerFactory
      * Helper method that does figures out content inclusion value to use, if any,
      * and construct re-configured {@link MapSerializer} appropriately.
      */
-    protected MapSerializer _checkMapContentInclusion(SerializerProvider ctxt,
-            BeanDescription beanDesc, MapSerializer mapSer)
+    protected MapSerializer _checkMapContentInclusion(SerializationContext ctxt,
+            BeanDescription.Supplier beanDescRef, MapSerializer mapSer)
     {
         final JavaType contentType = mapSer.getContentType();
-        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDesc,
+        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDescRef,
                 contentType, Map.class);
 
         // Need to support global legacy setting, for now:
@@ -820,9 +765,7 @@ public abstract class BasicSerializerFactory
             break;
         case CUSTOM: // new with 2.9
             valueToSuppress = ctxt.includeFilterInstance(null, inclV.getContentFilter());
-            if (valueToSuppress == null) { // is this legal?
-                suppressNulls = true;
-            } else {
+            if (valueToSuppress != null) { // is this legal?
                 suppressNulls = ctxt.includeFilterSuppressNulls(valueToSuppress);
             }
             break;
@@ -834,8 +777,8 @@ public abstract class BasicSerializerFactory
         return mapSer.withContentInclusion(valueToSuppress, suppressNulls);
     }
 
-    protected ValueSerializer<?> buildMapEntrySerializer(SerializerProvider ctxt,
-            JavaType type, BeanDescription beanDesc,  JsonFormat.Value effectiveFormat,
+    protected ValueSerializer<?> buildMapEntrySerializer(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef,  JsonFormat.Value effectiveFormat,
             boolean staticTyping,
             JavaType keyType, JavaType valueType)
     {
@@ -848,7 +791,7 @@ public abstract class BasicSerializerFactory
                 valueType, staticTyping, ctxt.findTypeSerializer(valueType), null);
 
         final JavaType contentType = ser.getContentType();
-        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDesc,
+        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDescRef,
                 contentType, Map.Entry.class);
 
         // Need to support global legacy setting, for now:
@@ -881,9 +824,7 @@ public abstract class BasicSerializerFactory
             break;
         case CUSTOM:
             valueToSuppress = ctxt.includeFilterInstance(null, inclV.getContentFilter());
-            if (valueToSuppress == null) { // is this legal?
-                suppressNulls = true;
-            } else {
+            if (valueToSuppress != null) { // is this legal?
                 suppressNulls = ctxt.includeFilterSuppressNulls(valueToSuppress);
             }
             break;
@@ -903,8 +844,8 @@ public abstract class BasicSerializerFactory
      * @param contentType Declared full content type of container
      * @param configType Raw base type under which `configOverride`, if any, needs to be defined
      */
-    protected JsonInclude.Value _findInclusionWithContent(SerializerProvider ctxt,
-            BeanDescription beanDesc,
+    protected JsonInclude.Value _findInclusionWithContent(SerializationContext ctxt,
+            BeanDescription.Supplier beanDescRef,
             JavaType contentType, Class<?> configType)
     {
         final SerializationConfig config = ctxt.getConfig();
@@ -914,7 +855,7 @@ public abstract class BasicSerializerFactory
         //  Start with Container-defaults, then use more-specific value override, if any.
 
         // Start by getting global setting, overridden by Map-type-override
-        JsonInclude.Value inclV = beanDesc.findPropertyInclusion(config.getDefaultPropertyInclusion());
+        JsonInclude.Value inclV = beanDescRef.get().findPropertyInclusion(config.getDefaultPropertyInclusion());
         inclV = config.getDefaultPropertyInclusion(configType, inclV);
 
         // and then merge content-type overrides, if any. But note that there's
@@ -934,19 +875,19 @@ public abstract class BasicSerializerFactory
         }
         return inclV;
     }
-    
+
     /*
     /**********************************************************************
     /* Factory methods, for Arrays
     /**********************************************************************
      */
-    
+
     /**
      * Helper method that handles configuration details when constructing serializers for
      * <code>Object[]</code> (and subtypes, except for String).
      */
-    protected ValueSerializer<?> buildArraySerializer(SerializerProvider ctxt,
-            ArrayType type, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected ValueSerializer<?> buildArraySerializer(SerializationContext ctxt,
+            ArrayType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides,
             boolean staticTyping,
             TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
     {
@@ -958,13 +899,12 @@ public abstract class BasicSerializerFactory
         ValueSerializer<?> ser = null;
 
         for (Serializers serializers : customSerializers()) { // (1) Custom
-             ser = serializers.findArraySerializer(config, type, beanDesc, formatOverrides,
-                     elementTypeSerializer, elementValueSerializer);
-             if (ser != null) {
+             if ((ser = serializers.findArraySerializer(config, type, beanDescRef, formatOverrides,
+                     elementTypeSerializer, elementValueSerializer)) != null) {
                  break;
              }
         }
-        
+
         if (ser == null) {
              Class<?> raw = type.getRawClass();
              // Important: do NOT use standard serializers if non-standard element value serializer specified
@@ -973,7 +913,7 @@ public abstract class BasicSerializerFactory
                      ser = StringArraySerializer.instance;
                  } else {
                      // other standard types?
-                     ser = JDKArraySerializers.findStandardImpl(raw);
+                     ser = JDKArraySerializers.findStandardImpl(ctxt, raw, formatOverrides);
                  }
              }
              if (ser == null) {
@@ -984,7 +924,7 @@ public abstract class BasicSerializerFactory
          // [databind#120]: Allow post-processing
          if (_factoryConfig.hasSerializerModifiers()) {
              for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                 ser = mod.modifyArraySerializer(config, type, beanDesc, ser);
+                 ser = mod.modifyArraySerializer(config, type, beanDescRef, ser);
              }
          }
          return ser;
@@ -996,11 +936,11 @@ public abstract class BasicSerializerFactory
     /**********************************************************************
      */
 
-    public ValueSerializer<?> findReferenceSerializer(SerializerProvider ctxt,
-            ReferenceType refType, BeanDescription beanDesc, JsonFormat.Value format,
+    public ValueSerializer<?> findReferenceSerializer(SerializationContext ctxt,
+            ReferenceType refType, BeanDescription.Supplier beanDesc, JsonFormat.Value format,
             boolean staticTyping)
     {
-        JavaType contentType = refType.getContentType(); 
+        JavaType contentType = refType.getContentType();
         TypeSerializer contentTypeSerializer = (TypeSerializer) contentType.getTypeHandler();
         final SerializationConfig config = ctxt.getConfig();
         if (contentTypeSerializer == null) {
@@ -1037,14 +977,14 @@ public abstract class BasicSerializerFactory
         return null;
     }
 
-    protected ValueSerializer<?> _buildReferenceSerializer(SerializerProvider ctxt, Class<?> baseType,
-            ReferenceType refType, BeanDescription beanDesc, boolean staticTyping,
+    protected ValueSerializer<?> _buildReferenceSerializer(SerializationContext ctxt, Class<?> baseType,
+            ReferenceType refType, BeanDescription.Supplier beanDescRef, boolean staticTyping,
             TypeSerializer contentTypeSerializer, ValueSerializer<Object> contentSerializer)
     {
         final JavaType contentType = refType.getReferencedType();
-        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDesc,
+        JsonInclude.Value inclV = _findInclusionWithContent(ctxt, beanDescRef,
                 contentType, baseType);
-        
+
         // Need to support global legacy setting, for now:
         JsonInclude.Include incl = (inclV == null) ? JsonInclude.Include.USE_DEFAULTS : inclV.getContentInclusion();
         Object valueToSuppress;
@@ -1102,8 +1042,8 @@ public abstract class BasicSerializerFactory
     /**********************************************************************
      */
 
-    protected ValueSerializer<?> buildIteratorSerializer(SerializerProvider ctxt,
-            JavaType type, BeanDescription beanDesc, JsonFormat.Value formatOverrides,
+    protected ValueSerializer<?> buildIteratorSerializer(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDesc, JsonFormat.Value formatOverrides,
             boolean staticTyping,
             JavaType valueType)
     {
@@ -1111,17 +1051,17 @@ public abstract class BasicSerializerFactory
                 ctxt.findTypeSerializer(valueType));
     }
 
-    protected ValueSerializer<?> buildIterableSerializer(SerializerProvider ctxt,
-            JavaType type, BeanDescription beanDesc, JsonFormat.Value effectiveFormat,
-            boolean staticTyping,
+    protected ValueSerializer<?> buildIterableSerializer(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef,
+            JsonFormat.Value effectiveFormat, boolean staticTyping,
             JavaType valueType)
     {
         return new IterableSerializer(valueType, staticTyping,
                 ctxt.findTypeSerializer(valueType));
     }
 
-    protected ValueSerializer<?> buildEnumSerializer(SerializerProvider ctxt,
-            JavaType type, BeanDescription beanDesc, JsonFormat.Value effectiveFormat)
+    protected ValueSerializer<?> buildEnumSerializer(SerializationContext ctxt,
+            JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value effectiveFormat)
     {
         // As per [databind#24], may want to use alternate shape, serialize as JSON Object.
         // Challenge here is that EnumSerializer does not know how to produce
@@ -1129,21 +1069,55 @@ public abstract class BasicSerializerFactory
         // otherwise pass it to EnumSerializer.
         JsonFormat.Shape shape = effectiveFormat.getShape();
         if (shape == JsonFormat.Shape.POJO || shape == JsonFormat.Shape.OBJECT) {
+            final BeanDescription beanDesc = beanDescRef.get();
             // one special case: suppress serialization of "getDeclaringClass()"...
             ((BasicBeanDescription) beanDesc).removeProperty("declaringClass");
+            // [databind#2787]: remove self-referencing enum fields introduced by annotation flattening of mixins
+            if (type.isEnumType()){
+                _removeEnumSelfReferences(beanDesc);
+            }
             // returning null will mean that eventually BeanSerializer gets constructed
             return null;
         }
         @SuppressWarnings("unchecked")
         Class<Enum<?>> enumClass = (Class<Enum<?>>) type.getRawClass();
         final SerializationConfig config = ctxt.getConfig();
-        ValueSerializer<?> ser = EnumSerializer.construct(enumClass, config, beanDesc, effectiveFormat);
+        ValueSerializer<?> ser = EnumSerializer.construct(enumClass, config,
+                beanDescRef.get(), effectiveFormat);
         if (_factoryConfig.hasSerializerModifiers()) {
             for (ValueSerializerModifier mod : _factoryConfig.serializerModifiers()) {
-                ser = mod.modifyEnumSerializer(config, type, beanDesc, ser);
+                ser = mod.modifyEnumSerializer(config, type, beanDescRef, ser);
             }
         }
         return ser;
+    }
+
+    /**
+     * Helper method used for serialization {@link Enum} as {@link JsonFormat.Shape#OBJECT}.
+     * Removes any  self-referencing properties from its bean description before it is
+     * transformed into a JSON Object as configured by {@link JsonFormat.Shape#OBJECT}.
+     * <p>
+     * Internally, this method iterates through {@link BeanDescription#findProperties()}
+     * and removes self references.
+     *
+     * @param beanDesc the bean description to remove Enum properties from.
+     *
+     * @since 2.16
+     */
+    private void _removeEnumSelfReferences(BeanDescription beanDesc) {
+        Class<?> aClass = ClassUtil.findEnumType(beanDesc.getBeanClass());
+        Iterator<BeanPropertyDefinition> it = beanDesc.findProperties().iterator();
+        while (it.hasNext()) {
+            BeanPropertyDefinition property = it.next();
+            JavaType propType = property.getPrimaryType();
+            // is the property a self-reference?
+            if (propType.isEnumType() && propType.isTypeOrSubTypeOf(aClass)
+                    // [databind#4564] Since 2.16.3, Enum's should allow self as field, so let's remove only if static.
+                    && property.getAccessor().isStatic())
+            {
+                it.remove();
+            }
+        }
     }
 
     /*
@@ -1158,10 +1132,11 @@ public abstract class BasicSerializerFactory
      *
      * @since 3.0
      */
-    protected JsonFormat.Value _calculateEffectiveFormat(BeanDescription beanDesc,
+    protected JsonFormat.Value _calculateEffectiveFormat(SerializationContext ctxt,
+            BeanDescription.Supplier beanDescRef,
             Class<?> baseType, JsonFormat.Value formatOverrides)
     {
-        JsonFormat.Value fromType = beanDesc.findExpectedFormat(baseType);
+        JsonFormat.Value fromType = beanDescRef.findExpectedFormat(baseType);
         if (formatOverrides == null) {
             return fromType;
         }
@@ -1173,7 +1148,7 @@ public abstract class BasicSerializerFactory
      * class that indicates key serializer to use.
      * If so, will try to instantiate key serializer and return it; otherwise returns null.
      */
-    protected ValueSerializer<Object> _findKeySerializer(SerializerProvider ctxt,
+    protected ValueSerializer<Object> _findKeySerializer(SerializationContext ctxt,
             Annotated a)
     {
         AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
@@ -1186,7 +1161,7 @@ public abstract class BasicSerializerFactory
      * class that indicates content ("value") serializer to use.
      * If so, will try to instantiate value serializer and return it; otherwise returns null.
      */
-    protected ValueSerializer<Object> _findContentSerializer(SerializerProvider ctxt,
+    protected ValueSerializer<Object> _findContentSerializer(SerializationContext ctxt,
             Annotated a)
     {
         AnnotationIntrospector intr = ctxt.getAnnotationIntrospector();
@@ -1198,9 +1173,9 @@ public abstract class BasicSerializerFactory
      * Method called to find filter that is configured to be used with bean
      * serializer being built, if any.
      */
-    protected Object findFilterId(SerializationConfig config, BeanDescription beanDesc) {
+    protected Object findFilterId(SerializationConfig config, BeanDescription.Supplier beanDescRef) {
         return config.getAnnotationIntrospector().findFilterId(config,
-                (Annotated)beanDesc.getClassInfo());
+                (Annotated)beanDescRef.getClassInfo());
     }
 
     /**
@@ -1210,17 +1185,19 @@ public abstract class BasicSerializerFactory
      * (instead of dynamic runtime types).
      */
     protected boolean usesStaticTyping(SerializationConfig config,
-            BeanDescription beanDesc, TypeSerializer typeSer)
+            BeanDescription.Supplier beanDescRef)
     {
-        // 16-Aug-2010, tatu: If there is a (value) type serializer, we cannot force
-        //    static typing; that would make it impossible to handle expected subtypes
-        if (typeSer != null) {
-            return false;
-        }
-        AnnotationIntrospector intr = config.getAnnotationIntrospector();
-        JsonSerialize.Typing t = intr.findSerializationTyping(config, beanDesc.getClassInfo());
-        if (t != null && t != JsonSerialize.Typing.DEFAULT_TYPING) {
-            return (t == JsonSerialize.Typing.STATIC);
+        JsonSerialize.Typing t = config.getAnnotationIntrospector()
+                .findSerializationTyping(config, beanDescRef.getClassInfo());
+        if (t != null) {
+            switch (t) {
+            case DYNAMIC:
+                return false;
+            case STATIC:
+                return true;
+            case DEFAULT_TYPING:
+                // fall through
+            }
         }
         return config.isEnabled(MapperFeature.USE_STATIC_TYPING);
     }

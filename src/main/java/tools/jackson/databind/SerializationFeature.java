@@ -67,9 +67,9 @@ public enum SerializationFeature implements ConfigFeature
      * (like <code>@JsonSerialize</code>): ones that do have annotations
      * do not result in an exception being thrown.
      *<p>
-     * Feature is enabled by default.
+     * Feature is disabled by default as of Jackson 3.0 (in 2.x it was enabled).
      */
-    FAIL_ON_EMPTY_BEANS(true),
+    FAIL_ON_EMPTY_BEANS(false),
 
     /**
      * Feature that determines what happens when a direct self-reference
@@ -128,22 +128,27 @@ public enum SerializationFeature implements ConfigFeature
     /**********************************************************************
      */
 
-     /**
-      * Feature that determines whether <code>close</code> method of
-      * serialized <b>root level</b> objects (ones for which <code>ObjectMapper</code>'s
-      * writeValue() (or equivalent) method is called)
-      * that implement {@link java.io.Closeable}
-      * is called after serialization or not. If enabled, <b>close()</b> will
-      * be called after serialization completes (whether succesfully, or
-      * due to an error manifested by an exception being thrown). You can
-      * think of this as sort of "finally" processing.
-      *<p>
-      * NOTE: only affects behavior with <b>root</b> objects, and not other
-      * objects reachable from the root object. Put another way, only one
-      * call will be made for each 'writeValue' call.
+    /**
+     * Feature that determines whether {@code close()} method of
+     * serialized <b>root level</b> objects (ones for which {@link ObjectMapper}'s
+     * (and {@link ObjectWriter}'s)
+     * writeValue() (or equivalent) method is called)
+     * that implement {@link java.lang.AutoCloseable}
+     * is called after serialization or not. If enabled, <b>close()</b> will
+     * be called after serialization completes (whether successfully, or
+     * due to an error manifested by an exception being thrown). You can
+     * think of this as sort of "finally" processing.
+     *<p>
+     * NOTE: only affects behavior with <b>root</b> objects, and not other
+     * objects reachable from the root object. Put another way, only one
+     * call will be made for each 'writeValue' call.
+     *<p>
+     * NOTE: in Jackson 2.x this used to only apply to {@link java.io.Closeable}s,
+     * but now it also applies to {@link java.lang.AutoCloseable}s as well (as
+     * of Jackson 3.0).
      *<p>
      * Feature is disabled by default.
-      */
+     */
     CLOSE_CLOSEABLE(false),
 
     /**
@@ -167,99 +172,6 @@ public enum SerializationFeature implements ConfigFeature
      */
 
     /**
-     * Feature that determines whether Date (and date/time) values
-     * (and Date-based things like {@link java.util.Calendar}s) are to be
-     * serialized as numeric time stamps (true; the default),
-     * or as something else (usually textual representation).
-     * If textual representation is used, the actual format depends on configuration
-     * settings including possible per-property use of {@code @JsonFormat} annotation,
-     * globally configured {@link java.text.DateFormat}.
-     *<p>
-     * For "classic" JDK date types ({@link java.util.Date}, {@link java.util.Calendar})
-     * the default formatting is provided by {@link tools.jackson.databind.util.StdDateFormat},
-     * and corresponds to format String of "yyyy-MM-dd'T'HH:mm:ss.SSSX"
-     * (see {@link java.text.DateFormat} for details of format Strings).
-     * Whether this feature affects handling of other date-related
-     * types depend on handlers of those types, although ideally they
-     * should use this feature
-     *<p>
-     * Note: whether {@link java.util.Map} keys are serialized as Strings
-     * or not is controlled using {@link #WRITE_DATE_KEYS_AS_TIMESTAMPS} instead of
-     * this feature.
-     *<p>
-     * Feature is enabled by default, so that date/time are by default
-     * serialized as time stamps.
-     */
-    WRITE_DATES_AS_TIMESTAMPS(true),
-
-    /**
-     * Feature that determines whether {@link java.util.Date}s
-     * (and sub-types) used as {@link java.util.Map} keys are serialized
-     * as time stamps or not (if not, will be serialized as textual values).
-     *<p>
-     * Default value is 'false', meaning that Date-valued Map keys are serialized
-     * as textual (ISO-8601) values.
-     *<p>
-     * Feature is disabled by default.
-     */
-    WRITE_DATE_KEYS_AS_TIMESTAMPS(false),
-
-    /**
-     * Feature that determines whether date/date-time values should be serialized
-     * so that they include timezone id, in cases where type itself contains
-     * timezone information. Including this information may lead to compatibility
-     * issues because ISO-8601 specification does not define formats that include
-     * such information.
-     *<p>
-     * If enabled, Timezone id should be included using format specified
-     * with Java 8 <code>DateTimeFormatter#ISO_ZONED_DATE_TIME</code> definition
-     * (for example, '2011-12-03T10:15:30+01:00[Europe/Paris]').
-     *<p>
-     * Note: setting has no relevance if date/time values are serialized as timestamps.
-     *<p>
-     * Feature is disabled by default, so that zone id is NOT included; rather, timezone
-     * offset is used for ISO-8601 compatibility (if any timezone information is
-     * included in value).
-     */
-    WRITE_DATES_WITH_ZONE_ID(false), 
-
-    /**
-     * Feature that determines whether timezone/offset included in zoned date/time
-     * values (note: does NOT {@link java.util.Date} will be overridden if there
-     * is an explicitly set context time zone.
-     * If disabled, timezone/offset value is used-is; if enabled, context time zone
-     * is used instead.
-     *<p>
-     * Note that this setting only affects "Zoned" date/time values of
-     * {@code Java 8 date/time} types -- it will have no effect on old
-     * {@link java.util} value handling (of which {@link java.util.Date} has no timezone
-     * information and must use contextual timezone, implicit or explicit; and
-     * {@link java.util.Calendar} which will always use timezone Calendar value has).
-     * Setting is also ignored by Joda date/time values.
-     *<p>
-     * Featured is enabled by default for backwards-compatibility purposes (in
-     * Jackson 2.12 override was always done if there was explicitly defined timezone).
-     *
-     * @since 2.13
-     */
-    WRITE_DATES_WITH_CONTEXT_TIME_ZONE(true),
-
-    /**
-     * Feature that determines whether time values that represents time periods
-     * (durations, periods, ranges) are to be serialized by default using
-     * a numeric (true) or textual (false) representations. Note that numeric
-     * representation may mean either simple number, or an array of numbers,
-     * depending on type.
-     *<p>
-     * Note: whether {@link java.util.Map} keys are serialized as Strings
-     * or not is controlled using {@link #WRITE_DATE_KEYS_AS_TIMESTAMPS}.
-     *<p>
-     * Feature is enabled by default, so that period/duration are by default
-     * serialized as timestamps.
-     */
-    WRITE_DURATIONS_AS_TIMESTAMPS(true),
-    
-    /**
      * Feature that determines how type <code>char[]</code> is serialized:
      * when enabled, will be serialized as an explict JSON array (with
      * single-character Strings as values); when disabled, defaults to
@@ -268,48 +180,6 @@ public enum SerializationFeature implements ConfigFeature
      * Feature is disabled by default.
      */
     WRITE_CHAR_ARRAYS_AS_JSON_ARRAYS(false),
-
-    /**
-     * Feature that determines standard serialization mechanism used for
-     * Enum values: if enabled, return value of <code>Enum.toString()</code>
-     * is used; if disabled, return value of <code>Enum.name()</code> is used.
-     *<p>
-     * Note: this feature should usually have same value
-     * as {@link DeserializationFeature#READ_ENUMS_USING_TO_STRING}.
-     *<p>
-     * Feature is disabled by default.
-     */
-    WRITE_ENUMS_USING_TO_STRING(false),
-
-    /**
-     * Feature that determines whether Java Enum values are serialized
-     * as numbers (true), or textual values (false). If textual values are
-     * used, other settings are also considered.
-     * If this feature is enabled,
-     *  return value of <code>Enum.ordinal()</code>
-     * (an integer) will be used as the serialization.
-     *<p>
-     * Note that this feature has precedence over {@link #WRITE_ENUMS_USING_TO_STRING},
-     * which is only considered if this feature is set to false.
-     *<p>
-     * Note that since 2.10, this does NOT apply to {@link Enum}s written as
-     * keys of {@link java.util.Map} values, which has separate setting,
-     * {@link #WRITE_ENUM_KEYS_USING_INDEX}.
-     *<p>
-     * Feature is disabled by default.
-     */
-    WRITE_ENUMS_USING_INDEX(false),
-
-    /**
-     * Feature that determines whether {link Enum}s
-     * used as {@link java.util.Map} keys are serialized
-     * as using {@link Enum#ordinal()} or not.
-     * Similar to {@link #WRITE_ENUMS_USING_INDEX} used when writing
-     * {@link Enum}s as regular values.
-     *<p>
-     * Feature is disabled by default.
-     */
-    WRITE_ENUM_KEYS_USING_INDEX(false),
 
     /**
      * Feature that determines whether Container properties (POJO properties
@@ -324,17 +194,18 @@ public enum SerializationFeature implements ConfigFeature
      * dynamically changed on per-call basis, because its effect is considered during
      * construction of serializers and property handlers.
      *<p>
-     * Feature is enabled by default.
-     *
-     * @deprecated Since 2.8 there are better mechanism for specifying filtering; specifically
+     * NOTE: Since 2.8 there are better mechanism for specifying filtering; specifically
      *   using {@link com.fasterxml.jackson.annotation.JsonInclude} or configuration overrides.
+     *  This feature was deprecated from 2.8 through to 2.20 but no longer deprecated
+     *  since 2.21 / 3.0.
+     *<p>
+     * Feature is enabled by default.
      */
-    @Deprecated // since 2.8
     WRITE_EMPTY_JSON_ARRAYS(true),
 
     /**
-     * Feature added for interoperability, to work with oddities of
-     * so-called "BadgerFish" convention.
+     * Feature added for inter-operability (originally to work with oddities of
+     * so-called "BadgerFish" convention).
      * Feature determines handling of single element {@link java.util.Collection}s
      * and arrays: if enabled, {@link java.util.Collection}s and arrays that contain exactly
      * one element will be serialized as if that element itself was serialized.
@@ -356,21 +227,6 @@ public enum SerializationFeature implements ConfigFeature
     WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED(false),
 
     /**
-     * Feature that controls whether numeric timestamp values are
-     * to be written using nanosecond timestamps (enabled) or not (disabled);
-     * <b>if and only if</b> datatype supports such resolution.
-     * Only newer datatypes (such as Java8 Date/Time) support such resolution --
-     * older types (pre-Java8 <b>java.util.Date</b> etc) and Joda do not --
-     * and this setting <b>has no effect</b> on such types.
-     *<p>
-     * If disabled, standard millisecond timestamps are assumed.
-     * This is the counterpart to {@link DeserializationFeature#READ_DATE_TIMESTAMPS_AS_NANOSECONDS}.
-     *<p>
-     * Feature is enabled by default, to support most accurate time values possible.
-     */
-    WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS(true),
-
-    /**
      * Feature that determines whether {@link java.util.Map} entries are first
      * sorted by key before serialization or not: if enabled, additional sorting
      * step is performed if necessary (not necessary for {@link java.util.SortedMap}s),
@@ -379,6 +235,21 @@ public enum SerializationFeature implements ConfigFeature
      * Feature is disabled by default.
      */
     ORDER_MAP_ENTRIES_BY_KEYS(false),
+
+    /**
+     * Feature that determines whether to intentionally fail when the mapper attempts to
+     * order map entries with incomparable keys by accessing the first key of the map.
+     * So depending on the Map implementation, this may not be the same key every time.
+     * <p>
+     * If enabled, will simply fail by throwing an exception.
+     * If disabled, will not throw an exception and instead simply return the original map.
+     * <p>
+     * Note that this feature will apply only when configured to order map entries by keys, either
+     * through annotation or enabling {@link #ORDER_MAP_ENTRIES_BY_KEYS}.
+     * <p>
+     * Feature is disabled by default.
+     */
+    FAIL_ON_ORDER_MAP_BY_INCOMPARABLE_KEY(false),
 
     /*
     /**********************************************************************
@@ -422,7 +293,7 @@ public enum SerializationFeature implements ConfigFeature
 
     private final boolean _defaultState;
     private final int _mask;
-    
+
     private SerializationFeature(boolean defaultState) {
         _defaultState = defaultState;
         _mask = (1 << ordinal());

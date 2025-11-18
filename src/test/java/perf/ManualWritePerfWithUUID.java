@@ -3,7 +3,7 @@ package perf;
 import java.util.UUID;
 
 import tools.jackson.core.JsonGenerator;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.ser.std.StdScalarSerializer;
@@ -13,7 +13,7 @@ public class ManualWritePerfWithUUID
 {
     @Override
     protected int targetSizeMegs() { return 10; }
-    
+
     public static void main(String[] args) throws Exception
     {
         if (args.length != 0) {
@@ -41,7 +41,7 @@ class UUIDSlow
 {
     @JsonSerialize(contentUsing=SlowSer.class)
     public final UUID[] values;
-    
+
     public UUIDSlow(UUID[] v) { values = v; }
 }
 
@@ -51,7 +51,7 @@ class SlowSer extends StdScalarSerializer<UUID>
 
     @Override
     public void serialize(UUID value, JsonGenerator jgen,
-            SerializerProvider provider) {
+            SerializationContext provider) {
         jgen.writeString(value.toString());
     }
 }

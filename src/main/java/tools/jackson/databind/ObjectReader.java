@@ -1,14 +1,13 @@
 package tools.jackson.databind;
 
 import java.io.*;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import tools.jackson.core.*;
-import tools.jackson.core.exc.WrappedIOException;
+import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.filter.FilteringParserDelegate;
 import tools.jackson.core.filter.JsonPointerBasedFilter;
 import tools.jackson.core.filter.TokenFilter;
@@ -27,6 +26,7 @@ import tools.jackson.databind.node.TreeTraversingParser;
 import tools.jackson.databind.type.SimpleType;
 import tools.jackson.databind.type.TypeFactory;
 import tools.jackson.databind.util.ClassUtil;
+import tools.jackson.databind.util.TokenBuffer;
 
 /**
  * Builder object that can be used for per-serialization configuration of
@@ -81,7 +81,7 @@ public class ObjectReader
     protected final boolean _unwrapRoot;
 
     /**
-     * Filter to be consider for JsonParser.  
+     * Filter to be consider for JsonParser.
      * Default value to be null as filter not considered.
      */
     private final TokenFilter _filter;
@@ -109,7 +109,7 @@ public class ObjectReader
      * performance a bit on cases where readers are reused.
      */
     protected final ValueDeserializer<Object> _rootDeserializer;
-    
+
     /**
      * Instance to update with data binding; if any. If null,
      * a new instance is created, if non-null, properties of
@@ -177,7 +177,7 @@ public class ObjectReader
         _rootDeserializer = _prefetchRootDeserializer(valueType);
         _filter = null;
     }
-    
+
     /**
      * Copy constructor used for building variations.
      */
@@ -233,7 +233,7 @@ public class ObjectReader
         _unwrapRoot = base._unwrapRoot;
         _filter = filter;
     }
-    
+
     /**
      * Method that will return version information stored in and read from jar
      * that contains this class.
@@ -338,7 +338,7 @@ public class ObjectReader
             DeserializationFeature... other)
     {
         return _with(_config.with(first, other));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
@@ -346,14 +346,14 @@ public class ObjectReader
      */
     public ObjectReader withFeatures(DeserializationFeature... features) {
         return _with(_config.withFeatures(features));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
      * with specified feature disabled.
      */
     public ObjectReader without(DeserializationFeature feature) {
-        return _with(_config.without(feature)); 
+        return _with(_config.without(feature));
     }
 
     /**
@@ -363,7 +363,7 @@ public class ObjectReader
     public ObjectReader without(DeserializationFeature first,
             DeserializationFeature... other) {
         return _with(_config.without(first, other));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
@@ -371,7 +371,7 @@ public class ObjectReader
      */
     public ObjectReader withoutFeatures(DeserializationFeature... features) {
         return _with(_config.withoutFeatures(features));
-    }    
+    }
 
     /*
     /**********************************************************************
@@ -400,7 +400,7 @@ public class ObjectReader
      * with specified feature disabled.
      */
     public ObjectReader without(DatatypeFeature feature) {
-        return _with(_config.without(feature)); 
+        return _with(_config.without(feature));
     }
 
     /**
@@ -409,7 +409,7 @@ public class ObjectReader
      */
     public ObjectReader withoutFeatures(DatatypeFeature... features) {
         return _with(_config.withoutFeatures(features));
-    }    
+    }
 
     /*
     /**********************************************************
@@ -431,14 +431,14 @@ public class ObjectReader
      */
     public ObjectReader withFeatures(StreamReadFeature... features) {
         return _with(_config.withFeatures(features));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
      * with specified feature disabled.
      */
     public ObjectReader without(StreamReadFeature feature) {
-        return _with(_config.without(feature)); 
+        return _with(_config.without(feature));
     }
 
     /**
@@ -469,14 +469,14 @@ public class ObjectReader
      */
     public ObjectReader withFeatures(FormatFeature... features) {
         return _with(_config.withFeatures(features));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
      * with specified feature disabled.
      */
     public ObjectReader without(FormatFeature feature) {
-        return _with(_config.without(feature)); 
+        return _with(_config.without(feature));
     }
 
     /**
@@ -486,7 +486,7 @@ public class ObjectReader
     public ObjectReader withoutFeatures(FormatFeature... features) {
         return _with(_config.withoutFeatures(features));
     }
-    
+
     /*
     /**********************************************************************
     /* Life-cycle, fluent factory methods, other
@@ -494,8 +494,8 @@ public class ObjectReader
      */
 
     /**
-     * Convenience method to bind from {@link JsonPointer}.  
-     * {@link JsonPointerBasedFilter} is registered and will be used for parsing later. 
+     * Convenience method to bind from {@link JsonPointer}.
+     * {@link JsonPointerBasedFilter} is registered and will be used for parsing later.
      */
     public ObjectReader at(String pointerExpr) {
         _assertNotNull("pointerExpr", pointerExpr);
@@ -520,7 +520,7 @@ public class ObjectReader
      */
     public ObjectReader with(DeserializationConfig config) {
         return _with(config);
-    }    
+    }
 
     /**
      * Method for constructing a new instance with configuration that uses
@@ -567,7 +567,7 @@ public class ObjectReader
     public ObjectReader withRootName(PropertyName rootName) {
         return _with(_config.withRootName(rootName));
     }
-    
+
     /**
      * Convenience method that is same as calling:
      *<code>
@@ -579,7 +579,7 @@ public class ObjectReader
     public ObjectReader withoutRootName() {
         return _with(_config.withRootName(PropertyName.NO_NAME));
     }
-    
+
     /**
      * Method for constructing a new instance with configuration that
      * passes specified {@link FormatSchema} to {@link JsonParser} that
@@ -602,7 +602,7 @@ public class ObjectReader
      * Method for constructing a new reader instance that is configured
      * to data bind into specified type.
      *<p>
-     * Note that the method does NOT change state of this reader, but
+     * Note that the method does not change state of this reader, but
      * rather construct and returns a newly configured instance.
      */
     public ObjectReader forType(JavaType valueType)
@@ -613,24 +613,24 @@ public class ObjectReader
         ValueDeserializer<Object> rootDeser = _prefetchRootDeserializer(valueType);
         return _new(this, _config, valueType, rootDeser,
                 _valueToUpdate, _schema, _injectableValues);
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
      * to data bind into specified type.
      *<p>
-     * Note that the method does NOT change state of this reader, but
+     * Note that the method does not change state of this reader, but
      * rather construct and returns a newly configured instance.
      */
     public ObjectReader forType(Class<?> valueType) {
         return forType(_config.constructType(valueType));
-    }    
+    }
 
     /**
      * Method for constructing a new reader instance that is configured
      * to data bind into specified type.
      *<p>
-     * Note that the method does NOT change state of this reader, but
+     * Note that the method does not change state of this reader, but
      * rather construct and returns a newly configured instance.
      */
     public ObjectReader forType(TypeReference<?> valueTypeRef) {
@@ -639,7 +639,7 @@ public class ObjectReader
 
     /**
      * Method for constructing a new instance with configuration that
-     * updates passed Object (as root value), instead of constructing 
+     * updates passed Object (as root value), instead of constructing
      * a new value.
      *<p>
      * Note that the method does NOT change state of this reader, but
@@ -655,7 +655,7 @@ public class ObjectReader
                     _schema, _injectableValues);
         }
         JavaType t;
-        
+
         /* no real benefit from pre-fetching, as updating readers are much
          * less likely to be reused, and value type may also be forced
          * with a later chained call...
@@ -728,7 +728,7 @@ public class ObjectReader
     /* Internal factory methods
     /**********************************************************************
      */
-    
+
     protected final ObjectReader _with(DeserializationConfig newConfig) {
         if (newConfig == _config) {
             return this;
@@ -741,7 +741,7 @@ public class ObjectReader
     /* Simple accessors
     /**********************************************************************
      */
-    
+
     public boolean isEnabled(DeserializationFeature f) {
         return _config.isEnabled(f);
     }
@@ -826,20 +826,6 @@ public class ObjectReader
      * @since 3.0
      */
     public JsonParser createParser(Path src) throws JacksonException {
-        _assertNotNull("src", src);
-        DeserializationContextExt ctxt = _deserializationContext();
-        return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
-    }
-
-    /**
-     * Factory method for constructing {@link JsonParser} that is properly
-     * wired to allow callbacks for deserialization: basically
-     * constructs a {@link ObjectReadContext} and then calls
-     * {@link TokenStreamFactory#createParser(ObjectReadContext,java.net.URL)}.
-     *
-     * @since 3.0
-     */
-    public JsonParser createParser(URL src) throws JacksonException {
         _assertNotNull("src", src);
         DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createParser(ctxt, src));
@@ -961,13 +947,26 @@ public class ObjectReader
      * Factory method for constructing non-blocking {@link JsonParser} that is properly
      * wired to allow configuration access (and, if relevant for parser, callbacks):
      * essentially constructs a {@link ObjectReadContext} and then calls
-     * {@link TokenStreamFactory#createParser(ObjectReadContext,DataInput)}.
+     * {@link TokenStreamFactory#createNonBlockingByteArrayParser(ObjectReadContext)}.
      *
      * @since 3.0
      */
     public JsonParser createNonBlockingByteArrayParser() throws JacksonException {
         DeserializationContextExt ctxt = _deserializationContext();
         return ctxt.assignAndReturnParser(_parserFactory.createNonBlockingByteArrayParser(ctxt));
+    }
+
+    /**
+     * Factory method for constructing non-blocking {@link JsonParser} that is properly
+     * wired to allow configuration access (and, if relevant for parser, callbacks):
+     * essentially constructs a {@link ObjectReadContext} and then calls
+     * {@link TokenStreamFactory#createNonBlockingByteBufferParser(ObjectReadContext)}.
+     *
+     * @since 3.0
+     */
+    public JsonParser createNonBlockingByteBufferParser() throws JacksonException {
+        DeserializationContextExt ctxt = _deserializationContext();
+        return ctxt.assignAndReturnParser(_parserFactory.createNonBlockingByteBufferParser(ctxt));
     }
 
     /*
@@ -993,7 +992,7 @@ public class ObjectReader
 
     @Override
     public JsonNode stringNode(String text) {
-        return _config.getNodeFactory().textNode(text);
+        return _config.getNodeFactory().stringNode(text);
     }
 
     @Override
@@ -1005,7 +1004,7 @@ public class ObjectReader
     public JsonNode nullNode() {
         return _config.getNodeFactory().nullNode();
     }
-    
+
     @Override
     public JsonParser treeAsTokens(TreeNode n) {
         _assertNotNull("n", n);
@@ -1267,8 +1266,6 @@ public class ObjectReader
      * was specified with {@link #withValueToUpdate(Object)}.
      *
      * @param path Path that contains content to read
-     *
-     * @since 3.0
      */
     @SuppressWarnings("unchecked")
     public <T> T readValue(Path path) throws JacksonException
@@ -1277,28 +1274,6 @@ public class ObjectReader
         DeserializationContextExt ctxt = _deserializationContext();
         return (T) _bindAndClose(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, path), false));
-    }
-
-    /**
-     * Method that binds content read from given input source,
-     * using configuration of this reader.
-     * Value return is either newly constructed, or root value that
-     * was specified with {@link #withValueToUpdate(Object)}.
-     *<p>
-     *<p>
-     * NOTE: handling of {@link java.net.URL} is delegated to
-     * {@link TokenStreamFactory#createParser(ObjectReadContext, java.net.URL)} and usually simply
-     * calls {@link java.net.URL#openStream()}, meaning no special handling
-     * is done. If different HTTP connection options are needed you will need
-     * to create {@link java.io.InputStream} separately.
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T readValue(URL url) throws JacksonException
-    {
-        _assertNotNull("src", url);
-        DeserializationContextExt ctxt = _deserializationContext();
-        return (T) _bindAndClose(ctxt,
-                _considerFilter(_parserFactory.createParser(ctxt, url), false));
     }
 
     /**
@@ -1328,12 +1303,29 @@ public class ObjectReader
                 _considerFilter(_parserFactory.createParser(ctxt, input), false));
     }
 
+    /**
+     * Method that binds content read from given {@link TokenBuffer}
+     * using configuration of this reader.
+     * Value return is either newly constructed, or root value that
+     * was specified with {@link #withValueToUpdate(Object)}.
+     *
+     * @param src {@link TokenBuffer} that contains content to read
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T readValue(TokenBuffer src) throws JacksonException
+    {
+        _assertNotNull("src", src);
+        DeserializationContextExt ctxt = _deserializationContext();
+        return (T) _bindAndClose(ctxt,
+                _considerFilter(src.asParser(ctxt) , false));
+    }
+
     /*
     /**********************************************************************
     /* Deserialization methods; JsonNode ("tree")
     /**********************************************************************
      */
-    
+
     /**
      * Method that reads content from given input source,
      * using configuration of this reader, and binds it as JSON Tree.
@@ -1358,7 +1350,7 @@ public class ObjectReader
         return _bindAndCloseAsTree(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), false));
     }
-    
+
     /**
      * Same as {@link #readTree(InputStream)} except content accessed through
      * passed-in {@link Reader}
@@ -1419,12 +1411,24 @@ public class ObjectReader
                 _considerFilter(_parserFactory.createParser(ctxt, content), false));
     }
 
+    /**
+     * Same as {@link #readTree(InputStream)} except content read using
+     * passed-in {@link TokenBuffer}.
+     */
+    public JsonNode readTree(TokenBuffer src) throws JacksonException
+    {
+        _assertNotNull("src", src);
+        DeserializationContextExt ctxt = _deserializationContext();
+        return _bindAndCloseAsTree(ctxt,
+                _considerFilter(src.asParser(ctxt), false));
+    }
+
     /*
     /**********************************************************************
     /* Deserialization methods; reading sequence of values
     /**********************************************************************
      */
-    
+
     /**
      * Method for reading sequence of Objects from parser stream.
      *<p>
@@ -1444,7 +1448,7 @@ public class ObjectReader
         // false -> do not close as caller gave parser instance
         return _newIterator(p, ctxt, _findRootDeserializer(ctxt), false);
     }
-    
+
     /**
      * Method for reading sequence of Objects from parser stream.
      *<p>
@@ -1472,7 +1476,7 @@ public class ObjectReader
         return _bindAndReadValues(ctxt,
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
-    
+
     /**
      * Overloaded version of {@link #readValue(InputStream)}.
      */
@@ -1486,10 +1490,10 @@ public class ObjectReader
         p.nextToken();
         return _newIterator(p, ctxt, _findRootDeserializer(ctxt), true);
     }
-    
+
     /**
      * Overloaded version of {@link #readValue(InputStream)}.
-     * 
+     *
      * @param content String that contains JSON content to parse
      */
     @SuppressWarnings("resource")
@@ -1546,25 +1550,6 @@ public class ObjectReader
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
 
-    /**
-     * Overloaded version of {@link #readValue(InputStream)}.
-     *<p>
-     * NOTE: handling of {@link java.net.URL} is delegated to
-     * {@link TokenStreamFactory#createParser(ObjectReadContext, java.net.URL)} and usually simply
-     * calls {@link java.net.URL#openStream()}, meaning no special handling
-     * is done. If different HTTP connection options are needed you will need
-     * to create {@link java.io.InputStream} separately.
-     * 
-     * @param src URL to read to access JSON content to parse.
-     */
-    public <T> MappingIterator<T> readValues(URL src) throws JacksonException
-    {
-        _assertNotNull("src", src);
-        DeserializationContextExt ctxt = _deserializationContext();
-        return _bindAndReadValues(ctxt,
-                _considerFilter(_parserFactory.createParser(ctxt, src), true));
-    }
-
     public <T> MappingIterator<T> readValues(DataInput src) throws JacksonException
     {
         _assertNotNull("src", src);
@@ -1573,9 +1558,17 @@ public class ObjectReader
                 _considerFilter(_parserFactory.createParser(ctxt, src), true));
     }
 
+    public <T> MappingIterator<T> readValues(TokenBuffer src) throws JacksonException
+    {
+        _assertNotNull("src", src);
+        DeserializationContextExt ctxt = _deserializationContext();
+        return _bindAndReadValues(ctxt,
+                _considerFilter(src.asParser(ctxt), true));
+    }
+
     /*
     /**********************************************************************
-    /* Implementation of rest of ObjectCodec methods
+    /* Misc conversion methods
     /**********************************************************************
      */
 
@@ -1618,6 +1611,9 @@ public class ObjectReader
             }
         } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
             result = valueToUpdate;
+        } else if (t == JsonToken.NOT_AVAILABLE) {
+            // 28-Jan-2025, tatu: [databind#4932] Need to handle this case too
+            result = valueToUpdate;
         } else { // pointing to event other than null
             result = ctxt.readRootValue(p, _valueType, _findRootDeserializer(ctxt), _valueToUpdate);
         }
@@ -1642,6 +1638,9 @@ public class ObjectReader
                     result = _valueToUpdate;
                 }
             } else if (t == JsonToken.END_ARRAY || t == JsonToken.END_OBJECT) {
+                result = _valueToUpdate;
+            } else if (t == JsonToken.NOT_AVAILABLE) {
+                // 28-Jan-2025, tatu: [databind#4932] Need to handle this case too
                 result = _valueToUpdate;
             } else {
                 result = ctxt.readRootValue(p, _valueType, _findRootDeserializer(ctxt), _valueToUpdate);
@@ -1730,7 +1729,7 @@ public class ObjectReader
         }
         return resultNode;
     }
-    
+
     protected <T> MappingIterator<T> _bindAndReadValues(DeserializationContextExt ctxt,
             JsonParser p) throws JacksonException
     {
@@ -1740,7 +1739,7 @@ public class ObjectReader
     }
 
     /**
-     * Consider filter when creating JsonParser.  
+     * Consider filter when creating JsonParser.
      */
     protected JsonParser _considerFilter(final JsonParser p, boolean multiValue) {
         // 26-Mar-2016, tatu: Need to allow multiple-matches at least if we have
@@ -1795,19 +1794,11 @@ public class ObjectReader
                 .assignParser(p);
     }
 
-    protected InputStream _inputStream(URL src) throws JacksonException {
-        try {
-            return src.openStream();
-        } catch (IOException e) {
-            throw WrappedIOException.construct(e);
-        }
-    }
-
     protected InputStream _inputStream(File f) throws JacksonException {
         try {
             return new FileInputStream(f);
         } catch (IOException e) {
-            throw WrappedIOException.construct(e);
+            throw JacksonIOException.construct(e);
         }
     }
 
@@ -1815,7 +1806,7 @@ public class ObjectReader
         try {
             return Files.newInputStream(path);
         } catch (IOException e) {
-            throw WrappedIOException.construct(e);
+            throw JacksonIOException.construct(e);
         }
     }
 
@@ -1830,7 +1821,7 @@ public class ObjectReader
     /* Helper methods, locating deserializers etc
     /**********************************************************************
      */
-    
+
     /**
      * Method called to locate deserializer for the passed root-level value.
      */

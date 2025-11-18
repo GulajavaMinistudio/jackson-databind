@@ -2,13 +2,19 @@ package tools.jackson.databind.deser.creators;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.*;
-import tools.jackson.databind.exc.ValueInstantiationException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class NullValueViaCreatorTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class NullValueViaCreatorTest
+    extends DatabindTestUtil
 {
     protected static class Container {
         Contained<String> contained;
@@ -40,7 +46,7 @@ public class NullValueViaCreatorTest extends BaseMapTest
     protected static class ContainerDeserializerResolver extends Deserializers.Base {
         @Override
         public ValueDeserializer<?> findBeanDeserializer(JavaType type,
-                DeserializationConfig config, BeanDescription beanDesc)
+                DeserializationConfig config, BeanDescription.Supplier beanDescRef)
         {
             if (!Contained.class.isAssignableFrom(type.getRawClass())) {
                 return null;
@@ -99,6 +105,7 @@ public class NullValueViaCreatorTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testUsesDeserializersNullValue() throws Exception {
         ObjectMapper mapper = jsonMapperBuilder()
                 .addModule(new TestModule())
@@ -108,15 +115,13 @@ public class NullValueViaCreatorTest extends BaseMapTest
     }
 
     // [databind#597]: ensure that a useful exception is thrown
+    @Test
     public void testCreatorReturningNull()
     {
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = newJsonMapper();
+
         String json = "{ \"type\" : \"     \", \"id\" : \"000c0ffb-a0d6-4d2e-a379-4aeaaf283599\" }";
-        try {
-            objectMapper.readValue(json, JsonEntity.class);
-            fail("Should not have succeeded");
-        } catch (ValueInstantiationException e) {
-            verifyException(e, "JSON creator returned null");
-        }
-    }    
+
+        assertNull(objectMapper.readValue(json, JsonEntity.class));
+    }
 }

@@ -3,20 +3,25 @@ package tools.jackson.databind.node;
 import java.io.*;
 import java.util.*;
 
-import tools.jackson.core.*;
+import org.junit.jupiter.api.Test;
 
+import tools.jackson.core.*;
 import tools.jackson.databind.*;
-import tools.jackson.databind.node.TestTreeDeserialization.Bean;
+import tools.jackson.databind.node.TreeDeserializationTest.Bean;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * This unit test suite tries to verify that ObjectMapper
  * can properly parse JSON and bind contents into appropriate
  * JsonNode instances.
  */
-public class TreeReadViaMapperTest extends BaseMapTest
+public class TreeReadViaMapperTest extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = objectMapper();
 
+    @Test
     public void testSimple() throws Exception
     {
         final String JSON = SAMPLE_DOC_JSON_SPEC;
@@ -33,13 +38,13 @@ public class TreeReadViaMapperTest extends BaseMapTest
             assertType(result, ObjectNode.class);
             assertEquals(1, result.size());
             assertTrue(result.isObject());
-            
+
             ObjectNode main = (ObjectNode) result;
-            assertEquals("Image", main.propertyNames().next());
-            JsonNode ob = main.elements().next();
+            assertEquals("Image", main.propertyNames().iterator().next());
+            JsonNode ob = main.values().iterator().next();
             assertType(ob, ObjectNode.class);
             ObjectNode imageMap = (ObjectNode) ob;
-            
+
             assertEquals(5, imageMap.size());
             ob = imageMap.get("Width");
             assertTrue(ob.isIntegralNumber());
@@ -48,29 +53,29 @@ public class TreeReadViaMapperTest extends BaseMapTest
             ob = imageMap.get("Height");
             assertTrue(ob.isIntegralNumber());
             assertEquals(SAMPLE_SPEC_VALUE_HEIGHT, ob.intValue());
-            
+
             ob = imageMap.get("Title");
-            assertTrue(ob.isTextual());
-            assertEquals(SAMPLE_SPEC_VALUE_TITLE, ob.textValue());
-            
+            assertTrue(ob.isString());
+            assertEquals(SAMPLE_SPEC_VALUE_TITLE, ob.stringValue());
+
             ob = imageMap.get("Thumbnail");
             assertType(ob, ObjectNode.class);
             ObjectNode tn = (ObjectNode) ob;
             ob = tn.get("Url");
-            assertTrue(ob.isTextual());
-            assertEquals(SAMPLE_SPEC_VALUE_TN_URL, ob.textValue());
+            assertTrue(ob.isString());
+            assertEquals(SAMPLE_SPEC_VALUE_TN_URL, ob.stringValue());
             ob = tn.get("Height");
             assertTrue(ob.isIntegralNumber());
             assertEquals(SAMPLE_SPEC_VALUE_TN_HEIGHT, ob.intValue());
             ob = tn.get("Width");
-            assertTrue(ob.isTextual());
-            assertEquals(SAMPLE_SPEC_VALUE_TN_WIDTH, ob.textValue());
-            
+            assertTrue(ob.isString());
+            assertEquals(SAMPLE_SPEC_VALUE_TN_WIDTH, ob.stringValue());
+
             ob = imageMap.get("IDs");
             assertTrue(ob.isArray());
             ArrayNode idList = (ArrayNode) ob;
             assertEquals(4, idList.size());
-            assertEquals(4, calcLength(idList.elements()));
+            assertEquals(4, idList.values().size());
             assertEquals(4, calcLength(idList.iterator()));
             {
                 int[] values = new int[] {
@@ -91,6 +96,7 @@ public class TreeReadViaMapperTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testMixed() throws IOException
     {
         String JSON = "{\"node\" : { \"a\" : 3 }, \"x\" : 9 }";
@@ -108,6 +114,7 @@ public class TreeReadViaMapperTest extends BaseMapTest
      * Type mappers should be able to gracefully deal with end of
      * input.
      */
+    @Test
     public void testEOF() throws Exception
     {
         String JSON =
@@ -125,6 +132,7 @@ public class TreeReadViaMapperTest extends BaseMapTest
         p.close();
     }
 
+    @Test
     public void testNullViaParser() throws Exception
     {
         final String JSON = " null ";
@@ -135,23 +143,26 @@ public class TreeReadViaMapperTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testMultiple() throws Exception
     {
-        final ObjectMapper mapper = objectMapper();
+        ObjectMapper mapper = jsonMapperBuilder()
+                .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
         String JSON = "12  \"string\" [ 1, 2, 3 ]";
-        JsonParser p = mapper.createParser(new StringReader(JSON));
+        JsonParser p = mapper.createParser(JSON);
         JsonNode result = mapper.readTree(p);
 
         assertTrue(result.isIntegralNumber());
         assertTrue(result.isInt());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
         assertEquals(12, result.intValue());
 
         result = mapper.readTree(p);
-        assertTrue(result.isTextual());
+        assertTrue(result.isString());
         assertFalse(result.isIntegralNumber());
         assertFalse(result.isInt());
-        assertEquals("string", result.textValue());
+        assertEquals("string", result.stringValue());
 
         result = mapper.readTree(p);
         assertTrue(result.isArray());

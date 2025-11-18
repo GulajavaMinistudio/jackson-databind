@@ -44,7 +44,7 @@ public class BeanSerializer
     {
         super(type, builder, properties, filteredProperties);
     }
-    
+
     /**
      * Alternate copy constructor that can be used to construct
      * standard {@link BeanSerializer} passing an instance of
@@ -68,7 +68,6 @@ public class BeanSerializer
         super(src, toIgnore, toInclude);
     }
 
-    // @since 2.11.1
     protected BeanSerializer(BeanSerializerBase src,
             BeanPropertyWriter[] properties, BeanPropertyWriter[] filteredProperties) {
         super(src, properties, filteredProperties);
@@ -115,6 +114,11 @@ public class BeanSerializer
         return new BeanSerializer(this, properties, filteredProperties);
     }
 
+    @Override
+    public ValueSerializer<?> withIgnoredProperties(Set<String> toIgnore) {
+        return new BeanSerializer(this, toIgnore, null);
+    }
+
     /**
      * Implementation has to check whether as-array serialization
      * is possible reliably; if (and only if) so, will construct
@@ -127,7 +131,7 @@ public class BeanSerializer
         if (canCreateArraySerializer()) {
             return BeanAsArraySerializer.construct(this);
         }
-        // already is one, so:
+        // cannot change so jus use this one
         return this;
     }
 
@@ -143,7 +147,7 @@ public class BeanSerializer
      * {@link BeanPropertyWriter} instances.
      */
     @Override
-    public final void serialize(Object bean, JsonGenerator gen, SerializerProvider provider)
+    public void serialize(Object bean, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         if (_objectIdWriter != null) {

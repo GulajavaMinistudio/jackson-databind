@@ -20,7 +20,7 @@ class InternalNodeSerializer
 
     private final static ObjectWriter COMPACT_WRITER = MAPPER.writer();
     private final static ObjectWriter PRETTY_WRITER = MAPPER.writerWithDefaultPrettyPrinter();
-    
+
     private static JacksonSerializable _wrapper(BaseJsonNode root) {
         return new WrapperForSerializer(root);
     }
@@ -43,21 +43,21 @@ class InternalNodeSerializer
         protected final BaseJsonNode _root;
 
         // Non-final as passed when `serialize()` is called
-        protected SerializerProvider _context;
+        protected SerializationContext _context;
 
         public WrapperForSerializer(BaseJsonNode root) {
             _root = root;
         }
 
         @Override
-        public void serialize(JsonGenerator g, SerializerProvider ctxt) throws JacksonException
+        public void serialize(JsonGenerator g, SerializationContext ctxt) throws JacksonException
         {
             _context = ctxt;
             _serializeNonRecursive(g, _root);
         }
 
         @Override
-        public void serializeWithType(JsonGenerator gen, SerializerProvider serializers,
+        public void serializeWithType(JsonGenerator gen, SerializationContext serializers,
                 TypeSerializer typeSer) throws JacksonException
         {
             // Should not really be called given usage, so
@@ -69,10 +69,10 @@ class InternalNodeSerializer
         {
             if (node instanceof ObjectNode) {
                 g.writeStartObject(this, node.size());
-                _serializeNonRecursive(g, new IteratorStack(), node.fields());
+                _serializeNonRecursive(g, new IteratorStack(), node.properties().iterator());
             } else if (node instanceof ArrayNode) {
                 g.writeStartArray(this, node.size());
-                _serializeNonRecursive(g, new IteratorStack(), node.elements());
+                _serializeNonRecursive(g, new IteratorStack(), node.iterator());
             } else {
                 node.serialize(g, _context);
             }
@@ -100,12 +100,20 @@ class InternalNodeSerializer
                     }
                     if (value instanceof ObjectNode) {
                         stack.push(currIt);
-                        currIt = value.fields();
+                        currIt = value.properties().iterator();
                         g.writeStartObject(value, value.size());
                     } else if (value instanceof ArrayNode) {
                         stack.push(currIt);
-                        currIt = value.elements();
+                        currIt = value.iterator();
                         g.writeStartArray(value, value.size());
+                    } else if (value instanceof POJONode) {
+                        // [databind#3262] Problematic case, try to handle
+                        try {
+                            value.serialize(g, _context);
+                        } catch (JacksonException e) {
+                            g.writeString(String.format("[ERROR: (%s) %s]",
+                                    e.getClass().getName(), e.getMessage()));
+                        }
                     } else {
                         value.serialize(g, _context);
                     }

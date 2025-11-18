@@ -1,25 +1,29 @@
 package tools.jackson.databind.deser.creators;
 
 import java.math.BigDecimal;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.deser.Deserializers;
 import tools.jackson.databind.deser.jdk.EnumDeserializer;
 import tools.jackson.databind.exc.ValueInstantiationException;
 import tools.jackson.databind.introspect.AnnotatedMethod;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class EnumCreatorTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class EnumCreatorTest extends DatabindTestUtil
 {
     protected enum EnumWithCreator {
         A, B;
@@ -46,13 +50,13 @@ public class EnumCreatorTest extends BaseMapTest
     protected enum TestEnumFromInt
     {
         ENUM_A(1), ENUM_B(2), ENUM_C(3);
-        
+
         private final int id;
-        
+
         private TestEnumFromInt(int id) {
             this.id = id;
         }
-        
+
         @JsonCreator public static TestEnumFromInt fromId(int id) {
             for (TestEnumFromInt e: values()) {
                 if (e.id == id) return e;
@@ -74,12 +78,12 @@ public class EnumCreatorTest extends BaseMapTest
         TEST1,
         TEST2,
         TEST3;
-       
+
         @JsonGetter("name")
         public String getName() {
             return name();
         }
-       
+
         @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
         public static EnumWithPropertiesModeJsonCreator create(@JsonProperty("name") String name) {
             return EnumWithPropertiesModeJsonCreator.valueOf(name);
@@ -98,15 +102,15 @@ public class EnumCreatorTest extends BaseMapTest
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         public static EnumWithDelegateModeJsonCreator create(JsonNode json) {
-            return EnumWithDelegateModeJsonCreator.valueOf(json.get("name").asText());
+            return EnumWithDelegateModeJsonCreator.valueOf(json.get("name").asString());
         }
     }
-    
+
     // [databind#324]: exception from creator method
     protected enum TestEnum324
     {
         A, B;
-        
+
         @JsonCreator public static TestEnum324 creator(String arg) {
             throw new RuntimeException("Foobar!");
         }
@@ -116,14 +120,16 @@ public class EnumCreatorTest extends BaseMapTest
     static class DelegatingDeserializers extends Deserializers.Base
     {
         @Override
-        public ValueDeserializer<?> findEnumDeserializer(final Class<?> type, final DeserializationConfig config, final BeanDescription beanDesc)
+        public ValueDeserializer<?> findEnumDeserializer(JavaType type,
+                DeserializationConfig config, BeanDescription.Supplier beanDescRef)
         {
-            final Collection<AnnotatedMethod> factoryMethods = beanDesc.getFactoryMethods();
+            final Collection<AnnotatedMethod> factoryMethods = beanDescRef.get().getFactoryMethods();
             if (factoryMethods != null) {
                 for (AnnotatedMethod am : factoryMethods) {
                     final JsonCreator creator = am.getAnnotation(JsonCreator.class);
                     if (creator != null) {
-                        return EnumDeserializer.deserializerForCreator(config, type, am, null, null);
+                        return EnumDeserializer.deserializerForCreator(
+                            config, type.getRawClass(), am, null, null, null);
                     }
                 }
             }
@@ -164,7 +170,7 @@ public class EnumCreatorTest extends BaseMapTest
     static enum MyEnum960
     {
         VALUE, BOGUS;
-        
+
         @JsonCreator
         public static MyEnum960 getInstance() {
             return VALUE;
@@ -225,6 +231,35 @@ public class EnumCreatorTest extends BaseMapTest
         }
     }
 
+    static class DataClass4544 {
+        public DataEnum4544 data;
+    }
+
+    public enum DataEnum4544
+    {
+        TEST(0);
+
+        private final int data;
+
+        DataEnum4544(int data) {
+            this.data = data;
+        }
+
+        // Important! Without ignoring accessor will find logical property
+        // that matches Creator parameter... and assume properties-based
+        @JsonIgnore
+        public int getData() {
+            return data;
+        }
+
+        @JsonCreator
+        public static DataEnum4544 of(@ImplicitName("data") int data) {
+            return Arrays.stream(values())
+                    .filter(it -> it.getData() == data)
+                    .findAny().get();
+        }
+    }
+
     /*
     /**********************************************************
     /* Test methods
@@ -233,55 +268,63 @@ public class EnumCreatorTest extends BaseMapTest
 
     protected final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testCreatorEnums() throws Exception {
         EnumWithCreator value = MAPPER.readValue("\"enumA\"", EnumWithCreator.class);
         assertEquals(EnumWithCreator.A, value);
     }
 
+    @Test
     public void testCreatorEnumsFromBigDecimal() throws Exception {
         EnumWithBDCreator value = MAPPER.readValue("\"8.0\"", EnumWithBDCreator.class);
         assertEquals(EnumWithBDCreator.E8, value);
     }
 
+    @Test
     public void testEnumWithCreatorEnumMaps() throws Exception {
         EnumMap<EnumWithCreator,String> value = MAPPER.readValue("{\"enumA\":\"value\"}",
                 new TypeReference<EnumMap<EnumWithCreator,String>>() {});
         assertEquals("value", value.get(EnumWithCreator.A));
     }
 
+    @Test
     public void testEnumWithCreatorMaps() throws Exception {
         HashMap<EnumWithCreator,String> value = MAPPER.readValue("{\"enumA\":\"value\"}",
                 new TypeReference<java.util.HashMap<EnumWithCreator,String>>() {});
         assertEquals("value", value.get(EnumWithCreator.A));
     }
 
+    @Test
     public void testEnumWithCreatorEnumSets() throws Exception {
         EnumSet<EnumWithCreator> value = MAPPER.readValue("[\"enumA\"]",
                 new TypeReference<EnumSet<EnumWithCreator>>() {});
         assertTrue(value.contains(EnumWithCreator.A));
     }
 
+    @Test
     public void testJsonCreatorPropertiesWithEnum() throws Exception
     {
         EnumWithPropertiesModeJsonCreator type1 = MAPPER.readValue("{\"name\":\"TEST1\", \"description\":\"TEST\"}", EnumWithPropertiesModeJsonCreator.class);
         assertSame(EnumWithPropertiesModeJsonCreator.TEST1, type1);
-        
+
         EnumWithPropertiesModeJsonCreator type2 = MAPPER.readValue("{\"name\":\"TEST3\", \"description\":\"TEST\"}", EnumWithPropertiesModeJsonCreator.class);
         assertSame(EnumWithPropertiesModeJsonCreator.TEST3, type2);
-     
-    }
-    
-    public void testJsonCreatorDelagateWithEnum() throws Exception {
-        final ObjectMapper mapper = new ObjectMapper();
-        
-        EnumWithDelegateModeJsonCreator type1 = mapper.readValue("{\"name\":\"TEST1\", \"description\":\"TEST\"}", EnumWithDelegateModeJsonCreator.class);
-        assertSame(EnumWithDelegateModeJsonCreator.TEST1, type1);
-        
-        EnumWithDelegateModeJsonCreator type2 = mapper.readValue("{\"name\":\"TEST3\", \"description\":\"TEST\"}", EnumWithDelegateModeJsonCreator.class);
-        assertSame(EnumWithDelegateModeJsonCreator.TEST3, type2);
-     
+
     }
 
+    @Test
+    public void testJsonCreatorDelagateWithEnum() throws Exception {
+        final ObjectMapper mapper = new ObjectMapper();
+
+        EnumWithDelegateModeJsonCreator type1 = mapper.readValue("{\"name\":\"TEST1\", \"description\":\"TEST\"}", EnumWithDelegateModeJsonCreator.class);
+        assertSame(EnumWithDelegateModeJsonCreator.TEST1, type1);
+
+        EnumWithDelegateModeJsonCreator type2 = mapper.readValue("{\"name\":\"TEST3\", \"description\":\"TEST\"}", EnumWithDelegateModeJsonCreator.class);
+        assertSame(EnumWithDelegateModeJsonCreator.TEST3, type2);
+
+    }
+
+    @Test
     public void testEnumsFromInts() throws Exception
     {
         Object ob = MAPPER.readValue("1 ", TestEnumFromInt.class);
@@ -290,6 +333,7 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // [databind#324]
+    @Test
     public void testExceptionFromCreator() throws Exception
     {
         try {
@@ -299,8 +343,9 @@ public class EnumCreatorTest extends BaseMapTest
             verifyException(e, "foobar");
         }
     }
-    
+
     // [databind#745]
+    @Test
     public void testDeserializerForCreatorWithEnumMaps() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -312,13 +357,15 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // for [databind#929]
+    @Test
     public void testMultiArgEnumCreator() throws Exception
     {
         Enum929 v = MAPPER.readValue("{\"id\":3,\"name\":\"B\"}", Enum929.class);
         assertEquals(Enum929.B, v);
     }
-    
+
     // for [databind#960]
+    @Test
     public void testNoArgEnumCreator() throws Exception
     {
         MyEnum960 v = MAPPER.readValue("{\"value\":\"bogus\"}", MyEnum960.class);
@@ -326,15 +373,20 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // for [databind#1291]
+    @Test
     public void testEnumCreators1291() throws Exception
     {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = jsonMapperBuilder()
+                .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .disable(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                .build();
         String json = mapper.writeValueAsString(Enum1291.V2);
         Enum1291 result = mapper.readValue(json, Enum1291.class);
         assertSame(Enum1291.V2, result);
     }
 
     // for [databind#1389]
+    @Test
     public void testMultiArgEnumInCollections() throws Exception
     {
         EnumSet<Enum929> valueEnumSet = MAPPER.readValue("[{\"id\":3,\"name\":\"B\"}, {\"id\":3,\"name\":\"A\"}]",
@@ -349,6 +401,7 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // for [databind#3280]
+    @Test
     public void testPropertyCreatorEnum3280() throws Exception
     {
         final ObjectReader r = MAPPER.readerFor(Enum3280.class);
@@ -361,6 +414,7 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // for [databind#3655]
+    @Test
     public void testEnumsFromIntsUnwrapped() throws Exception
     {
         Object ob = MAPPER
@@ -372,6 +426,7 @@ public class EnumCreatorTest extends BaseMapTest
     }
 
     // for [databind#3655]
+    @Test
     public void testEnumsFromStringUnwrapped() throws Exception
     {
         Object ob = MAPPER
@@ -380,5 +435,18 @@ public class EnumCreatorTest extends BaseMapTest
                 .readValue("[\"ENUM_A\"]");
         assertEquals(TestEnumFromString.class, ob.getClass());
         assertSame(TestEnumFromString.ENUM_A, ob);
+    }
+
+    // for [databind#4544]
+    @Test
+    void testEnumsWithImplicitNames4544() throws Exception {
+        final ObjectMapper mapper = jsonMapperBuilder()
+                .annotationIntrospector(new ImplicitNameIntrospector())
+                .build();
+
+        String json = a2q("{'data': 0}");
+        DataClass4544 data = mapper.readValue(json, DataClass4544.class);
+
+        assertEquals(DataEnum4544.TEST, data.data);
     }
 }

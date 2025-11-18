@@ -5,19 +5,25 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
+import tools.jackson.core.json.JsonWriteFeature;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonNaming;
 import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.TestNamingStrategyCustom.PersonBean;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests to verify functioning of standard {@link PropertyNamingStrategy}
  * implementations Jackson includes out of the box.
  */
-public class TestNamingStrategyStd extends BaseMapTest
+public class TestNamingStrategyStd extends DatabindTestUtil
 {
     @JsonPropertyOrder({"www", "some_url", "some_uris"})
     static class Acronyms
@@ -55,7 +61,7 @@ public class TestNamingStrategyStd extends BaseMapTest
             this._x = _x;
         }
     }
-    
+
     @JsonPropertyOrder({"results", "user", "__", "$_user"})
     static class OtherNonStandardNames
     {
@@ -63,7 +69,7 @@ public class TestNamingStrategyStd extends BaseMapTest
         public String _User;
         public String ___;
         public String $User;
-        
+
         public OtherNonStandardNames() {this(null, null, null, null);}
         public OtherNonStandardNames(String Results, String _User, String ___, String $User)
         {
@@ -89,7 +95,7 @@ public class TestNamingStrategyStd extends BaseMapTest
     public static class ClassWithObjectNodeField {
         public String id;
         public ObjectNode json;
-    }    
+    }
 
     static class ExplicitBean {
         @JsonProperty("firstName")
@@ -179,7 +185,6 @@ public class TestNamingStrategyStd extends BaseMapTest
      */
 
     final static List<Object[]> SNAKE_CASE_NAME_TRANSLATIONS = Arrays.asList(new Object[][] {
-                {null, null},
                 {"", ""},
                 {"a", "a"},
                 {"abc", "abc"},
@@ -233,10 +238,12 @@ public class TestNamingStrategyStd extends BaseMapTest
                 {"uId", "u_id" },
                 // [databind#2267]
                 {"xCoordinate", "x_coordinate" },
+                // [databind#4409]
+                {"RGBA", "rgba"},
+                {"RGBa", "rgba"},
     });
 
     final static List<Object[]> UPPER_SNAKE_CASE_NAME_TRANSLATIONS = Arrays.asList(new Object[][] {
-        {null, null},
         {"", ""},
         {"a", "A"},
         {"abc", "ABC"},
@@ -309,6 +316,7 @@ public class TestNamingStrategyStd extends BaseMapTest
      * {@link PropertyNamingStrategies#SNAKE_CASE}
      * outside the context of an ObjectMapper.
      */
+    @Test
     public void testLowerCaseStrategyStandAlone()
     {
         for (Object[] pair : SNAKE_CASE_NAME_TRANSLATIONS) {
@@ -318,6 +326,7 @@ public class TestNamingStrategyStd extends BaseMapTest
         }
     }
 
+    @Test
     public void testLowerCaseTranslations() throws Exception
     {
         // First serialize
@@ -330,11 +339,14 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("Sixpack", result.lastName);
         assertEquals(42, result.age);
     }
-    
+
+    @Test
     public void testLowerCaseAcronymsTranslations() throws Exception
     {
         // First serialize
-        String json = _lcWithUnderscoreMapper.writeValueAsString(new Acronyms("world wide web", "http://jackson.codehaus.org", "/path1/,/path2/"));
+        String json = _lcWithUnderscoreMapper.writer()
+                .without(JsonWriteFeature.ESCAPE_FORWARD_SLASHES)
+                .writeValueAsString(new Acronyms("world wide web", "http://jackson.codehaus.org", "/path1/,/path2/"));
         assertEquals("{\"www\":\"world wide web\",\"some_url\":\"http://jackson.codehaus.org\",\"some_uris\":\"/path1/,/path2/\"}", json);
 
         // then deserialize
@@ -344,6 +356,7 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("/path1/,/path2/", result.someURIs);
     }
 
+    @Test
     public void testLowerCaseOtherNonStandardNamesTranslations() throws Exception
     {
         // First serialize
@@ -358,12 +371,13 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("$User", result.$User);
     }
 
+    @Test
     public void testLowerCaseUnchangedNames() throws Exception
     {
         // First serialize
         String json = _lcWithUnderscoreMapper.writeValueAsString(new UnchangedNames("from_user", "_user", "from$user", "from7user", "_x"));
         assertEquals("{\"from_user\":\"from_user\",\"user\":\"_user\",\"from$user\":\"from$user\",\"from7user\":\"from7user\",\"x\":\"_x\"}", json);
-        
+
         // then deserialize
         UnchangedNames result = _lcWithUnderscoreMapper.readValue(json, UnchangedNames.class);
         assertEquals("from_user", result.from_user);
@@ -374,6 +388,7 @@ public class TestNamingStrategyStd extends BaseMapTest
     }
 
     // [databind#3368]
+    @Test
     public void testSnakeCase3368() throws Exception
     {
         String test = "    {\n" +
@@ -393,6 +408,7 @@ public class TestNamingStrategyStd extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testUpperSnakeCaseStrategyStandAlone()
     {
         for (Object[] pair : UPPER_SNAKE_CASE_NAME_TRANSLATIONS) {
@@ -402,6 +418,7 @@ public class TestNamingStrategyStd extends BaseMapTest
         }
     }
 
+    @Test
     public void testUpperSnakeCaseTranslations() throws Exception
     {
         // First serialize
@@ -427,6 +444,7 @@ public class TestNamingStrategyStd extends BaseMapTest
      * {@link PropertyNamingStrategies#UPPER_CAMEL_CASE }
      * outside the context of an ObjectMapper.
      */
+    @Test
     public void testPascalCaseStandAlone()
     {
         assertEquals("UserName", PropertyNamingStrategies.UPPER_CAMEL_CASE.nameForField(null, null, "userName"));
@@ -439,6 +457,7 @@ public class TestNamingStrategyStd extends BaseMapTest
     }
 
     // [databind#428]
+    @Test
     public void testIssue428PascalWithOverrides() throws Exception
     {
         String json = jsonMapperBuilder()
@@ -457,10 +476,11 @@ public class TestNamingStrategyStd extends BaseMapTest
      */
 
     // For [databind#461]
+    @Test
     public void testSimpleLowerCase() throws Exception
     {
         final BoringBean input = new BoringBean();
-        ObjectMapper m = objectMapper();
+        ObjectMapper m = newJsonMapper();
 
         assertEquals(a2q("{'firstname':'Bob','lastname':'Burger'}"),
                 m.writeValueAsString(input));
@@ -471,7 +491,8 @@ public class TestNamingStrategyStd extends BaseMapTest
     /* Test methods for KEBAB_CASE
     /**********************************************************************
      */
-    
+
+    @Test
     public void testKebabCaseStrategyStandAlone()
     {
         assertEquals("some-value",
@@ -485,7 +506,8 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("some-url-stuff",
                 PropertyNamingStrategies.KEBAB_CASE.nameForField(null, null, "SomeURLStuff"));
     }
-    
+
+    @Test
     public void testSimpleKebabCase() throws Exception
     {
         final FirstNameBean input = new FirstNameBean("Bob");
@@ -504,6 +526,7 @@ public class TestNamingStrategyStd extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testLowerCaseWithDotsStrategyStandAlone()
     {
         assertEquals("some.value",
@@ -518,6 +541,7 @@ public class TestNamingStrategyStd extends BaseMapTest
                 PropertyNamingStrategies.LOWER_DOT_CASE.nameForField(null, null, "SomeURLStuff"));
     }
 
+    @Test
     public void testSimpleLowerCaseWithDots() throws Exception
     {
         final ObjectMapper m = jsonMapperBuilder()
@@ -537,10 +561,11 @@ public class TestNamingStrategyStd extends BaseMapTest
     /* Test methods, other
     /**********************************************************************
      */
-    
+
     /**
      * Test [databind#815], problems with ObjectNode, naming strategy
      */
+    @Test
     public void testNamingWithObjectNode() throws Exception
     {
         ObjectMapper m = jsonMapperBuilder()
@@ -554,9 +579,10 @@ public class TestNamingStrategyStd extends BaseMapTest
         assertEquals("1", result.id);
         assertNotNull(result.json);
         assertEquals(2, result.json.size());
-        assertEquals("bing", result.json.path("baz").asText());
+        assertEquals("bing", result.json.path("baz").asString());
     }
 
+    @Test
     public void testExplicitRename() throws Exception
     {
         ObjectMapper m = jsonMapperBuilder()
@@ -588,15 +614,17 @@ public class TestNamingStrategyStd extends BaseMapTest
     }
 
     // Also verify that "no naming strategy" should be ok
+    @Test
     public void testExplicitNoNaming() throws Exception
     {
-        ObjectMapper mapper = objectMapper();
+        ObjectMapper mapper = newJsonMapper();
         String json = mapper.writeValueAsString(new DefaultNaming());
         assertEquals(a2q("{'someValue':3}"), json);
     }
 
     // Try to reproduce [databind#3102] but with regular POJO. Oddly,
     // does not actually fail.
+    @Test
     public void testNamingViaConstructorParams() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()

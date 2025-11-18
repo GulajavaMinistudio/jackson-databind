@@ -2,15 +2,18 @@ package tools.jackson.databind.interop;
 
 import java.io.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Simple test to ensure that we can make POJOs use Jackson
  * for JDK serialization, via {@link Externalizable}
- * 
- * @since 2.1
  */
-public class TestExternalizable extends BaseMapTest
+public class TestExternalizable extends DatabindTestUtil
 {
     /* Not pretty, but needed to make ObjectMapper accessible from
      * static context (alternatively could use ThreadLocal).
@@ -37,12 +40,12 @@ public class TestExternalizable extends BaseMapTest
         public int available() throws IOException {
             return in.available();
         }
-        
+
         @Override
         public void close() throws IOException {
             in.close();
         }
-        
+
         @Override
         public boolean  markSupported() {
             return false;
@@ -62,12 +65,12 @@ public class TestExternalizable extends BaseMapTest
         public int read(byte[] buffer, int offset, int len) throws IOException {
             return in.read(buffer, offset, len);
         }
-        
+
         @Override
         public long skip(long n) throws IOException {
             return in.skip(n);
         }
-    }        
+    }
 
     /**
      * Helper class we need to adapt {@link ObjectOutput} as
@@ -80,7 +83,7 @@ public class TestExternalizable extends BaseMapTest
         public ExternalizableOutput(ObjectOutput out) {
             this.out = out;
         }
-        
+
         @Override
         public void flush() throws IOException {
             out.flush();
@@ -90,7 +93,7 @@ public class TestExternalizable extends BaseMapTest
         public void close() throws IOException {
             out.close();
         }
-        
+
         @Override
         public void write(int ch) throws IOException {
             out.write(ch);
@@ -100,13 +103,13 @@ public class TestExternalizable extends BaseMapTest
         public void write(byte[] data) throws IOException {
             out.write(data);
         }
-        
+
         @Override
         public void write(byte[] data, int offset, int len) throws IOException {
             out.write(data, offset, len);
         }
     }
-    
+
 //    @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.ARRAY)
     @SuppressWarnings("resource")
     static class MyPojo implements Externalizable
@@ -142,12 +145,12 @@ public class TestExternalizable extends BaseMapTest
             if (o == this) return true;
             if (o == null) return false;
             if (o.getClass() != getClass()) return false;
-            
+
             MyPojo other = (MyPojo) o;
-            
+
             if (other.id != id) return false;
             if (!other.name.equals(name)) return false;
-            
+
             if (other.values.length != values.length) return false;
             for (int i = 0, end = values.length; i < end; ++i) {
                 if (values[i] != other.values[i]) return false;
@@ -178,8 +181,9 @@ public class TestExternalizable extends BaseMapTest
             this.values = values;
         }
     }
-    
+
     @SuppressWarnings("unused")
+    @Test
     public void testSerializeAsExternalizable() throws Exception
     {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -196,7 +200,7 @@ public class TestExternalizable extends BaseMapTest
         if (ix < 0) {
             fail("Serialization ("+ser.length+") does NOT contain JSON (of "+json.length+")");
         }
-        
+
         // Sanity check:
         if (false) {
             bytes = new ByteArrayOutputStream();
@@ -206,13 +210,13 @@ public class TestExternalizable extends BaseMapTest
             obs.close();
             System.out.println("Native size: "+bytes.size()+", vs JSON: "+ser.length);
         }
-        
+
         // then read back!
         ObjectInputStream ins = new ObjectInputStream(new ByteArrayInputStream(ser));
         MyPojo output = (MyPojo) ins.readObject();
         ins.close();
         assertNotNull(output);
-        
+
         assertEquals(input, output);
     }
 

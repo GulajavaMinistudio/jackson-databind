@@ -24,34 +24,37 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
 {
     protected final As _inclusion;
 
+    /**
+     * Indicates that we should be strict about handling missing type information.
+     *
+     * @since 2.15
+     */
+    protected final boolean _strictTypeIdHandling;
+
     protected final String _msgForMissingId = (_property == null)
             ? String.format("missing type id property '%s'", _typePropertyName)
             : String.format("missing type id property '%s' (for POJO property '%s')", _typePropertyName, _property.getName());
 
     public AsPropertyTypeDeserializer(JavaType bt, TypeIdResolver idRes,
-            String typePropertyName, boolean typeIdVisible, JavaType defaultImpl)
-    {
-        this(bt, idRes, typePropertyName, typeIdVisible, defaultImpl, As.PROPERTY);
-    }
-
-    public AsPropertyTypeDeserializer(JavaType bt, TypeIdResolver idRes,
             String typePropertyName, boolean typeIdVisible, JavaType defaultImpl,
-            As inclusion)
+            As inclusion, boolean strictTypeIdHandling)
     {
         super(bt, idRes, typePropertyName, typeIdVisible, defaultImpl);
         _inclusion = inclusion;
+        _strictTypeIdHandling = strictTypeIdHandling;
     }
 
     public AsPropertyTypeDeserializer(AsPropertyTypeDeserializer src, BeanProperty property) {
         super(src, property);
         _inclusion = src._inclusion;
+        _strictTypeIdHandling = src._strictTypeIdHandling;
     }
-    
+
     @Override
     public TypeDeserializer forProperty(BeanProperty prop) {
         return (prop == _property) ? this : new AsPropertyTypeDeserializer(this, prop);
     }
-    
+
     @Override
     public As getTypeInclusion() { return _inclusion; }
 
@@ -155,7 +158,7 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
             }
             if (p.hasToken(JsonToken.VALUE_STRING)) {
                 if (ctxt.isEnabled(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)) {
-                    String str = p.getText().trim();
+                    String str = p.getString().trim();
                     if (str.isEmpty()) {
                         return null;
                     }
@@ -166,7 +169,8 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
         // genuine, or faked for "dont fail on bad type id")
         ValueDeserializer<Object> deser = _findDefaultImplDeserializer(ctxt);
         if (deser == null) {
-            JavaType t = _handleMissingTypeId(ctxt, priorFailureMsg);
+            JavaType t = _strictTypeIdHandling
+                    ? _handleMissingTypeId(ctxt, priorFailureMsg) : _baseType;
             if (t == null) {
                 // 09-Mar-2017, tatu: Is this the right thing to do?
                 return null;
@@ -197,9 +201,9 @@ public class AsPropertyTypeDeserializer extends AsArrayTypeDeserializer
             return super.deserializeTypedFromArray(p, ctxt);
         }
         return deserializeTypedFromObject(p, ctxt);
-    }    
-    
+    }
+
     // These are fine from base class:
     //public Object deserializeTypedFromArray(JsonParser p, DeserializationContext ctxt)
-    //public Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt)    
+    //public Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt)
 }

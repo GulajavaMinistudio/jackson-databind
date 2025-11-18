@@ -1,12 +1,12 @@
 package tools.jackson.databind.jsontype;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.BeanProperty;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ValueDeserializer;
-
-import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
 /**
  * Interface for deserializing type information from JSON content, to
@@ -81,7 +81,7 @@ public abstract class TypeDeserializer
      */
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as JSON Object (regardless of Java type).
      * Method needs to figure out intended
@@ -93,7 +93,7 @@ public abstract class TypeDeserializer
             DeserializationContext ctxt) throws JacksonException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as JSON Array (regardless of Java type).
      * Method needs to figure out intended
@@ -104,7 +104,7 @@ public abstract class TypeDeserializer
     public abstract Object deserializeTypedFromArray(JsonParser p, DeserializationContext ctxt) throws JacksonException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * is serialized as a scalar JSON value (something other
      * than Array or Object), regardless of Java type.
@@ -116,7 +116,7 @@ public abstract class TypeDeserializer
     public abstract Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt) throws JacksonException;
 
     /**
-     * Method called to let this type deserializer handle 
+     * Method called to let this type deserializer handle
      * deserialization of "typed" object, when value itself
      * may have been serialized using any kind of JSON value
      * (Array, Object, scalar). Should only be called if JSON
@@ -152,7 +152,7 @@ public abstract class TypeDeserializer
         switch (t) {
         case VALUE_STRING:
             if (base.isAssignableFrom(String.class)) {
-                return p.getText();
+                return p.getString();
             }
             break;
         case VALUE_NUMBER_INT:
@@ -180,4 +180,3 @@ public abstract class TypeDeserializer
         return null;
     }
 }
-    

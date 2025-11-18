@@ -1,8 +1,15 @@
 package tools.jackson.databind.node;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * This singleton value class is used to contain explicit JSON null
@@ -33,26 +40,185 @@ public class NullNode
 
     @Override public JsonToken asToken() { return JsonToken.VALUE_NULL; }
 
-    @Override public String asText(String defaultValue) { return defaultValue; }
-    @Override public String asText() { return "null"; }
-
-    @SuppressWarnings("unchecked")
     @Override
-    public JsonNode requireNonNull() {
-        return _reportRequiredViolation("requireNonNull() called on `NullNode`");
+    public NullNode deepCopy() { return this; }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, scalar access, non-numeric
+    /**********************************************************************
+     */
+
+    @Override
+    protected Boolean _asBoolean() {
+        return Boolean.FALSE;
     }
 
-    // as with MissingNode, not considered number node; hence defaults are returned if provided
+    @Override
+    protected String _asString() {
+        return "";
+    }
+
+    // Explicit overrides for all overloads for documentation purposes
+
+    @Override
+    public String stringValue() { return null; }
+
+    @Override
+    public String stringValue(String defaultValue) { return defaultValue; }
+
+    @Override
+    public Optional<String> stringValueOpt() {
+        return Optional.empty();
+    }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, scalar access, numeric
+    /**********************************************************************
+     */
+
+    // `shortValue()` (etc) fine as defaults (fail); but need to override `asShort()`
+
+    @Override
+    public short asShort() {
+        return 0;
+    }
+
+    @Override
+    public short asShort(short defaultValue) {
+        return 0;
+    }
+
+    @Override
+    public Optional<Short> asShortOpt() {
+        return Optional.of((short) 0);
+    }
+
+    // `intValue()` (etc) fine as defaults (fail); but need to override `asInt()`
+
+    @Override
+    public int asInt() {
+        return 0;
+    }
+
+    @Override
+    public int asInt(int defaultValue) {
+        return 0;
+    }
+
+    @Override
+    public OptionalInt asIntOpt() {
+        return OptionalInt.of(0);
+    }
+
+    // `longValue()` (etc) fine as defaults (fail); but need to override `asLong()`
+
+    @Override
+    public long asLong() { return 0L; }
+
+    @Override
+    public long asLong(long defaultValue) { return 0L; }
+
+    @Override
+    public OptionalLong asLongOpt() {
+        return OptionalLong.of(0L);
+    }
+
+    // `bigIntegerValue()` (etc) fine as defaults (fail); but need to override `asBigInteger()`
+
+    @Override
+    public BigInteger asBigInteger() {
+        return BigInteger.ZERO;
+    }
+
+    @Override
+    public BigInteger asBigInteger(BigInteger defaultValue) {
+        return asBigInteger();
+    }
+
+    @Override
+    public Optional<BigInteger> asBigIntegerOpt() {
+        return Optional.of(asBigInteger());
+    }
+
+    // `floatValue()` (etc) fine as defaults (fail); but need to override `asFloat()`
+
+    @Override
+    public float asFloat() {
+        return 0.0f;
+    }
+
+    @Override
+    public float asFloat(float defaultValue) {
+        return asFloat();
+    }
+
+    @Override
+    public Optional<Float> asFloatOpt() {
+        return Optional.of(asFloat());
+    }
+
+    // `doubleValue()` (etc) fine as defaults (fail); but need to override `asDouble()`
+
+    @Override
+    public double asDouble() {
+        return 0.0d;
+    }
+
+    @Override
+    public double asDouble(double defaultValue) {
+        return asDouble();
+    }
+
+    @Override
+    public OptionalDouble asDoubleOpt() {
+        return OptionalDouble.of(asDouble());
+    }
     
+    // `decimalValue()` (etc) fine as defaults (fail); but need to override `asDecimal()`
+
+    @Override
+    public BigDecimal asDecimal() {
+        return BigDecimal.ZERO;
+    }
+
+    @Override
+    public BigDecimal asDecimal(BigDecimal defaultValue) {
+        return asDecimal();
+    }
+
+    @Override
+    public Optional<BigDecimal> asDecimalOpt() {
+        return Optional.of(asDecimal());
+    }
+
     /*
     public int asInt(int defaultValue);
     public long asLong(long defaultValue);
     public double asDouble(double defaultValue);
     public boolean asBoolean(boolean defaultValue);
     */
+
+    /*
+    /**********************************************************************
+    /* Overridden methods, other
+    /**********************************************************************
+     */
+
+    @Override
+    protected String _valueDesc() {
+        return "<null>";
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public JsonNode requireNonNull() {
+        return _reportRequiredViolation("requireNonNull() called on `NullNode`");
+    }
     
     @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
+    public final void serialize(JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         provider.defaultSerializeNullValue(g);

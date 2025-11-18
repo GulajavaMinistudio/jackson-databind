@@ -2,7 +2,7 @@ package tools.jackson.databind.ser.impl;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.DatabindException;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ser.std.StdSerializer;
 
 /**
@@ -16,14 +16,14 @@ public class FailingSerializer
     extends StdSerializer<Object>
 {
     protected final String _msg;
-    
+
     public FailingSerializer(String msg) {
         super(Object.class);
         _msg = msg;
     }
-    
+
     @Override
-    public void serialize(Object value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(Object value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         provider.reportMappingProblem(_msg);

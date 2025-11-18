@@ -4,6 +4,7 @@ import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.AnnotatedField;
 import tools.jackson.databind.introspect.AnnotatedMethod;
 import tools.jackson.databind.introspect.AnnotatedParameter;
+import tools.jackson.databind.util.NamingStrategyImpls;
 
 /**
  * Container for standard {@link PropertyNamingStrategy} implementations
@@ -19,7 +20,7 @@ public abstract class PropertyNamingStrategies
     /* Static instances that may be referenced
     /**********************************************************************
      */
-    
+
     /**
      * Naming convention used in Java, where words other than first are capitalized
      * and no separator is used between words. Since this is the native Java naming convention,
@@ -117,45 +118,6 @@ public abstract class PropertyNamingStrategies
         }
 
         protected abstract String translate(String propertyName);
-
-        /**
-         * Helper method to share implementation between snake and dotted case.
-         */
-        protected String translateLowerCaseWithSeparator(final String input, final char separator)
-        {
-            if (input == null) {
-                return input; // garbage in, garbage out
-            }
-            final int length = input.length();
-            if (length == 0) {
-                return input;
-            }
-    
-            final StringBuilder result = new StringBuilder(length + (length >> 1));
-            int upperCount = 0;
-            for (int i = 0; i < length; ++i) {
-                char ch = input.charAt(i);
-                char lc = Character.toLowerCase(ch);
-    
-                if (lc == ch) { // lower-case letter means we can get new word
-                    // but need to check for multi-letter upper-case (acronym), where assumption
-                    // is that the last upper-case char is start of a new word
-                    if (upperCount > 1) {
-                        // so insert hyphen before the last character now
-                        result.insert(result.length() - 1, separator);
-                    }
-                    upperCount = 0;
-                } else {
-                    // Otherwise starts new word, unless beginning of string
-                    if ((upperCount == 0) && (i > 0)) {
-                        result.append(separator);
-                    }
-                    ++upperCount;
-                }
-                result.append(lc);
-            }
-            return result.toString();
-        }
     }
 
     /*
@@ -163,7 +125,7 @@ public abstract class PropertyNamingStrategies
     /* Standard implementations
     /**********************************************************************
      */
-    
+
     /**
      * A {@link PropertyNamingStrategy} that translates typical camel case Java
      * property names to lower case JSON element names, separated by
@@ -171,7 +133,7 @@ public abstract class PropertyNamingStrategies
      * provides some additional translations beyond strictly translating from
      * camel case only.  In particular, the following translations are applied
      * by this PropertyNamingStrategy.
-     * 
+     *
      * <ul><li>Every upper case letter in the Java property name is translated
      * into two characters, an underscore and the lower case equivalent of the
      * target character, with three exceptions.
@@ -220,35 +182,7 @@ public abstract class PropertyNamingStrategies
         @Override
         protected String translate(String input)
         {
-            if (input == null) return input; // garbage in, garbage out
-            int length = input.length();
-            StringBuilder result = new StringBuilder(length * 2);
-            int resultLength = 0;
-            boolean wasPrevTranslated = false;
-            for (int i = 0; i < length; i++)
-            {
-                char c = input.charAt(i);
-                if (i > 0 || c != '_') // skip first starting underscore
-                {
-                    if (Character.isUpperCase(c))
-                    {
-                        if (!wasPrevTranslated && resultLength > 0 && result.charAt(resultLength - 1) != '_')
-                        {
-                            result.append('_');
-                            resultLength++;
-                        }
-                        c = Character.toLowerCase(c);
-                        wasPrevTranslated = true;
-                    }
-                    else
-                    {
-                        wasPrevTranslated = false;
-                    }
-                    result.append(c);
-                    resultLength++;
-                }
-            }
-            return resultLength > 0 ? result.toString() : input;
+            return NamingStrategyImpls.SNAKE_CASE.translate(input);
         }
     }
 
@@ -263,10 +197,7 @@ public abstract class PropertyNamingStrategies
 
         @Override
         protected String translate(String input) {
-            String output = super.translate(input);
-            if (output == null)
-                return null;
-            return super.translate(input).toUpperCase();
+            return NamingStrategyImpls.UPPER_SNAKE_CASE.translate(input);
         }
     }
 
@@ -280,20 +211,20 @@ public abstract class PropertyNamingStrategies
 
         @Override
         protected String translate(String input) {
-            return input;
+            return NamingStrategyImpls.LOWER_CAMEL_CASE.translate(input);
         }
     }
 
     /**
-     * A {@link PropertyNamingStrategy} that translates typical camelCase Java 
+     * A {@link PropertyNamingStrategy} that translates typical camelCase Java
      * property names to PascalCase JSON element names (i.e., with a capital
-     * first letter).  In particular, the following translations are applied by 
+     * first letter).  In particular, the following translations are applied by
      * this PropertyNamingStrategy.
-     * 
-     * <ul><li>The first lower-case letter in the Java property name is translated 
+     *
+     * <ul><li>The first lower-case letter in the Java property name is translated
      * into its equivalent upper-case representation.</li></ul>
-     * 
-     * This rules result in the following example translation from 
+     *
+     * This rules result in the following example translation from
      * Java property names to JSON element names.
      * <ul><li>&quot;userName&quot; is translated to &quot;UserName&quot;</li></ul>
      */
@@ -303,7 +234,7 @@ public abstract class PropertyNamingStrategies
 
         /**
          * Converts camelCase to PascalCase
-         * 
+         *
          * For example, "userName" would be converted to
          * "UserName".
          *
@@ -312,18 +243,7 @@ public abstract class PropertyNamingStrategies
          */
         @Override
         protected String translate(String input) {
-            if (input == null || input.isEmpty()){
-                return input; // garbage in, garbage out
-            }
-            // Replace first lower-case letter with upper-case equivalent
-            char c = input.charAt(0);
-            char uc = Character.toUpperCase(c);
-            if (c == uc) {
-                return input;
-            }
-            StringBuilder sb = new StringBuilder(input);
-            sb.setCharAt(0, uc);
-            return sb.toString();
+            return NamingStrategyImpls.UPPER_CAMEL_CASE.translate(input);
         }
     }
 
@@ -339,7 +259,7 @@ public abstract class PropertyNamingStrategies
 
         @Override
         protected String translate(String input) {
-            return input.toLowerCase();
+            return NamingStrategyImpls.LOWER_CASE.translate(input);
         }
     }
 
@@ -355,7 +275,7 @@ public abstract class PropertyNamingStrategies
 
         @Override
         protected String translate(String input) {
-            return translateLowerCaseWithSeparator(input, '-');
+            return NamingStrategyImpls.KEBAB_CASE.translate(input);
         }
     }
 
@@ -369,7 +289,7 @@ public abstract class PropertyNamingStrategies
 
         @Override
         protected String translate(String input){
-            return translateLowerCaseWithSeparator(input, '.');
+            return NamingStrategyImpls.LOWER_DOT_CASE.translate(input);
         }
     }
 }

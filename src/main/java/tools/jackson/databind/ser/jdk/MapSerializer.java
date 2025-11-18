@@ -62,7 +62,7 @@ public class MapSerializer
     /* Serializers used
     /**********************************************************************
      */
-    
+
     /**
      * Key serializer to use, if it can be statically determined
      */
@@ -283,7 +283,7 @@ public class MapSerializer
 
         if (mapType == null) { // for tests?
             keyType = valueType = UNSPECIFIED_TYPE;
-        } else { 
+        } else {
             keyType = mapType.getKeyType();
             if (mapType.hasRawClass(java.util.Properties.class)) {
                 // 25-Mar-2020, tatu: [databind#2657] Since non-standard Properties may actually
@@ -321,7 +321,7 @@ public class MapSerializer
      */
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property)
     {
         ValueSerializer<?> ser = null;
@@ -386,7 +386,7 @@ public class MapSerializer
         if (format != null) {
             Boolean B = format.getFeature(JsonFormat.Feature.WRITE_SORTED_MAP_ENTRIES);
             if (B != null) { // do NOT override if not defined
-                sortKeys = B.booleanValue();
+                sortKeys = B;
             }
         }
         MapSerializer mser = withResolved(property, keySer, ser, ignored, included, sortKeys);
@@ -467,12 +467,12 @@ public class MapSerializer
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider prov, Map<?,?> value)
+    public boolean isEmpty(SerializationContext prov, Map<?,?> value)
     {
         if (value.isEmpty()) {
             return true;
         }
-        
+
         // 05-Nove-2015, tatu: Simple cases are cheap, but for recursive
         //   emptiness checking we actually need to see if values are empty as well.
         Object supp = _suppressableValue;
@@ -549,7 +549,7 @@ public class MapSerializer
      */
 
     @Override
-    public void serialize(Map<?,?> value, JsonGenerator gen, SerializerProvider provider)
+    public void serialize(Map<?,?> value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         gen.writeStartObject(value);
@@ -558,7 +558,7 @@ public class MapSerializer
     }
 
     @Override
-    public void serializeWithType(Map<?,?> value, JsonGenerator gen, SerializerProvider ctxt,
+    public void serializeWithType(Map<?,?> value, JsonGenerator gen, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -582,7 +582,7 @@ public class MapSerializer
      *<p>
      * NOTE: Public only since it also is called by {@code AnyGetterWriter}.
      */
-    public void serializeWithoutTypeInfo(Map<?, ?> value, JsonGenerator gen, SerializerProvider ctxt)
+    public void serializeWithoutTypeInfo(Map<?, ?> value, JsonGenerator gen, SerializationContext ctxt)
         throws JacksonException
     {
         if (!value.isEmpty()) {
@@ -611,13 +611,13 @@ public class MapSerializer
 
     /**
      * General-purpose serialization for contents, where we do not necessarily know
-     * the value serialization, but 
+     * the value serialization, but
      * we do know that no value suppression is needed (which simplifies processing a bit)
      *<p>
      * NOTE: {@code public} only because it is called by code from {@code Guava}
      *  {@code TableSerializer}
      */
-    public void serializeEntries(Map<?,?> value, JsonGenerator gen, SerializerProvider provider)
+    public void serializeEntries(Map<?,?> value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         // If value type needs polymorphic type handling, some more work needed:
@@ -664,7 +664,7 @@ public class MapSerializer
      * NOTE: {@code public} because other similar methods are (no current known
      * external usage).
      */
-    public void serializeOptionalFields(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
+    public void serializeOptionalFields(Map<?,?> value, JsonGenerator gen, SerializationContext provider,
             Object suppressableValue)
         throws JacksonException
     {
@@ -721,7 +721,7 @@ public class MapSerializer
             }
         }
     }
-    
+
     /**
      * Method called to serialize fields, when the value type is statically known,
      * so that value serializer is passed and does not need to be fetched from
@@ -730,7 +730,7 @@ public class MapSerializer
      * NOTE: {@code public} because other similar methods are (no current known
      * external usage).
      */
-    public void serializeEntriesUsing(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
+    public void serializeEntriesUsing(Map<?,?> value, JsonGenerator gen, SerializationContext provider,
             ValueSerializer<Object> ser)
         throws JacksonException
     {
@@ -772,7 +772,7 @@ public class MapSerializer
      * NOTE: {@code public} because other similar methods are (no current known
      * external usage).
      */
-    public void serializeFilteredEntries(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
+    public void serializeFilteredEntries(Map<?,?> value, JsonGenerator gen, SerializationContext provider,
             PropertyFilter filter,
             Object suppressableValue)
         throws JacksonException
@@ -834,7 +834,7 @@ public class MapSerializer
      * NOTE: {@code public} because other similar methods are (no current known
      * external usage).
      */
-    public void serializeTypedEntries(Map<?,?> value, JsonGenerator gen, SerializerProvider provider,
+    public void serializeTypedEntries(Map<?,?> value, JsonGenerator gen, SerializationContext provider,
             Object suppressableValue)
         throws JacksonException
     {
@@ -853,7 +853,7 @@ public class MapSerializer
                 keySerializer = _keySerializer;
             }
             final Object valueElem = entry.getValue();
-    
+
             // And then value
             ValueSerializer<Object> valueSer;
             if (valueElem == null) {
@@ -894,7 +894,7 @@ public class MapSerializer
      *
      * @param bean Enclosing POJO that has any-getter used to obtain "any properties"
      */
-    public void serializeFilteredAnyProperties(SerializerProvider provider, JsonGenerator gen,
+    public void serializeFilteredAnyProperties(SerializationContext provider, JsonGenerator gen,
             Object bean, Map<?,?> value, PropertyFilter filter,
             Object suppressableValue)
         throws JacksonException
@@ -960,12 +960,12 @@ public class MapSerializer
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
     {
-        JsonMapFormatVisitor v2 = visitor.expectMapFormat(typeHint);        
+        JsonMapFormatVisitor v2 = visitor.expectMapFormat(typeHint);
         if (v2 != null) {
             v2.keyFormat(_keySerializer, _keyType);
             ValueSerializer<?> valueSer = _valueSerializer;
             if (valueSer == null) {
-                valueSer = _findAndAddDynamic(visitor.getProvider(), _valueType);
+                valueSer = _findAndAddDynamic(visitor.getContext(), _valueType);
             }
             v2.valueFormat(valueSer, _valueType);
         }
@@ -978,12 +978,32 @@ public class MapSerializer
      */
 
     protected Map<?,?> _orderEntries(Map<?,?> input, JsonGenerator gen,
-            SerializerProvider provider) throws JacksonException
+            SerializationContext provider) throws JacksonException
     {
         // minor optimization: may already be sorted?
         if (input instanceof SortedMap<?,?>) {
             return input;
         }
+        // or is it empty? then no need to sort either
+        if (input.isEmpty()) {
+            return input;
+        }
+        // [databind#4773] Since 2.19: We should not try sorting Maps with uncomparable keys
+        // And first key is a good enough sample for now.
+        Object firstKey = input.keySet().iterator().next();
+        if (!Comparable.class.isInstance(firstKey)) {
+            // We cannot sort incomparable keys, should we fail or just skip sorting?
+            if (!provider.isEnabled(SerializationFeature.FAIL_ON_ORDER_MAP_BY_INCOMPARABLE_KEY)) {
+                return input;
+            } else {
+                Class<?> clazz = firstKey == null ? Object.class : firstKey.getClass();
+                provider.reportBadDefinition(clazz,
+                    String.format("Cannot order Map entries by key of incomparable type %s, consider disabling " +
+                                "`SerializationFeature.FAIL_ON_ORDER_MAP_BY_INCOMPARABLE_KEY` to simply skip sorting",
+                                ClassUtil.classNameOf(firstKey)));
+            }
+        }
+
         // [databind#1411]: TreeMap does not like null key... (although note that
         //   check above should prevent this code from being called in that case)
         // [databind#153]: but, apparently, some custom Maps do manage hit this
@@ -995,7 +1015,7 @@ public class MapSerializer
                 if (key == null) {
                     _writeNullKeyedEntry(gen, provider, entry.getValue());
                     continue;
-                } 
+                }
                 result.put(key, entry.getValue());
             }
             return result;
@@ -1012,11 +1032,11 @@ public class MapSerializer
         //   known good cases).
         //   While my first instinct was to do black-listing (remove Hashtable and ConcurrentHashMap),
         //   all in all it is probably better to just white list `HashMap` (and its sub-classes).
-        
+
         return (input instanceof HashMap) && input.containsKey(null);
     }
-    
-    protected void _writeNullKeyedEntry(JsonGenerator g, SerializerProvider ctxt,
+
+    protected void _writeNullKeyedEntry(JsonGenerator g, SerializationContext ctxt,
             Object value) throws JacksonException
     {
         ValueSerializer<Object> keySerializer = ctxt.findNullKeySerializer(_keyType, _property);
@@ -1049,7 +1069,7 @@ public class MapSerializer
         }
     }
 
-    private final ValueSerializer<Object> _findSerializer(SerializerProvider ctxt,
+    private final ValueSerializer<Object> _findSerializer(SerializationContext ctxt,
             Object value)
     {
         final Class<?> cc = value.getClass();

@@ -4,14 +4,18 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class OptionalNumbersTest extends BaseMapTest
+public class OptionalNumbersTest
+    extends DatabindTestUtil
 {
     static class OptionalIntBean {
         public OptionalInt value;
@@ -21,7 +25,7 @@ public class OptionalNumbersTest extends BaseMapTest
             value = OptionalInt.of(v);
         }
     }
-    
+
     static class OptionalLongBean {
         public OptionalLong value;
 
@@ -51,12 +55,14 @@ public class OptionalNumbersTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testOptionalIntAbsent() throws Exception
     {
         String json = MAPPER.writeValueAsString(OptionalInt.empty());
         assertFalse(MAPPER.readValue(json, OptionalInt.class).isPresent());
     }
 
+    @Test
     public void testOptionalIntInArrayAbsent() throws Exception
     {
         OptionalInt[] ints = MAPPER.readValue("[null]", OptionalInt[].class);
@@ -65,11 +71,13 @@ public class OptionalNumbersTest extends BaseMapTest
         assertFalse(ints[0].isPresent());
     }
 
+    @Test
     public void testOptionalIntPresent() throws Exception
     {
         assertEquals(5, MAPPER.readValue(MAPPER.writeValueAsBytes(OptionalInt.of(5)), OptionalInt.class).getAsInt());
     }
 
+    @Test
     public void testOptionalIntCoerceFromString() throws Exception
     {
         OptionalInt opt = MAPPER.readValue(q("123"), OptionalInt.class);
@@ -94,11 +102,13 @@ public class OptionalNumbersTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testOptionalLongAbsent() throws Exception
     {
         assertFalse(MAPPER.readValue(MAPPER.writeValueAsBytes(OptionalLong.empty()), OptionalLong.class).isPresent());
     }
 
+    @Test
     public void testOptionalLongInArrayAbsent() throws Exception
     {
         OptionalLong[] arr = MAPPER.readValue("[null]", OptionalLong[].class);
@@ -106,12 +116,14 @@ public class OptionalNumbersTest extends BaseMapTest
         assertNotNull(arr[0]);
         assertFalse(arr[0].isPresent());
     }
-    
+
+    @Test
     public void testOptionalLongPresent() throws Exception
     {
         assertEquals(Long.MAX_VALUE, MAPPER.readValue(MAPPER.writeValueAsBytes(OptionalLong.of(Long.MAX_VALUE)), OptionalLong.class).getAsLong());
     }
 
+    @Test
     public void testOptionalLongCoerceFromString() throws Exception
     {
         OptionalLong opt = MAPPER.readValue(q("123"), OptionalLong.class);
@@ -121,7 +133,7 @@ public class OptionalNumbersTest extends BaseMapTest
         opt = MAPPER.readValue("\"\"", OptionalLong.class);
         assertNotNull(opt);
         assertFalse(opt.isPresent());
-        
+
         OptionalLongBean bean = MAPPER.readValue(a2q("{'value':null}"),
                 OptionalLongBean.class);
         assertNotNull(bean.value);
@@ -131,7 +143,8 @@ public class OptionalNumbersTest extends BaseMapTest
         assertNotNull(bean.value);
         assertEquals(19L, bean.value.getAsLong());
     }
-    
+
+    @Test
     public void testOptionalLongSerializeFilter() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -159,11 +172,13 @@ public class OptionalNumbersTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testOptionalDoubleAbsent() throws Exception
     {
         assertFalse(MAPPER.readValue(MAPPER.writeValueAsBytes(OptionalInt.empty()), OptionalInt.class).isPresent());
     }
 
+    @Test
     public void testOptionalDoubleInArrayAbsent() throws Exception
     {
         OptionalDouble[] arr = MAPPER.readValue("[null]", OptionalDouble[].class);
@@ -172,11 +187,13 @@ public class OptionalNumbersTest extends BaseMapTest
         assertFalse(arr[0].isPresent());
     }
 
+    @Test
     public void testOptionalDoublePresent() throws Exception
     {
         assertEquals(Double.MIN_VALUE, MAPPER.readValue(MAPPER.writeValueAsBytes(OptionalDouble.of(Double.MIN_VALUE)), OptionalDouble.class).getAsDouble());
     }
 
+    @Test
     public void testOptionalDoubleCoerceFromString() throws Exception
     {
         OptionalDouble opt = MAPPER.readValue(q("0.25"), OptionalDouble.class);
@@ -186,7 +203,7 @@ public class OptionalNumbersTest extends BaseMapTest
         opt = MAPPER.readValue("\"\"", OptionalDouble.class);
         assertNotNull(opt);
         assertFalse(opt.isPresent());
-        
+
         OptionalDoubleBean bean = MAPPER.readValue(a2q("{'value':null}"),
                 OptionalDoubleBean.class);
         assertNotNull(bean.value);
@@ -197,6 +214,7 @@ public class OptionalNumbersTest extends BaseMapTest
         assertEquals(0.5, bean.value.getAsDouble());
     }
 
+    @Test
     public void testOptionalDoubleInArraySpecialValues() throws Exception
     {
         OptionalDouble[] actual = MAPPER.readValue(
@@ -213,6 +231,7 @@ public class OptionalNumbersTest extends BaseMapTest
         assertArrayEquals(expected, actual);
     }
 
+    @Test
     public void testOptionalDoubleInArraySpecialValuesWithoutCoercion() throws Exception
     {
         OptionalDouble[] actual = MAPPER_WITHOUT_COERCION.readValue(
@@ -228,12 +247,14 @@ public class OptionalNumbersTest extends BaseMapTest
         assertArrayEquals(expected, actual);
     }
 
+    @Test
     public void testQuotedOptionalDoubleWithoutCoercion()
     {
         assertThrows(MismatchedInputException.class,
                 () -> MAPPER_WITHOUT_COERCION.readValue(a2q("['1']"), OptionalDouble[].class));
     }
 
+    @Test
     public void testOptionalDoubleBeanSpecialValuesWithoutCoercion_null() throws Exception
     {
         OptionalDoubleBean bean = MAPPER_WITHOUT_COERCION.readValue(
@@ -241,6 +262,7 @@ public class OptionalNumbersTest extends BaseMapTest
         assertEquals(OptionalDouble.empty(), bean.value);
     }
 
+    @Test
     public void testOptionalDoubleBeanSpecialValuesWithoutCoercion_nan() throws Exception
     {
         OptionalDoubleBean bean = MAPPER_WITHOUT_COERCION.readValue(
@@ -248,6 +270,7 @@ public class OptionalNumbersTest extends BaseMapTest
         assertEquals(OptionalDouble.of(Double.NaN), bean.value);
     }
 
+    @Test
     public void testOptionalDoubleBeanSpecialValuesWithoutCoercion_positiveInfinity() throws Exception
     {
         OptionalDoubleBean bean = MAPPER_WITHOUT_COERCION.readValue(
@@ -255,6 +278,7 @@ public class OptionalNumbersTest extends BaseMapTest
         assertEquals(OptionalDouble.of(Double.POSITIVE_INFINITY), bean.value);
     }
 
+    @Test
     public void testOptionalDoubleBeanSpecialValuesWithoutCoercion_negativeInfinity() throws Exception
     {
         OptionalDoubleBean bean = MAPPER_WITHOUT_COERCION.readValue(

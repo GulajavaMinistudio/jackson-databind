@@ -1,19 +1,26 @@
 package tools.jackson.databind.deser.builder;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
-import java.util.LinkedHashMap;
-import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
 
 // [databind#921]: support infering type parameters from Builder
 public class BuilderWithTypeParametersTest
-    extends BaseMapTest
 {
     public static class MyPOJO {
       public String x;
@@ -40,9 +47,9 @@ public class BuilderWithTypeParametersTest
 
       // 28-Apr-2020, tatu: Note that as per [databind#921] the NAME of
       //   type variable here MUST match that of enclosing class. This has
-      //   no semantic meaning to JDK or javac, but internally 
+      //   no semantic meaning to JDK or javac, but internally
       //   `MapperFeature.INFER_BUILDER_TYPE_BINDINGS` relies on this -- but
-      //   can not really validate it. So user just has to rely on bit of
+      //   cannot really validate it. So user just has to rely on bit of
       //    black magic to use generic types with builders.
       public static class Builder<T> {
         private List<T> data;
@@ -61,7 +68,7 @@ public class BuilderWithTypeParametersTest
     // 05-Sep-2020, tatu: This is not correct and cannot be made to work --
     //   assumption is that static method binding `T` would somehow refer to
     //   class type parameter `T`: this is not true.
-/*    
+/*
     public static class MyGenericPOJOWithCreator<T> {
       List<T> data;
 
@@ -93,6 +100,7 @@ public class BuilderWithTypeParametersTest
     }
     */
 
+    @Test
     public void testWithBuilderInferringBindings() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .enable(MapperFeature.INFER_BUILDER_TYPE_BINDINGS)
@@ -106,6 +114,7 @@ public class BuilderWithTypeParametersTest
         assertEquals(MyPOJO.class, ob.getClass());
     }
 
+    @Test
     public void testWithBuilderWithoutInferringBindings() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .disable(MapperFeature.INFER_BUILDER_TYPE_BINDINGS)
@@ -119,8 +128,9 @@ public class BuilderWithTypeParametersTest
       assertEquals(LinkedHashMap.class, ob.getClass());
     }
 
-    // 05-Sep-2020, tatu: see above for reason why this can not work
-/*    
+    // 05-Sep-2020, tatu: see above for reason why this cannot work
+/*
+    @Test
     public void testWithCreator() throws Exception {
       final ObjectMapper mapper = new ObjectMapper();
       final String json = a2q("{ 'data': [ { 'x': 'x', 'y': 'y' } ] }");

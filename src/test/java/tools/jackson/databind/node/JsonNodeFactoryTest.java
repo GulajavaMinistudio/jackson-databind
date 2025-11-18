@@ -4,8 +4,13 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.TreeMap;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.json.JsonMapper;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonNodeFactoryTest extends NodeTestBase
 {
@@ -22,9 +27,11 @@ public class JsonNodeFactoryTest extends NodeTestBase
         }
     }
 
+    @Test
     public void testSimpleCreation()
     {
         JsonNodeFactory f = MAPPER.getNodeFactory();
+
         JsonNode n;
 
         n = f.numberNode((byte) 4);
@@ -53,10 +60,11 @@ public class JsonNodeFactoryTest extends NodeTestBase
     // 09-Sep-2020, tatu: Let's try something more useful: auto-sorting
     //    Tree Model!
 
-   public void testSortingObjectNode() throws Exception
-   {
+    @Test
+    public void testSortingObjectNode() throws Exception
+    {
        final String SIMPLE_INPUT = "{\"b\":2,\"a\":1}";
-       
+
        // First, by default, ordering retained:
        assertEquals(SIMPLE_INPUT,
                MAPPER.writeValueAsString(MAPPER.readTree(SIMPLE_INPUT)));
@@ -75,7 +83,8 @@ public class JsonNodeFactoryTest extends NodeTestBase
                MAPPER.writeValueAsString(mapper.readTree(BIGGER_INPUT)));
    }
 
-   // 06-Nov-2022, tatu: Wasn't being tests, oddly enough
+   // 06-Nov-2022, tatu: Wasn't being tested, oddly enough
+    @Test
    public void testBigDecimalNormalization() throws Exception
    {
        final BigDecimal NON_NORMALIZED = new BigDecimal("12.5000");
@@ -86,12 +95,11 @@ public class JsonNodeFactoryTest extends NodeTestBase
        assertEquals(NON_NORMALIZED, n1.decimalValue());
 
        // But can change
-       JsonNodeFactory nf = JsonNodeFactory.withExactBigDecimals(false);
-       ObjectMapper nonNormMapper = JsonMapper.builder()
+       ObjectMapper normMapper = JsonMapper.builder()
                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-               .nodeFactory(nf)
+               .enable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
                .build();
-       JsonNode n3 = nonNormMapper.readTree(String.valueOf(NON_NORMALIZED));
+       JsonNode n3 = normMapper.readTree(String.valueOf(NON_NORMALIZED));
        assertEquals(NORMALIZED, n3.decimalValue());
    }
 }

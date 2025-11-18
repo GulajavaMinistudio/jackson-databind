@@ -28,19 +28,19 @@ public enum MapperFeature
 
     /**
      * Feature that determines whether otherwise regular "getter"
-     * methods (but only ones that handle Collections and Maps,
-     * not getters of other type)
-     * can be used for purpose of getting a reference to a Collection
-     * and Map to modify the property, without requiring a setter
-     * method.
-     * This is similar to how JAXB framework sets Collections and
-     * Maps: no setter is involved, just getter.
+     * methods (but only ones that handle {@link java.util.Collection}s
+     * and {@link java.util.Map}s, not getters of other types)
+     * can be used for purpose of getting a reference to
+     * {@code Collection} / {@code Map} valued properties,
+     * without requiring a setter method.
+     * This is similar to how JAXB framework sets {@code Collection}s
+     * and {@code Map}s: no setter is involved, just getter.
      *<p>
      * Note that such getters-as-setters methods have lower
      * precedence than setters, so they are only used if no
      * setter is found for the Map/Collection property.
      *<p>
-     * Feature is disabled by default since 3.0 (with 2.x was enabled)
+     * Feature is disabled by default since 3.0 (in 2.x was enabled)
      */
     USE_GETTERS_AS_SETTERS(false),
 
@@ -52,6 +52,10 @@ public enum MapperFeature
      * Feature is disabled by default, meaning that existence of `transient`
      * for a field does not necessarily lead to ignoral of getters or setters
      * but just ignoring the use of field for access.
+     *<p>
+     * NOTE! This should have no effect on <b>explicit</b> ignoral annotation
+     * possibly added to {@code transient} fields: those should always have expected
+     * semantics (same as if field was not {@code transient}).
      */
     PROPAGATE_TRANSIENT_MARKER(false),
 
@@ -74,9 +78,9 @@ public enum MapperFeature
      * rules; if disabled, such fields are NOT used as mutators except if
      * explicitly annotated for such use.
      *<p>
-     * Feature is enabled by default, for backwards compatibility reasons.
+     * Feature is disabled by default in Jackson 3.x, in 2.x it was enabled by default.
      */
-    ALLOW_FINAL_FIELDS_AS_MUTATORS(true),
+    ALLOW_FINAL_FIELDS_AS_MUTATORS(false),
 
     /**
      * Feature that determines whether member mutators (fields and
@@ -102,7 +106,7 @@ public enum MapperFeature
      * parameter name information is used, but constructor is NOT considered an explicit
      * Creator (although may be discovered as one using other annotations or heuristics).
      *<p>
-     * Feature is mostly used to help inter-operability with frameworks like Lombok
+     * Feature is mostly used to help interoperability with frameworks like Lombok
      * that may automatically generate {@code ConstructorProperties} annotation
      * but without necessarily meaning that constructor should be used as Creator
      * for deserialization.
@@ -110,6 +114,17 @@ public enum MapperFeature
      * Feature is enabled by default.
      */
     INFER_CREATOR_FROM_CONSTRUCTOR_PROPERTIES(true),
+
+    /**
+     * Feature that when enabled will allow getters with is-Prefix also for
+     * non-boolean return types; if disabled only methods that return
+     * {@code boolean} or {@code Boolean} qualify as "is getters".
+     * <p>
+     * Feature is disabled by default for backwards compatibility.
+     *
+     * @since 2.14
+     */
+    ALLOW_IS_GETTERS_FOR_NON_BOOLEAN(false),
 
     /**
      * Feature that determines whether nominal property type of {@link Void} is
@@ -121,6 +136,34 @@ public enum MapperFeature
      * Feature is enabled by default.
      */
     ALLOW_VOID_VALUED_PROPERTIES(true),
+
+    /**
+     * Feature that controls whether Jackson should detect Constructor and
+     * (factory) method parameter names (as "Implicit Names") -- similar to how
+     * {@code java.lang.reflect.Field} names are detected.
+     * This can avoid need to add explicit annotations
+     * like {@code @JsonProperty} for parameter names and allow for Creator
+     * (constructor / factory method) auto-detection (without explicit
+     * {@code @JsonCreator} annotation) as well.
+     * <p>
+     * In Jackson 2.x this functionality was provided by the separate
+     * {@code jackson-parameter-names} module; starting with Jackson 3.x functionality
+     * has been merged into core databind and is enabled by default.
+     * <p>
+     * Disabling this feature restores the older Jackson 2.x behavior where
+     * parameter names were not available as Implicit Names unless the external module
+     * was explicitly registered (NOTE: there is no 3.x version of
+     * {@code jackson-parameter-names} module).
+     * <p>
+     * Note that for constructor and factory method parameter names to be
+     * available at runtime, classes must be compiled with the Java compiler
+     * {@code -parameters} option.
+     *<p>
+     * Feature is enabled by default.
+     *
+     * @since 3.0
+     */
+    DETECT_PARAMETER_NAMES(true),
 
     /*
     /**********************************************************************
@@ -170,6 +213,16 @@ public enum MapperFeature
      */
     OVERRIDE_PUBLIC_ACCESS_MODIFIERS(true),
 
+    /**
+     * Feature that inverse logic in {@link com.fasterxml.jackson.annotation.JsonProperty#access}
+     * for <code>READ_ONLY</code> and <code>WRITE_ONLY</code>.
+     *<p>
+     * Feature is disabled by default.
+     *
+     * @since 2.19
+     */
+    INVERSE_READ_WRITE_ACCESS(false),
+
     /*
     /**********************************************************************
     /* Type-handling features
@@ -214,16 +267,27 @@ public enum MapperFeature
      * Feature is enabled by default which means that deserialization does
      * support deserializing types via builders with type parameters (generic types).
      *<p>
-     * See: https://github.com/FasterXML/jackson-databind/issues/921
+     * See: <a href="https://github.com/FasterXML/jackson-databind/issues/921">databind#921</a>
      */
     INFER_BUILDER_TYPE_BINDINGS(true),
+
+    /**
+     * Feature that determines what happens when deserializing to a registered sub-type
+     * (polymorphic deserialization), but no type information has been provided.
+     * If enabled, then an {@code InvalidTypeIdException} will be thrown;
+     * if disabled then the deserialization may proceed without the type information
+     * if sub-type is legit target (non-abstract).
+     *<p>
+     * Feature is enabled by default.
+     */
+    REQUIRE_TYPE_ID_FOR_SUBTYPES(true),
 
     /*
     /**********************************************************************
     /* View-related features
     /**********************************************************************
      */
-    
+
     /**
      * Feature that determines whether properties that have no view
      * annotations are included in JSON serialization views (see
@@ -234,13 +298,12 @@ public enum MapperFeature
      * changes between "opt-in" (feature disabled) and
      * "opt-out" (feature enabled) modes.
      *<p>
-     * Default value is enabled, meaning that non-annotated
-     * properties are included in all views if there is no
+     * Feature is disabled by default as of Jackson 3.0 (in 2.x it was enabled),
+     * meaning that non-annotated
+     * properties are not included views if there is no
      * {@link com.fasterxml.jackson.annotation.JsonView} annotation.
-     *<p>
-     * Feature is enabled by default.
      */
-    DEFAULT_VIEW_INCLUSION(true),
+    DEFAULT_VIEW_INCLUSION(false),
 
     /*
     /**********************************************************************
@@ -263,9 +326,9 @@ public enum MapperFeature
      * Note: does <b>not</b> apply to {@link java.util.Map} serialization (since
      * entries are not considered Bean/POJO properties.
      *<p>
-     * Feature is disabled by default.
+     * Feature is enabled by default since 3.0 (in 2.x was disabled)
      */
-    SORT_PROPERTIES_ALPHABETICALLY(false),
+    SORT_PROPERTIES_ALPHABETICALLY(true),
 
     /**
      * Feature that defines whether Creator properties (ones passed through
@@ -277,6 +340,11 @@ public enum MapperFeature
      *<p>
      * Note: does <b>not</b> apply to {@link java.util.Map} serialization (since
      * entries are not considered Bean/POJO properties.
+     * <p>
+     * WARNING: Disabling it may have a negative impact on deserialization performance.
+     * When disabled, all properties before the last creator property in the input need to be buffered,
+     * since all creator properties are required to create the instance.
+     * Enabling this feature ensures that there is as little buffering as possible. 
      *<p>
      * Feature is enabled by default.
      */
@@ -349,15 +417,17 @@ public enum MapperFeature
     ALLOW_EXPLICIT_PROPERTY_RENAMING(false),
 
     /**
-     * Feature that when enabled will allow getters with is-Prefix also for
-     * non-boolean return types; if disabled only methods that return
-     * {@code boolean} or {@code Boolean} qualify as "is getters".
+     * Feature that can be enabled to solve problem where an upper-case letter in
+     * the first 2 characters of Java field name (like {@code "IPhone"} or {@code "iPhone"})
+     * prevents match with property name derived from accessors (getter like
+     * {@code getIPhone()} becomes {@code "iphone"}).
+     * If enabled, additional checking is done with case-insensitive comparison (for
+     * cases of the first or second letter of Field name being upper-case) to merge
+     * accessors. If disabled, no special processing is done.
      * <p>
-     * Feature is disabled by default for backwards compatibility.
-     *
-     * @since 2.14
+     * Feature is enabled by default since 3.0 (in 2.x was disabled)
      */
-    ALLOW_IS_GETTERS_FOR_NON_BOOLEAN(false),
+    FIX_FIELD_NAME_UPPER_CASE_PREFIX(true),
 
     /*
     /**********************************************************************
@@ -433,7 +503,7 @@ public enum MapperFeature
         _defaultState = defaultState;
         _mask = (1L << ordinal());
     }
-    
+
     public boolean enabledByDefault() { return _defaultState; }
 
     public long getLongMask() {

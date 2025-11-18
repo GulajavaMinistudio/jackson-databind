@@ -22,8 +22,6 @@ import tools.jackson.databind.util.Annotations;
 public final class SetterlessProperty
     extends SettableBeanProperty
 {
-    private static final long serialVersionUID = 1L;
-
     protected final AnnotatedMethod _annotated;
 
     /**
@@ -79,12 +77,17 @@ public final class SetterlessProperty
                 config.isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS));
     }
 
+    @Override // since 2.20
+    public boolean isMerging() {
+        return true;
+    }
+
     /*
     /**********************************************************
     /* BeanProperty impl
     /**********************************************************
      */
-    
+
     @Override
     public <A extends Annotation> A getAnnotation(Class<A> acls) {
         return _annotated.getAnnotation(acls);
@@ -97,7 +100,7 @@ public final class SetterlessProperty
     /* Overridden methods
     /**********************************************************
      */
-    
+
     @Override
     public final void deserializeAndSet(JsonParser p, DeserializationContext ctxt,
             Object instance) throws JacksonException
@@ -143,14 +146,14 @@ public final class SetterlessProperty
     }
 
     @Override
-    public final void set(Object instance, Object value) {
+    public final void set(DeserializationContext ctxt, Object instance, Object value) {
         throw new UnsupportedOperationException("Should never call `set()` on setterless property ('"+getName()+"')");
     }
 
     @Override
-    public Object setAndReturn(Object instance, Object value)
+    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value)
     {
-        set(instance, value);
+        set(ctxt, instance, value);
         return instance;
     }
 }

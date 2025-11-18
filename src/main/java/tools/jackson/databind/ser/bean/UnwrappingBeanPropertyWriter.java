@@ -1,13 +1,12 @@
 package tools.jackson.databind.ser.bean;
 
-import java.util.Iterator;
 import java.util.Map.Entry;
 
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.io.SerializedString;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import tools.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
@@ -23,10 +22,7 @@ import tools.jackson.databind.util.NameTransformer;
  */
 public class UnwrappingBeanPropertyWriter
     extends BeanPropertyWriter
-    implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L;
-
     /**
      * Transformer used to add prefix and/or suffix for properties
      * of unwrapped POJO.
@@ -58,7 +54,7 @@ public class UnwrappingBeanPropertyWriter
 
         // important: combine transformers:
         transformer = NameTransformer.chainedTransformer(transformer, _nameTransformer);
-    
+
         return _new(transformer, new SerializedString(newName));
     }
 
@@ -82,7 +78,7 @@ public class UnwrappingBeanPropertyWriter
     }
 
     @Override
-    public void serializeAsProperty(Object bean, JsonGenerator gen, SerializerProvider prov)
+    public void serializeAsProperty(Object bean, JsonGenerator gen, SerializationContext prov)
         throws Exception
     {
         final Object value = get(bean);
@@ -153,7 +149,7 @@ public class UnwrappingBeanPropertyWriter
 
     @Override
     public void depositSchemaProperty(final JsonObjectFormatVisitor visitor,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         ValueSerializer<Object> ser = provider
                 .findPrimaryPropertySerializer(getType(), this)
@@ -179,9 +175,7 @@ public class UnwrappingBeanPropertyWriter
     {
         JsonNode props = schemaNode.get("properties");
         if (props != null) {
-            Iterator<Entry<String, JsonNode>> it = props.fields();
-            while (it.hasNext()) {
-                Entry<String,JsonNode> entry = it.next();
+            for (Entry<String,JsonNode> entry : props.properties()) {
                 String name = entry.getKey();
                 if (_nameTransformer != null) {
                     name = _nameTransformer.transform(name);
@@ -196,11 +190,11 @@ public class UnwrappingBeanPropertyWriter
     /* Overrides: internal, other
     /**********************************************************************
      */
-    
+
     // need to override as we must get unwrapping instance...
     @Override
     protected ValueSerializer<Object> _findAndAddDynamic(PropertySerializerMap map,
-            Class<?> type, SerializerProvider provider)
+            Class<?> type, SerializationContext provider)
     {
         ValueSerializer<Object> serializer;
         if (_nonTrivialBaseType != null) {
@@ -217,7 +211,7 @@ public class UnwrappingBeanPropertyWriter
                 t = NameTransformer.chainedTransformer(t, ((UnwrappingBeanSerializer) serializer)._nameTransformer);
         }
         serializer = serializer.unwrappingSerializer(t);
-        
+
         _dynamicSerializers = _dynamicSerializers.newWith(type, serializer);
         return serializer;
     }

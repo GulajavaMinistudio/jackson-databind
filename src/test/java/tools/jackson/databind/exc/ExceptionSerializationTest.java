@@ -3,18 +3,22 @@ package tools.jackson.databind.exc;
 import java.io.IOException;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import tools.jackson.core.JsonParser;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
 
 /**
  * Unit tests for verifying that simple exceptions can be serialized.
  */
 public class ExceptionSerializationTest
-    extends BaseMapTest
 {
     @SuppressWarnings("serial")
     @JsonIgnoreProperties({ "bogus1" })
@@ -47,6 +51,7 @@ public class ExceptionSerializationTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSimple() throws Exception
     {
         String TEST = "test exception";
@@ -71,6 +76,7 @@ public class ExceptionSerializationTest
     }
 
     // to double-check [databind#1413]
+    @Test
     public void testSimpleOther() throws Exception
     {
         JsonParser p = MAPPER.createParser("{ }");
@@ -79,9 +85,10 @@ public class ExceptionSerializationTest
         p.close();
         assertNotNull(json);
     }
-    
+
     // for [databind#877]
     @SuppressWarnings("unchecked")
+    @Test
     public void testIgnorals() throws Exception
     {
         ExceptionWithIgnoral input = new ExceptionWithIgnoral("foobar");
@@ -117,6 +124,7 @@ public class ExceptionSerializationTest
     }
 
     // [databind#1368]
+    @Test
     public void testDatabindExceptionSerialization() throws IOException {
         Exception e = null;
         // cant deserialize due to unexpected constructor
@@ -130,7 +138,7 @@ public class ExceptionSerializationTest
         // but should be able to serialize new exception we got
         String json = MAPPER.writeValueAsString(e);
         JsonNode root = MAPPER.readTree(json);
-        String msg = root.path("message").asText();
+        String msg = root.path("message").asString();
         String MATCH = "cannot construct instance";
         if (!msg.toLowerCase().contains(MATCH)) {
             fail("Exception should contain '"+MATCH+"', does not: '"+msg+"'");
@@ -138,6 +146,7 @@ public class ExceptionSerializationTest
     }
 
     // [databind#3275]
+    @Test
     public void testSerializeWithNamingStrategy() throws IOException {
         final ObjectMapper mapper = JsonMapper.builder()
                 .propertyNamingStrategy(PropertyNamingStrategies.UPPER_CAMEL_CASE)

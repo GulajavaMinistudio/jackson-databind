@@ -1,11 +1,19 @@
 package tools.jackson.databind.node;
 
+import java.math.BigDecimal;
+
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.DatatypeFeatures;
 import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 // Tests for new (2.14) `JsonNodeFeature`
-public class NodeFeaturesTest extends BaseMapTest
+public class NodeFeaturesTest extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = newJsonMapper();
     private final ObjectReader READER = MAPPER.reader();
@@ -19,6 +27,7 @@ public class NodeFeaturesTest extends BaseMapTest
     private final String JSON_EMPTY = ("{}");
     private final String JSON_WITH_NULL = a2q("{'nvl':null}");
 
+    @Test
     public void testDefaultSettings() throws Exception
     {
         assertTrue(READER.isEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
@@ -30,13 +39,38 @@ public class NodeFeaturesTest extends BaseMapTest
                 .isEnabled(JsonNodeFeature.WRITE_NULL_PROPERTIES));
     }
 
+    @Test
+    public void testImplicitVsExplicit()
+    {
+        DatatypeFeatures dfs = DatatypeFeatures.defaultFeatures();
+        assertTrue(dfs.isEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertFalse(dfs.isExplicitlySet(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertFalse(dfs.isExplicitlyEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertFalse(dfs.isExplicitlyDisabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+
+        // disable
+        dfs = dfs.without(JsonNodeFeature.READ_NULL_PROPERTIES);
+        assertFalse(dfs.isEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertTrue(dfs.isExplicitlySet(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertFalse(dfs.isExplicitlyEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertTrue(dfs.isExplicitlyDisabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+
+        // re-enable
+        dfs = dfs.with(JsonNodeFeature.READ_NULL_PROPERTIES);
+        assertTrue(dfs.isEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertTrue(dfs.isExplicitlySet(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertTrue(dfs.isExplicitlyEnabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+        assertFalse(dfs.isExplicitlyDisabled(JsonNodeFeature.READ_NULL_PROPERTIES));
+    }
+
     /*
     /**********************************************************************
-    /* ObjectNode property handling
+    /* ObjectNode property handling: null-handling
     /**********************************************************************
      */
-    
+
     // [databind#3421]
+    @Test
     public void testReadNulls() throws Exception
     {
         // so by default we'll get null included
@@ -61,6 +95,7 @@ public class NodeFeaturesTest extends BaseMapTest
     }
 
     // [databind#3476]
+    @Test
     public void testWriteNulls() throws Exception
     {
         // so by default we'll get null written
@@ -87,7 +122,92 @@ public class NodeFeaturesTest extends BaseMapTest
 
     /*
     /**********************************************************************
+    /* ObjectNode property handling: sorting on write
+    /**********************************************************************
+     */
+
+    // [databind#3476]
+    @Test
+    public void testWriteSortedProperties() throws Exception
+    {
+        assertFalse(WRITER.isEnabled(JsonNodeFeature.WRITE_PROPERTIES_SORTED));
+
+        ObjectNode doc = MAPPER.createObjectNode();
+        doc.put("b", 2);
+        doc.put("c", 3);
+        doc.put("a", 1);
+
+        // by default, retain insertion order:
+        assertEquals(a2q("{'b':2,'c':3,'a':1}"), WRITER.writeValueAsString(doc));
+
+        // but if forcing sorting, changes
+        final String SORTED = a2q("{'a':1,'b':2,'c':3}");
+        ObjectMapper sortingMapper = JsonMapper.builder()
+                .enable(JsonNodeFeature.WRITE_PROPERTIES_SORTED)
+                .build();
+        assertEquals(SORTED, sortingMapper.writeValueAsString(doc));
+
+        // Let's verify ObjectWriter config too
+        ObjectWriter w2 = WRITER.with(JsonNodeFeature.WRITE_PROPERTIES_SORTED);
+        assertTrue(w2.isEnabled(JsonNodeFeature.WRITE_PROPERTIES_SORTED));
+        assertEquals(SORTED, w2.writeValueAsString(doc));
+    }
+
+    /*
+    /**********************************************************************
     /* Other features
     /**********************************************************************
      */
+
+    // [databind#4801] USE_BIG_DECIMAL_FOR_FLOATS
+    @Test
+    public void testBigDecimalForJsonNodeFeature() throws Exception {
+        final String JSON = "0.1234567890123456789012345678912345"; // Precision-sensitive
+
+        BigDecimal expectedBigDecimal = new BigDecimal("0.1234567890123456789012345678912345"); // Full precision
+        BigDecimal expectedDoubleLossy = new BigDecimal("0.12345678901234568"); // Precision loss
+
+        ObjectMapper mapper;
+
+        // Case 1: Both enabled → Should use BigDecimal
+        mapper = JsonMapper.builder()
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedBigDecimal, mapper.readTree(JSON).decimalValue());
+
+        // Case 2: Global enabled, JsonNodeFeature disabled → Should use Double (truncated decimal)
+        mapper = JsonMapper.builder()
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .disable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedDoubleLossy, mapper.readTree(JSON).decimalValue());
+
+        // Case 3: Global enabled, JsonNodeFeature undefined → Should use BigDecimal (default to global)
+        mapper = JsonMapper.builder()
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedBigDecimal, mapper.readTree(JSON).decimalValue());
+
+        // Case 4: Global disabled, JsonNodeFeature enabled → Should use BigDecimal
+        mapper = JsonMapper.builder()
+                .disable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedBigDecimal, mapper.readTree(JSON).decimalValue());
+
+        // Case 5: Both disabled → Should use Double (truncated decimal)
+        mapper = JsonMapper.builder()
+                .disable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .disable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedDoubleLossy, mapper.readTree(JSON).decimalValue());
+
+        // Case 6: Global disabled, JsonNodeFeature undefined → Should use Double (default to global, truncated decimal)
+        mapper = JsonMapper.builder()
+                .disable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                .build();
+        assertEquals(expectedDoubleLossy, mapper.readTree(JSON).decimalValue());
+    }
+
 }

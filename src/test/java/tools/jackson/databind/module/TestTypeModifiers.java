@@ -2,21 +2,25 @@ package tools.jackson.databind.module;
 
 import java.lang.reflect.Type;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import tools.jackson.core.*;
 import tools.jackson.core.exc.StreamReadException;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.ser.Serializers;
 import tools.jackson.databind.ser.std.StdSerializer;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.type.*;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 @SuppressWarnings("serial")
-public class TestTypeModifiers extends BaseMapTest
+public class TestTypeModifiers extends DatabindTestUtil
 {
     private static class ModifierModule extends SimpleModule
     {
@@ -30,7 +34,7 @@ public class TestTypeModifiers extends BaseMapTest
             context.addSerializers(new Serializers.Base() {
                 @Override
                 public ValueSerializer<?> findMapLikeSerializer(SerializationConfig config,
-                        MapLikeType type, BeanDescription beanDesc, JsonFormat.Value format,
+                        MapLikeType type, BeanDescription.Supplier beanDesc, JsonFormat.Value format,
                         ValueSerializer<Object> keySerializer,
                         TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
                 {
@@ -42,7 +46,7 @@ public class TestTypeModifiers extends BaseMapTest
 
                 @Override
                 public ValueSerializer<?> findCollectionLikeSerializer(SerializationConfig config,
-                        CollectionLikeType type, BeanDescription beanDesc, JsonFormat.Value format,
+                        CollectionLikeType type, BeanDescription.Supplier beanDesc, JsonFormat.Value format,
                         TypeSerializer elementTypeSerializer, ValueSerializer<Object> elementValueSerializer)
                 {
                     if (CollectionMarker.class.isAssignableFrom(type.getRawClass())) {
@@ -53,8 +57,10 @@ public class TestTypeModifiers extends BaseMapTest
             });
             context.addDeserializers(new SimpleDeserializers() {
                 @Override
-                public ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type, DeserializationConfig config,
-                        BeanDescription beanDesc, TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
+                public ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type,
+                        DeserializationConfig config,
+                        BeanDescription.Supplier beanDescRef, TypeDeserializer elementTypeDeserializer,
+                        ValueDeserializer<?> elementDeserializer)
                 {
                     if (CollectionMarker.class.isAssignableFrom(type.getRawClass())) {
                         return new MyCollectionDeserializer();
@@ -62,8 +68,9 @@ public class TestTypeModifiers extends BaseMapTest
                     return null;
                 }
                 @Override
-                public ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type, DeserializationConfig config,
-                        BeanDescription beanDesc, KeyDeserializer keyDeserializer,
+                public ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type,
+                        DeserializationConfig config,
+                        BeanDescription.Supplier beanDescRef, KeyDeserializer keyDeserializer,
                         TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
                 {
                     if (MapMarker.class.isAssignableFrom(type.getRawClass())) {
@@ -79,11 +86,11 @@ public class TestTypeModifiers extends BaseMapTest
     {
         public XxxSerializer() { super(Object.class); }
         @Override
-        public void serialize(Object value, JsonGenerator g, SerializerProvider provider) {
+        public void serialize(Object value, JsonGenerator g, SerializationContext provider) {
             g.writeString("xxx:"+value);
         }
     }
-    
+
     interface MapMarker<K,V> {
         public K getKey();
         public V getValue();
@@ -132,9 +139,9 @@ public class TestTypeModifiers extends BaseMapTest
             _keySerializer = keySer;
             _valueSerializer = valueSer;
         }
-        
+
         @Override
-        public void serialize(MapMarker<?,?> value, JsonGenerator jgen, SerializerProvider provider)
+        public void serialize(MapMarker<?,?> value, JsonGenerator jgen, SerializationContext provider)
         {
             jgen.writeStartObject();
             if (_keySerializer == null) {
@@ -162,14 +169,14 @@ public class TestTypeModifiers extends BaseMapTest
             int value = p.getIntValue();
             if (p.nextToken() != JsonToken.END_OBJECT) throw new StreamReadException(p, "Wrong token: "+p.currentToken());
             return new MyMapLikeType(key, value);
-        }        
+        }
     }
 
     static class MyCollectionSerializer extends StdSerializer<MyCollectionLikeType>
     {
         public MyCollectionSerializer() { super(MyCollectionLikeType.class); }
         @Override
-        public void serialize(MyCollectionLikeType value, JsonGenerator g, SerializerProvider provider) {
+        public void serialize(MyCollectionLikeType value, JsonGenerator g, SerializationContext provider) {
             g.writeStartArray();
             g.writeNumber(value.value);
             g.writeEndArray();
@@ -184,7 +191,7 @@ public class TestTypeModifiers extends BaseMapTest
             int value = p.getIntValue();
             if (p.nextToken() != JsonToken.END_ARRAY) throw new StreamReadException(p, "Wrong token: "+p.currentToken());
             return new MyCollectionLikeType(value);
-        }        
+        }
     }
 
     static class MyTypeModifier extends TypeModifier
@@ -212,17 +219,18 @@ public class TestTypeModifiers extends BaseMapTest
      */
 
     private final ObjectMapper MY_TYPE_MAPPER = jsonMapperBuilder()
-            .typeFactory(TypeFactory.defaultInstance().withModifier(new MyTypeModifier()))
+            .typeFactory(defaultTypeFactory().withModifier(new MyTypeModifier()))
             .build();
 
     private final ObjectMapper MAPPER_WITH_MODIFIER = jsonMapperBuilder()
-            .typeFactory(TypeFactory.defaultInstance().withModifier(new MyTypeModifier()))
+            .typeFactory(defaultTypeFactory().withModifier(new MyTypeModifier()))
             .addModule(new ModifierModule())
             .build();
 
     /**
      * Basic test for ensuring that we can get "xxx-like" types recognized.
      */
+    @Test
     public void testMapLikeTypeConstruction() throws Exception
     {
         JavaType type = MY_TYPE_MAPPER.constructType(MyMapLikeType.class);
@@ -236,6 +244,7 @@ public class TestTypeModifiers extends BaseMapTest
         assertSame(Integer.class, param.getRawClass());
     }
 
+    @Test
     public void testMapLikeTypeViaParametric() throws Exception
     {
         // [databind#2796]: should refine with another call too
@@ -252,15 +261,17 @@ public class TestTypeModifiers extends BaseMapTest
     }
 
     // [databind#2395] Can trigger problem this way too
-    // NOTE: oddly enough, seems to ONLY fail 
+    // NOTE: oddly enough, seems to ONLY fail
+    @Test
     public void testTypeResolutionForRecursive() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .typeFactory(TypeFactory.defaultInstance().withModifier(new MyTypeModifier()))
+                .typeFactory(defaultTypeFactory().withModifier(new MyTypeModifier()))
                 .build();
         assertNotNull(mapper.readTree("{}"));
     }
 
+    @Test
     public void testCollectionLikeTypeConstruction() throws Exception
     {
         JavaType type = MY_TYPE_MAPPER.constructType(MyCollectionLikeType.class);
@@ -270,17 +281,20 @@ public class TestTypeModifiers extends BaseMapTest
         assertSame(Integer.class, param.getRawClass());
     }
 
+    @Test
     public void testCollectionLikeSerialization() throws Exception
     {
         assertEquals("[19]", MAPPER_WITH_MODIFIER.writeValueAsString(new MyCollectionLikeType(19)));
     }
 
+    @Test
     public void testMapLikeSerialization() throws Exception
     {
         // Due to custom serializer, should get:
         assertEquals("{\"x\":\"xxx:3\"}", MAPPER_WITH_MODIFIER.writeValueAsString(new MyMapLikeType("x", 3)));
     }
 
+    @Test
     public void testCollectionLikeDeserialization() throws Exception
     {
         MyMapLikeType result = MAPPER_WITH_MODIFIER.readValue("{\"a\":13}", MyMapLikeType.class);
@@ -288,6 +302,7 @@ public class TestTypeModifiers extends BaseMapTest
         assertEquals(Integer.valueOf(13), result.getValue());
     }
 
+    @Test
     public void testMapLikeDeserialization() throws Exception
     {
         MyCollectionLikeType result = MAPPER_WITH_MODIFIER.readValue("[-37]", MyCollectionLikeType.class);

@@ -37,7 +37,7 @@ public class CreatorCollector
     /**
      * Type of bean being created
      */
-    protected final BeanDescription _beanDesc;
+    protected final JavaType _beanType;
 
     protected final boolean _canFixAccess;
 
@@ -70,8 +70,8 @@ public class CreatorCollector
     /**********************************************************
      */
 
-    public CreatorCollector(BeanDescription beanDesc, MapperConfig<?> config) {
-        _beanDesc = beanDesc;
+    public CreatorCollector(MapperConfig<?> config, JavaType beanType) {
+        _beanType = beanType;
         _canFixAccess = config.canOverrideAccessModifiers();
         _forceAccess = config
                 .isEnabled(MapperFeature.OVERRIDE_PUBLIC_ACCESS_MODIFIERS);
@@ -84,9 +84,8 @@ public class CreatorCollector
                 _creators[C_DELEGATE], _delegateArgs);
         final JavaType arrayDelegateType = _computeDelegateType(ctxt,
                 _creators[C_ARRAY_DELEGATE], _arrayDelegateArgs);
-        final JavaType type = _beanDesc.getType();
 
-        StdValueInstantiator inst = new StdValueInstantiator(config, type);
+        StdValueInstantiator inst = new StdValueInstantiator(config, _beanType);
         inst.configureFromObjectSettings(_creators[C_DEFAULT], _creators[C_DELEGATE],
                 delegateType, _delegateArgs, _creators[C_PROPS],
                 _propertyBasedArgs);
@@ -113,10 +112,8 @@ public class CreatorCollector
      * or factory method that is called to instantiate a value before populating
      * it with data. Default creator is only used if no other creators are
      * indicated.
-     * 
-     * @param creator
-     *            Creator method; no-arguments constructor or static factory
-     *            method.
+     *
+     * @param creator Creator method; no-arguments constructor or factory method.
      */
     public void setDefaultCreator(AnnotatedWithParams creator) {
         _creators[C_DEFAULT] = _fixAccess(creator);
@@ -171,11 +168,12 @@ public class CreatorCollector
         if (verifyNonDup(creator, C_PROPS, explicit)) {
             // Better ensure we have no duplicate names either...
             if (properties.length > 1) {
-                HashMap<String, Integer> names = new HashMap<String, Integer>();
+                HashMap<String, Integer> names = new HashMap<>();
                 for (int i = 0, len = properties.length; i < len; ++i) {
                     String name = properties[i].getName();
                     // Need to consider Injectables, which may not have
                     // a name at all, and need to be skipped
+                    // (same for possible AnySetter)
                     if (name.isEmpty() && (properties[i].getInjectableValueId() != null)) {
                         continue;
                     }
@@ -183,7 +181,7 @@ public class CreatorCollector
                     if (old != null) {
                         throw new IllegalArgumentException(String.format(
                                 "Duplicate creator property \"%s\" (index %s vs %d) for type %s ",
-                                name, old, i, ClassUtil.nameOf(_beanDesc.getBeanClass())));
+                                name, old, i, ClassUtil.nameOf(_beanType.getRawClass())));
                     }
                 }
             }
@@ -197,23 +195,14 @@ public class CreatorCollector
     /**********************************************************
      */
 
-    /**
-     * @since 2.1
-     */
     public boolean hasDefaultCreator() {
         return _creators[C_DEFAULT] != null;
     }
 
-    /**
-     * @since 2.6
-     */
     public boolean hasDelegatingCreator() {
         return _creators[C_DELEGATE] != null;
     }
 
-    /**
-     * @since 2.6
-     */
     public boolean hasPropertyBasedCreator() {
         return _creators[C_PROPS] != null;
     }
@@ -244,12 +233,12 @@ public class CreatorCollector
 
         // 03-May-2018, tatu: need to check possible annotation-based
         //   custom deserializer [databind#2012],
-        //   type refinement(s) [databind#2016]. 
+        //   type refinement(s) [databind#2016].
         JavaType baseType = creator.getParameterType(ix);
         AnnotationIntrospector intr = config.getAnnotationIntrospector();
         if (intr != null) {
             AnnotatedParameter delegate = creator.getParameter(ix);
-            
+
             // First: custom deserializer(s):
             Object deserDef = intr.findDeserializer(config, delegate);
             if (deserDef != null) {
@@ -311,9 +300,7 @@ public class CreatorCollector
                     if (_isEnumValueOf(newOne)) {
                         return false; // ignore
                     }
-                    if (_isEnumValueOf(oldOne)) {
-                        ;
-                    } else {
+                    if (!_isEnumValueOf(oldOne)) {
                         _reportDuplicateCreator(typeIndex, explicit, oldOne, newOne);
                     }
                 }
@@ -323,7 +310,6 @@ public class CreatorCollector
                     return false;
                 } else if (oldType.isAssignableFrom(newType)) {
                     // new type more specific, use it
-                    ;
                     // 23-Feb-2021, tatu: due to [databind#3062], backwards-compatibility,
                     //   let's allow "primitive/Wrapper" case and tie-break in favor
                     //   of PRIMITIVE argument (null would never map to scalar creators,
@@ -359,7 +345,7 @@ public class CreatorCollector
                         : "implicitly discovered",
                 oldOne, newOne));
     }
-    
+
     /**
      * Helper method for recognizing `Enum.valueOf()` factory method
      */

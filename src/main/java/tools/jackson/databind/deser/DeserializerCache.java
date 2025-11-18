@@ -1,6 +1,8 @@
 package tools.jackson.databind.deser;
 
 import java.util.HashMap;
+import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -26,9 +28,11 @@ public final class DeserializerCache
     private static final long serialVersionUID = 3L;
 
     /**
-     * By default allow caching of up to 1000 deserializers.
+     * Default size of the underlying cache to use.
+     *<p>
+     * NOTE: reduced from 2.x default.
      */
-    public final static int DEFAULT_MAX_CACHED = 1000;
+    public final static int DEFAULT_MAX_CACHE_SIZE = 1000;
 
     /*
     /**********************************************************************
@@ -52,21 +56,28 @@ public final class DeserializerCache
     private final transient HashMap<JavaType, ValueDeserializer<Object>> _incompleteDeserializers
         = new HashMap<>(8);
 
+    /**
+     * We hold an explicit lock while creating deserializers to avoid creating duplicates.
+     * Guards {@link #_incompleteDeserializers}.
+     */
+    private final ReentrantLock _incompleteDeserializersLock = new ReentrantLock();
+
     /*
     /**********************************************************************
     /* Life-cycle
     /**********************************************************************
      */
 
-    public DeserializerCache() { this(DEFAULT_MAX_CACHED); }
-
-    public DeserializerCache(int maxSize) {
-        int initial = Math.min(64, maxSize>>2);
-        _cachedDeserializers = new SimpleLookupCache<>(initial, maxSize);
+    public DeserializerCache() {
+        this(new SimpleLookupCache<>(64, DEFAULT_MAX_CACHE_SIZE));
     }
 
-    private DeserializerCache(DeserializerCache src) {
-        _cachedDeserializers = src._cachedDeserializers;
+    public DeserializerCache(LookupCache<JavaType, ValueDeserializer<Object>> cache) {
+        _cachedDeserializers = cache;
+    }
+
+    public DeserializerCache emptyCopy() {
+        return new DeserializerCache(_cachedDeserializers.emptyCopy());
     }
 
     /*
@@ -77,7 +88,7 @@ public final class DeserializerCache
 
     //  Need to re-create just to initialize `transient` fields
     protected Object readResolve() {
-        return new DeserializerCache(this);
+        return new DeserializerCache(_cachedDeserializers);
     }
 
     /*
@@ -88,7 +99,7 @@ public final class DeserializerCache
 
     /**
      * Method that can be used to determine how many deserializers this
-     * provider is caching currently 
+     * provider is caching currently
      * (if it does caching: default implementation does)
      * Exact count depends on what kind of deserializers get cached;
      * default implementation caches only dynamically constructed deserializers,
@@ -110,7 +121,7 @@ public final class DeserializerCache
      * configuration changes for mapper than owns the provider.
      */
     public void flushCachedDeserializers() {
-        _cachedDeserializers.clear();       
+        _cachedDeserializers.clear();
     }
 
     /*
@@ -140,15 +151,15 @@ public final class DeserializerCache
     public ValueDeserializer<Object> findValueDeserializer(DeserializationContext ctxt,
             DeserializerFactory factory, JavaType propertyType)
     {
+        Objects.requireNonNull(propertyType, "Null 'propertyType' passed");
         ValueDeserializer<Object> deser = _findCachedDeserializer(propertyType);
         if (deser == null) {
             // If not, need to request factory to construct (or recycle)
             deser = _createAndCacheValueDeserializer(ctxt, factory, propertyType);
             if (deser == null) {
-                /* Should we let caller handle it? Let's have a helper method
-                 * decide it; can throw an exception, or return a valid
-                 * deserializer
-                 */
+                // Should we let caller handle it? Let's have a helper method
+                // decide it; can throw an exception, or return a valid
+                // deserializer
                 deser = _handleUnknownValueDeserializer(ctxt, propertyType);
             }
         }
@@ -166,6 +177,7 @@ public final class DeserializerCache
     public KeyDeserializer findKeyDeserializer(DeserializationContext ctxt,
             DeserializerFactory factory, JavaType type)
     {
+        Objects.requireNonNull(type, "Null 'type' passed");
         KeyDeserializer kd = factory.createKeyDeserializer(ctxt, type);
         if (kd == null) { // if none found, need to use a placeholder that'll fail
             return _handleUnknownKeyDeserializer(ctxt, type);
@@ -183,9 +195,7 @@ public final class DeserializerCache
 
     protected ValueDeserializer<Object> _findCachedDeserializer(JavaType type)
     {
-        if (type == null) {
-            throw new IllegalArgumentException("Null JavaType passed");
-        }
+        // note: caller ensures 'type' never null
         if (_hasCustomHandlers(type)) {
             return null;
         }
@@ -195,40 +205,51 @@ public final class DeserializerCache
     /**
      * Method that will try to create a deserializer for given type,
      * and resolve and cache it if necessary
-     * 
+     *
      * @param ctxt Currently active deserialization context
-     * @param type Type of property to deserialize
+     * @param type Type of property to deserialize (never null, callers verify)
      */
     protected ValueDeserializer<Object> _createAndCacheValueDeserializer(DeserializationContext ctxt,
             DeserializerFactory factory, JavaType type)
     {
-        /* Only one thread to construct deserializers at any given point in time;
-         * limitations necessary to ensure that only completely initialized ones
-         * are visible and used.
-         */
-        synchronized (_incompleteDeserializers) {
-            // Ok, then: could it be that due to a race condition, deserializer can now be found?
-            ValueDeserializer<Object> deser = _findCachedDeserializer(type);
+        // Only one thread to construct deserializers at any given point in time;
+        // limitations necessary to ensure that only completely initialized ones
+        // are visible and used.
+        final boolean isCustom = _hasCustomHandlers(type);
+        if (!isCustom) {
+            ValueDeserializer<Object> deser = _cachedDeserializers.get(type);
             if (deser != null) {
                 return deser;
             }
+        }
+        _incompleteDeserializersLock.lock();
+        try {
+            if (!isCustom) {
+                ValueDeserializer<Object> deser = _cachedDeserializers.get(type);
+                if (deser != null) {
+                    return deser;
+                }
+            }
+            // Ok, then: could it be that due to a race condition, deserializer can now be found?
             int count = _incompleteDeserializers.size();
             // Or perhaps being resolved right now?
             if (count > 0) {
-                deser = _incompleteDeserializers.get(type);
+                ValueDeserializer<Object> deser = _incompleteDeserializers.get(type);
                 if (deser != null) {
                     return deser;
                 }
             }
             // Nope: need to create and possibly cache
             try {
-                return _createAndCache2(ctxt, factory, type);
+                return _createAndCache2(ctxt, factory, type, isCustom);
             } finally {
                 // also: any deserializers that have been created are complete by now
                 if (count == 0 && _incompleteDeserializers.size() > 0) {
                     _incompleteDeserializers.clear();
                 }
             }
+        } finally {
+            _incompleteDeserializersLock.unlock();
         }
     }
 
@@ -237,7 +258,7 @@ public final class DeserializerCache
      * intermediate and eventual)
      */
     protected ValueDeserializer<Object> _createAndCache2(DeserializationContext ctxt,
-            DeserializerFactory factory, JavaType type)
+            DeserializerFactory factory, JavaType type, boolean isCustom)
     {
         ValueDeserializer<Object> deser;
         try {
@@ -251,11 +272,11 @@ public final class DeserializerCache
         if (deser == null) {
             return null;
         }
-        /* cache resulting deserializer? always true for "plain" BeanDeserializer
-         * (but can be re-defined for sub-classes by using @JsonCachable!)
-         */
+        // cache resulting deserializer? always true for "plain" BeanDeserializer
+        // (but can be re-defined for sub-classes by using @JsonCachable!)
+
         // 27-Mar-2015, tatu: As per [databind#735], avoid caching types with custom value desers
-        boolean addToCache = !_hasCustomHandlers(type) && deser.isCachable();
+        boolean addToCache = !isCustom && deser.isCachable();
 
         /* we will temporarily hold on to all created deserializers (to
          * handle cyclic references, and possibly reuse non-cached
@@ -266,9 +287,8 @@ public final class DeserializerCache
          *   either not add Lists or Maps, or clear references eagerly.
          *   Let's actually do both; since both seem reasonable.
          */
-        /* Need to resolve? Mostly done for bean deserializers; required for
-         * resolving cyclic references.
-         */
+        // Need to resolve? Mostly done for bean deserializers; required for
+        // resolving cyclic references.
         _incompleteDeserializers.put(type, deser);
         try {
             deser.resolve(ctxt);
@@ -286,7 +306,7 @@ public final class DeserializerCache
     /* Helper methods for actual construction of deserializers
     /**********************************************************************
      */
-    
+
     /**
      * Method that does the heavy lifting of checking for per-type annotations,
      * find out full type, and figure out which actual factory method
@@ -302,45 +322,47 @@ public final class DeserializerCache
         if (type.isAbstract() || type.isMapLikeType() || type.isCollectionLikeType()) {
             type = config.mapAbstractType(type);
         }
-        BeanDescription beanDesc = ctxt.introspectBeanDescription(type);
+        BeanDescription.Supplier beanDescRef = ctxt.lazyIntrospectBeanDescription(type);
         // Then: does type define explicit deserializer to use, with annotation(s)?
         ValueDeserializer<Object> deser = findDeserializerFromAnnotation(ctxt,
-                beanDesc.getClassInfo());
+                beanDescRef.getClassInfo());
         if (deser != null) {
             return deser;
         }
 
         // If not, may have further type-modification annotations to check:
-        JavaType newType = modifyTypeByAnnotation(ctxt, beanDesc.getClassInfo(), type);
+        JavaType newType = modifyTypeByAnnotation(ctxt, beanDescRef.getClassInfo(), type);
         if (newType != type) {
             type = newType;
-            beanDesc = ctxt.introspectBeanDescription(newType);
+            beanDescRef = ctxt.lazyIntrospectBeanDescription(newType);
         }
 
         // We may also have a Builder type to consider...
-        Class<?> builder = beanDesc.findPOJOBuilder();
+        Class<?> builder = ctxt.getAnnotationIntrospector().findPOJOBuilder(config,
+                beanDescRef.getClassInfo());
         if (builder != null) {
             return (ValueDeserializer<Object>) factory.createBuilderBasedDeserializer(
-            		ctxt, type, beanDesc, builder);
+            		ctxt, type, beanDescRef, builder);
         }
 
         // Or perhaps a Converter?
-        Converter<Object,Object> conv = beanDesc.findDeserializationConverter();
-        if (conv == null) { // nope, just construct in normal way
-            return (ValueDeserializer<Object>) _createDeserializer2(ctxt, factory, type, beanDesc);
+        Converter<Object,Object> conv = config.findDeserializationConverter(beanDescRef.getClassInfo());
+        if (conv != null) {
+            // otherwise need to do bit of introspection
+            JavaType delegateType = conv.getInputType(ctxt.getTypeFactory());
+            // One more twist, as per [databind#288]; probably need to get new BeanDesc
+            if (!delegateType.hasRawClass(type.getRawClass())) {
+                beanDescRef = ctxt.lazyIntrospectBeanDescription(delegateType);
+            }
+            return new StdConvertingDeserializer<Object>(conv, delegateType,
+                    _createDeserializer2(ctxt, factory, delegateType, beanDescRef));
         }
-        // otherwise need to do bit of introspection
-        JavaType delegateType = conv.getInputType(ctxt.getTypeFactory());
-        // One more twist, as per [databind#288]; probably need to get new BeanDesc
-        if (!delegateType.hasRawClass(type.getRawClass())) {
-            beanDesc = ctxt.introspectBeanDescription(delegateType);
-        }
-        return new StdConvertingDeserializer<Object>(conv, delegateType,
-                _createDeserializer2(ctxt, factory, delegateType, beanDesc));
+        // Nope, regular deserializer
+        return (ValueDeserializer<Object>) _createDeserializer2(ctxt, factory, type, beanDescRef);
     }
 
     protected ValueDeserializer<?> _createDeserializer2(DeserializationContext ctxt,
-            DeserializerFactory factory, JavaType type, BeanDescription beanDesc)
+            DeserializerFactory factory, JavaType type, BeanDescription.Supplier beanDescRef)
     {
         final DeserializationConfig config = ctxt.getConfig();
         // If not, let's see which factory method to use
@@ -348,49 +370,48 @@ public final class DeserializerCache
         // 12-Feb-20202, tatu: Need to ensure that not only all Enum implementations get
         //    there, but also `Enum` -- latter wrt [databind#2605], polymorphic usage
         if (type.isEnumType()) {
-            return factory.createEnumDeserializer(ctxt, type, beanDesc);
+            return factory.createEnumDeserializer(ctxt, type, beanDescRef);
         }
         if (type.isContainerType()) {
             if (type.isArrayType()) {
-                return factory.createArrayDeserializer(ctxt, (ArrayType) type, beanDesc);
+                return factory.createArrayDeserializer(ctxt, (ArrayType) type, beanDescRef);
             }
             if (type.isMapLikeType()) {
                 // 11-Mar-2017, tatu: As per [databind#1554], also need to block
-                //    handling as Map if overriden with "as POJO" option.
+                //    handling as Map if overridden with "as POJO" option.
                 // Ideally we'd determine it bit later on (to allow custom handler checks)
                 // but that won't work for other reasons. So do it here.
                 // (read: rewrite for 3.0)
-                JsonFormat.Value format = beanDesc.findExpectedFormat(type.getRawClass());
+                JsonFormat.Value format = beanDescRef.findExpectedFormat(type.getRawClass());
                 if (format.getShape() != JsonFormat.Shape.POJO) {
                     MapLikeType mlt = (MapLikeType) type;
-                    if (mlt instanceof MapType) {
-                        return factory.createMapDeserializer(ctxt,(MapType) mlt, beanDesc);
+                    if (mlt instanceof MapType mapType) {
+                        return factory.createMapDeserializer(ctxt, mapType, beanDescRef);
                     }
-                    return factory.createMapLikeDeserializer(ctxt, mlt, beanDesc);
+                    return factory.createMapLikeDeserializer(ctxt, mlt, beanDescRef);
                 }
             }
             if (type.isCollectionLikeType()) {
-                /* One exception is if shape is to be Shape.POJO (or, as alias, OBJECT).
-                 * Ideally we'd determine it bit later on (to allow custom handler checks),
-                 * but that won't work for other reasons. So do it here.
-                 */
-                JsonFormat.Value format = beanDesc.findExpectedFormat(type.getRawClass());
+                // One exception is if shape is to be Shape.POJO (or, as alias, OBJECT).
+                // Ideally we'd determine it bit later on (to allow custom handler checks),
+                // but that won't work for other reasons. So do it here.
+                JsonFormat.Value format = beanDescRef.findExpectedFormat(type.getRawClass());
                 if (format.getShape() != JsonFormat.Shape.POJO) {
                     CollectionLikeType clt = (CollectionLikeType) type;
-                    if (clt instanceof CollectionType) {
-                        return factory.createCollectionDeserializer(ctxt, (CollectionType) clt, beanDesc);
+                    if (clt instanceof CollectionType collectionType) {
+                        return factory.createCollectionDeserializer(ctxt, collectionType, beanDescRef);
                     }
-                    return factory.createCollectionLikeDeserializer(ctxt, clt, beanDesc);
+                    return factory.createCollectionLikeDeserializer(ctxt, clt, beanDescRef);
                 }
             }
         }
         if (type.isReferenceType()) {
-            return factory.createReferenceDeserializer(ctxt, (ReferenceType) type, beanDesc);
+            return factory.createReferenceDeserializer(ctxt, (ReferenceType) type, beanDescRef);
         }
         if (JsonNode.class.isAssignableFrom(type.getRawClass())) {
-            return factory.createTreeDeserializer(config, type, beanDesc);
+            return factory.createTreeDeserializer(config, type, beanDescRef);
         }
-        return factory.createBeanDeserializer(ctxt, type, beanDesc);
+        return factory.createBeanDeserializer(ctxt, type, beanDescRef);
     }
 
     /**
@@ -435,7 +456,7 @@ public final class DeserializerCache
             return null;
         }
         return ctxt.converterInstance(a, convDef);
-    }    
+    }
     /**
      * Method called to see if given method has annotations that indicate
      * a more specific type than what the argument specifies.
@@ -476,7 +497,7 @@ public final class DeserializerCache
                         // keyType = type.getKeyType(); // just in case it's used below
                     }
                 }
-            }            
+            }
         }
         JavaType contentType = type.getContentType();
         if (contentType != null) {
@@ -484,8 +505,8 @@ public final class DeserializerCache
                 Object cdDef = intr.findContentDeserializer(config, a);
                 if (cdDef != null) {
                     ValueDeserializer<?> cd = null;
-                    if (cdDef instanceof ValueDeserializer<?>) {
-                        cd = (ValueDeserializer<?>) cdDef;
+                    if (cdDef instanceof ValueDeserializer<?> valueDeserializer) {
+                        cd = valueDeserializer;
                     } else {
                         Class<?> cdClass = _verifyAsClass(cdDef, "findContentDeserializer", ValueDeserializer.None.class);
                         if (cdClass != null) {
@@ -502,7 +523,7 @@ public final class DeserializerCache
         // And after handlers, possible type refinements
         // (note: could possibly avoid this if explicit deserializer was invoked?)
         type = intr.refineDeserializationType(config, a, type);
-        
+
         return type;
     }
 
@@ -515,8 +536,6 @@ public final class DeserializerCache
     /**
      * Helper method used to prevent both caching and cache lookups for structured
      * types that have custom value handlers
-     *
-     * @since 2.8.11
      */
     private boolean _hasCustomHandlers(JavaType t) {
         if (t.isContainerType()) {

@@ -1,21 +1,27 @@
 package tools.jackson.databind.jsontype;
 
+import java.io.IOException;
+import java.util.*;
+
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-import java.io.IOException;
-import java.util.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Reproduction of [https://github.com/FasterXML/jackson-databind/issues/676]
+ * Reproduction of <a href="https://github.com/FasterXML/jackson-databind/issues/676">databind#676</a>
  * <p/>
  * Deserialization of class with generic collection inside
- * depends on how is was deserialized first time.
+ * depends on how it was deserialized first time.
  */
-public class TestPolymorphicDeserialization676 extends BaseMapTest
+public class TestPolymorphicDeserialization676 extends DatabindTestUtil
 {
     private static final int TIMESTAMP = 123456;
 
@@ -77,9 +83,11 @@ public class TestPolymorphicDeserialization676 extends BaseMapTest
      * If the class was first deserialized as polymorphic field,
      * deserialization will fail at complex type.
      */
+    @Test
     public void testDeSerFail() throws IOException {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .polymorphicTypeValidator(new NoCheckSubTypeValidator())
+                .enable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
 
         MapContainer deserMapBad = createDeSerMapContainer(originMap, mapper);
@@ -88,10 +96,12 @@ public class TestPolymorphicDeserialization676 extends BaseMapTest
                 mapper.readValue(mapper.writeValueAsString(originMap), MapContainer.class));
     }
 
+    @Test
     public void testDeSerCorrect() throws IOException {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .polymorphicTypeValidator(new NoCheckSubTypeValidator())
                 .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .enable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
         Map<String, Object> map = new HashMap<String, Object>();
         map.put("1", 1);

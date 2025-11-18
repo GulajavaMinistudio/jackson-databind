@@ -4,12 +4,17 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class OptionalMapsTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class OptionalMapsTest
+    extends DatabindTestUtil
 {
     static final class OptMapBean {
         public Map<String, Optional<?>> values;
@@ -26,6 +31,7 @@ public class OptionalMapsTest extends BaseMapTest
     /**********************************************************************
      */
 
+    @Test
     public void testMapElementInclusion() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder().changeDefaultPropertyInclusion(
@@ -42,5 +48,5 @@ public class OptionalMapsTest extends BaseMapTest
         assertEquals("{\"values\":{\"key\":\"\"}}",
                 mapper.writeValueAsString(new OptMapBean("key", Optional.of(""))));
     }
-    
+
 }

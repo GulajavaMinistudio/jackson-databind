@@ -3,8 +3,11 @@ package tools.jackson.databind.ser.jackson;
 import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
+
 import tools.jackson.core.*;
 import tools.jackson.core.type.WritableTypeId;
 import tools.jackson.databind.*;
@@ -53,7 +56,9 @@ public class JsonValueSerializer
      * one would not normally be added.
      */
     protected final boolean _forceTypeInformation;
-    
+
+    protected final Set<String> _ignoredProperties;
+
     /*
     /**********************************************************************
     /* Life-cycle
@@ -66,16 +71,18 @@ public class JsonValueSerializer
      *    {@link tools.jackson.databind.annotation.JsonSerialize#using}), otherwise
      *    null
      */
-    public JsonValueSerializer(JavaType nominalType,
+    protected JsonValueSerializer(JavaType nominalType,
             JavaType valueType, boolean staticTyping,
             TypeSerializer vts, ValueSerializer<?> ser,
-            AnnotatedMember accessor)
+            AnnotatedMember accessor,
+            Set<String> ignoredProperties)
     {
         super(nominalType, null, vts, ser);
         _valueType = valueType;
         _staticTyping = staticTyping;
         _accessor = accessor;
         _forceTypeInformation = true; // gets reconsidered when we are contextualized
+        _ignoredProperties = ignoredProperties;
     }
 
     protected JsonValueSerializer(JsonValueSerializer src, BeanProperty property,
@@ -86,6 +93,21 @@ public class JsonValueSerializer
         _accessor = src._accessor;
         _staticTyping = src._staticTyping;
         _forceTypeInformation = forceTypeInfo;
+        _ignoredProperties = src._ignoredProperties;
+    }
+
+    public static JsonValueSerializer construct(SerializationConfig config,
+            JavaType nominalType,
+            JavaType valueType, boolean staticTyping,
+            TypeSerializer vts, ValueSerializer<?> ser,
+            AnnotatedMember accessor)
+    {
+        JsonIgnoreProperties.Value ignorals = config.getAnnotationIntrospector()
+            .findPropertyIgnoralByName(config, accessor);
+        final Set<String> ignoredProperties = ignorals.findIgnoredForSerialization();
+        ser = _withIgnoreProperties(ser, ignoredProperties);
+        return new JsonValueSerializer(nominalType, valueType, staticTyping,
+                vts, ser, accessor, ignoredProperties);
     }
 
     public JsonValueSerializer withResolved(BeanProperty property,
@@ -106,7 +128,7 @@ public class JsonValueSerializer
      */
 
     @Override // since 2.12
-    public boolean isEmpty(SerializerProvider ctxt, Object bean)
+    public boolean isEmpty(SerializationContext ctxt, Object bean)
     {
         // 31-Oct-2020, tatu: Should perhaps catch access issue here... ?
         Object referenced = _accessor.getValue(bean);
@@ -115,7 +137,7 @@ public class JsonValueSerializer
         }
         ValueSerializer<Object> ser = _valueSerializer;
         if (ser == null) {
-            ser = _findAndAddDynamic(ctxt, referenced.getClass());
+            ser = _findSerializer(ctxt, referenced);
         }
         return ser.isEmpty(ctxt, referenced);
     }
@@ -131,7 +153,7 @@ public class JsonValueSerializer
      * statically figure out what the result type must be.
      */
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider ctxt,
+    public ValueSerializer<?> createContextual(SerializationContext ctxt,
             BeanProperty property)
     {
         TypeSerializer vts = _valueTypeSerializer;
@@ -149,10 +171,11 @@ public class JsonValueSerializer
                 // false -> no need to cache
                 /* 10-Mar-2010, tatu: Ideally we would actually separate out type
                  *   serializer from value serializer; but, alas, there's no access
-                 *   to serializer factory at this point... 
+                 *   to serializer factory at this point...
                  */
                 // I _think_ this can be considered a primary property...
                 ser = ctxt.findPrimaryPropertySerializer(_valueType, property);
+                ser = _withIgnoreProperties(ser, _ignoredProperties);
                 /* 09-Dec-2010, tatu: Turns out we must add special handling for
                  *   cases where "native" (aka "natural") type is being serialized,
                  *   using standard serializer
@@ -179,7 +202,8 @@ public class JsonValueSerializer
      */
 
     @Override
-    public void serialize(Object bean, JsonGenerator gen, SerializerProvider ctxt)
+    public void serialize(final Object bean, final JsonGenerator gen,
+            final SerializationContext ctxt)
         throws JacksonException
     {
         Object value;
@@ -195,13 +219,7 @@ public class JsonValueSerializer
         }
         ValueSerializer<Object> ser = _valueSerializer;
         if (ser == null) {
-            Class<?> cc = value.getClass();
-            if (_valueType.hasGenericTypes()) {
-                ser = _findAndAddDynamic(ctxt,
-                        ctxt.constructSpecializedType(_valueType, cc));
-            } else {
-                ser = _findAndAddDynamic(ctxt, cc);
-            }
+            ser = _findSerializer(ctxt, value);
         }
         if (_valueTypeSerializer != null) {
             ser.serializeWithType(value, gen, ctxt, _valueTypeSerializer);
@@ -210,8 +228,40 @@ public class JsonValueSerializer
         }
     }
 
+    protected ValueSerializer<Object> _findSerializer(SerializationContext ctxt, Object value) {
+        final UnaryOperator<ValueSerializer<Object>> serTransformer =
+                valueSer -> _withIgnoreProperties(valueSer, _ignoredProperties);
+        Class<?> cc = value.getClass();
+        if (_valueType.hasGenericTypes()) {
+            return _findAndAddDynamic(ctxt,
+                    ctxt.constructSpecializedType(_valueType, cc),
+                    serTransformer);
+        }
+        return _findAndAddDynamic(ctxt, cc, serTransformer);
+    }
+
+    /**
+     * Internal helper that configures the provided {@code ser} to ignore properties specified by {@link JsonIgnoreProperties}.
+     *
+     * @param ser  Serializer to be configured
+     * @param ignoredProperties Properties to ignore, if any
+     *
+     * @return Configured serializer with specified properties ignored
+     */
+    @SuppressWarnings("unchecked")
+    protected static ValueSerializer<Object> _withIgnoreProperties(ValueSerializer<?> ser,
+            Set<String> ignoredProperties)
+    {
+        if (ser != null) {
+            if (!ignoredProperties.isEmpty()) {
+                ser = ser.withIgnoredProperties(ignoredProperties);
+            }
+        }
+        return (ValueSerializer<Object>) ser;
+    }
+
     @Override
-    public void serializeWithType(Object bean, JsonGenerator gen, SerializerProvider ctxt,
+    public void serializeWithType(Object bean, JsonGenerator gen, SerializationContext ctxt,
             TypeSerializer typeSer0) throws JacksonException
     {
         // Regardless of other parts, first need to find value to serialize:
@@ -272,7 +322,7 @@ public class JsonValueSerializer
          *    So we will need to add special
          *    handling here (see https://github.com/FasterXML/jackson-module-jsonSchema/issues/57
          *    for details).
-         *    
+         *
          *    Note that meaning of JsonValue, then, is very different for Enums. Sigh.
          */
         final JavaType type = _accessor.getType();
@@ -284,7 +334,7 @@ public class JsonValueSerializer
         }
         ValueSerializer<Object> ser = _valueSerializer;
         if (ser == null) {
-            ser = visitor.getProvider().findPrimaryPropertySerializer(type, _property);
+            ser = visitor.getContext().findPrimaryPropertySerializer(type, _property);
             if (ser == null) { // can this ever occur?
                 visitor.expectAnyFormat(typeHint);
                 return;
@@ -296,7 +346,7 @@ public class JsonValueSerializer
     /**
      * Overridable helper method used for special case handling of schema information for
      * Enums.
-     * 
+     *
      * @return True if method handled callbacks; false if not; in latter case caller will
      *   send default callbacks
      */
@@ -319,7 +369,8 @@ public class JsonValueSerializer
                         t = t.getCause();
                     }
                     ClassUtil.throwIfError(t);
-                    throw DatabindException.wrapWithPath(t, en, _accessor.getName() + "()");
+                    throw DatabindException.wrapWithPath(visitor.getContext(), t,
+                            new JacksonException.Reference(en, _accessor.getName() + "()"));
                 }
             }
             stringVisitor.enumTypes(enums);
@@ -366,7 +417,7 @@ public class JsonValueSerializer
         }
 
         @Override
-        public TypeSerializer forProperty(SerializerProvider ctxt,
+        public TypeSerializer forProperty(SerializationContext ctxt,
                 BeanProperty prop) { // should never get called
             throw new UnsupportedOperationException();
         }
@@ -387,7 +438,7 @@ public class JsonValueSerializer
         }
 
         @Override
-        public WritableTypeId writeTypePrefix(JsonGenerator g, SerializerProvider ctxt,
+        public WritableTypeId writeTypePrefix(JsonGenerator g, SerializationContext ctxt,
                 WritableTypeId typeId) throws JacksonException
         {
             // 28-Jun-2017, tatu: Important! Need to "override" value
@@ -396,7 +447,7 @@ public class JsonValueSerializer
         }
 
         @Override
-        public WritableTypeId writeTypeSuffix(JsonGenerator g, SerializerProvider ctxt,
+        public WritableTypeId writeTypeSuffix(JsonGenerator g, SerializationContext ctxt,
                 WritableTypeId typeId) throws JacksonException
         {
             // NOTE: already overwrote value object so:

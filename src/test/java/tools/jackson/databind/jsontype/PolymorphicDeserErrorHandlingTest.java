@@ -1,12 +1,18 @@
 package tools.jackson.databind.jsontype;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidTypeIdException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class PolymorphicDeserErrorHandlingTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+public class PolymorphicDeserErrorHandlingTest extends DatabindTestUtil
 {
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY,
             property = "clazz")
@@ -39,19 +45,21 @@ public class PolymorphicDeserErrorHandlingTest extends BaseMapTest
     /* Test methods
     /**********************************************************************
      */
-    
+
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testUnknownClassAsSubtype() throws Exception
     {
         ObjectReader reader = MAPPER.readerFor(BaseUnknownWrapper.class)
                 .without(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE);
         BaseUnknownWrapper w = reader.readValue(a2q
-                ("{'value':{'clazz':'com.foobar.Nothing'}}'"));
+                ("{'value':{'clazz':'com.foobar.Nothing'}}"));
         assertNotNull(w);
     }
 
     // [databind#2668]
+    @Test
     public void testSubType2668() throws Exception
     {
         String json = "{\"type\": \"child2\", \"baz\":\"1\"}"; // JSON for Child2

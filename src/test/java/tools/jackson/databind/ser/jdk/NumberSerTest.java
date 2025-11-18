@@ -2,20 +2,31 @@ package tools.jackson.databind.ser.jdk;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import tools.jackson.databind.BaseMapTest;
+import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for verifying serialization of simple basic non-structured
  * types; primitives (and/or their wrappers), Strings.
  */
-public class NumberSerTest extends BaseMapTest
+public class NumberSerTest extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = sharedMapper();
 
@@ -67,7 +78,7 @@ public class NumberSerTest extends BaseMapTest
         public BigDecimalAsString() { this(BigDecimal.valueOf(0.25)); }
         public BigDecimalAsString(BigDecimal v) { value = v; }
     }
-    
+
     static class NumberWrapper {
         // ensure it will use `Number` as statically force type, when looking for serializer
         @JsonSerialize(as=Number.class)
@@ -75,13 +86,51 @@ public class NumberSerTest extends BaseMapTest
 
         public NumberWrapper(Number v) { value = v; }
     }
-    
+
+    static class BigDecimalHolder {
+        private final BigDecimal value;
+
+        public BigDecimalHolder(String num) {
+            value = new BigDecimal(num);
+        }
+
+        public BigDecimal getValue() {
+            return value;
+        }
+    }
+
+    static class BigDecimalAsStringSerializer extends ValueSerializer<BigDecimal> {
+        private final DecimalFormat df = createDecimalFormatForDefaultLocale("0.0");
+
+        @Override
+        public void serialize(BigDecimal value, JsonGenerator gen, SerializationContext serializers) {
+            gen.writeString(df.format(value));
+        }
+    }
+
+    static class BigDecimalAsNumberSerializer extends ValueSerializer<BigDecimal> {
+        private final DecimalFormat df = createDecimalFormatForDefaultLocale("0.0");
+
+        @Override
+        public void serialize(BigDecimal value, JsonGenerator gen, SerializationContext serializers) {
+            gen.writeNumber(df.format(value));
+        }
+    }
+
+    @SuppressWarnings("serial")
+    static class MyBigDecimal extends BigDecimal {
+        public MyBigDecimal(String value) {
+            super(value);
+        }
+    }
+
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
 
+    @Test
     public void testDouble() throws Exception
     {
         double[] values = new double[] {
@@ -96,6 +145,7 @@ public class NumberSerTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testBigInteger() throws Exception
     {
         BigInteger[] values = new BigInteger[] {
@@ -111,6 +161,7 @@ public class NumberSerTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNumbersAsString() throws Exception
     {
         assertEquals(a2q("{'value':'3'}"), MAPPER.writeValueAsString(new IntAsString()));
@@ -120,6 +171,7 @@ public class NumberSerTest extends BaseMapTest
         assertEquals(a2q("{'value':'123456'}"), MAPPER.writeValueAsString(new BigIntegerAsString()));
     }
 
+    @Test
     public void testNumbersAsStringNonEmpty() throws Exception
     {
         assertEquals(a2q("{'value':'3'}"), NON_EMPTY_MAPPER.writeValueAsString(new IntAsString()));
@@ -129,6 +181,7 @@ public class NumberSerTest extends BaseMapTest
         assertEquals(a2q("{'value':'123456'}"), NON_EMPTY_MAPPER.writeValueAsString(new BigIntegerAsString()));
     }
 
+    @Test
     public void testConfigOverridesForNumbers() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -150,6 +203,7 @@ public class NumberSerTest extends BaseMapTest
                 mapper.writeValueAsString(new BigDecimalWrapper(BigDecimal.valueOf(-0.5))));
     }
 
+    @Test
     public void testNumberType() throws Exception
     {
         assertEquals(a2q("{'value':1}"), MAPPER.writeValueAsString(new NumberWrapper(Byte.valueOf((byte) 1))));
@@ -160,5 +214,44 @@ public class NumberSerTest extends BaseMapTest
         assertEquals(a2q("{'value':0.05}"), MAPPER.writeValueAsString(new NumberWrapper(Double.valueOf(0.05))));
         assertEquals(a2q("{'value':123}"), MAPPER.writeValueAsString(new NumberWrapper(BigInteger.valueOf(123))));
         assertEquals(a2q("{'value':0.025}"), MAPPER.writeValueAsString(new NumberWrapper(BigDecimal.valueOf(0.025))));
+    }
+
+    @Test
+    public void testCustomSerializationBigDecimalAsString() throws Exception {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(BigDecimal.class, new BigDecimalAsStringSerializer());
+        ObjectMapper mapper = jsonMapperBuilder().addModule(module).build();
+        assertEquals(a2q("{'value':'2.0'}"), mapper.writeValueAsString(new BigDecimalHolder("2")));
+    }
+
+    @Test
+    public void testCustomSerializationBigDecimalAsNumber() throws Exception {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(BigDecimal.class, new BigDecimalAsNumberSerializer());
+        ObjectMapper mapper = jsonMapperBuilder().addModule(module).build();
+        assertEquals(a2q("{'value':2.0}"), mapper.writeValueAsString(new BigDecimalHolder("2")));
+    }
+
+    @Test
+    public void testConfigOverrideJdkNumber() throws Exception {
+        ObjectMapper mapper = jsonMapperBuilder().withConfigOverride(BigDecimal.class,
+                        c -> c.setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING)))
+                .build();
+        String value = mapper.writeValueAsString(new BigDecimal("123.456"));
+        assertEquals(a2q("'123.456'"), value);
+    }
+
+    @Test
+    public void testConfigOverrideNonJdkNumber() throws Exception {
+        ObjectMapper mapper = jsonMapperBuilder().withConfigOverride(MyBigDecimal.class,
+                c -> c.setFormat(JsonFormat.Value.forShape(JsonFormat.Shape.STRING)))
+                .build();
+        String value = mapper.writeValueAsString(new MyBigDecimal("123.456"));
+        assertEquals(a2q("'123.456'"), value);
+    }
+
+    // default locale is en_US
+    static DecimalFormat createDecimalFormatForDefaultLocale(final String pattern) {
+        return new DecimalFormat(pattern, new DecimalFormatSymbols(Locale.ENGLISH));
     }
 }

@@ -5,19 +5,21 @@ import java.text.DateFormat;
 import tools.jackson.core.*;
 import tools.jackson.core.util.Instantiatable;
 import tools.jackson.databind.cfg.*;
+import tools.jackson.databind.introspect.Annotated;
 import tools.jackson.databind.introspect.ClassIntrospector;
 import tools.jackson.databind.introspect.MixInHandler;
 import tools.jackson.databind.jsontype.SubtypeResolver;
 import tools.jackson.databind.ser.FilterProvider;
 import tools.jackson.databind.ser.SerializerFactory;
 import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.util.Converter;
 import tools.jackson.databind.util.RootNameLookup;
 
 /**
  * Object that contains baseline configuration for serialization
  * process. An instance is owned by {@link ObjectMapper}, which
  * passes an immutable instance for serialization process to
- * {@link SerializerProvider} and {@link SerializerFactory}
+ * {@link SerializationContext} and {@link SerializerFactory}
  * (either directly, or through {@link ObjectWriter}.
  *<p>
  * Note that instances are considered immutable and as such no copies
@@ -111,7 +113,7 @@ public final class SerializationConfig
         _streamWriteFeatures = streamWriteFeatures;
         _formatWriteFeatures = formatWriteFeatures;
     }
-    
+
     private SerializationConfig(SerializationConfig src, BaseSettings base)
     {
         super(src, base);
@@ -214,7 +216,7 @@ public final class SerializationConfig
     public SerializationConfig withView(Class<?> view) {
         return (_view == view) ? this : new SerializationConfig(this, view);
     }
-    
+
     @Override
     public SerializationConfig with(ContextAttributes attrs) {
         return (attrs == _attributes) ? this : new SerializationConfig(this, attrs);
@@ -228,7 +230,7 @@ public final class SerializationConfig
 
     /**
      * In addition to constructing instance with specified date format,
-     * will enable or disable <code>SerializationFeature.WRITE_DATES_AS_TIMESTAMPS</code>
+     * will enable or disable <code>DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS</code>
      * (enable if format set as null; disable if non-null)
      */
     @Override
@@ -236,9 +238,9 @@ public final class SerializationConfig
         SerializationConfig cfg = super.with(df);
         // Also need to toggle this feature based on existence of date format:
         if (df == null) {
-            return cfg.with(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            return cfg.with(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
         }
-        return cfg.without(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return cfg.without(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /*
@@ -472,8 +474,8 @@ public final class SerializationConfig
 
     public PrettyPrinter constructDefaultPrettyPrinter() {
         PrettyPrinter pp = _defaultPrettyPrinter;
-        if (pp instanceof Instantiatable<?>) {
-            pp = (PrettyPrinter) ((Instantiatable<?>) pp).createInstance();
+        if (pp instanceof Instantiatable<?> pInstantiatable) {
+            pp = (PrettyPrinter) pInstantiatable.createInstance();
         }
         return pp;
     }
@@ -551,18 +553,6 @@ public final class SerializationConfig
     }
 
     /**
-     * Accessor for checking whether give {@link DatatypeFeature}
-     * is enabled or not.
-     *
-     * @param feature Feature to check
-     *
-     * @return True if feature is enabled; false otherwise
-     */
-    public final boolean isEnabled(DatatypeFeature feature) {
-        return _datatypeFeatures.isEnabled(feature);
-    }
-
-    /**
      * Method for getting provider used for locating filters given
      * id (which is usually provided with filter annotations).
      * Will be null if no provided was set for {@link ObjectWriter}
@@ -571,7 +561,7 @@ public final class SerializationConfig
     public FilterProvider getFilterProvider() {
         return _filterProvider;
     }
-    
+
     /**
      * Accessor for configured blueprint "default" {@link PrettyPrinter} to
      * use, if default pretty-printing is enabled.
@@ -582,5 +572,18 @@ public final class SerializationConfig
      */
     public PrettyPrinter getDefaultPrettyPrinter() {
         return _defaultPrettyPrinter;
+    }
+
+    /*
+    /**********************************************************************
+    /* Introspection support
+    /**********************************************************************
+     */
+
+    // @since 3.0
+    public Converter<Object,Object> findSerializationConverter(Annotated ann)
+    {
+        return _createConverter(ann,
+                getAnnotationIntrospector().findSerializationConverter(this, ann));
     }
 }

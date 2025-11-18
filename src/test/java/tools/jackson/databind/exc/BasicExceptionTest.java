@@ -5,13 +5,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 
-import tools.jackson.core.*;
+import org.junit.jupiter.api.Test;
 
+import tools.jackson.core.*;
+import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.*;
 import tools.jackson.databind.introspect.BeanPropertyDefinition;
-import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class BasicExceptionTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class BasicExceptionTest extends DatabindTestUtil
 {
     static class User {
         public String user;
@@ -23,9 +27,10 @@ public class BasicExceptionTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testBadDefinition() throws Exception
     {
-        JavaType t = TypeFactory.defaultInstance().constructType(String.class);
+        JavaType t = defaultTypeFactory().constructType(String.class);
         JsonParser p = MAPPER.createParser("[]");
         InvalidDefinitionException e = new InvalidDefinitionException(p,
                "Testing", t);
@@ -55,10 +60,11 @@ public class BasicExceptionTest extends BaseMapTest
                 beanDef, (BeanPropertyDefinition) null);
         assertEquals(beanDef.getType(), e.getType());
         assertNotNull(e);
-        
+
         g.close();
     }
 
+    @Test
     public void testIgnoredProperty() throws Exception
     {
         // first just construct valid instance with some variations
@@ -84,6 +90,7 @@ public class BasicExceptionTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testUnrecognizedProperty() throws Exception
     {
         JsonParser p = MAPPER.createParser("{ }");
@@ -105,22 +112,25 @@ public class BasicExceptionTest extends BaseMapTest
 
     // [databind#2128]: ensure Location added once and only once
     // [databind#2482]: ensure Location is the original one
+    // [core#1173]: ... and needs to be correct column, too
+    @Test
     public void testLocationAddition() throws Exception
     {
         String problemJson = "{\n\t\"userList\" : [\n\t{\n\t user : \"1\"\n\t},\n\t{\n\t \"user\" : \"2\"\n\t}\n\t]\n}";
         try {
             MAPPER.readValue(problemJson, Users.class);
             fail("Should not pass");
-        } catch (DatabindException e) { // becomes "generic" due to wrapping for passing path info
+        } catch (StreamReadException e) { // becomes "generic" due to wrapping for passing path info
             String msg = e.getMessage();
             String[] str = msg.split(" at \\[");
             if (str.length != 2) {
                 fail("Should only get one 'at [' marker, got "+(str.length-1)+", source: "+msg);
             }
-            JsonLocation loc = e.getLocation();
-//          String expectedLocation = "line: 4, column: 4";
+            TokenStreamLocation loc = e.getLocation();
+//          String expectedLocation = "line: 4, column: 3";
             assertEquals(4, loc.getLineNr());
-            assertEquals(4, loc.getColumnNr());
+            // 12-Feb-2024, tatu: varies depending on whether [core#1173] is fixed or not...
+            assertEquals(3, loc.getColumnNr());
         }
     }
 }

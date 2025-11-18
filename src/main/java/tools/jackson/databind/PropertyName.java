@@ -1,5 +1,7 @@
 package tools.jackson.databind;
 
+import java.util.Objects;
+
 import tools.jackson.core.SerializableString;
 import tools.jackson.core.io.SerializedString;
 import tools.jackson.core.util.InternCache;
@@ -56,7 +58,7 @@ public class PropertyName
      * of {@link SerializedString} at most leads to multiple instantiations.
      */
     protected SerializableString _encodedSimple;
-    
+
     public PropertyName(String simpleName) {
         this(simpleName, null);
     }
@@ -80,6 +82,9 @@ public class PropertyName
                 return NO_NAME;
             }
             */
+            // 22-Jun-2024, tatu: This is hopeful not problematic as marker
+            //   value should only be provided by AnnotationIntrospector etc,
+            //   but not stored in Deserializer/Serializer instances.
         }
         return this;
     }
@@ -101,6 +106,55 @@ public class PropertyName
             return USE_DEFAULT;
         }
         return new PropertyName(INTERNER.intern(simpleName), ns);
+    }
+
+    /**
+     * Method that will combine information from two {@link PropertyName}
+     * instances
+     *
+     * @param name1 Name with higher precedence; may be {@code null}
+     * @param name2 Name with lower precedence; may be {@code null}
+     *
+     * @return Merged information; only {@code null} if both arguments
+     *   are {@code null}s.
+     *
+     * @since 2.17
+     */
+    public static PropertyName merge(PropertyName name1, PropertyName name2) {
+        if (name1 == null) {
+            return name2;
+        }
+        if (name2 == null) {
+            return name1;
+        }
+        // 22-Jun-2024, tatu: [databind#4595] Should not merge NO_NAME
+        if (name1 == NO_NAME) {
+            return name1;
+        }
+        String ns = _nonEmpty(name1._namespace, name2._namespace);
+        String simple = _nonEmpty(name1._simpleName, name2._simpleName);
+
+        // But see if we can just return one of arguments as-is:
+        if (ns == name1._namespace && simple == name1._simpleName) {
+            return name1;
+        }
+        if (ns == name2._namespace && simple == name2._simpleName) {
+            return name2;
+        }
+        return construct(simple, ns);
+    }
+
+    private static String _nonEmpty(String str1, String str2) {
+        if (str1 == null) {
+            return str2;
+        }
+        if (str2 == null) {
+            return str1;
+        }
+        if (str1.isEmpty()) {
+            return str2;
+        }
+        return str1;
     }
 
     public PropertyName internSimpleName()
@@ -129,7 +183,7 @@ public class PropertyName
         }
         return new PropertyName(simpleName, _namespace);
     }
-    
+
     /**
      * Fluent factory method for constructing an instance with different
      * namespace.
@@ -144,7 +198,7 @@ public class PropertyName
         }
         return new PropertyName(_simpleName, ns);
     }
-    
+
     /*
     /**********************************************************
     /* FullyNamed impl
@@ -166,7 +220,7 @@ public class PropertyName
     /* Accessors
     /**********************************************************
      */
-    
+
     public String getSimpleName() {
         return _simpleName;
     }
@@ -187,7 +241,7 @@ public class PropertyName
         }
         return sstr;
     }
-    
+
     public String getNamespace() {
         return _namespace;
     }
@@ -203,7 +257,7 @@ public class PropertyName
         // _simpleName never null so...
         return _simpleName.equals(str);
     }
-    
+
     public boolean hasNamespace() {
         return _namespace != null;
     }
@@ -213,7 +267,7 @@ public class PropertyName
      *<pre>
      *   !hasSimpleName() &lt;&lt; !hasNamespace();
      *</pre>
-     * 
+     *
      * @since 2.4
      */
     public boolean isEmpty() {
@@ -231,9 +285,8 @@ public class PropertyName
     {
         if (o == this) return true;
         if (o == null) return false;
-        /* 13-Nov-2012, tatu: by default, require strict type equality.
-         *   Re-evaluate if this becomes an issue.
-         */
+        // 13-Nov-2012, tatu: by default, require strict type equality.
+        //   Re-evaluate if this becomes an issue.
         if (o.getClass() != getClass()) return false;
         // 13-Nov-2012, tatu: Should we have specific rules on matching USE_DEFAULT?
         //   (like, it only ever matching exact instance)
@@ -250,15 +303,13 @@ public class PropertyName
         }
         return _namespace.equals(other._namespace);
     }
-    
+
     @Override
     public int hashCode() {
-        if (_namespace == null) {
-            return _simpleName.hashCode();
-        }
-        return _namespace.hashCode() ^  _simpleName.hashCode();
+        return Objects.hashCode(_simpleName) * 31
+                + Objects.hashCode(_namespace);
     }
-    
+
     @Override
     public String toString() {
         if (_namespace == null) {

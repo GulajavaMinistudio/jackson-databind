@@ -3,10 +3,19 @@ package tools.jackson.databind.exc;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.testutil.BrokenStringWriter;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+import static tools.jackson.databind.testutil.DatabindTestUtil.newJsonMapper;
+import static tools.jackson.databind.testutil.DatabindTestUtil.verifyException;
 
 /**
  * Unit test for verifying that exceptions are properly handled (caught,
@@ -14,7 +23,6 @@ import tools.jackson.databind.testutil.BrokenStringWriter;
  * with Object serialization.
  */
 public class TestExceptionsDuringWriting
-    extends BaseMapTest
 {
     /*
     /**********************************************************
@@ -30,7 +38,7 @@ public class TestExceptionsDuringWriting
         extends ValueSerializer<Bean>
     {
         @Override
-        public void serialize(Bean value, JsonGenerator jgen, SerializerProvider provider)
+        public void serialize(Bean value, JsonGenerator jgen, SerializationContext provider)
         {
             throw new IllegalArgumentException("test string");
         }
@@ -46,6 +54,7 @@ public class TestExceptionsDuringWriting
      * Unit test that verifies that by default all exceptions except for
      * JacksonExceptions are caught and wrapped.
      */
+    @Test
     public void testCatchAndRethrow()
         throws Exception
     {
@@ -62,7 +71,7 @@ public class TestExceptionsDuringWriting
             l.add(b);
             mapper.writeValue(sw, l);
             fail("Should have gotten an exception");
-        } catch (DatabindException e) { // too generic but will do for now
+        } catch (JacksonException e) { // too generic but will do for now
             // should contain original message somewhere
             verifyException(e, "test string");
             Throwable root = e.getCause();
@@ -79,6 +88,7 @@ public class TestExceptionsDuringWriting
      * but are passed through as is.
      */
     @SuppressWarnings("resource")
+    @Test
     public void testExceptionWithSimpleMapper()
         throws Exception
     {
@@ -87,7 +97,7 @@ public class TestExceptionsDuringWriting
             BrokenStringWriter sw = new BrokenStringWriter("TEST");
             mapper.writeValue(sw, createLongObject());
             fail("Should have gotten an exception");
-        } catch (DatabindException e) {
+        } catch (JacksonException e) {
             verifyException(e, "TEST");
             Throwable root = e.getCause();
             assertNotNull(root);

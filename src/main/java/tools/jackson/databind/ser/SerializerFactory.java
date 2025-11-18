@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import tools.jackson.databind.*;
 
 /**
- * Abstract class that defines API used by {@link SerializerProvider}
+ * Abstract class that defines API used by {@link SerializationContext}
  * to obtain actual
  * {@link ValueSerializer} instances from multiple distinct factories.
  */
@@ -18,8 +18,8 @@ public abstract class SerializerFactory
      */
 
     /**
-     * Method called to create (or, for immutable serializers, reuse) a serializer for given type. 
-     * 
+     * Method called to create (or, for immutable serializers, reuse) a serializer for given type.
+     *
      * @param ctxt (not null) Context that needs to be used to resolve annotation-provided
      *    serializers (but NOT for others)
      * @param formatOverride (nullable) Possible format overrides (from property annotations)
@@ -27,20 +27,20 @@ public abstract class SerializerFactory
      *
      * @since 3.0 (last argument added)
      */
-    public abstract ValueSerializer<Object> createSerializer(SerializerProvider ctxt,
-            JavaType baseType, BeanDescription beanDesc, JsonFormat.Value formatOverride);
+    public abstract ValueSerializer<Object> createSerializer(SerializationContext ctxt,
+            JavaType baseType, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverride);
 
     /**
      * Method called to create serializer to use for serializing JSON property names (which must
      * be output as <code>JsonToken.FIELD_NAME</code>) for Map that has specified declared
      * key type, and is for specified property (or, if property is null, as root value)
-     * 
+     *
      * @param type Declared type for Map keys
-     * 
+     *
      * @return Serializer to use, if factory knows it; null if not (in which case default
      *   serializer is to be used)
      */
-    public abstract ValueSerializer<Object> createKeySerializer(SerializerProvider ctxt,
+    public abstract ValueSerializer<Object> createKeySerializer(SerializationContext ctxt,
             JavaType type);
 
     /**
@@ -98,9 +98,9 @@ public abstract class SerializerFactory
      * @deprecated Since 3.0 use variant that takes {@code JsonFormat.Value} argument
      */
     @Deprecated // since 3.0
-    public ValueSerializer<Object> createSerializer(SerializerProvider ctxt, JavaType baseType)
+    public ValueSerializer<Object> createSerializer(SerializationContext ctxt, JavaType baseType)
     {
-        BeanDescription beanDesc = ctxt.introspectBeanDescription(baseType);
-        return createSerializer(ctxt, baseType, beanDesc, null);
+        return createSerializer(ctxt, baseType,
+                ctxt.lazyIntrospectBeanDescription(baseType), null);
     }
 }

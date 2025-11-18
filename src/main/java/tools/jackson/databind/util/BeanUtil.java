@@ -7,6 +7,7 @@ import java.util.GregorianCalendar;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import tools.jackson.databind.JavaType;
+import tools.jackson.databind.cfg.MapperConfig;
 
 /**
  * Helper class that contains functionality needed by both serialization
@@ -20,6 +21,11 @@ public class BeanUtil
     /**********************************************************************
      */
 
+    /**
+     * @deprecated since 3.0.0-rc2 Use {@link tools.jackson.databind.introspect.DefaultAccessorNamingStrategy}
+     *    instead
+     */
+    @Deprecated // since 3.0.0-rc2
     public static String stdManglePropertyName(final String basename, final int offset)
     {
         final int end = basename.length();
@@ -51,7 +57,7 @@ public class BeanUtil
     /* Value defaulting helpers
     /**********************************************************************
      */
-    
+
     /**
      * Accessor used to find out "default value" to use for comparing values to
      * serialize, to determine whether to exclude value from serialization with
@@ -107,19 +113,11 @@ public class BeanUtil
      * "well-known" types for which there would be a datatype module; and if so,
      * return appropriate failure message to give to caller.
      */
-    public static String checkUnsupportedType(JavaType type) {
+    public static String checkUnsupportedType(MapperConfig<?> config, JavaType type) {
         final String className = type.getRawClass().getName();
         String typeName, moduleName;
 
-        if (isJava8TimeClass(className)) {
-            // [modules-java8#207]: do NOT check/block helper types in sub-packages,
-            // but only main-level types (to avoid issues with module)
-            if (className.indexOf('.', 10) >= 0) {
-                return null;
-            }
-            typeName =  "Java 8 date/time";
-            moduleName = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310";
-        } else if (isJodaTimeClass(className)) {
+        if (isJodaTimeClass(className)) {
             typeName =  "Joda date/time";
             moduleName = "com.fasterxml.jackson.datatype:jackson-datatype-joda";
         } else {
@@ -128,15 +126,7 @@ public class BeanUtil
         return String.format("%s type %s not supported by default: add Module \"%s\" to enable handling",
                 typeName, ClassUtil.getTypeDescription(type), moduleName);
     }
-
-    public static boolean isJava8TimeClass(Class<?> rawType) {
-        return isJava8TimeClass(rawType.getName());
-    }
-
-    private static boolean isJava8TimeClass(String className) {
-        return className.startsWith("java.time.");
-    }
-
+    
     public static boolean isJodaTimeClass(Class<?> rawType) {
         return isJodaTimeClass(rawType.getName());
     }

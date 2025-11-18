@@ -2,14 +2,21 @@ package tools.jackson.databind.deser.filter;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.DeserializationProblemHandler;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+
 // Test(s) to verify [databind#1440]
-public class ProblemHandlerLocation1440Test extends BaseMapTest
+public class ProblemHandlerLocation1440Test
 {
     static class DeserializationProblem {
         public List<String> unknownProperties = new ArrayList<>();
@@ -36,7 +43,7 @@ public class ProblemHandlerLocation1440Test extends BaseMapTest
         public List<String> problems() {
             return probs.unknownProperties;
         }
-        
+
         @Override
         public boolean handleUnknownProperty(final DeserializationContext ctxt, final JsonParser p,
                 ValueDeserializer<?> deserializer, Object beanOrClass, String propertyName)
@@ -110,6 +117,7 @@ public class ProblemHandlerLocation1440Test extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testIncorrectContext() throws Exception
     {
         // need invalid to trigger problem:

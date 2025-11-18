@@ -1,10 +1,15 @@
 package tools.jackson.databind.deser.inject;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestInjectables extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestInjectables extends DatabindTestUtil
 {
     static class InjectedBean
     {
@@ -15,7 +20,7 @@ public class TestInjectables extends BaseMapTest
         protected String otherStuff;
 
         protected long third;
-        
+
         public int value;
 
         @JacksonInject
@@ -27,7 +32,7 @@ public class TestInjectables extends BaseMapTest
     static class CtorBean {
         protected String name;
         protected int age;
-        
+
         public CtorBean(@JacksonInject String n, @JsonProperty("age") int a)
         {
             name = n;
@@ -38,7 +43,7 @@ public class TestInjectables extends BaseMapTest
     static class CtorBean2 {
         protected String name;
         protected Integer age;
-        
+
         public CtorBean2(@JacksonInject String n, @JacksonInject("number") Integer a)
         {
             name = n;
@@ -53,7 +58,8 @@ public class TestInjectables extends BaseMapTest
 
         public int value;
     }
-    
+
+    // [databind#471]
     static class Bean471 {
 
         protected final Object constructorInjected;
@@ -92,22 +98,25 @@ public class TestInjectables extends BaseMapTest
      */
 
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testSimple() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
-                .injectableValues(new InjectableValues.Std()
+            .injectableValues(new InjectableValues.Std()
             .addValue(String.class, "stuffValue")
             .addValue("myId", "xyz")
             .addValue(Long.TYPE, Long.valueOf(37))
-            ).build();
+            )
+            .build();
         InjectedBean bean = mapper.readValue("{\"value\":3}", InjectedBean.class);
         assertEquals(3, bean.value);
         assertEquals("stuffValue", bean.stuff);
         assertEquals("xyz", bean.otherStuff);
         assertEquals(37L, bean.third);
     }
-    
+
+    @Test
     public void testWithCtors() throws Exception
     {
         CtorBean bean = MAPPER.readerFor(CtorBean.class)
@@ -118,6 +127,7 @@ public class TestInjectables extends BaseMapTest
         assertEquals("Bubba", bean.name);
     }
 
+    @Test
     public void testTwoInjectablesViaCreator() throws Exception
     {
         CtorBean2 bean = MAPPER.readerFor(CtorBean2.class)
@@ -130,6 +140,7 @@ public class TestInjectables extends BaseMapTest
     }
 
     // [databind#471]
+    @Test
     public void testIssue471() throws Exception
     {
         final Object constructorInjected = "constructorInjected";
@@ -160,6 +171,7 @@ public class TestInjectables extends BaseMapTest
     }
 
     // [databind#77]
+    @Test
     public void testTransientField() throws Exception
     {
         TransientBean bean = MAPPER.readerFor(TransientBean.class)

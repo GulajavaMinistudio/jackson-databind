@@ -58,7 +58,7 @@ public abstract class AnnotationIntrospector
              * Usually this can be defined by using
              * {@link com.fasterxml.jackson.annotation.JsonManagedReference}
              */
-            MANAGED_REFERENCE
+            MANAGED_REFERENCE,
 
             /**
              * Reference property that Jackson manages by suppressing it during serialization,
@@ -66,7 +66,7 @@ public abstract class AnnotationIntrospector
              * Usually this can be defined by using
              * {@link com.fasterxml.jackson.annotation.JsonBackReference}
              */
-            ,BACK_REFERENCE
+            BACK_REFERENCE
             ;
         }
 
@@ -80,7 +80,7 @@ public abstract class AnnotationIntrospector
 
         public static ReferenceProperty managed(String name) { return new ReferenceProperty(Type.MANAGED_REFERENCE, name); }
         public static ReferenceProperty back(String name) { return new ReferenceProperty(Type.BACK_REFERENCE, name); }
-        
+
         public Type getType() { return _type; }
         public String getName() { return _name; }
 
@@ -152,7 +152,7 @@ public abstract class AnnotationIntrospector
     /* Factory methods
     /**********************************************************************
      */
-    
+
     /**
      * Factory method for accessing "no operation" implementation
      * of introspector: instance that will never find any annotation-based
@@ -191,7 +191,7 @@ public abstract class AnnotationIntrospector
     public Collection<AnnotationIntrospector> allIntrospectors() {
         return Collections.singletonList(this);
     }
-    
+
     /**
      * Method that can be used to collect all "real" introspectors that
      * this introspector contains, if any; or this introspector
@@ -211,7 +211,7 @@ public abstract class AnnotationIntrospector
         result.add(this);
         return result;
     }
-    
+
     /*
     /**********************************************************************
     /* Default Versioned impl
@@ -220,7 +220,7 @@ public abstract class AnnotationIntrospector
 
     @Override
     public abstract Version version();
-    
+
     /*
     /**********************************************************************
     /* Meta-annotations (annotations for annotation types)
@@ -345,7 +345,7 @@ public abstract class AnnotationIntrospector
      *
      * @param config Effective mapper configuration in use
      * @param ann Annotated entity to introspect
-     * 
+     *
      * @return Id of the filter to use for filtering properties of annotated
      *    class, if any; or null if none found.
      */
@@ -366,6 +366,19 @@ public abstract class AnnotationIntrospector
     public Object findNamingStrategy(MapperConfig<?> config, AnnotatedClass ac) { return null; }
 
     /**
+     * Method for finding {@link EnumNamingStrategy} for given
+     * class, if any specified by annotations; and if so, either return
+     * a {@link EnumNamingStrategy} instance, or Class to use for
+     * creating instance
+     *
+     * @param ac Annotated class to introspect
+     *
+     * @return Subclass or instance of {@link EnumNamingStrategy}, if one
+     *   is specified for given class; null if not.
+     */
+    public Object findEnumNamingStrategy(MapperConfig<?> config, AnnotatedClass ac) { return null; }
+
+    /**
      * Method used to check whether specified class defines a human-readable
      * description to use for documentation.
      * There are no further definitions for contents; for example, whether
@@ -374,7 +387,7 @@ public abstract class AnnotationIntrospector
      *
      * @param config Effective mapper configuration in use
      * @param ac Annotated class to introspect
-     * 
+     *
      * @return Human-readable description, if any.
      */
     public String findClassDescription(MapperConfig<?> config, AnnotatedClass ac) { return null; }
@@ -395,7 +408,7 @@ public abstract class AnnotationIntrospector
      * @param config Effective mapper configuration in use
      * @param ac Annotated class to introspect
      */
-    public VisibilityChecker findAutoDetectVisibility(MapperConfig<?> config, 
+    public VisibilityChecker findAutoDetectVisibility(MapperConfig<?> config,
             AnnotatedClass ac, VisibilityChecker checker) {
         return checker;
     }
@@ -446,7 +459,7 @@ public abstract class AnnotationIntrospector
      * a list of directly
      * declared subtypes, no recursive processing is guarantees (i.e. caller
      * has to do it if/as necessary)
-     * 
+     *
      * @param config Effective mapper configuration in use
      * @param a Annotated entity (class, field/method) to check for annotations
      */
@@ -517,10 +530,10 @@ public abstract class AnnotationIntrospector
      * Type if identifier needs to be compatible with provider of
      * values (of type {@link InjectableValues}); often a simple String
      * id is used.
-     * 
+     *
      * @param config Effective mapper configuration in use
      * @param member Member to check for information
-     * 
+     *
      * @return Identifier of value to inject, if any; null if no injection
      *   indicator is found
      */
@@ -549,7 +562,7 @@ public abstract class AnnotationIntrospector
      *<p>
      * Since 2.9 this method may also be called to find "default view(s)" for
      * {@link AnnotatedClass}
-     * 
+     *
      * @param config Effective mapper configuration in use
      * @param a Annotated property (represented by a method, field or ctor parameter)
      *
@@ -600,7 +613,7 @@ public abstract class AnnotationIntrospector
      * these may be marked up using HTML is not defined.
      *
      * @param config Effective mapper configuration in use
-     * 
+     *
      * @return Human-readable description, if any.
      */
     public String findPropertyDescription(MapperConfig<?> config, Annotated ann) { return null; }
@@ -774,7 +787,7 @@ public abstract class AnnotationIntrospector
      * Note also that this feature does not necessarily work well with polymorphic
      * type handling, or object identity handling; if such features are needed
      * an explicit serializer is usually better way to handle serialization.
-     * 
+     *
      * @param a Annotated property (field, method) or class to check for annotations
      */
     public Object findSerializationConverter(MapperConfig<?> config, Annotated a) {
@@ -794,7 +807,7 @@ public abstract class AnnotationIntrospector
      * type is used for actual serialization.
      *<p>
      * Other notes are same as those for {@link #findSerializationConverter}
-     * 
+     *
      * @param a Annotated property (field, method) to check.
      */
     public Object findSerializationContentConverter(MapperConfig<?> config, AnnotatedMember a) {
@@ -857,7 +870,7 @@ public abstract class AnnotationIntrospector
      */
     public void findAndAddVirtualProperties(MapperConfig<?> config, AnnotatedClass ac,
             List<BeanPropertyWriter> properties) { }
-    
+
     /*
     /**********************************************************************
     /* Serialization: property annotations
@@ -871,9 +884,9 @@ public abstract class AnnotationIntrospector
      * Should return null if no annotation
      * is found; otherwise a non-null name (possibly
      * {@link PropertyName#USE_DEFAULT}, which means "use default heuristics").
-     * 
+     *
      * @param a Property accessor to check
-     * 
+     *
      * @return Name to use if found; null if not.
      */
     public PropertyName findNameForSerialization(MapperConfig<?> config, Annotated a) {
@@ -917,7 +930,7 @@ public abstract class AnnotationIntrospector
      * properties, often bound with matching "any setter" method.
      *
      * @param ann Annotated entity to check
-     * 
+     *
      * @return True if such annotation is found (and is not disabled),
      *   false otherwise
      */
@@ -926,48 +939,56 @@ public abstract class AnnotationIntrospector
     }
 
     /**
-     * Method for efficiently figuring out which if given set of <code>Enum</code> values
-     * have explicitly defined name. Method will overwrite entries in incoming <code>names</code>
-     * array with explicit names found, if any, leaving other entries unmodified.
+     * Finds the explicitly defined name of the given set of {@code Enum} values, if any.
+     * The method overwrites entries in the incoming {@code names} array with the explicit
+     * names found, if any, leaving other entries unmodified.
      *
-     * @param enumType Type of Enumeration
-     * @param enumValues Values of enumeration
-     * @param names Matching declared names of enumeration values (with indexes
-     *     matching {@code enumValues} entries)
+     * @param config the mapper configuration to use
+     * @param annotatedClass the annotated class for which to find the explicit names
+     * @param enumValues the set of {@code Enum} values to find the explicit names for
+     * @param names the matching declared names of enumeration values (with indexes matching
+     *              {@code enumValues} entries)
      *
-     * @return Array of names to use (possible {@code names} passed as argument)
+     * @return an array of names to use (possibly {@code names} passed as argument)
+     *
+     * @since 2.16
      */
-    public String[] findEnumValues(MapperConfig<?> config,
-            Class<?> enumType, Enum<?>[] enumValues, String[] names) {
+    public String[] findEnumValues(MapperConfig<?> config, AnnotatedClass annotatedClass,
+            Enum<?>[] enumValues, String[] names) {
         return names;
     }
 
     /**
-     * Method that is related to {@link #findEnumValues} but is called to check if
-     * there are alternative names (aliased) that can be accepted for entries, in 
-     * addition to primary names introspected earlier.
-     * If so, these aliases should be returned in {@code aliases} {@link List} passed
-     * as argument (and initialized for proper size by caller).
+     * Method that is called to check if there are alternative names (aliases) that can be accepted for entries
+     * in addition to primary names that were introspected earlier, related to {@link #findEnumValues}.
+     * These aliases should be returned in {@code String[][] aliases} passed in as argument. 
+     * The {@code aliases.length} is expected to match the number of {@code Enum} values.
      *
-     * @param enumType Type of Enumeration
-     * @param enumValues Values of enumeration
-     * @param aliases (in/out) Pre-allocated array where aliases found, if any, may be
-     *     added (in indexes matching those of {@code enumValues})
+     * @param config The configuration of the mapper
+     * @param annotatedClass The annotated class of the enumeration type
+     * @param enumValues The values of the enumeration
+     * @param aliases (in/out) Pre-allocated array where aliases found, if any, may be added (in indexes
+     *     matching those of {@code enumValues})
+     *
+     * @since 2.16
      */
-    public void findEnumAliases(MapperConfig<?> config,
-            Class<?> enumType, Enum<?>[] enumValues, String[][] aliases) {
-        ;
+    public void findEnumAliases(MapperConfig<?> config, AnnotatedClass annotatedClass,
+            Enum<?>[] enumValues, String[][] aliases) {
+        return;
     }
 
     /**
-     * Finds the Enum value that should be considered the default value, if possible.
+     * Finds the first Enum value that should be considered as default value 
+     * for unknown Enum values, if present.
      *
-     * @param enumCls The Enum class to scan for the default value.
-     *
+     * @param ac The Enum class to scan for the default value.
+     * @param enumValues     The Enum values of the Enum class.
      * @return null if none found or it's not possible to determine one.
+     *
+     * @since 2.16
      */
-    public Enum<?> findDefaultEnumValue(MapperConfig<?> config, 
-            Class<?> enumCls) {
+    public Enum<?> findDefaultEnumValue(MapperConfig<?> config,
+            AnnotatedClass ac, Enum<?>[] enumValues) {
         return null;
     }
 
@@ -1029,7 +1050,7 @@ public abstract class AnnotationIntrospector
      * Note also that this feature does not necessarily work well with polymorphic
      * type handling, or object identity handling; if such features are needed
      * an explicit deserializer is usually better way to handle deserialization.
-     * 
+     *
      * @param a Annotated property (field, method) or class to check for annotations
      */
     public Object findDeserializationConverter(MapperConfig<?> config, Annotated a) {
@@ -1049,7 +1070,7 @@ public abstract class AnnotationIntrospector
      * needs to convert this into its target type to be set as property value.
      *<p>
      * Other notes are same as those for {@link #findDeserializationConverter}
-     * 
+     *
      * @param a Annotated property (field, method) to check.
      */
     public Object findDeserializationContentConverter(MapperConfig<?> config, AnnotatedMember a) {
@@ -1074,7 +1095,7 @@ public abstract class AnnotationIntrospector
 
     /*
     /**********************************************************************
-    /* Deserialization: class annotations
+    /* Deserialization: value instantiation, Creators
     /**********************************************************************
      */
 
@@ -1113,9 +1134,67 @@ public abstract class AnnotationIntrospector
         return null;
     }
 
+    /**
+     * Method called to check whether potential Creator (constructor or static factory
+     * method) has explicit annotation to indicate it as actual Creator; and if so,
+     * which {@link com.fasterxml.jackson.annotation.JsonCreator.Mode} to use.
+     *<p>
+     * NOTE: caller needs to consider possibility of both `null` (no annotation found)
+     * and {@link com.fasterxml.jackson.annotation.JsonCreator.Mode#DISABLED} (annotation found,
+     * but disabled); latter is necessary as marker in case multiple introspectors are chained,
+     * as well as possibly as when using mix-in annotations.
+     *
+     * @param config Configuration settings in effect (for serialization or deserialization)
+     * @param a Annotated accessor (usually constructor or static method) to check
+     */
+    public JsonCreator.Mode findCreatorAnnotation(MapperConfig<?> config, Annotated a) {
+        return null;
+    }
+
+    /**
+     * Method called to check if introspector can find a Creator it considers
+     * its "Preferred Creator": Creator to use as the primary one, when no Creator has
+     * explicit annotation ({@link #findCreatorAnnotation} returns {@code null}).
+     * Examples of preferred creators include the canonical constructor defined by
+     * Java Records; "Data" classes by frameworks
+     * like Lombok and JVM languages like Kotlin and Scala (case classes) also have
+     * similar concepts.
+     * If introspector can determine that one of given {@link PotentialCreator}s should
+     * be considered preferred one, it should return it; if not, it should return {@code null}.
+     * Note that core databind functionality may call this method even in the presence of
+     * explicitly annotated creators; and may or may not use Creator returned depending
+     * on other criteria.
+     *<p>
+     * NOTE: when returning chosen Creator, it may be necessary to mark its "mode"
+     * with {@link PotentialCreator#overrideMode} (especially for "delegating" creators).
+     *<p>
+     * NOTE: method is NOT called for Java Record types; selection of the canonical constructor
+     * as the Primary creator is handled directly by {@link POJOPropertiesCollector}
+     *<p>
+     * NOTE: was called {@code findDefaultCreator()} in Jackson 2.x but was renamed
+     * due to possible confusion with 0-argument "default" constructor.
+     *
+     * @param config Configuration settings in effect (for deserialization)
+     * @param valueClass Class being instantiated; defines Creators passed
+     * @param declaredConstructors Constructors value class declares (EXCEPT possible
+     *    0-parameter ("default") constructor which is passed separately)
+     * @param declaredFactories Factory methods value class declares
+     * @param zeroParamsConstructor 0-parameter ("default") constructor, if class has one.
+     *
+     * @return Default Creator to possibly use for {@code valueClass}, if one can be
+     *    determined; {@code null} if not.
+     */
+    public PotentialCreator findPreferredCreator(MapperConfig<?> config,
+            AnnotatedClass valueClass,
+            List<PotentialCreator> declaredConstructors,
+            List<PotentialCreator> declaredFactories,
+            Optional<PotentialCreator> zeroParamsConstructor) {
+        return null;
+    }
+
     /*
     /**********************************************************************
-    /* Deserialization: property annotations
+    /* Deserialization: other property annotations
     /**********************************************************************
      */
 
@@ -1126,7 +1205,7 @@ public abstract class AnnotationIntrospector
      * Should return null if no annotation
      * is found; otherwise a non-null name (possibly
      * {@link PropertyName#USE_DEFAULT}, which means "use default heuristics").
-     * 
+     *
      * @param ann Annotated entity to check
      *
      * @return Name to use if found; null if not.
@@ -1134,13 +1213,13 @@ public abstract class AnnotationIntrospector
     public PropertyName findNameForDeserialization(MapperConfig<?> config, Annotated ann) {
         return null;
     }
-    
+
     /**
      * Method for checking whether given method has an annotation
      * that suggests that the method is to serve as "any setter";
      * method to be used for setting values of any properties for
      * which no dedicated setter method is found.
-     * 
+     *
      * @param ann Annotated entity to check
      *
      * @return True if such annotation is found (and is not disabled),
@@ -1165,23 +1244,6 @@ public abstract class AnnotationIntrospector
         return null;
     }
 
-    /**
-     * Method called to check whether potential Creator (constructor or static factory
-     * method) has explicit annotation to indicate it as actual Creator; and if so,
-     * which {@link com.fasterxml.jackson.annotation.JsonCreator.Mode} to use.
-     *<p>
-     * NOTE: caller needs to consider possibility of both `null` (no annotation found)
-     * and {@link com.fasterxml.jackson.annotation.JsonCreator.Mode#DISABLED} (annotation found,
-     * but disabled); latter is necessary as marker in case multiple introspectors are chained,
-     * as well as possibly as when using mix-in annotations.
-     *
-     * @param config Configuration settings in effect (for serialization or deserialization)
-     * @param a Annotated accessor (usually constructor or static method) to check
-     */
-    public JsonCreator.Mode findCreatorAnnotation(MapperConfig<?> config, Annotated a) {
-        return null;
-    }
-
     /*
     /**********************************************************************
     /* Overridable methods: may be used as low-level extension points.
@@ -1191,7 +1253,7 @@ public abstract class AnnotationIntrospector
     /**
      * Method that should be used by sub-classes for ALL
      * annotation access;
-     * overridable so 
+     * overridable so
      * that sub-classes may, if they choose to, mangle actual access to
      * block access ("hide" annotations) or perhaps change it.
      *<p>

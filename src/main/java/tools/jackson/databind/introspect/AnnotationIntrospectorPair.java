@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.*;
 
@@ -76,14 +77,14 @@ public class AnnotationIntrospectorPair
         _secondary.allIntrospectors(result);
         return result;
     }
-    
+
     // // // Generic annotation properties, lookup
-    
+
     @Override
     public boolean isAnnotationBundle(Annotation ann) {
         return _primary.isAnnotationBundle(ann) || _secondary.isAnnotationBundle(ann);
     }
-    
+
     /*
     /**********************************************************************
     /* General class annotations
@@ -93,16 +94,8 @@ public class AnnotationIntrospectorPair
     @Override
     public PropertyName findRootName(MapperConfig<?> config, AnnotatedClass ac)
     {
-        PropertyName name1 = _primary.findRootName(config, ac);
-        if (name1 == null) {
-            return _secondary.findRootName(config, ac);
-        }
-        if (name1.hasSimpleName()) {
-            return name1;
-        }
-        // name1 is empty; how about secondary?
-        PropertyName name2 = _secondary.findRootName(config, ac);
-        return (name2 == null) ? name1 : name2;
+        return PropertyName.merge(_primary.findRootName(config, ac),
+                _secondary.findRootName(config, ac));
     }
 
     @Override
@@ -113,7 +106,7 @@ public class AnnotationIntrospectorPair
         return (v2 == null) // shouldn't occur but
             ? v1 : v2.withOverrides(v1);
     }
-    
+
     @Override
     public JsonIncludeProperties.Value findPropertyInclusionByName(MapperConfig<?> config, Annotated a)
     {
@@ -142,13 +135,23 @@ public class AnnotationIntrospectorPair
         }
         return id;
     }
-    
+
     @Override
     public Object findNamingStrategy(MapperConfig<?> config, AnnotatedClass ac)
     {
         Object str = _primary.findNamingStrategy(config, ac);
         if (str == null) {
             str = _secondary.findNamingStrategy(config, ac);
+        }
+        return str;
+    }
+
+    @Override
+    public Object findEnumNamingStrategy(MapperConfig<?> config, AnnotatedClass ac)
+    {
+        Object str = _primary.findEnumNamingStrategy(config, ac);
+        if (str == null) {
+            str = _secondary.findEnumNamingStrategy(config, ac);
         }
         return str;
     }
@@ -167,7 +170,7 @@ public class AnnotationIntrospectorPair
     /* Property auto-detection
     /**********************************************************************
      */
-    
+
     @Override
     public VisibilityChecker findAutoDetectVisibility(MapperConfig<?> config,
             AnnotatedClass ac, VisibilityChecker checker)
@@ -238,7 +241,7 @@ public class AnnotationIntrospectorPair
         return b;
     }
     */
-    
+
     @Override
     public List<NamedType> findSubtypes(MapperConfig<?> config, Annotated a)
     {
@@ -257,7 +260,7 @@ public class AnnotationIntrospectorPair
     {
         String name = _primary.findTypeName(config, ac);
         if (name == null || name.length() == 0) {
-            name = _secondary.findTypeName(config, ac);                
+            name = _secondary.findTypeName(config, ac);
         }
         return name;
     }
@@ -267,14 +270,14 @@ public class AnnotationIntrospectorPair
     /* General member (field, method/constructor) annotations
     /**********************************************************************
      */
-    
-    @Override        
+
+    @Override
     public ReferenceProperty findReferenceType(MapperConfig<?> config, AnnotatedMember member) {
         ReferenceProperty r = _primary.findReferenceType(config, member);
         return (r == null) ? _secondary.findReferenceType(config, member) : r;
     }
 
-    @Override        
+    @Override
     public NameTransformer findUnwrappingNameTransformer(MapperConfig<?> config, AnnotatedMember member) {
         NameTransformer r = _primary.findUnwrappingNameTransformer(config, member);
         return (r == null) ? _secondary.findUnwrappingNameTransformer(config, member) : r;
@@ -314,7 +317,7 @@ public class AnnotationIntrospectorPair
         return _explicitClassOrOb(_secondary.findSerializer(config, am),
                 ValueSerializer.None.class);
     }
-    
+
     @Override
     public Object findKeySerializer(MapperConfig<?> config, Annotated a) {
         Object r = _primary.findKeySerializer(config, a);
@@ -334,7 +337,7 @@ public class AnnotationIntrospectorPair
         return _explicitClassOrOb(_secondary.findContentSerializer(config, a),
                 ValueSerializer.None.class);
     }
-    
+
     @Override
     public Object findNullSerializer(MapperConfig<?> config, Annotated a) {
         Object r = _primary.findNullSerializer(config, a);
@@ -401,7 +404,7 @@ public class AnnotationIntrospectorPair
     }
 
     @Override
-    public ObjectIdInfo findObjectReferenceInfo(MapperConfig<?> config, 
+    public ObjectIdInfo findObjectReferenceInfo(MapperConfig<?> config,
             Annotated ann, ObjectIdInfo objectIdInfo) {
         // to give precedence for primary, must start with secondary:
         objectIdInfo = _secondary.findObjectReferenceInfo(config, ann, objectIdInfo);
@@ -421,17 +424,8 @@ public class AnnotationIntrospectorPair
 
     @Override
     public PropertyName findWrapperName(MapperConfig<?> config, Annotated ann) {
-        PropertyName name = _primary.findWrapperName(config, ann);
-        if (name == null) {
-            name = _secondary.findWrapperName(config, ann);
-        } else if (name == PropertyName.USE_DEFAULT) {
-            // does the other introspector have a better idea?
-            PropertyName name2 = _secondary.findWrapperName(config, ann);
-            if (name2 != null) {
-                name = name2;
-            }
-        }
-        return name;
+        return PropertyName.merge(_primary.findWrapperName(config, ann),
+                _secondary.findWrapperName(config, ann));
     }
 
     @Override
@@ -491,11 +485,8 @@ public class AnnotationIntrospectorPair
     @Override // since 2.11
     public PropertyName findRenameByField(MapperConfig<?> config,
             AnnotatedField f, PropertyName implName) {
-        PropertyName n = _secondary.findRenameByField(config, f, implName);
-        if (n == null) {
-            n = _primary.findRenameByField(config, f, implName);
-        }
-        return n;
+        return PropertyName.merge(_secondary.findRenameByField(config, f, implName),
+                    _primary.findRenameByField(config, f, implName));
     }
 
     // // // Serialization: type refinements
@@ -531,20 +522,11 @@ public class AnnotationIntrospectorPair
     }
 
     // // // Serialization: property annotations
-    
+
     @Override
     public PropertyName findNameForSerialization(MapperConfig<?> config, Annotated a) {
-        PropertyName n = _primary.findNameForSerialization(config, a);
-        // note: "use default" should not block explicit answer, so:
-        if (n == null) {
-            n = _secondary.findNameForSerialization(config, a);
-        } else if (n == PropertyName.USE_DEFAULT) {
-            PropertyName n2 = _secondary.findNameForSerialization(config, a);
-            if (n2 != null) {
-                n = n2;
-            }
-        }
-        return n;
+        return PropertyName.merge(_primary.findNameForSerialization(config, a),
+                _secondary.findNameForSerialization(config, a));
     }
 
     @Override
@@ -575,26 +557,27 @@ public class AnnotationIntrospectorPair
     }
 
     @Override
-    public  String[] findEnumValues(MapperConfig<?> config,
-            Class<?> enumType, Enum<?>[] enumValues, String[] names) {
+    public String[] findEnumValues(MapperConfig<?> config, AnnotatedClass annotatedClass,
+            Enum<?>[] enumValues, String[] names) {
         // reverse order to give _primary higher precedence
-        names = _secondary.findEnumValues(config, enumType, enumValues, names);
-        names = _primary.findEnumValues(config, enumType, enumValues, names);
+        names = _secondary.findEnumValues(config, annotatedClass, enumValues, names);
+        names = _primary.findEnumValues(config, annotatedClass, enumValues, names);
         return names;
     }
 
     @Override
-    public Enum<?> findDefaultEnumValue(MapperConfig<?> config, Class<?> enumCls) {
-        Enum<?> en = _primary.findDefaultEnumValue(config, enumCls);
-        return (en == null) ? _secondary.findDefaultEnumValue(config, enumCls) : en;
+    public void findEnumAliases(MapperConfig<?> config, AnnotatedClass annotatedClass,
+            Enum<?>[] enumConstants, String[][] aliases) {
+        // reverse order to give _primary higher precedence
+        _secondary.findEnumAliases(config, annotatedClass, enumConstants, aliases);
+        _primary.findEnumAliases(config, annotatedClass, enumConstants, aliases);
     }
 
     @Override
-    public void findEnumAliases(MapperConfig<?> config,
-            Class<?> enumType, Enum<?>[] enumValues, String[][] aliases) {
-        // reverse order to give _primary higher precedence
-        _secondary.findEnumAliases(config, enumType, enumValues, aliases);
-        _primary.findEnumAliases(config, enumType, enumValues, aliases);
+    public Enum<?> findDefaultEnumValue(MapperConfig<?> config,
+            AnnotatedClass annotatedClass, Enum<?>[] enumValues) {
+        Enum<?> en = _primary.findDefaultEnumValue(config, annotatedClass, enumValues);
+        return (en == null) ? _secondary.findDefaultEnumValue(config, annotatedClass, enumValues) : en;
     }
 
     // // // Deserialization: general annotations
@@ -627,7 +610,7 @@ public class AnnotationIntrospectorPair
         }
         return _explicitClassOrOb(_secondary.findContentDeserializer(config, am),
                 ValueDeserializer.None.class);
-                
+
     }
 
     @Override
@@ -652,7 +635,11 @@ public class AnnotationIntrospectorPair
         return _primary.refineDeserializationType(config, a, t);
     }
 
-    // // // Deserialization: class annotations
+    /*
+    /**********************************************************************
+    /* Deserialization: value instantiation, Creators
+    /**********************************************************************
+     */
 
     @Override
     public Object findValueInstantiator(MapperConfig<?> config, AnnotatedClass ac) {
@@ -672,22 +659,39 @@ public class AnnotationIntrospectorPair
         return (result == null) ? _secondary.findPOJOBuilderConfig(config, ac) : result;
     }
 
-    // // // Deserialization: method annotations
+    @Override
+    public JsonCreator.Mode findCreatorAnnotation(MapperConfig<?> config, Annotated a) {
+        JsonCreator.Mode mode = _primary.findCreatorAnnotation(config, a);
+        return (mode == null) ? _secondary.findCreatorAnnotation(config, a) : mode;
+    }
+
+    @Override
+    public PotentialCreator findPreferredCreator(MapperConfig<?> config,
+            AnnotatedClass valueClass,
+            List<PotentialCreator> declaredConstructors,
+            List<PotentialCreator> declaredFactories,
+            Optional<PotentialCreator> zeroParamsConstructor) {
+        PotentialCreator primaryCtor = _primary.findPreferredCreator(config,
+                valueClass, declaredConstructors, declaredFactories, zeroParamsConstructor);
+        if (primaryCtor == null) {
+            primaryCtor = _secondary.findPreferredCreator(config,
+                    valueClass, declaredConstructors, declaredFactories, zeroParamsConstructor);
+        }
+        return primaryCtor;
+    }
+
+    /*
+    /**********************************************************************
+    /* Deserialization: other property annotations
+    /**********************************************************************
+     */
 
     @Override
     public PropertyName findNameForDeserialization(MapperConfig<?> config, Annotated a)
     {
-        // note: "use default" should not block explicit answer, so:
-        PropertyName n = _primary.findNameForDeserialization(config, a);
-        if (n == null) {
-            n = _secondary.findNameForDeserialization(config, a);
-        } else if (n == PropertyName.USE_DEFAULT) {
-            PropertyName n2 = _secondary.findNameForDeserialization(config, a);
-            if (n2 != null) {
-                n = n2;
-            }
-        }
-        return n;
+        return PropertyName.merge(
+                _primary.findNameForDeserialization(config, a),
+                _secondary.findNameForDeserialization(config, a));
     }
 
     @Override
@@ -714,12 +718,6 @@ public class AnnotationIntrospectorPair
             b = _secondary.findMergeInfo(config, a);
         }
         return b;
-    }
-
-    @Override
-    public JsonCreator.Mode findCreatorAnnotation(MapperConfig<?> config, Annotated a) {
-        JsonCreator.Mode mode = _primary.findCreatorAnnotation(config, a);
-        return (mode == null) ? _secondary.findCreatorAnnotation(config, a) : mode;
     }
 
     protected boolean _isExplicitClassOrOb(Object maybeCls, Class<?> implicit) {

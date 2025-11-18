@@ -111,7 +111,7 @@ public class StdValueInstantiator
 
     @Override
     public ValueInstantiator createContextual(DeserializationContext ctxt,
-            BeanDescription beanDesc)
+            BeanDescription.Supplier beanDescRef)
     {
         return this;
     }
@@ -337,7 +337,7 @@ public class StdValueInstantiator
         if (_fromStringCreator != null) {
             try {
                 return _fromStringCreator.call1(value);
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 return ctxt.handleInstantiationProblem(_fromStringCreator.getDeclaringClass(),
                         value, rewrapCtorProblem(ctxt, t));
             }
@@ -353,7 +353,7 @@ public class StdValueInstantiator
             Object arg = Integer.valueOf(value);
             try {
                 return _fromIntCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromIntCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0));
             }
@@ -363,7 +363,7 @@ public class StdValueInstantiator
             Object arg = Long.valueOf(value);
             try {
                 return _fromLongCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromLongCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0));
             }
@@ -373,13 +373,24 @@ public class StdValueInstantiator
             Object arg = BigInteger.valueOf(value);
             try {
                 return _fromBigIntegerCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0)
                 );
             }
         }
-
+        
+        if (_fromDoubleCreator != null) {
+            Object arg = Double.valueOf(value);
+            try {
+                return _fromDoubleCreator.call1(arg);
+            } catch (Exception t0) {
+                return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
+                        arg, rewrapCtorProblem(ctxt, t0)
+                );
+            }
+        }
+        
         return super.createFromInt(ctxt, value);
     }
 
@@ -390,7 +401,7 @@ public class StdValueInstantiator
             Long arg = Long.valueOf(value);
             try {
                 return _fromLongCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromLongCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0)
                 );
@@ -401,8 +412,21 @@ public class StdValueInstantiator
             BigInteger arg = BigInteger.valueOf(value);
             try {
                 return _fromBigIntegerCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
+                        arg, rewrapCtorProblem(ctxt, t0)
+                );
+            }
+        }
+        
+        // [databind#4453]: Note: can lose precision (since double is 64-bits of which
+        // only part is for mantissa). But already the case with regular properties.
+        if (_fromDoubleCreator != null) {
+            Object arg = Double.valueOf(value);
+            try {
+                return _fromDoubleCreator.call1(arg);
+            } catch (Exception t0) {
+                return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0)
                 );
             }
@@ -417,7 +441,7 @@ public class StdValueInstantiator
         if (_fromBigIntegerCreator != null) {
             try {
                 return _fromBigIntegerCreator.call1(value);
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 return ctxt.handleInstantiationProblem(_fromBigIntegerCreator.getDeclaringClass(),
                         value, rewrapCtorProblem(ctxt, t)
                 );
@@ -434,7 +458,7 @@ public class StdValueInstantiator
             Double arg = Double.valueOf(value);
             try {
                 return _fromDoubleCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0));
             }
@@ -444,7 +468,7 @@ public class StdValueInstantiator
             BigDecimal arg = BigDecimal.valueOf(value);
             try {
                 return _fromBigDecimalCreator.call1(arg);
-            } catch (Throwable t0) {
+            } catch (Exception t0) {
                 return ctxt.handleInstantiationProblem(_fromBigDecimalCreator.getDeclaringClass(),
                         arg, rewrapCtorProblem(ctxt, t0));
             }
@@ -459,7 +483,7 @@ public class StdValueInstantiator
         if (_fromBigDecimalCreator != null) {
             try {
                 return _fromBigDecimalCreator.call1(value);
-            } catch (Throwable t) {
+            } catch (Exception t) {
                 return ctxt.handleInstantiationProblem(_fromBigDecimalCreator.getDeclaringClass(),
                         value, rewrapCtorProblem(ctxt, t)
                 );
@@ -475,7 +499,7 @@ public class StdValueInstantiator
             if (dbl != null) {
                 try {
                     return _fromDoubleCreator.call1(dbl);
-                } catch (Throwable t0) {
+                } catch (Exception t0) {
                     return ctxt.handleInstantiationProblem(_fromDoubleCreator.getDeclaringClass(),
                             dbl, rewrapCtorProblem(ctxt, t0));
                 }
@@ -503,7 +527,7 @@ public class StdValueInstantiator
         final Boolean arg = Boolean.valueOf(value);
         try {
             return _fromBooleanCreator.call1(arg);
-        } catch (Throwable t0) {
+        } catch (Exception t0) {
             return ctxt.handleInstantiationProblem(_fromBooleanCreator.getDeclaringClass(),
                     arg, rewrapCtorProblem(ctxt, t0));
         }
@@ -551,8 +575,8 @@ public class StdValueInstantiator
             Throwable t)
     {
         // 05-Nov-2015, tatu: Only avoid wrapping if already a DatabindException
-        if (t instanceof DatabindException) {
-            return (DatabindException) t;
+        if (t instanceof DatabindException databindException) {
+            return databindException;
         }
         return ctxt.instantiationException(getValueClass(), t);
     }
@@ -605,12 +629,15 @@ public class StdValueInstantiator
                 if (prop == null) { // delegate
                     args[i] = delegate;
                 } else { // nope, injectable:
-                    args[i] = ctxt.findInjectableValue(prop.getInjectableValueId(), prop, null);
+                    // 09-May-2025, tatu: Not sure where to get "optional" (last arg) value...
+                    // 25-Aug-2025, tatu: ... or "useInput"
+                    args[i] = ctxt.findInjectableValue(prop.getInjectableValueId(), prop,
+                            null, null, null);
                 }
             }
             // and then try calling with full set of arguments
             return delegateCreator.call(args);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             throw rewrapCtorProblem(ctxt, t);
         }
     }

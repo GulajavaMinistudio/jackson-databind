@@ -2,9 +2,14 @@ package tools.jackson.databind.type;
 
 import java.util.*;
 
-import tools.jackson.databind.*;
+import org.junit.jupiter.api.Test;
 
-public class RecursiveTypeTest extends BaseMapTest
+import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class RecursiveTypeTest extends DatabindTestUtil
 {
     // for [databind#1301]
     @SuppressWarnings("serial")
@@ -45,20 +50,21 @@ public class RecursiveTypeTest extends BaseMapTest
         public R setValue(final R value) {
             throw new UnsupportedOperationException();
         }
-      
+
         static <L, R> ImmutablePair<L, R> of(final L left, final R right) {
             return new ImmutablePair<L, R>(left, right);
         }
     }
 
     // for [databind#1301]
+    @Test
     public void testRecursiveType()
     {
-        TypeFactory tf = TypeFactory.defaultInstance();
+        TypeFactory tf = defaultTypeFactory();
         JavaType type = tf.constructType(HashTree.class);
         assertNotNull(type);
     }
-    
+
     // for [databind#1301]
     @SuppressWarnings("serial")
     static class DataDefinition extends HashMap<String, DataDefinition> {
@@ -68,10 +74,11 @@ public class RecursiveTypeTest extends BaseMapTest
         public boolean required;
         public String type;
     }
-    
-    private final ObjectMapper MAPPER = new ObjectMapper();
+
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     // [databind#938]
+    @Test
     public void testRecursivePair() throws Exception
     {
         JavaType t = MAPPER.constructType(ImmutablePair.class);
@@ -89,9 +96,10 @@ public class RecursiveTypeTest extends BaseMapTest
     }
 
     // for [databind#1301]
+    @Test
     public void testJavaTypeToString() throws Exception
     {
-        TypeFactory tf = objectMapper().getTypeFactory();
+        TypeFactory tf = MAPPER.getTypeFactory();
         String desc = tf.constructType(DataDefinition.class).toString();
         assertNotNull(desc);
         // could try comparing exact message, but since it's informational try looser:
@@ -104,8 +112,9 @@ public class RecursiveTypeTest extends BaseMapTest
     }
 
     // for [databind#1647]
+    @Test
     public void testSuperClassWithReferencedJavaType() {
-        TypeFactory tf = objectMapper().getTypeFactory();
+        TypeFactory tf = MAPPER.getTypeFactory();
         tf.constructType(Base.class); // must be constructed before sub to set the cache correctly
         JavaType subType = tf.constructType(Sub.class);
         // baseTypeFromSub should be a ResolvedRecursiveType in this test

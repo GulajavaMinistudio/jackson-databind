@@ -3,19 +3,25 @@ package tools.jackson.databind.deser.jdk;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.*;
 import tools.jackson.core.type.TypeReference;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * This unit test suite tries to verify that the "Native" java type
  * mapper can properly re-construct Java array objects from Json arrays.
  */
 public class ArrayDeserializationTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     public final static class Bean1
     {
@@ -67,7 +73,7 @@ public class ArrayDeserializationTest
         }
 
         @Override
-        public void serialize(JsonGenerator gen, SerializerProvider provider)
+        public void serialize(JsonGenerator gen, SerializationContext provider)
         {
             gen.writeString(_desc);
         }
@@ -82,9 +88,9 @@ public class ArrayDeserializationTest
 
         @Override
         public void serializeWithType(JsonGenerator gen,
-                SerializerProvider provider, TypeSerializer typeSer) {
+                SerializationContext provider, TypeSerializer typeSer) {
         }
-    }	
+    }
 
     static class ObjectWrapper {
         public Object wrapped;
@@ -101,7 +107,7 @@ public class ArrayDeserializationTest
         {
             List<NonDeserializable> list = new ArrayList<NonDeserializable>();
             while (p.nextToken() != JsonToken.END_ARRAY) {
-                list.add(new NonDeserializable(p.getText(), false));
+                list.add(new NonDeserializable(p.getString(), false));
             }
             return list.toArray(new NonDeserializable[0]);
         }
@@ -109,15 +115,15 @@ public class ArrayDeserializationTest
 
     static class NonDeserializable {
         protected String value;
-        
+
         public NonDeserializable(String v, boolean bogus) {
             value = v;
         }
     }
 
-    static class Product { 
-        public String name; 
-        public List<Things> thelist; 
+    static class Product {
+        public String name;
+        public List<Things> thelist;
     }
 
     static class Things {
@@ -136,8 +142,9 @@ public class ArrayDeserializationTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
-    
+    private final ObjectMapper MAPPER = newJsonMapper();
+
+    @Test
     public void testUntypedArray() throws Exception
     {
 
@@ -156,6 +163,7 @@ public class ArrayDeserializationTest
         assertEquals(Double.valueOf(2.0), result[4]);
     }
 
+    @Test
     public void testIntegerArray() throws Exception
     {
         final int LEN = 90000;
@@ -182,6 +190,7 @@ public class ArrayDeserializationTest
     }
 
     // allow "" to mean 'null' for Arrays, List and Maps
+    @Test
     public void testFromEmptyString() throws Exception
     {
         ObjectReader r = MAPPER.reader()
@@ -192,6 +201,7 @@ public class ArrayDeserializationTest
     }
 
     // allow "" to mean 'null' for Arrays, List and Maps
+    @Test
     public void testFromEmptyString2() throws Exception
     {
         ObjectMapper m = jsonMapperBuilder()
@@ -202,13 +212,14 @@ public class ArrayDeserializationTest
         assertNotNull(p);
         assertNull(p.thelist);
     }
-    
+
     /*
     /**********************************************************
     /* Arrays of arrays...
     /**********************************************************
      */
 
+    @Test
     public void testUntypedArrayOfArrays() throws Exception
     {
         // to get "untyped" default map-to-map, pass Object[].class
@@ -233,14 +244,15 @@ public class ArrayDeserializationTest
         ObjectArrayWrapper aw = MAPPER.readValue("{\"wrapped\":"+JSON+"}", ObjectArrayWrapper.class);
         assertNotNull(aw);
         assertNotNull(aw.wrapped);
-    }    
-    
+    }
+
     /*
     /**********************************************************
     /* Tests for String arrays, char[]
     /**********************************************************
      */
 
+    @Test
     public void testStringArray() throws Exception
     {
         final String[] STRS = new String[] {
@@ -270,6 +282,7 @@ public class ArrayDeserializationTest
         assertNull(result[0]);
     }
 
+    @Test
     public void testCharArray() throws Exception
     {
         final String TEST_STR = "Let's just test it? Ok!";
@@ -287,6 +300,7 @@ public class ArrayDeserializationTest
     /**********************************************************
      */
 
+    @Test
     public void testBooleanArray() throws Exception
     {
         boolean[] result = MAPPER.readValue("[ true, false, false ]", boolean[].class);
@@ -297,6 +311,7 @@ public class ArrayDeserializationTest
         assertFalse(result[2]);
     }
 
+    @Test
     public void testByteArrayAsNumbers() throws Exception
     {
         final int LEN = 37000;
@@ -322,6 +337,7 @@ public class ArrayDeserializationTest
         assertEquals(0, result[LEN]);
     }
 
+    @Test
     public void testByteArrayAsBase64() throws Exception
     {
         /* Hmmh... let's use JsonGenerator here, to hopefully ensure we
@@ -350,6 +366,7 @@ public class ArrayDeserializationTest
      * And then bit more challenging case; let's try decoding
      * multiple byte arrays from an array...
      */
+    @Test
     public void testByteArraysAsBase64() throws Exception
     {
         StringWriter sw = new StringWriter(1000);
@@ -379,11 +396,12 @@ public class ArrayDeserializationTest
         assertEquals(entryCount, result.length);
         for (int i = 0; i < entryCount; ++i) {
             byte[] b = result[i];
-            assertArrayEquals("Comparing entry #"+i+"/"+entryCount,entries[i], b);
+            assertArrayEquals(entries[i], b, "Comparing entry #"+i+"/"+entryCount);
         }
     }
 
     // [JACKSON-763]
+    @Test
     public void testByteArraysWith763() throws Exception
     {
         String[] input = new String[] { "YQ==", "Yg==", "Yw==" };
@@ -392,7 +410,8 @@ public class ArrayDeserializationTest
         assertEquals("b", new String(data[1], "US-ASCII"));
         assertEquals("c", new String(data[2], "US-ASCII"));
     }
-    
+
+    @Test
     public void testShortArray() throws Exception
     {
         final int LEN = 31001; // fits in signed 16-bit
@@ -416,6 +435,7 @@ public class ArrayDeserializationTest
         }
     }
 
+    @Test
     public void testIntArray() throws Exception
     {
         final int LEN = 70000;
@@ -441,6 +461,7 @@ public class ArrayDeserializationTest
         }
     }
 
+    @Test
     public void testLongArray() throws Exception
     {
         final int LEN = 12300;
@@ -464,6 +485,7 @@ public class ArrayDeserializationTest
         }
     }
 
+    @Test
     public void testDoubleArray() throws Exception
     {
         final int LEN = 7000;
@@ -491,6 +513,7 @@ public class ArrayDeserializationTest
         }
     }
 
+    @Test
     public void testFloatArray() throws Exception
     {
         final int LEN = 7000;
@@ -515,12 +538,65 @@ public class ArrayDeserializationTest
         }
     }
 
+    @Test
+    public void testSingleStringToPrimitiveArray() throws Exception {
+       final ObjectMapper mapper = jsonMapperBuilder()
+                .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+                .build();
+        assertLengthValue(mapper.readValue("\"true\"", boolean[].class), true);
+        assertLengthValue(mapper.readValue("\"a\"", char[].class), 'a');
+        assertLengthValue(mapper.readValue("\"1\"", short[].class), (short) 1);
+        assertLengthValue(mapper.readValue("\"1\"", int[].class), 1);
+        assertLengthValue(mapper.readValue("\"1\"", long[].class), 1L);
+       // 06-Aug-2025, tatu: with [databind#5242] will try to access String
+        //   as Base64-encoded bytes. Need to think of whether to try to 
+        //   support Float/Double-as-single-String case or not; for now, not
+        //assertLengthValue(MAPPER.readValue("\"7.038531e-26\"", float[].class), 7.038531e-26f);
+        //assertLengthValue(MAPPER.readValue("\"1.5555\"", double[].class), 1.5555d);
+    }
+
+    private void assertLengthValue(boolean[] arr, boolean expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    private void assertLengthValue(char[] arr, char expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    private void assertLengthValue(short[] arr, short expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    private void assertLengthValue(int[] arr, int expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    private void assertLengthValue(long[] arr, long expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    void assertLengthValue(float[] arr, float expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
+    void assertLengthValue(double[] arr, double expt) {
+        assertEquals(1, arr.length);
+        assertEquals(expt, arr[0]);
+    }
+
     /*
     /**********************************************************
     /* Tests for Bean arrays
     /**********************************************************
      */
 
+    @Test
     public void testBeanArray()
         throws Exception
     {
@@ -551,8 +627,9 @@ public class ArrayDeserializationTest
     /* And special cases for byte array (base64 encoded)
     /**********************************************************
      */
-    
+
     // for [databind#890]
+    @Test
     public void testByteArrayTypeOverride890() throws Exception
     {
         HiddenBinaryBean890 result = MAPPER.readValue(
@@ -561,13 +638,14 @@ public class ArrayDeserializationTest
         assertNotNull(result.someBytes);
         assertEquals(byte[].class, result.someBytes.getClass());
     }
-    
+
     /*
     /**********************************************************
     /* And custom deserializers too
     /**********************************************************
      */
 
+    @Test
     public void testCustomDeserializers() throws Exception
     {
         SimpleModule testModule = new SimpleModule("test", Version.unknownVersion());
@@ -575,7 +653,7 @@ public class ArrayDeserializationTest
         ObjectMapper mapper = jsonMapperBuilder()
                 .addModule(testModule)
                 .build();
-        
+
         NonDeserializable[] result = mapper.readValue("[\"a\"]", NonDeserializable[].class);
         assertNotNull(result);
         assertEquals(1, result.length);

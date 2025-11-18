@@ -4,6 +4,7 @@ import java.util.*;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.deser.*;
 import tools.jackson.databind.deser.bean.PropertyBasedCreator;
 import tools.jackson.databind.deser.bean.PropertyValueBuffer;
@@ -17,7 +18,7 @@ import tools.jackson.databind.type.LogicalType;
  * Note: casting within this class is all messed up -- just could not figure out a way
  * to properly deal with recursive definition of {@code EnumMap<K extends Enum<K>, V>}
  */
-@SuppressWarnings({ "unchecked", "rawtypes" }) 
+@SuppressWarnings({ "unchecked", "rawtypes" })
 public class EnumMapDeserializer
     extends ContainerDeserializerBase<EnumMap<?,?>>
 {
@@ -49,7 +50,7 @@ public class EnumMapDeserializer
      * that takes one or more named properties as argument(s),
      * this creator is used for instantiation.
      */
-    protected PropertyBasedCreator _propertyBasedCreator;    
+    protected PropertyBasedCreator _propertyBasedCreator;
 
     /*
     /**********************************************************************
@@ -208,7 +209,7 @@ public class EnumMapDeserializer
     /* Actual deserialization
     /**********************************************************************
      */
-    
+
     @Override
     public EnumMap<?,?> deserialize(JsonParser p, DeserializationContext ctxt)
         throws JacksonException
@@ -245,9 +246,6 @@ public class EnumMapDeserializer
         // [databind#631]: Assign current value, to be accessible by custom deserializers
         p.assignCurrentValue(result);
 
-        final ValueDeserializer<Object> valueDes = _valueDeserializer;
-        final TypeDeserializer typeDeser = _valueTypeDeserializer;
-
         String keyStr;
         if (p.isExpectedStartObjectToken()) {
             keyStr = p.nextName();
@@ -267,7 +265,7 @@ public class EnumMapDeserializer
             Enum<?> key = (Enum<?>) _keyDeserializer.deserializeKey(keyStr, ctxt);
             JsonToken t = p.nextToken();
             if (key == null) {
-                if (!ctxt.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
+                if (!ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
                     return (EnumMap<?,?>) ctxt.handleWeirdStringValue(_enumClass, keyStr,
                             "value not one of declared Enum instance names for %s",
                             _containerType.getKeyType());
@@ -287,11 +285,17 @@ public class EnumMapDeserializer
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (typeDeser == null) {
-                    value =  valueDes.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = valueDes.deserializeWithType(p, ctxt, typeDeser);
+                    value = _deserializeNoNullChecks(p, ctxt);
+                }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+
+                    if (value == null && _skipNullValues) {
+                        continue;
+                    }
                 }
             } catch (Exception e) {
                 return wrapAndThrow(ctxt, e, result, keyStr);
@@ -360,7 +364,7 @@ public class EnumMapDeserializer
             // but we need to let key deserializer handle it separately, nonetheless
             Enum<?> key = (Enum<?>) _keyDeserializer.deserializeKey(keyName, ctxt);
             if (key == null) {
-                if (!ctxt.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
+                if (!ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
                     return (EnumMap<?,?>) ctxt.handleWeirdStringValue(_enumClass, keyName,
                             "value not one of declared Enum instance names for %s",
                             _containerType.getKeyType());
@@ -371,18 +375,24 @@ public class EnumMapDeserializer
                 p.skipChildren();
                 continue;
             }
-            Object value; 
+            Object value;
 
             try {
                 if (t == JsonToken.VALUE_NULL) {
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (_valueTypeDeserializer == null) {
-                    value = _valueDeserializer.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = _valueDeserializer.deserializeWithType(p, ctxt, _valueTypeDeserializer);
+                    value = _deserializeNoNullChecks(p, ctxt);
+                }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+
+                    if (value == null && _skipNullValues) {
+                        continue;
+                    }
                 }
             } catch (Exception e) {
                 wrapAndThrow(ctxt, e, _containerType.getRawClass(), keyName);
@@ -398,5 +408,21 @@ public class EnumMapDeserializer
             wrapAndThrow(ctxt, e, _containerType.getRawClass(), keyName);
             return null;
         }
+    }
+
+    /**
+     * Deserialize the content of the map.
+     * If _valueTypeDeserializer is null, use _valueDeserializer.deserialize; if non-null,
+     * use _valueDeserializer.deserializeWithType to deserialize value.
+     * This method only performs deserialization and does not consider _skipNullValues, _nullProvider, etc.
+     * @since 2.19.2
+     */
+    protected Object _deserializeNoNullChecks(JsonParser p, DeserializationContext ctxt)
+        throws JacksonException
+    {
+        if (_valueTypeDeserializer == null) {
+            return _valueDeserializer.deserialize(p, ctxt);
+        }
+        return _valueDeserializer.deserializeWithType(p, ctxt, _valueTypeDeserializer);
     }
 }

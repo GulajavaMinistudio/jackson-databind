@@ -2,18 +2,22 @@ package tools.jackson.databind.ser;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class GenericTypeSerializationTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class GenericTypeSerializationTest extends DatabindTestUtil
 {
     static class Account {
-        private Long id;        
+        private Long id;
         private String name;
 
         @JsonCreator
@@ -43,19 +47,19 @@ public class GenericTypeSerializationTest extends BaseMapTest
 
     static class Key<T> {
         private final T id;
-        
+
         public Key(T id) { this.id = id; }
-        
+
         public T getId() { return id; }
 
         public <V> Key<V> getParent() { return null; }
     }
- 
+
     static class Person1 {
         private Long id;
         private String name;
         private Key<Account> account;
-        
+
         public Person1(String name) { this.name = name; }
 
         public String getName() {
@@ -72,14 +76,14 @@ public class GenericTypeSerializationTest extends BaseMapTest
 
         public void setAccount(Key<Account> account) {
             this.account = account;
-        }    
+        }
     }
 
     static class Person2 {
         private Long id;
         private String name;
         private List<Key<Account>> accounts;
-        
+
         public Person2(String name) {
                 this.name = name;
         }
@@ -100,7 +104,7 @@ public class GenericTypeSerializationTest extends BaseMapTest
 
         class Element {
             public T value;
-    
+
             public Element(T v) { value = v; }
         }
     }
@@ -109,7 +113,7 @@ public class GenericTypeSerializationTest extends BaseMapTest
     static class Base727 {
         public int a;
     }
-    
+
     @JsonPropertyOrder(alphabetic=true)
     static class Impl727 extends Base727 {
         public int b;
@@ -448,11 +452,12 @@ public class GenericTypeSerializationTest extends BaseMapTest
     private final ObjectMapper MAPPER = newJsonMapper();
 
     @SuppressWarnings("unchecked")
-    public void testIssue468a()
+    @Test
+    public void testIssue468a() throws Exception
     {
         Person1 p1 = new Person1("John");
         p1.setAccount(new Key<Account>(new Account("something", 42L)));
-        
+
         // First: ensure we can serialize (pre 1.7 this failed)
         String json = MAPPER.writeValueAsString(p1);
 
@@ -470,7 +475,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
     }
 
     @SuppressWarnings("unchecked")
-    public void testIssue468b()
+    @Test
+    public void testIssue468b() throws Exception
     {
         Person2 p2 = new Person2("John");
         List<Key<Account>> accounts = new ArrayList<Key<Account>>();
@@ -496,14 +502,16 @@ public class GenericTypeSerializationTest extends BaseMapTest
      * Test related to unbound type variables, usually resulting
      * from inner classes of generic classes (like Sets).
      */
-    public void testUnboundTypes()
+    @Test
+    public void testUnboundTypes() throws Exception
     {
         GenericBogusWrapper<Integer> list = new GenericBogusWrapper<Integer>(Integer.valueOf(7));
         String json = MAPPER.writeValueAsString(list);
         assertEquals("{\"wrapped\":{\"value\":7}}", json);
     }
 
-    public void testRootTypeForCollections727()
+    @Test
+    public void testRootTypeForCollections727() throws Exception
     {
         List<Base727> input = new ArrayList<Base727>();
         input.add(new Impl727(1, 2));
@@ -520,7 +528,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
 
     // For [databind#2821]
     @SuppressWarnings("unchecked")
-    public void testTypeResolution2821()
+    @Test
+    public void testTypeResolution2821() throws Exception
     {
         Entity2821<String> entity = new Entity2821<>(new Attributes2821("id"), "hello");
         List<Entity2821<?>> list;
@@ -536,7 +545,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertNotNull(json);
     }
 
-    public void testStaticDelegateDeserialization()
+    @Test
+    public void testStaticDelegateDeserialization() throws Exception
     {
         GenericWrapper<Account, String> wrapper = MAPPER.readValue(
                 "{\"first\":{\"id\":1,\"name\":\"name\"},\"second\":\"str\"}",
@@ -547,7 +557,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals("str", second);
     }
 
-    public void testStaticDelegateDeserialization_factoryProvidesSpecificity0()
+    @Test
+    public void testStaticDelegateDeserialization_factoryProvidesSpecificity0() throws Exception
     {
         GenericSpecificityWrapper0<Object, Account> wrapper = MAPPER.readValue(
                 "{\"first\":\"1\",\"second\":{\"id\":1,\"name\":\"name\"}}",
@@ -558,7 +569,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals(new Account("name", 1L), second);
     }
 
-    public void testStaticDelegateDeserialization_factoryProvidesSpecificity1()
+    @Test
+    public void testStaticDelegateDeserialization_factoryProvidesSpecificity1() throws Exception
     {
         GenericSpecificityWrapper1<StringStub, Account> wrapper = MAPPER.readValue(
                 "{\"first\":\"1\",\"second\":{\"id\":1,\"name\":\"name\"}}",
@@ -569,7 +581,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals(new Account("name", 1L), second);
     }
 
-    public void testStaticDelegateDeserialization_factoryProvidesSpecificity2()
+    @Test
+    public void testStaticDelegateDeserialization_factoryProvidesSpecificity2() throws Exception
     {
         GenericSpecificityWrapper2<Stub<Object>, Account> wrapper = MAPPER.readValue(
                 "{\"first\":\"1\",\"second\":{\"id\":1,\"name\":\"name\"}}",
@@ -581,7 +594,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals(new Account("name", 1L), second);
     }
 
-    public void testStaticDelegateDeserialization_wildcardInResult()
+    @Test
+    public void testStaticDelegateDeserialization_wildcardInResult() throws Exception
     {
         WildcardWrapperImpl<Account, Account> wrapper = MAPPER.readValue(
                 "{\"first\":{\"id\":1,\"name\":\"name1\"},\"second\":{\"id\":2,\"name\":\"name2\"}}",
@@ -592,7 +606,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals(new Account("name2", 2L), account2);
     }
 
-    public void testSimpleStaticJsonCreator()
+    @Test
+    public void testSimpleStaticJsonCreator() throws Exception
     {
         SimpleWrapper<Account> wrapper = MAPPER.readValue("{\"object\":{\"id\":1,\"name\":\"name1\"}}",
                 new TypeReference<SimpleWrapper<Account>>() {});
@@ -600,7 +615,8 @@ public class GenericTypeSerializationTest extends BaseMapTest
         assertEquals(new Account("name1", 1L), account);
     }
 
-    public void testIndexedListExample()
+    @Test
+    public void testIndexedListExample() throws Exception
     {
         UUID uuid = UUID.randomUUID();
         IndexedList<TestIndexed, String> value = MAPPER.readValue(String.format("[\"%s\"]", uuid.toString()),

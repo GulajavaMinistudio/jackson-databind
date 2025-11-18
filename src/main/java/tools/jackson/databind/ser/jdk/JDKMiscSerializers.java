@@ -1,5 +1,6 @@
 package tools.jackson.databind.ser.jdk;
 
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 import java.util.concurrent.atomic.*;
 
@@ -25,10 +26,6 @@ public class JDKMiscSerializers
      */
     public static final ValueSerializer<?> find(Class<?> raw)
     {
-        ValueSerializer<?> ser = JDKStringLikeSerializer.find(raw);
-        if (ser != null) {
-            return ser;
-        }
         if (raw == UUID.class) {
             return new UUIDSerializer();
         }
@@ -47,8 +44,11 @@ public class JDKMiscSerializers
             return new TokenBufferSerializer();
         }
         // And then some stranger types... not 100% they are needed but:
-        if ((raw == Void.class) || (raw == Void.TYPE)) { 
+        if ((raw == Void.class) || (raw == Void.TYPE)) {
             return NullSerializer.instance;
+        }
+        if (ByteArrayOutputStream.class.isAssignableFrom(raw)) {
+            return new ByteArrayOutputStreamSerializer();
         }
         return null;
     }
@@ -63,9 +63,9 @@ public class JDKMiscSerializers
         extends StdScalarSerializer<AtomicBoolean>
     {
         public AtomicBooleanSerializer() { super(AtomicBoolean.class, false); }
-    
+
         @Override
-        public void serialize(AtomicBoolean value, JsonGenerator gen, SerializerProvider provider) throws JacksonException {
+        public void serialize(AtomicBoolean value, JsonGenerator gen, SerializationContext provider) throws JacksonException {
             gen.writeBoolean(value.get());
         }
 
@@ -79,9 +79,9 @@ public class JDKMiscSerializers
         extends StdScalarSerializer<AtomicInteger>
     {
         public AtomicIntegerSerializer() { super(AtomicInteger.class, false); }
-    
+
         @Override
-        public void serialize(AtomicInteger value, JsonGenerator gen, SerializerProvider provider) throws JacksonException {
+        public void serialize(AtomicInteger value, JsonGenerator gen, SerializationContext provider) throws JacksonException {
             gen.writeNumber(value.get());
         }
 
@@ -96,9 +96,9 @@ public class JDKMiscSerializers
         extends StdScalarSerializer<AtomicLong>
     {
         public AtomicLongSerializer() { super(AtomicLong.class, false); }
-    
+
         @Override
-        public void serialize(AtomicLong value, JsonGenerator gen, SerializerProvider provider) throws JacksonException {
+        public void serialize(AtomicLong value, JsonGenerator gen, SerializationContext provider) throws JacksonException {
             gen.writeNumber(value.get());
         }
 
@@ -106,6 +106,33 @@ public class JDKMiscSerializers
         public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
         {
             visitIntFormat(visitor, typeHint, JsonParser.NumberType.LONG);
+        }
+    }
+
+    /*
+    /**********************************************************************
+    /* Serializers, other
+    /**********************************************************************
+     */
+
+    /**
+     * @since 3.0
+     */
+    public static class ByteArrayOutputStreamSerializer
+        extends StdScalarSerializer<ByteArrayOutputStream>
+    {
+        public ByteArrayOutputStreamSerializer() { super(ByteArrayOutputStream.class, false); }
+
+        @Override
+        public void serialize(ByteArrayOutputStream value, JsonGenerator gen,
+                SerializationContext ctxt) throws JacksonException {
+            gen.writeBinary(value.toByteArray());
+        }
+
+        @Override
+        public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
+        {
+            acceptJsonFormatVisitorForBinary(visitor, typeHint);
         }
     }
 }

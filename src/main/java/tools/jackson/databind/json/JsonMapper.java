@@ -4,10 +4,10 @@ import tools.jackson.core.Version;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.core.json.JsonWriteFeature;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.cfg.MapperBuilder;
 import tools.jackson.databind.cfg.MapperBuilderState;
-
 import tools.jackson.databind.cfg.PackageVersion;
 
 /**
@@ -27,6 +27,12 @@ public class JsonMapper extends ObjectMapper
             super(f);
         }
 
+        /**
+         * NOTE: while public, not exposed as part of public API.
+         *
+         * @param state State from which to restore state of this builder
+         */
+        @SuppressWarnings("exports")
         public Builder(StateImpl state) {
             super(state);
         }
@@ -99,12 +105,12 @@ public class JsonMapper extends ObjectMapper
             implements java.io.Serializable // important!
         {
             private static final long serialVersionUID = 3L;
-    
+
             public StateImpl(Builder src) {
                 super(src);
             }
-    
-            // We also need actual instance of state as base class can not implement logic
+
+            // We also need actual instance of state as base class cannot implement logic
              // for reinstating mapper (via mapper builder) from state.
             @Override
             protected Object readResolve() {
@@ -137,7 +143,7 @@ public class JsonMapper extends ObjectMapper
     /**********************************************************************
      */
 
-    public static JsonMapper.Builder builder() {
+    public static Builder builder() {
         return new Builder(new JsonFactory());
     }
 
@@ -145,9 +151,23 @@ public class JsonMapper extends ObjectMapper
         return new Builder(streamFactory);
     }
 
+    /**
+     * Modifies the settings of this builder to more closely match the default configs used
+     * in Jackson 2.x versions.
+     * <p>
+     *     This method is still a work in progress and may not yet fully replicate the
+     *     default settings of Jackson 2.x.
+     * </p>
+     */
+    public static Builder builderWithJackson2Defaults() {
+        return builder(JsonFactory.builderWithJackson2Defaults().build())
+                .configureForJackson2();
+    }
+
+
     @SuppressWarnings("unchecked")
     @Override
-    public JsonMapper.Builder rebuild() {
+    public Builder rebuild() {
         return new Builder((Builder.StateImpl)_savedBuilderState);
     }
 

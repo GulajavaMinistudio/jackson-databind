@@ -2,21 +2,25 @@ package tools.jackson.databind.introspect;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.PropertyNamingStrategy;
 import tools.jackson.databind.annotation.*;
 import tools.jackson.databind.cfg.MapperConfig;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests to verify functioning of {@link PropertyNamingStrategy}.
  */
 @SuppressWarnings("serial")
-public class TestNamingStrategyCustom extends BaseMapTest
+public class TestNamingStrategyCustom extends DatabindTestUtil
 {
     /*
     /**********************************************************************
@@ -47,7 +51,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
             return "Set-"+defaultName;
         }
     }
-    
+
     static class CStyleStrategy extends PropertyNamingStrategy
     {
         @Override
@@ -83,14 +87,14 @@ public class TestNamingStrategyCustom extends BaseMapTest
             return result.toString();
         }
     }
-    
+
     static class GetterBean {
         public int getKey() { return 123; }
     }
 
     static class SetterBean {
         protected int value;
-        
+
         public void setKey(int v) {
             value = v;
         }
@@ -110,7 +114,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         public int age;
 
         public PersonBean() { this(null, null, 0); }
-        public PersonBean(String f, String l, int a)
+        protected PersonBean(String f, String l, int a)
         {
             firstName = f;
             lastName = l;
@@ -120,7 +124,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
 
     static class Value {
         public int intValue;
-        
+
         public Value() { this(0); }
         public Value(int v) { intValue = v; }
     }
@@ -144,13 +148,13 @@ public class TestNamingStrategyCustom extends BaseMapTest
             return propertyName.toLowerCase();
         }
     }
-    
+
     static class RenamedCollectionBean
     {
 //        @JsonDeserialize
         @JsonProperty
         private List<String> theValues = Collections.emptyList();
-        
+
         // intentionally odd name, to be renamed by naming strategy
         public List<String> getTheValues() { return theValues; }
     }
@@ -160,17 +164,18 @@ public class TestNamingStrategyCustom extends BaseMapTest
     static class BeanWithPrefixNames
     {
         protected int a = 3;
-        
+
         public int getA() { return a; }
         public void setA(int value) { a = value; }
     }
-    
+
     /*
     /**********************************************************************
     /* Test methods
     /**********************************************************************
      */
-    
+
+    @Test
     public void testSimpleGetters() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -179,6 +184,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         assertEquals("{\"Get-key\":123}", mapper.writeValueAsString(new GetterBean()));
     }
 
+    @Test
     public void testSimpleSetters() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -188,6 +194,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         assertEquals(13, bean.value);
     }
 
+    @Test
     public void testSimpleFields() throws Exception
     {
         // First serialize
@@ -202,6 +209,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         assertEquals(999, result.key);
     }
 
+    @Test
     public void testCStyleNaming() throws Exception
     {
         // First serialize
@@ -210,7 +218,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
                 .build();
         String json = mapper.writeValueAsString(new PersonBean("Joe", "Sixpack", 42));
         assertEquals("{\"first_name\":\"Joe\",\"last_name\":\"Sixpack\",\"age\":42}", json);
-        
+
         // then deserialize
         PersonBean result = mapper.readValue(json, PersonBean.class);
         assertEquals("Joe", result.firstName);
@@ -218,6 +226,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         assertEquals(42, result.age);
     }
 
+    @Test
     public void testWithGetterAsSetter() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -234,6 +243,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
         assertEquals(3, result.values.get(0).intValue);
     }
 
+    @Test
     public void testLowerCase() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -248,6 +258,7 @@ public class TestNamingStrategyCustom extends BaseMapTest
     }
 
     // @JsonNaming / [databind#45]
+    @Test
     public void testPerClassAnnotation() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()

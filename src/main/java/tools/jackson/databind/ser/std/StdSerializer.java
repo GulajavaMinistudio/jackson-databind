@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import tools.jackson.core.*;
 import tools.jackson.core.JsonParser.NumberType;
-import tools.jackson.core.exc.WrappedIOException;
+import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
 import tools.jackson.databind.introspect.AnnotatedMember;
@@ -37,7 +37,7 @@ public abstract class StdSerializer<T>
      * constructing converting serializers.
      */
     private final static Object KEY_CONTENT_CONVERTER_LOCK = new Object();
-    
+
     /**
      * Nominal type supported, usually declared type of
      * property for which serializer is used.
@@ -87,7 +87,7 @@ public abstract class StdSerializer<T>
      */
 
     @Override
-    public abstract void serialize(T value, JsonGenerator gen, SerializerProvider provider)
+    public abstract void serialize(T value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException;
 
     /*
@@ -106,6 +106,25 @@ public abstract class StdSerializer<T>
         visitor.expectAnyFormat(typeHint);
     }
 
+    /**
+     * Helper method for handling Binary values: typically serialized as Base64-encoded
+     * data (in textual formats) or native binary (binary formats).
+     */
+    protected void acceptJsonFormatVisitorForBinary(JsonFormatVisitorWrapper visitor, JavaType typeHint)
+    {
+        // 14-Mar-2016, tatu: while logically (and within JVM) binary, gets often encoded
+        // as Base64 String, let's try to indicate it is array of Bytes... difficult,
+        // thanks to JSON Schema's lackluster set of types available
+        //
+        // TODO: make work either as String/base64, or array of numbers,
+        //   with a qualifier that can be used to determine it's byte[]
+
+        JsonArrayFormatVisitor v2 = visitor.expectArrayFormat(typeHint);
+        if (v2 != null) {
+            v2.itemsFormat(JsonFormatTypes.INTEGER);
+        }
+    }
+
     /*
     /**********************************************************************
     /* Helper methods for JSON Schema generation
@@ -118,12 +137,12 @@ public abstract class StdSerializer<T>
         schema.put("type", type);
         return schema;
     }
-    
+
     protected ObjectNode createSchemaNode(String type, boolean isOptional)
     {
         ObjectNode schema = createSchemaNode(type);
         if (!isOptional) {
-            schema.put("required", !isOptional);
+            schema.put("required", true);
         }
         return schema;
     }
@@ -181,7 +200,7 @@ public abstract class StdSerializer<T>
             }
         }
     }
-    
+
     /**
      * Helper method that calls necessary visit method(s) to indicate that the
      * underlying JSON type is a floating-point JSON number.
@@ -218,7 +237,7 @@ public abstract class StdSerializer<T>
     /* Helper methods for exception handling
     /**********************************************************************
      */
-    
+
     /**
      * Method that will modify caught exception (passed in as argument)
      * as necessary to include reference information, and to ensure it
@@ -230,7 +249,7 @@ public abstract class StdSerializer<T>
      * <li>Wrapped {@code IOException}s are unpeeled
      *</ul>
      */
-    public void wrapAndThrow(SerializerProvider provider,
+    public void wrapAndThrow(SerializationContext ctxt,
             Throwable t, Object bean, String fieldName)
         throws JacksonException
     {
@@ -241,41 +260,43 @@ public abstract class StdSerializer<T>
             t = t.getCause();
         }
         // 16-Jan-2021, tatu: Let's peel off useless wrapper as well
-        while (t instanceof WrappedIOException && t.getCause() != null) {
+        while (t instanceof JacksonIOException && t.getCause() != null) {
             t = t.getCause();
         }
         // Errors to be passed as is, most others not
         ClassUtil.throwIfError(t);
         if (!(t instanceof JacksonException)) {
-            boolean wrap = (provider == null) || provider.isEnabled(SerializationFeature.WRAP_EXCEPTIONS);
+            boolean wrap = (ctxt == null) || ctxt.isEnabled(SerializationFeature.WRAP_EXCEPTIONS);
             if (!wrap) {
                 ClassUtil.throwIfRTE(t);
             }
         }
         // Need to add reference information
-        throw DatabindException.wrapWithPath(t, bean, fieldName);
+        throw DatabindException.wrapWithPath(ctxt, t,
+                new JacksonException.Reference(bean, fieldName));
     }
 
-    public void wrapAndThrow(SerializerProvider provider,
+    public void wrapAndThrow(SerializationContext ctxt,
             Throwable t, Object bean, int index)
         throws JacksonException
     {
         while (t instanceof InvocationTargetException && t.getCause() != null) {
             t = t.getCause();
         }
-        while (t instanceof WrappedIOException && t.getCause() != null) {
+        while (t instanceof JacksonIOException && t.getCause() != null) {
             t = t.getCause();
         }
         // Errors to be passed as is, most others not
         ClassUtil.throwIfError(t);
         if (!(t instanceof JacksonException)) {
-            boolean wrap = (provider == null) || provider.isEnabled(SerializationFeature.WRAP_EXCEPTIONS);
+            boolean wrap = (ctxt == null) || ctxt.isEnabled(SerializationFeature.WRAP_EXCEPTIONS);
             if (!wrap) {
                 ClassUtil.throwIfRTE(t);
             }
         }
         // Need to add reference information
-        throw DatabindException.wrapWithPath(t, bean, index);
+        throw DatabindException.wrapWithPath(ctxt, t,
+                new JacksonException.Reference(bean, index));
     }
 
     /*
@@ -288,11 +309,11 @@ public abstract class StdSerializer<T>
      * Helper method that can be used to see if specified property has annotation
      * indicating that a converter is to be used for contained values (contents
      * of structured types; array/List/Map values)
-     * 
+     *
      * @param existingSerializer (optional) configured content
      *    serializer if one already exists.
      */
-    protected ValueSerializer<?> findContextualConvertingSerializer(SerializerProvider provider,
+    protected ValueSerializer<?> findContextualConvertingSerializer(SerializationContext provider,
             BeanProperty prop, ValueSerializer<?> existingSerializer)
     {
         // 08-Dec-2016, tatu: to fix [databind#357], need to prevent recursive calls for
@@ -324,7 +345,7 @@ public abstract class StdSerializer<T>
         return existingSerializer;
     }
 
-    private ValueSerializer<?> _findConvertingContentSerializer(SerializerProvider provider,
+    private ValueSerializer<?> _findConvertingContentSerializer(SerializationContext provider,
             AnnotationIntrospector intr, BeanProperty prop, ValueSerializer<?> existingSerializer)
     {
         AnnotatedMember m = prop.getMember();
@@ -347,7 +368,7 @@ public abstract class StdSerializer<T>
      * Helper method used to locate filter that is needed, based on filter id
      * this serializer was constructed with.
      */
-    protected PropertyFilter findPropertyFilter(SerializerProvider provider,
+    protected PropertyFilter findPropertyFilter(SerializationContext provider,
             Object filterId, Object valueToFilter)
     {
         FilterProvider filters = provider.getFilterProvider();
@@ -367,7 +388,7 @@ public abstract class StdSerializer<T>
      *
      * @param typeForDefaults Type (erased) used for finding default format settings, if any
      */
-    protected JsonFormat.Value findFormatOverrides(SerializerProvider provider,
+    protected JsonFormat.Value findFormatOverrides(SerializationContext provider,
             BeanProperty prop, Class<?> typeForDefaults)
     {
         if (prop != null) {
@@ -381,10 +402,10 @@ public abstract class StdSerializer<T>
      * Convenience method that uses {@link #findFormatOverrides} to find possible
      * defaults and/of overrides, and then calls <code>JsonFormat.Value.getFeature(...)</code>
      * to find whether that feature has been specifically marked as enabled or disabled.
-     * 
+     *
      * @param typeForDefaults Type (erased) used for finding default format settings, if any
      */
-    protected Boolean findFormatFeature(SerializerProvider provider,
+    protected Boolean findFormatFeature(SerializationContext provider,
             BeanProperty prop, Class<?> typeForDefaults, JsonFormat.Feature feat)
     {
         JsonFormat.Value format = findFormatOverrides(provider, prop, typeForDefaults);
@@ -394,7 +415,7 @@ public abstract class StdSerializer<T>
         return null;
     }
 
-    protected JsonInclude.Value findIncludeOverrides(SerializerProvider provider,
+    protected JsonInclude.Value findIncludeOverrides(SerializationContext provider,
             BeanProperty prop, Class<?> typeForDefaults)
     {
         if (prop != null) {
@@ -403,11 +424,11 @@ public abstract class StdSerializer<T>
         // even without property or AnnotationIntrospector, may have type-specific defaults
         return provider.getDefaultPropertyInclusion(typeForDefaults);
     }
-    
+
     /**
      * Convenience method for finding out possibly configured content value serializer.
      */
-    protected ValueSerializer<?> findAnnotatedContentSerializer(SerializerProvider serializers,
+    protected ValueSerializer<?> findAnnotatedContentSerializer(SerializationContext serializers,
             BeanProperty property)
     {
         if (property != null) {
@@ -427,7 +448,7 @@ public abstract class StdSerializer<T>
     /* Helper methods, other
     /**********************************************************************
      */
-    
+
     /**
      * Method that can be called to determine if given serializer is the default
      * serializer Jackson uses; as opposed to a custom serializer installed by
@@ -447,7 +468,7 @@ public abstract class StdSerializer<T>
     }
 
     // @since 3.0
-    protected JacksonException _wrapIOFailure(SerializerProvider ctxt, IOException e) {
-        return WrappedIOException.construct(e, ctxt);
+    protected JacksonException _wrapIOFailure(SerializationContext ctxt, IOException e) {
+        return JacksonIOException.construct(e, ctxt.getGenerator());
     }
 }

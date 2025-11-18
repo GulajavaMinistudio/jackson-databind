@@ -2,15 +2,18 @@ package tools.jackson.databind.node;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 import tools.jackson.core.*;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * Numeric node that contains simple 32-bit integer values.
  */
 public class IntNode
-    extends NumericNode
+    extends NumericIntNode
 {
     private static final long serialVersionUID = 3L;
 
@@ -46,31 +49,33 @@ public class IntNode
         return CANONICALS[i - MIN_CANONICAL];
     }
 
-    /* 
+    /*
     /**********************************************************************
-    /* BaseJsonNode extended API
+    /* Overridden JsonNode methods
     /**********************************************************************
      */
-
-    @Override public JsonToken asToken() { return JsonToken.VALUE_NUMBER_INT; }
 
     @Override
     public JsonParser.NumberType numberType() { return JsonParser.NumberType.INT; }
 
-    /* 
+    @Override
+    public boolean isInt() { return true; }
+
+    /*
     /**********************************************************************
-    /* Overrridden JsonNode methods
+    /* Overridden JsonNode methods, scalar access
     /**********************************************************************
      */
 
     @Override
-    public boolean isIntegralNumber() { return true; }
+    protected Boolean _asBoolean() {
+        return (_value != 0);
+    }
 
     @Override
-    public boolean isInt() { return true; }
-
-    @Override public boolean canConvertToInt() { return true; }
-    @Override public boolean canConvertToLong() { return true; }
+    protected String _asString() {
+        return String.valueOf(_value);
+    }
     
     @Override
     public Number numberValue() {
@@ -78,39 +83,163 @@ public class IntNode
     }
 
     @Override
-    public short shortValue() { return (short) _value; }
+    public short shortValue() {
+        if (inShortRange()) {
+            return (short) _value;
+        }
+        return _reportShortCoercionRangeFail("shortValue()");
+    }
+
+    @Override
+    public short shortValue(short defaultValue) {
+        return inShortRange() ? (short) _value : defaultValue;
+    }
+
+    @Override
+    public Optional<Short> shortValueOpt() {
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
+    }
+
+    @Override
+    public short asShort() {
+        if (inShortRange()) {
+            return (short) _value;
+        }
+        return _reportShortCoercionRangeFail("asShort()");
+    }
+
+    @Override
+    public short asShort(short defaultValue) {
+        return inShortRange() ? (short) _value : defaultValue;
+    }
+
+    @Override
+    public Optional<Short> asShortOpt() {
+        return inShortRange() ? Optional.of((short) _value) : Optional.empty();
+    }
 
     @Override
     public int intValue() { return _value; }
 
     @Override
-    public long longValue() { return (long) _value; }
+    public int intValue(int defaultValue) { return _value; }
 
     @Override
-    public float floatValue() { return (float) _value; }
+    public OptionalInt intValueOpt() {
+        return OptionalInt.of(_value);
+    }
+
+    @Override
+    public int asInt() {
+        return _value;
+    }
+
+    @Override
+    public int asInt(int defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public OptionalInt asIntOpt() {
+        return OptionalInt.of(_value);
+    }
+
+    @Override
+    public long longValue() { return _value; }
+
+    @Override
+    public long longValue(long defaultValue) { return _value; }
+
+    @Override
+    public OptionalLong longValueOpt() {
+        return OptionalLong.of(_value);
+    }
+
+    @Override
+    public long asLong() { return _value; }
+
+    @Override
+    public long asLong(long defaultValue) { return _value; }
+
+    @Override
+    public OptionalLong asLongOpt() {
+        return OptionalLong.of(_value);
+    }
     
-    @Override
-    public double doubleValue() { return (double) _value; }
-
-    
-    @Override
-    public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
-
     @Override
     public BigInteger bigIntegerValue() { return BigInteger.valueOf(_value); }
 
     @Override
-    public String asText() {
-        return String.valueOf(_value);
+    public BigInteger bigIntegerValue(BigInteger defaultValue) {
+        return BigInteger.valueOf(_value);
     }
 
     @Override
-    public boolean asBoolean(boolean defaultValue) {
-        return _value != 0;
+    public Optional<BigInteger> bigIntegerValueOpt() {
+        return Optional.of(BigInteger.valueOf(_value));
     }
+
+    @Override
+    public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
+
+    @Override
+    public BigDecimal decimalValue(BigDecimal defaultValue) { return decimalValue(); }
+
+    @Override
+    public Optional<BigDecimal> decimalValueOpt() { return Optional.of(decimalValue()); }
+
+    /*
+    /**********************************************************************
+    /* Abstract methods impls for NumericIntNode
+    /**********************************************************************
+     */
+
+    @Override
+    public short _asShortValueUnchecked() {
+        return (short) _value;
+    }
+
+    @Override
+    public long _asLongValueUnchecked() {
+        return _value;
+    }
+
+    @Override
+    public int _asIntValueUnchecked() {
+        return _value;
+    }
+
+    @Override
+    protected float _asFloatValueUnchecked() {
+        return (float) _value;
+    }
+
+    @Override
+    protected double _asDoubleValueUnchecked() {
+        return (double) _value;
+    }
+
+    @Override
+    public boolean inShortRange() {
+        return (_value >= Short.MIN_VALUE && _value <= Short.MAX_VALUE);
+    }
+
+    @Override
+    public boolean inIntRange() {
+        return true;
+    }
+
+    @Override
+    public boolean inLongRange() { return true; }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods, other
+    /**********************************************************************
+     */
     
     @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
+    public final void serialize(JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         g.writeNumber(_value);

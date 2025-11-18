@@ -1,10 +1,11 @@
 package tools.jackson.databind.ser.impl;
 
 import java.util.Arrays;
+import java.util.function.UnaryOperator;
 
 import tools.jackson.databind.BeanProperty;
 import tools.jackson.databind.JavaType;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
 
 /**
@@ -18,10 +19,7 @@ import tools.jackson.databind.ValueSerializer;
  * is important to ensure correct multi-threaded access.
  */
 public abstract class PropertySerializerMap
-    implements java.io.Serializable
 {
-    private static final long serialVersionUID = 3L;
-
     /**
      * Configuration setting that determines what happens when maximum
      * size (currently 8) is reached: if true, will "start from beginning";
@@ -51,7 +49,7 @@ public abstract class PropertySerializerMap
      * and construct new map instance if warranted, and return both.
      */
     public final SerializerAndMapResult findAndAddPrimarySerializer(JavaType type,
-            SerializerProvider provider, BeanProperty property)
+            SerializationContext provider, BeanProperty property)
     {
         ValueSerializer<Object> serializer = provider.findPrimaryPropertySerializer(type, property);
         return new SerializerAndMapResult(serializer, newWith(type.getRawClass(), serializer));
@@ -64,19 +62,37 @@ public abstract class PropertySerializerMap
      * and construct new map instance if warranted, and return both.
      */
     public final SerializerAndMapResult findAndAddSecondarySerializer(Class<?> type,
-            SerializerProvider provider, BeanProperty property)
+            SerializationContext provider, BeanProperty property)
     {
         ValueSerializer<Object> serializer = provider.findContentValueSerializer(type, property);
         return new SerializerAndMapResult(serializer, newWith(type, serializer));
     }
 
     public final SerializerAndMapResult findAndAddSecondarySerializer(JavaType type,
-            SerializerProvider provider, BeanProperty property)
+            SerializationContext provider, BeanProperty property)
     {
         ValueSerializer<Object> serializer = provider.findContentValueSerializer(type, property);
         return new SerializerAndMapResult(serializer, newWith(type.getRawClass(), serializer));
     }
 
+    public final SerializerAndMapResult findAndAddSecondarySerializer(Class<?> type,
+            SerializationContext provider, BeanProperty property,
+            UnaryOperator<ValueSerializer<Object>> serTransformer)
+    {
+        ValueSerializer<Object> serializer = provider.findContentValueSerializer(type, property);
+        serializer = serTransformer.apply(serializer);
+        return new SerializerAndMapResult(serializer, newWith(type, serializer));
+    }
+
+    public final SerializerAndMapResult findAndAddSecondarySerializer(JavaType type,
+            SerializationContext provider, BeanProperty property,
+            UnaryOperator<ValueSerializer<Object>> serTransformer)
+    {
+        ValueSerializer<Object> serializer = provider.findContentValueSerializer(type, property);
+        serializer = serTransformer.apply(serializer);
+        return new SerializerAndMapResult(serializer, newWith(type.getRawClass(), serializer));
+    }
+    
     /**
      * Method called if initial lookup fails, when looking for a root value
      * serializer: one that is not directly attached to a property, but needs to
@@ -85,14 +101,14 @@ public abstract class PropertySerializerMap
      * and construct new map instance if warranted, and return both.
      */
     public final SerializerAndMapResult findAndAddRootValueSerializer(Class<?> type,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         ValueSerializer<Object> serializer = provider.findTypedValueSerializer(type, false);
         return new SerializerAndMapResult(serializer, newWith(type, serializer));
     }
 
     public final SerializerAndMapResult findAndAddRootValueSerializer(JavaType type,
-            SerializerProvider provider)
+            SerializationContext provider)
     {
         ValueSerializer<Object> serializer = provider.findTypedValueSerializer(type, false);
         return new SerializerAndMapResult(serializer, newWith(type.getRawClass(), serializer));
@@ -105,12 +121,12 @@ public abstract class PropertySerializerMap
      * and construct new map instance if warranted, and return both.
      */
     public final SerializerAndMapResult findAndAddKeySerializer(Class<?> type,
-            SerializerProvider provider, BeanProperty property)
+            SerializationContext provider, BeanProperty property)
     {
         ValueSerializer<Object> serializer = provider.findKeySerializer(type, property);
         return new SerializerAndMapResult(serializer, newWith(type, serializer));
     }
-    
+
     /**
      * Method that can be used to 'register' a serializer that caller has resolved
      * without help of this map.
@@ -147,7 +163,7 @@ public abstract class PropertySerializerMap
     {
         public final ValueSerializer<Object> serializer;
         public final PropertySerializerMap map;
-        
+
         public SerializerAndMapResult(ValueSerializer<Object> serializer,
                 PropertySerializerMap map)
         {
@@ -181,10 +197,7 @@ public abstract class PropertySerializerMap
      * map with new serializers.
      */
     private final static class Empty extends PropertySerializerMap
-        implements java.io.Serializable // since 3.0
     {
-        private static final long serialVersionUID = 3L;
-
         // No root serializers; do not reset when full
         public final static Empty FOR_PROPERTIES = new Empty(false);
 
@@ -199,15 +212,11 @@ public abstract class PropertySerializerMap
         public static Empty emptyFor(PropertySerializerMap src) {
             return (src._resetWhenFull) ? FOR_ROOT_VALUES : FOR_PROPERTIES;
         }
-        
-        Object readResolve() { // for JDK serialization (since 3.0)
-            return emptyFor(this);
-        }
 
         @Override
         public ValueSerializer<Object> serializerFor(Class<?> type) {
             return null; // empty, nothing to find
-        }        
+        }
 
         @Override
         public PropertySerializerMap newWith(Class<?> type, ValueSerializer<Object> serializer) {
@@ -222,10 +231,7 @@ public abstract class PropertySerializerMap
      * actual type.
      */
     private final static class Single extends PropertySerializerMap
-        implements java.io.Serializable // since 3.0
     {
-        private static final long serialVersionUID = 3L;
-
         private final Class<?> _type;
         private final ValueSerializer<Object> _serializer;
 
@@ -233,10 +239,6 @@ public abstract class PropertySerializerMap
             super(base);
             _type = type;
             _serializer = serializer;
-        }
-
-        Object writeReplace() { // for JDK serialization (since 3.0)
-            return Empty.emptyFor(this);
         }
 
         @Override
@@ -255,10 +257,7 @@ public abstract class PropertySerializerMap
     }
 
     private final static class Double extends PropertySerializerMap
-        implements java.io.Serializable // since 3.0
     {
-        private static final long serialVersionUID = 3L;
-
         private final Class<?> _type1, _type2;
         private final ValueSerializer<Object> _serializer1, _serializer2;
 
@@ -273,10 +272,6 @@ public abstract class PropertySerializerMap
             _serializer2 = serializer2;
         }
 
-        Object writeReplace() { // for JDK serialization (since 3.0)
-            return Empty.emptyFor(this);
-        }
-
         @Override
         public ValueSerializer<Object> serializerFor(Class<?> type)
         {
@@ -287,7 +282,7 @@ public abstract class PropertySerializerMap
                 return _serializer2;
             }
             return null;
-        }        
+        }
 
         @Override
         public PropertySerializerMap newWith(Class<?> type, ValueSerializer<Object> serializer) {
@@ -299,12 +294,9 @@ public abstract class PropertySerializerMap
             return new Multi(this, ts);
         }
     }
-    
-    private final static class Multi extends PropertySerializerMap
-        implements java.io.Serializable // since 3.0
-    {
-        private static final long serialVersionUID = 3L;
 
+    private final static class Multi extends PropertySerializerMap
+    {
         /**
          * Let's limit number of serializers we actually cache; linear
          * lookup won't scale too well beyond smallish number, and if
@@ -314,16 +306,12 @@ public abstract class PropertySerializerMap
          * limit. 8 sounds like a reasonable stab for now.
          */
         private final static int MAX_ENTRIES = 8;
-        
+
         private final TypeAndSerializer[] _entries;
 
         public Multi(PropertySerializerMap base, TypeAndSerializer[] entries) {
             super(base);
             _entries = entries;
-        }
-
-        Object writeReplace() { // for JDK serialization (since 3.0)
-            return Empty.emptyFor(this);
         }
 
         @Override

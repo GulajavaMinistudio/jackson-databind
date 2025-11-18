@@ -2,6 +2,7 @@ package tools.jackson.databind.util;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -73,11 +74,11 @@ public class SimpleBeanPropertyDefinition
             JsonInclude.Include inclusion)
     {
         JsonInclude.Value inclValue
-             = ((inclusion == null) || (inclusion == JsonInclude.Include.USE_DEFAULTS)) 
+             = ((inclusion == null) || (inclusion == JsonInclude.Include.USE_DEFAULTS))
              ? EMPTY_INCLUDE : JsonInclude.Value.construct(inclusion, null);
         return new SimpleBeanPropertyDefinition(config, member, name, metadata, inclValue);
     }
-    
+
     /**
      * @since 2.7
      */
@@ -196,6 +197,20 @@ public class SimpleBeanPropertyDefinition
         return _inclusion;
     }
 
+    @Override // since 2.17
+    public List<PropertyName> findAliases() {
+        if (_member != null) {
+            final AnnotationIntrospector intr = _config.getAnnotationIntrospector();
+            if (intr != null) {
+                List<PropertyName> propertyNames = intr.findPropertyAliases(_config, _member);
+                if (propertyNames != null) {
+                    return propertyNames;
+                }
+            }
+        }
+        return Collections.emptyList();
+    }
+
     /*
     /**********************************************************************
     /* Access to accessors (fields, methods etc)
@@ -216,30 +231,28 @@ public class SimpleBeanPropertyDefinition
 
     @Override
     public AnnotatedMethod getGetter() {
-        if ((_member instanceof AnnotatedMethod)
-                && ((AnnotatedMethod) _member).getParameterCount() == 0) {
-            return (AnnotatedMethod) _member;
+        if (_member instanceof AnnotatedMethod am && am.getParameterCount() == 0) {
+            return am;
         }
         return null;
     }
 
     @Override
     public AnnotatedMethod getSetter() {
-        if ((_member instanceof AnnotatedMethod)
-                && ((AnnotatedMethod) _member).getParameterCount() == 1) {
-            return (AnnotatedMethod) _member;
+        if (_member instanceof AnnotatedMethod method && method.getParameterCount() == 1) {
+            return method;
         }
         return null;
     }
 
     @Override
     public AnnotatedField getField() {
-        return (_member instanceof AnnotatedField) ? (AnnotatedField) _member : null;
+        return (_member instanceof AnnotatedField field) ? field : null;
     }
 
     @Override
     public AnnotatedParameter getConstructorParameter() {
-        return (_member instanceof AnnotatedParameter) ? (AnnotatedParameter) _member : null;
+        return (_member instanceof AnnotatedParameter ap) ? ap : null;
     }
 
     @Override

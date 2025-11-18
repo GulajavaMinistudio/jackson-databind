@@ -14,7 +14,7 @@ public class TokenBufferReadContext extends TokenStreamContext
 {
     protected final TokenStreamContext _parent;
 
-    protected final JsonLocation _startLocation;
+    protected final TokenStreamLocation _startLocation;
 
     // Benefit for reusing?
 //    protected JsonReadContext _child;
@@ -39,11 +39,11 @@ public class TokenBufferReadContext extends TokenStreamContext
             JsonReadContext rc = (JsonReadContext) base;
             _startLocation = rc.startLocation(contentRef);
         } else {
-            _startLocation = JsonLocation.NA;
+            _startLocation = TokenStreamLocation.NA;
         }
     }
 
-    protected TokenBufferReadContext(TokenStreamContext base, JsonLocation startLoc) {
+    protected TokenBufferReadContext(TokenStreamContext base, TokenStreamLocation startLoc) {
         super(base);
         _parent = base.getParent();
         _currentName = base.currentName();
@@ -58,7 +58,7 @@ public class TokenBufferReadContext extends TokenStreamContext
     protected TokenBufferReadContext() {
         super(TYPE_ROOT, -1);
         _parent = null;
-        _startLocation = JsonLocation.NA;
+        _startLocation = TokenStreamLocation.NA;
     }
 
     protected TokenBufferReadContext(TokenBufferReadContext parent, int type, int index) {
@@ -110,7 +110,7 @@ public class TokenBufferReadContext extends TokenStreamContext
     public TokenBufferReadContext parentOrCopy() {
         // 30-Apr-2017, tatu: This is bit awkward since part on ancestor stack is of different
         //     type (usually `JsonReadContext`)... and so for unbalanced buffers (with extra
-        //     END_OBJECT / END_ARRAY), we may need to create 
+        //     END_OBJECT / END_ARRAY), we may need to create
         if (_parent instanceof TokenBufferReadContext) {
             return (TokenBufferReadContext) _parent;
         }

@@ -1,49 +1,58 @@
 package tools.jackson.databind.node;
 
-import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.ArrayList;
+
+import org.junit.jupiter.api.Test;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.util.RawValue;
 
-import static java.util.Arrays.asList;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Additional tests for {@link ArrayNode} container class.
  */
 public class ArrayNodeTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
-    public void testDirectCreation() throws IOException
+    private final ObjectMapper MAPPER = newJsonMapper();
+
+    @Test
+    public void testDirectCreation() throws Exception
     {
         ArrayNode n = new ArrayNode(JsonNodeFactory.instance);
 
         assertFalse(n.isBoolean());
-        assertFalse(n.isTextual());
+        assertFalse(n.isString());
         assertFalse(n.isNumber());
-        assertFalse(n.canConvertToInt()); 
-        assertFalse(n.canConvertToLong()); 
-        assertFalse(n.canConvertToExactIntegral()); 
-        
+        assertFalse(n.canConvertToInt());
+        assertFalse(n.canConvertToLong());
+        assertFalse(n.canConvertToExactIntegral());
+        assertTrue(n.isArray());
+        assertFalse(n.isObject());
+        assertTrue(n.isContainer());
+
         assertStandardEquals(n);
-        assertFalse(n.elements().hasNext());
-        assertFalse(n.propertyNames().hasNext());
+        assertFalse(n.values().iterator().hasNext());
+        assertTrue(n.propertyNames().isEmpty());
         assertTrue(n.isEmpty());
-        TextNode text = TextNode.valueOf("x");
+        StringNode text = StringNode.valueOf("x");
         n.add(text);
         assertEquals(1, n.size());
         assertFalse(n.isEmpty());
-        assertFalse(0 == n.hashCode());
-        assertTrue(n.elements().hasNext());
+        assertNotEquals(0, n.hashCode());
+        assertTrue(n.values().iterator().hasNext());
         // no field names for arrays
-        assertFalse(n.propertyNames().hasNext());
         assertNull(n.get("x")); // not used with arrays
         assertTrue(n.path("x").isMissingNode());
+        assertFalse(n.optional("x").isPresent());
         assertSame(text, n.get(0));
 
         // single element, so:
@@ -53,7 +62,7 @@ public class ArrayNodeTest
         assertTrue(n.hasNonNull(0));
         assertFalse(n.has(1));
         assertFalse(n.hasNonNull(1));
-        
+
         // add null node too
         n.add((JsonNode) null);
         assertEquals(2, n.size());
@@ -73,10 +82,10 @@ public class ArrayNodeTest
         n.addAll(n2);
         assertEquals(3, n.size());
 
-        assertFalse(n.get(0).isTextual());
+        assertFalse(n.get(0).isString());
         assertNotNull(n.remove(0));
         assertEquals(2, n.size());
-        assertTrue(n.get(0).isTextual());
+        assertTrue(n.get(0).isString());
         assertNull(n.remove(-1));
         assertNull(n.remove(100));
         assertEquals(2, n.size());
@@ -88,7 +97,7 @@ public class ArrayNodeTest
         assertNull(n.get(10000));
         assertNull(n.remove(-4));
 
-        TextNode text2 = TextNode.valueOf("b");
+        StringNode text2 = StringNode.valueOf("b");
         n.insert(0, text2);
         assertEquals(4, n.size());
         assertSame(text2, n.get(0));
@@ -102,16 +111,17 @@ public class ArrayNodeTest
         assertEquals(0, n.size());
     }
 
-    public void testDirectCreation2() throws IOException
+    @Test
+    public void testDirectCreation2() throws Exception
     {
-        JsonNodeFactory f = objectMapper().getNodeFactory();
+        JsonNodeFactory f = MAPPER.getNodeFactory();
         ArrayList<JsonNode> list = new ArrayList<>();
         list.add(f.booleanNode(true));
-        list.add(f.textNode("foo"));
+        list.add(f.stringNode("foo"));
         ArrayNode n = new ArrayNode(f, list);
         assertEquals(2, n.size());
         assertTrue(n.get(0).isBoolean());
-        assertTrue(n.get(1).isTextual());
+        assertTrue(n.get(1).isString());
 
         // also, should fail with invalid set attempt
         try {
@@ -124,7 +134,7 @@ public class ArrayNodeTest
         assertEquals(3, n.size());
         assertTrue(n.get(0).isBoolean());
         assertTrue(n.get(1).isNull());
-        assertTrue(n.get(2).isTextual());
+        assertTrue(n.get(2).isString());
 
         n.removeAll();
         n.insert(0, (JsonNode) null);
@@ -132,7 +142,8 @@ public class ArrayNodeTest
         assertTrue(n.get(0).isNull());
     }
 
-    public void testArraySet() throws IOException {
+    @Test
+    public void testArraySet() throws Exception {
         final ArrayNode array = JsonNodeFactory.instance.arrayNode();
         for (int i = 0; i < 20; i++) {
             array.add("Original Data");
@@ -147,10 +158,10 @@ public class ArrayNodeTest
         array.set(6, Integer.valueOf(452));
         array.set(7, 4342L);
         array.set(8, Long.valueOf(154242L));
-        array.set(9, 1.22f);
-        array.set(10, Float.valueOf(242.1f));
-        array.set(11, 132.212D);
-        array.set(12, Double.valueOf(231.3D));
+        array.set(9, 1.25f);
+        array.set(10, Float.valueOf(242.25f));
+        array.set(11, 132.25D);
+        array.set(12, Double.valueOf(231.5D));
         array.set(13, BigDecimal.TEN);
         array.set(14, BigInteger.ONE);
         array.set(15, "Modified Data");
@@ -167,13 +178,13 @@ public class ArrayNodeTest
         assertEquals(452, array.get(6).intValue());
         assertEquals(4342L, array.get(7).longValue());
         assertEquals(154242L, array.get(8).longValue());
-        assertEquals(1.22f, array.get(9).floatValue());
-        assertEquals(242.1f, array.get(10).floatValue());
-        assertEquals(132.212D, array.get(11).doubleValue());
-        assertEquals(231.3D, array.get(12).doubleValue());
+        assertEquals(1.25f, array.get(9).floatValue(), 0.00001f);
+        assertEquals(242.25f, array.get(10).floatValue(), 0.00001f);
+        assertEquals(132.25D, array.get(11).doubleValue(), 0.000000001d);
+        assertEquals(231.5D, array.get(12).doubleValue(), 0.000000001d);
         assertEquals(0, BigDecimal.TEN.compareTo(array.get(13).decimalValue()));
         assertEquals(BigInteger.ONE, array.get(14).bigIntegerValue());
-        assertEquals("Modified Data", array.get(15).textValue());
+        assertEquals("Modified Data", array.get(15).stringValue());
         assertTrue(array.get(16).booleanValue());
         assertFalse(array.get(17).booleanValue());
         assertArrayEquals(new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, array.get(18).binaryValue());
@@ -181,18 +192,21 @@ public class ArrayNodeTest
         assertEquals(20, array.size());
         for (int i = 0; i < 20; i++) {
             if (i <= 18) {
-                assertNotEquals("Original Data", array.get(i).textValue());
+                if (i != 1) { // in 3.0, RawValue not convertible to String
+                    assertNotEquals("Original Data", array.get(i).asString());
+                }
             } else {
-                assertEquals("Original Data", array.get(i).textValue());
+                assertEquals("Original Data", array.get(i).stringValue());
             }
         }
     }
 
+    @Test
     public void testArrayViaMapper() throws Exception
     {
         final String JSON = "[[[-0.027512,51.503221],[-0.008497,51.503221],[-0.008497,51.509744],[-0.027512,51.509744]]]";
 
-        JsonNode n = objectMapper().readTree(JSON);
+        JsonNode n = MAPPER.readTree(JSON);
         assertNotNull(n);
         assertTrue(n.isArray());
         ArrayNode an = (ArrayNode) n;
@@ -202,6 +216,7 @@ public class ArrayNodeTest
         assertEquals(4, an2.size());
     }
 
+    @Test
     public void testAdds()
     {
         ArrayNode n = new ArrayNode(JsonNodeFactory.instance);
@@ -227,9 +242,10 @@ public class ArrayNodeTest
         assertEquals(14, n.size());
     }
 
+    @Test
     public void testNullAdds()
     {
-        JsonNodeFactory f = objectMapper().getNodeFactory();
+        JsonNodeFactory f = MAPPER.getNodeFactory();
         ArrayNode array = f.arrayNode(14);
 
         array.add((BigDecimal) null);
@@ -244,19 +260,20 @@ public class ArrayNodeTest
         array.add((String) null);
 
         assertEquals(10, array.size());
-        
+
         for (JsonNode node : array) {
             assertTrue(node.isNull());
         }
     }
 
+    @Test
     public void testAddAllWithNullInCollection()
     {
         // preparation
         final ArrayNode array = JsonNodeFactory.instance.arrayNode();
 
         // test
-        array.addAll(asList(null, JsonNodeFactory.instance.objectNode()));
+        array.addAll(Arrays.asList(null, JsonNodeFactory.instance.objectNode()));
 
         // assertions
         assertEquals(2, array.size());
@@ -267,9 +284,10 @@ public class ArrayNodeTest
         assertEquals(NullNode.getInstance(), array.get(0));
     }
 
+    @Test
     public void testNullInserts()
     {
-        JsonNodeFactory f = objectMapper().getNodeFactory();
+        JsonNodeFactory f = MAPPER.getNodeFactory();
         ArrayNode array = f.arrayNode(3);
 
         array.insert(0, (BigDecimal) null);
@@ -286,15 +304,16 @@ public class ArrayNodeTest
         array.insert(1, (String) null);
 
         assertEquals(10, array.size());
-        
+
         for (JsonNode node : array) {
             assertTrue(node.isNull());
         }
     }
 
+    @Test
     public void testNullSet()
     {
-        JsonNodeFactory f = objectMapper().getNodeFactory();
+        JsonNodeFactory f = MAPPER.getNodeFactory();
         ArrayNode array = f.arrayNode(3);
 
         for (int i = 0; i < 14; i++) {
@@ -327,6 +346,7 @@ public class ArrayNodeTest
         }
     }
 
+    @Test
     public void testNullChecking()
     {
         ArrayNode a1 = JsonNodeFactory.instance.arrayNode();
@@ -341,15 +361,16 @@ public class ArrayNodeTest
         assertEquals(0, a2.size());
     }
 
+    @Test
     public void testNullChecking2()
     {
-        ObjectMapper mapper = new ObjectMapper();
-        ArrayNode src = mapper.createArrayNode();
-        ArrayNode dest = mapper.createArrayNode();
+        ArrayNode src = MAPPER.createArrayNode();
+        ArrayNode dest = MAPPER.createArrayNode();
         src.add("element");
         dest.addAll(src);
     }
-    
+
+    @Test
     public void testParser() throws Exception
     {
         ArrayNode n = new ArrayNode(JsonNodeFactory.instance);
@@ -379,6 +400,7 @@ public class ArrayNodeTest
         p.close();
     }
 
+    @Test
     public void testArrayNodeEquality()
     {
         ArrayNode n1 = new ArrayNode(null);
@@ -387,20 +409,21 @@ public class ArrayNodeTest
         assertTrue(n1.equals(n2));
         assertTrue(n2.equals(n1));
 
-        n1.add(TextNode.valueOf("Test"));
+        n1.add(StringNode.valueOf("Test"));
 
         assertFalse(n1.equals(n2));
         assertFalse(n2.equals(n1));
 
-        n2.add(TextNode.valueOf("Test"));
+        n2.add(StringNode.valueOf("Test"));
 
         assertTrue(n1.equals(n2));
         assertTrue(n2.equals(n1));
     }
 
+    @Test
     public void testSimpleArray() throws Exception
     {
-        ArrayNode result = objectMapper().createArrayNode();
+        ArrayNode result = MAPPER.createArrayNode();
 
         assertTrue(result.isArray());
         assertType(result, ArrayNode.class);
@@ -408,7 +431,7 @@ public class ArrayNodeTest
         assertFalse(result.isObject());
         assertFalse(result.isNumber());
         assertFalse(result.isNull());
-        assertFalse(result.isTextual());
+        assertFalse(result.isString());
 
         // and let's add stuff...
         result.add(false);
@@ -421,18 +444,22 @@ public class ArrayNodeTest
         // plus see that we can access stuff
         assertEquals(NullNode.instance, result.path(0));
         assertEquals(NullNode.instance, result.get(0));
+        assertEquals(NullNode.instance, result.optional(0).get());
         assertEquals(BooleanNode.FALSE, result.path(1));
         assertEquals(BooleanNode.FALSE, result.get(1));
+        assertEquals(BooleanNode.FALSE, result.optional(1).get());
         assertEquals(2, result.size());
 
         assertNull(result.get(-1));
         assertNull(result.get(2));
+        assertFalse(result.optional(-1).isPresent());
+        assertFalse(result.optional(2).isPresent());
         JsonNode missing = result.path(2);
         assertTrue(missing.isMissingNode());
         assertTrue(result.path(-100).isMissingNode());
 
         // then construct and compare
-        ArrayNode array2 = objectMapper().createArrayNode();
+        ArrayNode array2 = MAPPER.createArrayNode();
         array2.addNull();
         array2.add(false);
         assertEquals(result, array2);
@@ -449,14 +476,70 @@ public class ArrayNodeTest
         assertEquals(0, array2.size());
     }
 
+    @Test
     public void testSimpleMismatch() throws Exception
     {
-        ObjectMapper mapper = objectMapper();
         try {
-            mapper.readValue(" 123 ", ArrayNode.class);
+            MAPPER.readValue(" 123 ", ArrayNode.class);
             fail("Should not pass");
         } catch (MismatchedInputException e) {
             verifyException(e, "from Integer value (token `JsonToken.VALUE_NUMBER_INT`)");
         }
     }
+
+    // [databind#4863]: valueStream(), entryStream(), forEachEntry()
+    @Test
+    public void testStreamMethods()
+    {
+        ArrayNode arr = MAPPER.createArrayNode();
+        arr.add(1).add("foo");
+        JsonNode n1 = arr.get(0);
+        JsonNode n2 = arr.get(1);
+
+        // First, valueStream() testing
+        assertEquals(2, arr.valueStream().count());
+        assertEquals(Arrays.asList(n1, n2),
+                arr.valueStream().collect(Collectors.toList()));
+
+        // And then entryStream() (empty)
+        assertEquals(0, arr.propertyStream().count());
+        assertEquals(Arrays.asList(),
+                arr.propertyStream().collect(Collectors.toList()));
+
+        // And then empty forEachEntry()
+        arr.forEachEntry((k, v) -> { throw new UnsupportedOperationException(); });
+    }
+
+    @Test
+    public void testRemoveAll() throws Exception
+    {
+        assertEquals(_arrayNode("[]"),
+                _arrayNode("['a', 2, null, true]").removeAll());
+    }
+
+    // [databind#4955]: remove methods
+    @Test
+    public void testRemoveIf() throws Exception
+    {
+        assertEquals(_arrayNode("[3]"),
+                _arrayNode("[2, 1, 3]")
+                .removeIf(value -> value.asInt() <= 2));
+        assertEquals(_arrayNode("[1]"),
+                _arrayNode("[1, 2, 3]")
+                .removeIf(value -> value.asInt() > 1));
+    }
+
+    // [databind#4955]: remove methods
+    @Test
+    public void testRemoveNulls() throws Exception
+    {
+        assertEquals(_arrayNode("[2]"),
+                _arrayNode("[null, null, 2, null]")
+                .removeNulls());
+    }
+
+    private ArrayNode _arrayNode(String json) throws Exception {
+        return (ArrayNode) MAPPER.readTree(a2q(json));
+    }
+
 }

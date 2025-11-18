@@ -1,13 +1,16 @@
 package tools.jackson.databind.exc;
 
-import tools.jackson.databind.BaseMapTest;
-import tools.jackson.databind.DatabindException;
+import org.junit.jupiter.api.Test;
+
+import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.newJsonMapper;
 
 public class TestExceptionHandlingWithDefaultDeserialization
-    extends BaseMapTest
 {
     static class Foo {
         private Bar bar;
@@ -39,7 +42,8 @@ public class TestExceptionHandlingWithDefaultDeserialization
         }
     }
 
-    public void testShouldThrowExceptionWithPathReference() throws IOException {
+    @Test
+    public void testShouldThrowExceptionWithPathReference() throws Exception {
         // given
         ObjectMapper mapper = newJsonMapper();
         String input = "{\"bar\":{\"baz\":{qux:\"quxValue\"))}";
@@ -49,7 +53,7 @@ public class TestExceptionHandlingWithDefaultDeserialization
         try {
             mapper.readValue(input, Foo.class);
             fail("Upsss! Exception has not been thrown.");
-        } catch (DatabindException ex) {
+        } catch (StreamReadException ex) {
             // then
             assertEquals(THIS+"$Foo[\"bar\"]->"+THIS+"$Bar[\"baz\"]",
                     ex.getPathReference());

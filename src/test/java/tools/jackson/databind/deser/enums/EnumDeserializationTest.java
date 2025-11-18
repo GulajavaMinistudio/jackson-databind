@@ -1,25 +1,32 @@
 package tools.jackson.databind.deser.enums;
 
-import static tools.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS;
-
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.*;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.deser.std.FromStringDeserializer;
 import tools.jackson.databind.deser.std.StdDeserializer;
 import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.exc.ValueInstantiationException;
 import tools.jackson.databind.module.SimpleModule;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS;
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 @SuppressWarnings("serial")
 public class EnumDeserializationTest
-    extends BaseMapTest
 {
     enum TestEnum { JACKSON, RULES, OK; }
 
@@ -47,7 +54,7 @@ public class EnumDeserializationTest
         @Override
         public TestEnum deserialize(JsonParser p, DeserializationContext ctxt)
         {
-            return TestEnum.valueOf(p.getText().toUpperCase());
+            return TestEnum.valueOf(p.getString().toUpperCase());
         }
     }
 
@@ -85,8 +92,39 @@ public class EnumDeserializationTest
             public String toString() {
                 return "bb";
             }
-        }
+        },
+        
+        @JsonProperty("cc")
+        C
         ;
+    }
+
+    // [databind#677]
+    static enum EnumWithPropertyAnnoBase {
+        @JsonProperty("a") 
+        A,
+        // For this value, force use of anonymous sub-class, to ensure things still work
+        @JsonProperty("b")
+        B {
+            @Override
+            public String toString() {
+                return "bb";
+            }
+        }
+    }
+
+    // [databind#677]
+    static enum EnumWithPropertyAnnoMixin {
+        @JsonProperty("a_mixin")
+        A,
+        // For this value, force use of anonymous sub-class, to ensure things still work
+        @JsonProperty("b_mixin")
+        B {
+            @Override
+            public String toString() {
+                return "bb";
+            }
+        }
     }
 
     // [databind#1161]
@@ -121,7 +159,7 @@ public class EnumDeserializationTest
     }
 
     static enum StrictEnumCreator {
-        A, B;
+        A, B, @JsonEnumDefaultValue UNKNOWN;
 
         @JsonCreator public static StrictEnumCreator fromId(String value) {
             for (StrictEnumCreator e: values()) {
@@ -165,7 +203,6 @@ public class EnumDeserializationTest
         }
     }
 
-
     @JsonDeserialize(using = AnEnumDeserializer.class, keyUsing = AnEnumKeyDeserializer.class)
     public enum LanguageCodeMixin {
     }
@@ -204,7 +241,7 @@ public class EnumDeserializationTest
         public String toString() {
             return value;
         }
-    }        
+    }
 
     // [databind#3006]
     enum Operation3006 {
@@ -233,6 +270,18 @@ public class EnumDeserializationTest
         }
     }
 
+    // [databind#4896]
+    enum YesOrNoOrEmpty4896 {
+        @JsonProperty("")
+        EMPTY,
+
+        @JsonProperty("yes")
+        YES,
+
+        @JsonProperty("no")
+        NO;
+    }
+
     /*
     /**********************************************************
     /* Test methods
@@ -241,15 +290,21 @@ public class EnumDeserializationTest
 
     protected final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testSimple() throws Exception
     {
         // First "good" case with Strings
         String JSON = "\"OK\" \"RULES\"  null";
-        // multiple main-level mappings, need explicit parser:
-        JsonParser p = MAPPER.createParser(JSON);
+        // multiple main-level mappings, need explicit parser
+        // (and possibly prevent validation of trailing tokens)
+        ObjectMapper mapper = jsonMapperBuilder()
+                .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
+        
+        JsonParser p = mapper.createParser(JSON);
 
-        assertEquals(TestEnum.OK, MAPPER.readValue(p, TestEnum.class));
-        assertEquals(TestEnum.RULES, MAPPER.readValue(p, TestEnum.class));
+        assertEquals(TestEnum.OK, mapper.readValue(p, TestEnum.class));
+        assertEquals(TestEnum.RULES, mapper.readValue(p, TestEnum.class));
 
         // should be ok; nulls are typeless; handled by mapper, not by deserializer
         assertNull(MAPPER.readValue(p, TestEnum.class));
@@ -258,11 +313,11 @@ public class EnumDeserializationTest
         assertFalse(p.hasCurrentToken());
 
         // Then alternative with index (0 means first entry)
-        assertEquals(TestEnum.JACKSON, MAPPER.readValue(" 0 ", TestEnum.class));
+        assertEquals(TestEnum.JACKSON, mapper.readValue(" 0 ", TestEnum.class));
 
         // Then error case: unrecognized value
         try {
-            /*Object result =*/ MAPPER.readValue("\"NO-SUCH-VALUE\"", TestEnum.class);
+            /*Object result =*/ mapper.readValue("\"NO-SUCH-VALUE\"", TestEnum.class);
             fail("Expected an exception for bogus enum value...");
         } catch (MismatchedInputException jex) {
             verifyException(jex, "not one of the values accepted for Enum class");
@@ -271,9 +326,10 @@ public class EnumDeserializationTest
     }
 
     /**
-     * Enums are considered complex if they have code (and hence sub-classes)... an
-     * example is TimeUnit
+     * Enums are considered complex if they have code (and hence sub-classes)...
+     * an example is TimeUnit
      */
+    @Test
     public void testComplexEnum() throws Exception
     {
         String json = MAPPER.writeValueAsString(TimeUnit.SECONDS);
@@ -281,10 +337,11 @@ public class EnumDeserializationTest
         TimeUnit result = MAPPER.readValue(json, TimeUnit.class);
         assertSame(TimeUnit.SECONDS, result);
     }
-    
+
     /**
      * Testing to see that annotation override works
      */
+    @Test
     public void testAnnotated() throws Exception
     {
         AnnotatedTestEnum e = MAPPER.readValue("\"JACKSON\"", AnnotatedTestEnum.class);
@@ -294,32 +351,35 @@ public class EnumDeserializationTest
         assertEquals(AnnotatedTestEnum.OK, e);
     }
 
+    @Test
     public void testSubclassedEnums() throws Exception
     {
         EnumWithSubClass value = MAPPER.readValue("\"A\"", EnumWithSubClass.class);
         assertEquals(EnumWithSubClass.A, value);
     }
 
+    @Test
     public void testToStringEnums() throws Exception
     {
         // can't reuse global one due to reconfig
         ObjectMapper m = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .enable(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .build();
         LowerCaseEnum value = m.readValue("\"c\"", LowerCaseEnum.class);
         assertEquals(LowerCaseEnum.C, value);
     }
 
+    @Test
     public void testNumbersToEnums() throws Exception
     {
         // by default numbers are fine:
-        assertFalse(MAPPER.deserializationConfig().isEnabled(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS));
+        assertFalse(MAPPER.deserializationConfig().isEnabled(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS));
         TestEnum value = MAPPER.readValue("1", TestEnum.class);
         assertSame(TestEnum.RULES, value);
 
         // but can also be changed to errors:
         ObjectReader r = MAPPER.readerFor(TestEnum.class)
-                .with(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+                .with(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
         try {
             value = r.readValue("1");
             fail("Expected an error");
@@ -339,16 +399,18 @@ public class EnumDeserializationTest
         }
     }
 
+    @Test
     public void testEnumsWithIndex() throws Exception
     {
         String json = MAPPER.writer()
-                .with(SerializationFeature.WRITE_ENUMS_USING_INDEX)
+                .with(EnumFeature.WRITE_ENUMS_USING_INDEX)
                 .writeValueAsString(TestEnum.RULES);
         assertEquals(String.valueOf(TestEnum.RULES.ordinal()), json);
         TestEnum result = MAPPER.readValue(json, TestEnum.class);
         assertSame(TestEnum.RULES, result);
     }
 
+    @Test
     public void testEnumsWithJsonValue() throws Exception
     {
         // first, enum as is
@@ -375,45 +437,68 @@ public class EnumDeserializationTest
 
     // Ability to ignore unknown Enum values:
 
+    @Test
     public void testAllowUnknownEnumValuesReadAsNull() throws Exception
     {
         // cannot use shared mapper when changing configs...
-        ObjectReader reader = MAPPER.reader(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
+        ObjectReader reader = MAPPER.reader(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
         assertNull(reader.forType(TestEnum.class).readValue("\"NO-SUCH-VALUE\""));
         assertNull(reader.forType(TestEnum.class).readValue(" 4343 "));
     }
 
-    // Ability to ignore unknown Enum values:
+    // Ability to ignore unknown Enum values as null:
 
     // [databind#1642]
+    @Test
     public void testAllowUnknownEnumValuesReadAsNullWithCreatorMethod() throws Exception
     {
         // cannot use shared mapper when changing configs...
-        ObjectReader reader = MAPPER.reader(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
+        ObjectReader reader = MAPPER.reader(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL);
         assertNull(reader.forType(StrictEnumCreator.class).readValue("\"NO-SUCH-VALUE\""));
         assertNull(reader.forType(StrictEnumCreator.class).readValue(" 4343 "));
     }
 
+    @Test
     public void testAllowUnknownEnumValuesForEnumSets() throws Exception
     {
-        EnumSet<TestEnum> result = MAPPER.reader(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+        // 05-Nov-2025, tatu: As per [databind#5203], no longer quietly skippped
+        try {
+            MAPPER.reader(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
                 .forType(new TypeReference<EnumSet<TestEnum>>() { })
                 .readValue("[\"NO-SUCH-VALUE\"]");
-        assertEquals(0, result.size());
+            fail("Expected an exception for bogus enum value-turned null");
+        } catch (InvalidNullException jex) {
+            verifyException(jex, "Invalid `null` value encountered");
+        }
     }
 
+    @Test
     public void testAllowUnknownEnumValuesAsMapKeysReadAsNull() throws Exception
     {
-        ClassWithEnumMapKey result = MAPPER.reader(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+        ClassWithEnumMapKey result = MAPPER.reader(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
                 .forType(ClassWithEnumMapKey.class)
                 .readValue("{\"map\":{\"NO-SUCH-VALUE\":\"val\"}}");
         // 25-Jan-2018, tatu: as per [databind#1883], we upgrade it to `EnumMap`, which won't accept nulls...
         assertEquals(0, result.map.size());
     }
 
+    // Ability to ignore unknown Enum values as a defined default:
+
+    // [databind#4979]
+    @Test
+    public void testAllowUnknownEnumValuesReadAsDefaultWithCreatorMethod4979() throws Exception
+    {
+        ObjectReader reader = MAPPER.reader(
+            EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE);
+        assertEquals(
+            StrictEnumCreator.UNKNOWN,
+            reader.forType(StrictEnumCreator.class).readValue("\"NO-SUCH-VALUE\""));
+    }
+
+    @Test
     public void testDoNotAllowUnknownEnumValuesAsMapKeysWhenReadAsNullDisabled() throws Exception
     {
-        assertFalse(MAPPER.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL));
+        assertFalse(MAPPER.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL));
          try {
              MAPPER.readValue("{\"map\":{\"NO-SUCH-VALUE\":\"val\"}}", ClassWithEnumMapKey.class);
              fail("Expected an exception for bogus enum value...");
@@ -424,6 +509,7 @@ public class EnumDeserializationTest
     }
 
     // [databind#141]: allow mapping of empty String into null
+    @Test
     public void testEnumsWithEmpty() throws Exception
     {
        final ObjectMapper mapper = jsonMapperBuilder()
@@ -433,6 +519,7 @@ public class EnumDeserializationTest
        assertNull(result);
     }
 
+    @Test
     public void testGenericEnumDeserialization() throws Exception
     {
        SimpleModule module = new SimpleModule("foobar");
@@ -445,13 +532,15 @@ public class EnumDeserializationTest
     }
 
     // [databind#381]
+    @Test
     public void testUnwrappedEnum() throws Exception {
         assertEquals(TestEnum.JACKSON,
                 MAPPER.readerFor(TestEnum.class)
                     .with(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS)
                     .readValue("[" + q("JACKSON") + "]"));
     }
-    
+
+    @Test
     public void testUnwrappedEnumException() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .disable(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS)
@@ -467,6 +556,7 @@ public class EnumDeserializationTest
     }
 
     // [databind#149]: 'stringified' indexes for enums
+    @Test
     public void testIndexAsString() throws Exception
     {
         // first, regular index ought to work fine
@@ -492,6 +582,7 @@ public class EnumDeserializationTest
         }
     }
 
+    @Test
     public void testEnumWithJsonPropertyRename() throws Exception
     {
         String json = MAPPER.writeValueAsString(new EnumWithPropertyAnno[] {
@@ -507,79 +598,134 @@ public class EnumDeserializationTest
         assertSame(EnumWithPropertyAnno.A, result[1]);
     }
 
+    @Test
+    public void testEnumWithJsonPropertyRenameWithToString() throws Exception {
+        EnumWithPropertyAnno a = MAPPER.readerFor(EnumWithPropertyAnno.class)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .readValue(q("a"));
+        assertSame(EnumWithPropertyAnno.A, a);
+
+        EnumWithPropertyAnno b = MAPPER.readerFor(EnumWithPropertyAnno.class)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .readValue(q("b"));
+        assertSame(EnumWithPropertyAnno.B, b);
+
+        EnumWithPropertyAnno bb = MAPPER.readerFor(EnumWithPropertyAnno.class)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .with(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+                .readValue(q("bb"));
+        assertNull(bb);
+
+        EnumWithPropertyAnno c = MAPPER.readerFor(EnumWithPropertyAnno.class)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .readValue(q("cc"));
+        assertSame(EnumWithPropertyAnno.C, c);
+    }
+
+    /**
+     * {@link #testEnumWithJsonPropertyRename()}
+     */
+    @Test
+    public void testEnumWithJsonPropertyRenameMixin() throws Exception
+    {
+        ObjectMapper mixinMapper = jsonMapperBuilder()
+                .addMixIn(EnumWithPropertyAnnoBase.class, EnumWithPropertyAnnoMixin.class)
+                .build();
+        String json = mixinMapper.writeValueAsString(new EnumWithPropertyAnnoBase[] {
+                EnumWithPropertyAnnoBase.B, EnumWithPropertyAnnoBase.A
+        });
+        assertEquals("[\"b_mixin\",\"a_mixin\"]", json);
+
+        // and while not really proper place, let's also verify deser while we're at it
+        EnumWithPropertyAnnoBase[] result = mixinMapper.readValue(json, EnumWithPropertyAnnoBase[].class);
+        assertNotNull(result);
+        assertEquals(2, result.length);
+        assertSame(EnumWithPropertyAnnoBase.B, result[0]);
+        assertSame(EnumWithPropertyAnnoBase.A, result[1]);
+    }
+
     // [databind#1161], unable to switch READ_ENUMS_USING_TO_STRING
+    @Test
     public void testDeserWithToString1161() throws Exception
     {
         Enum1161 result = MAPPER.readerFor(Enum1161.class)
+                .without(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .readValue(q("A"));
         assertSame(Enum1161.A, result);
 
         result = MAPPER.readerFor(Enum1161.class)
-                .with(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .readValue(q("a"));
         assertSame(Enum1161.A, result);
 
         // and once again, going back to defaults
         result = MAPPER.readerFor(Enum1161.class)
-                .without(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .without(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .readValue(q("A"));
         assertSame(Enum1161.A, result);
     }
-    
+
+    @Test
     public void testEnumWithDefaultAnnotation() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnno myEnum = mapper.readValue("\"foo\"", EnumWithDefaultAnno.class);
         assertSame(EnumWithDefaultAnno.OTHER, myEnum);
     }
 
+    @Test
     public void testEnumWithDefaultAnnotationUsingIndexInBound1() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnno myEnum = mapper.readValue("1", EnumWithDefaultAnno.class);
         assertSame(EnumWithDefaultAnno.B, myEnum);
     }
 
+    @Test
     public void testEnumWithDefaultAnnotationUsingIndexInBound2() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnno myEnum = mapper.readValue("2", EnumWithDefaultAnno.class);
         assertSame(EnumWithDefaultAnno.OTHER, myEnum);
     }
 
+    @Test
     public void testEnumWithDefaultAnnotationUsingIndexSameAsLength() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnno myEnum = mapper.readValue("3", EnumWithDefaultAnno.class);
         assertSame(EnumWithDefaultAnno.OTHER, myEnum);
     }
 
+    @Test
     public void testEnumWithDefaultAnnotationUsingIndexOutOfBound() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnno myEnum = mapper.readValue("4", EnumWithDefaultAnno.class);
         assertSame(EnumWithDefaultAnno.OTHER, myEnum);
     }
 
+    @Test
     public void testEnumWithDefaultAnnotationWithConstructor() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
-                .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
                 .build();
 
         EnumWithDefaultAnnoAndConstructor myEnum = mapper.readValue("\"foo\"", EnumWithDefaultAnnoAndConstructor.class);
-        assertNull("When using a constructor, the default value annotation shouldn't be used.", myEnum);
+        assertNull(myEnum, "When using a constructor, the default value annotation shouldn't be used.");
     }
 
+    @Test
     public void testExceptionFromCustomEnumKeyDeserializer() throws Exception {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .addModule(new EnumModule())
@@ -594,6 +740,7 @@ public class EnumDeserializationTest
     }
 
     // [databind#2164]
+    @Test
     public void testWrapExceptions() throws Exception
     {
         // By default, wrap:
@@ -619,14 +766,17 @@ public class EnumDeserializationTest
     }
 
     // [databind#2309]
+    @Test
     public void testEnumToStringNull2309() throws Exception
     {
         Enum2309 value = MAPPER.readerFor(Enum2309.class)
-                .with(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .with(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .readValue(q("NON_NULL"));
         assertEquals(Enum2309.NON_NULL, value);
     }
 
+    // [databind#2873] -- take case-sensitivity into account for Enum-as-Map-keys too
+    @Test
     public void testEnumValuesCaseSensitivity() throws Exception {
         try {
             MAPPER.readValue("{\"map\":{\"JACkson\":\"val\"}}", ClassWithEnumMapKey.class);
@@ -636,6 +786,8 @@ public class EnumDeserializationTest
         }
     }
 
+    // [databind#2873] -- take case-sensitivity into account for Enum-as-Map-keys too
+    @Test
     public void testAllowCaseInsensitiveEnumValues() throws Exception {
         ObjectMapper m = jsonMapperBuilder()
                 .enable(ACCEPT_CASE_INSENSITIVE_ENUMS)
@@ -646,11 +798,64 @@ public class EnumDeserializationTest
     }
 
     // [databind#3006]
+    @Test
     public void testIssue3006() throws Exception
     {
         assertEquals(Operation3006.ONE, MAPPER.readValue("1", Operation3006.class));
         assertEquals(Operation3006.ONE, MAPPER.readValue(q("1"), Operation3006.class));
         assertEquals(Operation3006.THREE, MAPPER.readValue("3", Operation3006.class));
         assertEquals(Operation3006.THREE, MAPPER.readValue(q("3"), Operation3006.class));
+    }
+
+    @Test
+    public void testEnumFeature_EnumIndexAsKey() throws Exception {
+        ObjectReader reader = MAPPER.reader()
+            .forType(ClassWithEnumMapKey.class)
+            .with(EnumFeature.READ_ENUM_KEYS_USING_INDEX);
+
+        ClassWithEnumMapKey result = reader.readValue("{\"map\": {\"0\":\"I AM FOR REAL\"}}");
+        assertEquals(result.map.get(TestEnum.JACKSON), "I AM FOR REAL");
+    }
+
+    @Test
+    public void testEnumFeature_symmetric_to_writing() throws Exception {
+        ClassWithEnumMapKey obj = new ClassWithEnumMapKey();
+        Map<TestEnum, String> objMap = new HashMap<>();
+        objMap.put(TestEnum.JACKSON, "I AM FOR REAL");
+        obj.map = objMap;
+
+        String deserObj = MAPPER.writer()
+            .with(EnumFeature.WRITE_ENUM_KEYS_USING_INDEX)
+            .writeValueAsString(obj);
+
+        ClassWithEnumMapKey result = MAPPER.reader()
+            .forType( ClassWithEnumMapKey.class)
+            .with(EnumFeature.READ_ENUM_KEYS_USING_INDEX)
+            .readValue(deserObj);
+
+        assertNotSame(obj, result);
+        assertNotSame(obj.map, result.map);
+        assertEquals(result.map.get(TestEnum.JACKSON), "I AM FOR REAL");
+    }
+
+
+    @Test
+    public void testEnumFeature_READ_ENUM_KEYS_USING_INDEX_isDisabledByDefault() {
+        ObjectReader READER = MAPPER.reader();
+        assertFalse(READER.isEnabled(EnumFeature.READ_ENUM_KEYS_USING_INDEX));
+        assertFalse(READER.without(EnumFeature.READ_ENUM_KEYS_USING_INDEX)
+            .isEnabled(EnumFeature.READ_ENUM_KEYS_USING_INDEX));
+    }
+
+    // [databind#4896]
+    @Test
+    public void testEnumReadFromEmptyString() throws Exception {
+        // First, regular value
+        assertEquals(YesOrNoOrEmpty4896.YES,
+                MAPPER.readerFor(YesOrNoOrEmpty4896.class)
+                    .readValue(q("yes")));
+        assertEquals(YesOrNoOrEmpty4896.EMPTY,
+            MAPPER.readerFor(YesOrNoOrEmpty4896.class)
+                .readValue(q("")));
     }
 }

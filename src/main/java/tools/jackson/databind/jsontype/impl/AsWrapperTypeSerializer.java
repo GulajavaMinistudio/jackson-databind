@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.BeanProperty;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsontype.TypeIdResolver;
 import tools.jackson.databind.util.ClassUtil;
 
@@ -23,11 +23,11 @@ public class AsWrapperTypeSerializer extends TypeSerializerBase
     }
 
     @Override
-    public AsWrapperTypeSerializer forProperty(SerializerProvider ctxt, BeanProperty prop)
+    public AsWrapperTypeSerializer forProperty(SerializationContext ctxt, BeanProperty prop)
     {
         return (_property == prop) ? this : new AsWrapperTypeSerializer(_idResolver, prop);
     }
-    
+
     @Override
     public As getTypeInclusion() { return As.WRAPPER_OBJECT; }
 
@@ -36,7 +36,7 @@ public class AsWrapperTypeSerializer extends TypeSerializerBase
     /* Internal helper methods
     /**********************************************************************
      */
-    
+
     /**
      * Helper method used to ensure that intended type id is output as something that is valid:
      * currently only used to ensure that `null` output is converted to an empty String.

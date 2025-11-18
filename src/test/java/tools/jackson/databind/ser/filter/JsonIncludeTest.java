@@ -1,7 +1,8 @@
 package tools.jackson.databind.ser.filter;
 
-import java.io.IOException;
 import java.util.*;
+
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -9,6 +10,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for checking that alternative settings for
@@ -16,14 +21,14 @@ import tools.jackson.databind.*;
  * as expected.
  */
 public class JsonIncludeTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     static class SimpleBean
     {
         public String getA() { return "a"; }
         public String getB() { return null; }
     }
-    
+
     @JsonInclude(JsonInclude.Include.ALWAYS) // just to ensure default
     static class NoNullsBean
     {
@@ -60,7 +65,7 @@ public class JsonIncludeTest
             this.z = z;
         }
     }
-    
+
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     static class MixedBean
     {
@@ -98,6 +103,12 @@ public class JsonIncludeTest
             this.i1 = i1;
             this.i2 = i2;
         }
+    }
+
+    // [databind#4741]
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    static class NonDefaultBean4741 {
+        public String value = null;
     }
 
     static class NonEmptyString {
@@ -149,8 +160,19 @@ public class JsonIncludeTest
         public NonDefaultCalendar(Calendar v) { super(v); }
     }
 
-    // [databind#1351]
+    // [databind#1327]
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    static class Issue1327BeanEmpty {
+        public List<String> myList = new ArrayList<String>();
+    }
 
+    // [databind#1327]
+    static class Issue1327BeanAlways {
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        public List<String> myList = new ArrayList<String>();
+    }
+
+    // [databind#1351]
     static class Issue1351Bean
     {
         public final String first;
@@ -202,7 +224,8 @@ public class JsonIncludeTest
 
     final private ObjectMapper MAPPER = newJsonMapper();
 
-    public void testGlobal() throws IOException
+    @Test
+    public void testGlobal() throws Exception
     {
         Map<String,Object> result = writeAndMap(MAPPER, new SimpleBean());
         assertEquals(2, result.size());
@@ -211,7 +234,8 @@ public class JsonIncludeTest
         assertTrue(result.containsKey("b"));
     }
 
-    public void testNonNullByClass() throws IOException
+    @Test
+    public void testNonNullByClass() throws Exception
     {
         Map<String,Object> result = writeAndMap(MAPPER, new NoNullsBean());
         assertEquals(1, result.size());
@@ -221,7 +245,8 @@ public class JsonIncludeTest
         assertNull(result.get("b"));
     }
 
-    public void testNonDefaultByClass() throws IOException
+    @Test
+    public void testNonDefaultByClass() throws Exception
     {
         NonDefaultBean bean = new NonDefaultBean();
         // need to change one of defaults
@@ -235,14 +260,16 @@ public class JsonIncludeTest
     }
 
     // [databind#998]
-    public void testNonDefaultByClassNoCtor() throws IOException
+    @Test
+    public void testNonDefaultByClassNoCtor() throws Exception
     {
         NonDefaultBeanXYZ bean = new NonDefaultBeanXYZ(1, 2, 0);
         String json = MAPPER.writeValueAsString(bean);
         assertEquals(a2q("{'x':1,'y':2}"), json);
     }
-    
-    public void testMixedMethod() throws IOException
+
+    @Test
+    public void testMixedMethod() throws Exception
     {
         MixedBean bean = new MixedBean();
         bean._a = "xyz";
@@ -260,25 +287,29 @@ public class JsonIncludeTest
         assertFalse(result.containsKey("a"));
     }
 
-    public void testDefaultForEmptyList() throws IOException
+    @Test
+    public void testDefaultForEmptyList() throws Exception
     {
         assertEquals("{}", MAPPER.writeValueAsString(new ListBean()));
     }
 
-    // NON_DEFAULT shoud work for arrays too
-    public void testNonEmptyDefaultArray() throws IOException
+    // NON_DEFAULT should work for arrays too
+    @Test
+    public void testNonEmptyDefaultArray() throws Exception
     {
         assertEquals("{}", MAPPER.writeValueAsString(new ArrayBean()));
     }
 
-    public void testDefaultForIntegers() throws IOException
+    @Test
+    public void testDefaultForIntegers() throws Exception
     {
         assertEquals("{}", MAPPER.writeValueAsString(new DefaultIntBean(0, Integer.valueOf(0))));
         assertEquals("{\"i2\":1}", MAPPER.writeValueAsString(new DefaultIntBean(0, Integer.valueOf(1))));
         assertEquals("{\"i1\":3}", MAPPER.writeValueAsString(new DefaultIntBean(3, Integer.valueOf(0))));
     }
 
-    public void testEmptyInclusionScalars() throws IOException
+    @Test
+    public void testEmptyInclusionScalars() throws Exception
     {
         ObjectMapper defMapper = MAPPER;
         ObjectMapper inclMapper = jsonMapperBuilder()
@@ -308,7 +339,35 @@ public class JsonIncludeTest
         assertEquals("{\"i\":0}", inclMapper.writeValueAsString(zero));
     }
 
+    // for [databind#1327]
+    @Test
+    public void test1327ClassDefaultsForEmpty() throws Exception {
+        ObjectMapper mapper = jsonMapperBuilder()
+                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
+                .build();
+
+        final String jsonString = mapper.writeValueAsString(new Issue1327BeanEmpty());
+
+        if (jsonString.contains("myList")) {
+            fail("Should not contain `myList`: "+jsonString);
+        }
+    }
+
+    @Test
+    public void test1327ClassDefaultsForAlways() throws Exception {
+        ObjectMapper mapper = jsonMapperBuilder()
+                .changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_EMPTY))
+                .build();
+
+        final String jsonString = mapper.writeValueAsString(new Issue1327BeanAlways());
+
+        if (!jsonString.contains("myList")) {
+            fail("Should contain `myList` with Include.ALWAYS: "+jsonString);
+        }
+    }
+
     // [databind#1351], [databind#1417]
+    @Test
     public void testIssue1351() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -321,26 +380,41 @@ public class JsonIncludeTest
                 mapper.writeValueAsString(new Issue1351NonBean(0)));
     }
 
-    // [databind#1550]
-    public void testInclusionOfDate() throws Exception
+    // [databind#4741]
+    @Test
+    public void testSerialization4741() throws Exception
     {
-        final Date input = new Date(0L);
-        assertEquals(a2q("{'value':0}"), 
-                MAPPER.writeValueAsString(new NonEmptyDate(input)));
-        assertEquals("{}", 
-                MAPPER.writeValueAsString(new NonDefaultDate(input)));
-
-    
+        NonDefaultBean4741 bean = new NonDefaultBean4741();
+        bean.value = "";
+        assertEquals(a2q("{'value':''}"), MAPPER.writeValueAsString(bean));
     }
 
     // [databind#1550]
+    @Test
+    public void testInclusionOfDate() throws Exception
+    {
+        ObjectWriter writerWith = MAPPER.writer().with(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        final Date input = new Date(0L);
+        assertEquals(a2q("{'value':0}"),
+                writerWith.writeValueAsString(new NonEmptyDate(input)));
+        assertEquals("{}",
+                writerWith.writeValueAsString(new NonDefaultDate(input)));
+
+
+    }
+
+    // [databind#1550]
+    @Test
     public void testInclusionOfCalendar() throws Exception
     {
+        ObjectWriter writerWith = MAPPER.writer().with(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
+
         final Calendar input = new GregorianCalendar();
         input.setTimeInMillis(0L);
-        assertEquals(a2q("{'value':0}"), 
-                MAPPER.writeValueAsString(new NonEmptyCalendar(input)));
-        assertEquals("{}", 
-                MAPPER.writeValueAsString(new NonDefaultCalendar(input)));
+        assertEquals(a2q("{'value':0}"),
+                writerWith.writeValueAsString(new NonEmptyCalendar(input)));
+        assertEquals("{}",
+                writerWith.writeValueAsString(new NonDefaultCalendar(input)));
     }
 }

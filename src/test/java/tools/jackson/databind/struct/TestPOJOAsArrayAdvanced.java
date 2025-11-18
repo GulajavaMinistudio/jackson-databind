@@ -1,11 +1,17 @@
 package tools.jackson.databind.struct;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
-import tools.jackson.databind.BaseMapTest;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestPOJOAsArrayAdvanced extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestPOJOAsArrayAdvanced extends DatabindTestUtil
 {
     @JsonFormat(shape=JsonFormat.Shape.ARRAY)
     @JsonPropertyOrder(alphabetic=true)
@@ -45,7 +51,7 @@ public class TestPOJOAsArrayAdvanced extends BaseMapTest
 
     static class ViewA { }
     static class ViewB { }
-    
+
     @JsonFormat(shape=JsonFormat.Shape.ARRAY)
     @JsonPropertyOrder(alphabetic=true)
     static class AsArrayWithView
@@ -84,8 +90,13 @@ public class TestPOJOAsArrayAdvanced extends BaseMapTest
     /*****************************************************
      */
 
-    private final static ObjectMapper MAPPER = new ObjectMapper();
+    // 06-Jan-2025, tatu: NOTE! need to make sure Default View Inclusion
+    //   is enabled for tests to work as expected
+    private final static ObjectMapper MAPPER = jsonMapperBuilder()
+            .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+            .build();
 
+    @Test
     public void testWithView() throws Exception
     {
         // Ok, first, ensure that serializer will "black out" filtered properties
@@ -105,10 +116,12 @@ public class TestPOJOAsArrayAdvanced extends BaseMapTest
         assertEquals(0, result.a);
     }
 
+    @Test
     public void testWithViewAndCreator() throws Exception
     {
         AsArrayWithViewAndCreator result = MAPPER.readerFor(AsArrayWithViewAndCreator.class)
                 .withView(ViewB.class)
+                .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
                 .readValue("[1,2,3]");
         // should include 'c' (not view-able) and 'b' (include in ViewB) but not 'a'
         assertEquals(3, result.c);
@@ -116,6 +129,7 @@ public class TestPOJOAsArrayAdvanced extends BaseMapTest
         assertEquals(0, result.a);
     }
 
+    @Test
     public void testWithCreatorsOrdered() throws Exception
     {
         CreatorAsArray input = new CreatorAsArray(3, 4);
@@ -135,6 +149,7 @@ public class TestPOJOAsArrayAdvanced extends BaseMapTest
     }
 
     // Same as above, but ordering of properties different...
+    @Test
     public void testWithCreatorsShuffled() throws Exception
     {
         CreatorAsArrayShuffled input = new CreatorAsArrayShuffled(3, 4);

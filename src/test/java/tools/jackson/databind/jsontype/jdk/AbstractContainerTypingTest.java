@@ -2,20 +2,25 @@ package tools.jackson.databind.jsontype.jdk;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * For [databind#292]
  */
 @SuppressWarnings("serial")
-public class AbstractContainerTypingTest extends BaseMapTest
+public class AbstractContainerTypingTest extends DatabindTestUtil
 {
     // Polymorphic abstract Map type, wrapper
-    
+
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
-    @JsonSubTypes({ 
+    @JsonSubTypes({
         @JsonSubTypes.Type(value = MapWrapper.class, name = "wrapper"),
     })
     static class MapWrapper {
@@ -23,7 +28,7 @@ public class AbstractContainerTypingTest extends BaseMapTest
     }
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="_type_")
-    @JsonSubTypes({ 
+    @JsonSubTypes({
         @JsonSubTypes.Type(value = DataValueMap.class,  name = "DataValueMap")
     })
     public interface IDataValueMap extends Map<String, String> { }
@@ -31,7 +36,7 @@ public class AbstractContainerTypingTest extends BaseMapTest
     static class DataValueMap extends HashMap<String, String> implements IDataValueMap { }
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
-    @JsonSubTypes({ 
+    @JsonSubTypes({
         @JsonSubTypes.Type(value = ListWrapper.class, name = "wrapper"),
     })
     static class ListWrapper {
@@ -39,7 +44,7 @@ public class AbstractContainerTypingTest extends BaseMapTest
     }
 
     @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
-    @JsonSubTypes({ 
+    @JsonSubTypes({
         @JsonSubTypes.Type(value = DataValueList.class,  name = "list")
     })
     public interface IDataValueList extends List<String> { }
@@ -53,7 +58,8 @@ public class AbstractContainerTypingTest extends BaseMapTest
      */
 
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testAbstractLists() throws Exception
     {
         ListWrapper w = new ListWrapper();
@@ -66,8 +72,9 @@ public class AbstractContainerTypingTest extends BaseMapTest
         assertNotNull(out.list);
         assertEquals(1, out.list.size());
         assertEquals("x", out.list.get(0));
-   }
-    
+    }
+
+    @Test
     public void testAbstractMaps() throws Exception
     {
         MapWrapper w = new MapWrapper();

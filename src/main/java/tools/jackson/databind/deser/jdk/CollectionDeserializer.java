@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
@@ -173,7 +174,7 @@ _containerType,
                 JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
         // also, often value deserializer is resolved here:
         ValueDeserializer<?> valueDeser = _valueDeserializer;
-        
+
         // May have a content converter
         valueDeser = findConvertingContentDeserializer(ctxt, property, valueDeser);
         final JavaType vt = _containerType.getContentType();
@@ -240,7 +241,7 @@ _containerType,
         // there is also possibility of "auto-wrapping" of single-element arrays.
         // Hence we only accept empty String here.
         if (p.hasToken(JsonToken.VALUE_STRING)) {
-            return _deserializeFromString(p, ctxt, p.getText());
+            return _deserializeFromString(p, ctxt, p.getString());
         }
         return handleNonArray(p, ctxt, createDefaultInstance(ctxt));
     }
@@ -330,12 +331,10 @@ _containerType,
         // [databind#631]: Assign current value, to be accessible by custom serializers
         p.assignCurrentValue(result);
 
-        ValueDeserializer<Object> valueDes = _valueDeserializer;
         // Let's offline handling of values with Object Ids (simplifies code here)
-        if (valueDes.getObjectIdReader(ctxt) != null) {
+        if (_valueDeserializer.getObjectIdReader(ctxt) != null) {
             return _deserializeWithObjectId(p, ctxt, result);
         }
-        final TypeDeserializer typeDeser = _valueTypeDeserializer;
         JsonToken t;
         while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
             try {
@@ -344,12 +343,21 @@ _containerType,
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (typeDeser == null) {
-                    value = valueDes.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = valueDes.deserializeWithType(p, ctxt, typeDeser);
+                    value = _deserializeNoNullChecks(p, ctxt);
                 }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+
+                    // _skipNullValues is checked by _tryToAddNull.
+                    if (value == null) {
+                        _tryToAddNull(p, ctxt, result);
+                        continue;
+                    }
+                }
+
                 result.add(value);
 
                 /* 17-Dec-2017, tatu: should not occur at this level...
@@ -362,7 +370,8 @@ _containerType,
                 if (!wrap) {
                     ClassUtil.throwIfRTE(e);
                 }
-                throw DatabindException.wrapWithPath(e, result, result.size());
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(result, result.size()));
             }
         }
         return result;
@@ -385,8 +394,6 @@ _containerType,
         if (!canWrap) {
             return (Collection<Object>) ctxt.handleUnexpectedToken(_containerType, p);
         }
-        ValueDeserializer<Object> valueDes = _valueDeserializer;
-        final TypeDeserializer typeDeser = _valueTypeDeserializer;
         JsonToken t = p.currentToken();
 
         Object value;
@@ -397,11 +404,19 @@ _containerType,
                 if (_skipNullValues) {
                     return result;
                 }
-                value = _nullProvider.getNullValue(ctxt);
-            } else if (typeDeser == null) {
-                value = valueDes.deserialize(p, ctxt);
+                value = null;
             } else {
-                value = valueDes.deserializeWithType(p, ctxt, typeDeser);
+                value = _deserializeNoNullChecks(p, ctxt);
+            }
+
+            if (value == null) {
+                value = _nullProvider.getNullValue(ctxt);
+
+                // _skipNullValues is checked by _tryToAddNull.
+                if (value == null) {
+                    _tryToAddNull(p, ctxt, result);
+                    return result;
+                }
             }
         } catch (Exception e) {
             boolean wrap = ctxt.isEnabled(DeserializationFeature.WRAP_EXCEPTIONS);
@@ -409,7 +424,8 @@ _containerType,
                 ClassUtil.throwIfRTE(e);
             }
             // note: pass Object.class, not Object[].class, as we need element type for error info
-            throw DatabindException.wrapWithPath(e, Object.class, result.size());
+            throw DatabindException.wrapWithPath(ctxt, e,
+                    new JacksonException.Reference(Object.class, result.size()));
         }
         result.add(value);
         return result;
@@ -426,8 +442,6 @@ _containerType,
         // [databind#631]: Assign current value, to be accessible by custom serializers
         p.assignCurrentValue(result);
 
-        final ValueDeserializer<Object> valueDes = _valueDeserializer;
-        final TypeDeserializer typeDeser = _valueTypeDeserializer;
         CollectionReferringAccumulator referringAccumulator =
                 new CollectionReferringAccumulator(_containerType.getContentType().getRawClass(), result);
 
@@ -435,15 +449,21 @@ _containerType,
         while ((t = p.nextToken()) != JsonToken.END_ARRAY) {
             try {
                 Object value;
+
                 if (t == JsonToken.VALUE_NULL) {
                     if (_skipNullValues) {
                         continue;
                     }
-                    value = _nullProvider.getNullValue(ctxt);
-                } else if (typeDeser == null) {
-                    value = valueDes.deserialize(p, ctxt);
+                    value = null;
                 } else {
-                    value = valueDes.deserializeWithType(p, ctxt, typeDeser);
+                    value = _deserializeNoNullChecks(p, ctxt);
+                }
+
+                if (value == null) {
+                    value = _nullProvider.getNullValue(ctxt);
+                    if (value == null && _skipNullValues) {
+                        continue;
+                    }
                 }
                 referringAccumulator.add(value);
             } catch (UnresolvedForwardReference reference) {
@@ -454,12 +474,48 @@ _containerType,
                 if (!wrap) {
                     ClassUtil.throwIfRTE(e);
                 }
-                throw DatabindException.wrapWithPath(e, result, result.size());
+                throw DatabindException.wrapWithPath(ctxt, e,
+                        new JacksonException.Reference(result, result.size()));
             }
         }
         return result;
     }
 
+    /**
+     * Deserialize the content of the collection.
+     * If _valueTypeDeserializer is null, use _valueDeserializer.deserialize; if non-null,
+     * use _valueDeserializer.deserializeWithType to deserialize value.
+     * This method only performs deserialization and does not consider _skipNullValues, _nullProvider, etc.
+     */
+    protected Object _deserializeNoNullChecks(JsonParser p,DeserializationContext ctxt)
+    {
+        if (_valueTypeDeserializer == null) {
+            return _valueDeserializer.deserialize(p, ctxt);
+        }
+        return _valueDeserializer.deserializeWithType(p, ctxt, _valueTypeDeserializer);
+    }
+
+    /**
+     * {@code java.util.TreeSet} (and possibly other {@link Collection} types) does not
+     * allow addition of {@code null} values, so isolate handling here.
+     *
+     */
+    protected void _tryToAddNull(JsonParser p, DeserializationContext ctxt, Collection<?> set)
+    {
+        if (_skipNullValues) {
+            return;
+        }
+
+        // Ideally we'd have better idea of where nulls are accepted, but first
+        // let's just produce something better than NPE:
+        try {
+            set.add(null);
+        } catch (NullPointerException e) {
+            ctxt.handleUnexpectedToken(_valueType, JsonToken.VALUE_NULL, p,
+                    "`java.util.Collection` of type %s does not accept `null` values",
+                    ClassUtil.getTypeDescription(getValueType(ctxt)));
+        }
+    }    
     /**
      * Helper class for dealing with Object Id references for values contained in
      * collections being deserialized.
@@ -495,7 +551,7 @@ _containerType,
             return id;
         }
 
-        public void resolveForwardReference(Object id, Object value) throws JacksonException
+        public void resolveForwardReference(DeserializationContext ctxt, Object id, Object value) throws JacksonException
         {
             Iterator<CollectionReferring> iterator = _accumulator.iterator();
             // Resolve ordering after resolution of an id. This mean either:
@@ -520,23 +576,23 @@ _containerType,
 
     /**
      * Helper class to maintain processing order of value. The resolved
-     * object associated with {@link #_id} comes before the values in
-     * {@link #next}.
+     * object associated with {@code #id} parameter from {@link #handleResolvedForwardReference(Object, Object)} 
+     * comes before the values in {@link #next}.
      */
     private final static class CollectionReferring extends Referring {
         private final CollectionReferringAccumulator _parent;
         public final List<Object> next = new ArrayList<Object>();
-        
+
         CollectionReferring(CollectionReferringAccumulator parent,
                 UnresolvedForwardReference reference, Class<?> contentType)
         {
             super(reference, contentType);
             _parent = parent;
         }
-        
+
         @Override
-        public void handleResolvedForwardReference(Object id, Object value) throws JacksonException {
-            _parent.resolveForwardReference(id, value);
+        public void handleResolvedForwardReference(DeserializationContext ctxt, Object id, Object value) throws JacksonException {
+            _parent.resolveForwardReference(ctxt, id, value);
         }
     }
 }

@@ -3,23 +3,29 @@ package tools.jackson.databind.ser;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.*;
 import tools.jackson.core.io.ContentReference;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.util.TokenBuffer;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for those Jackson types we want to ensure can be serialized.
  */
 public class JacksonTypesSerTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testLocation() throws IOException
     {
         File f = new File("/tmp/test.json");
-        JsonLocation loc = new JsonLocation(ContentReference.rawReference(f),
+        TokenStreamLocation loc = new TokenStreamLocation(ContentReference.rawReference(f),
                 -1, 100, 13);
         Map<String,Object> result = writeAndMap(MAPPER, loc);
         // 04-Apr-2021, tatu: Jackson 2.x used to output "sourceRef"; no longer in 3.x
@@ -35,6 +41,7 @@ public class JacksonTypesSerTest
      * Verify that {@link TokenBuffer} can be properly serialized
      * automatically, using the "standard" JSON sample document
      */
+    @Test
     public void testTokenBuffer() throws Exception
     {
         // First, copy events from known good source (StringReader)

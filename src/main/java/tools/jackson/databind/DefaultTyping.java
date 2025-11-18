@@ -16,7 +16,7 @@ public enum DefaultTyping {
      * typing.
      */
     JAVA_LANG_OBJECT,
-    
+
     /**
      * Value that means that default typing will be used for
      * properties with declared type of {@link java.lang.Object}
@@ -33,7 +33,7 @@ public enum DefaultTyping {
      * This does NOT apply to {@link TreeNode} and its subtypes.
      */
     NON_CONCRETE_AND_ARRAYS,
-    
+
     /**
      * Value that means that default typing will be used for
      * all non-final types, with exception of small number of
@@ -45,22 +45,9 @@ public enum DefaultTyping {
     NON_FINAL,
 
     /**
-     * Value that means that default typing will be used for
-     * all types, with exception of small number of
-     * "natural" types (String, Boolean, Integer, Double) that
-     * can be correctly inferred from JSON, and primitives (which
-     * can not be polymorphic either). Typing is also enabled for
-     * all array types.
-     *<p>
-     * WARNING: most of the time this is <b>NOT</b> the setting you want
-     * as it tends to add Type Ids everywhere, even in cases
-     * where type can not be anything other than declared (for example
-     * if declared value type of a property is {@code final} -- for example,
-     * properties of type {@code long} (or wrapper {@code Long}).
-     *<p>
-     * Note that the only known use case for this setting is for serialization
-     * when passing instances of final class, and base type is not
-     * separately specified.
+     * Enables default typing for non-final types as {@link #NON_FINAL},
+     * but also includes Enums.
      */
-    EVERYTHING;
+    NON_FINAL_AND_ENUMS
+    ;
 }

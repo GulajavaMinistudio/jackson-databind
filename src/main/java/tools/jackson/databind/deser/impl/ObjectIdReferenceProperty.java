@@ -6,16 +6,14 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.NullValueProvider;
+import tools.jackson.databind.deser.ReadableObjectId.Referring;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.UnresolvedForwardReference;
-import tools.jackson.databind.deser.ReadableObjectId.Referring;
 import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.introspect.ObjectIdInfo;
 
 public class ObjectIdReferenceProperty extends SettableBeanProperty
 {
-    private static final long serialVersionUID = 1L;
-
     private final SettableBeanProperty _forward;
 
     public ObjectIdReferenceProperty(SettableBeanProperty forward, ObjectIdInfo objectIdInfo)
@@ -59,7 +57,7 @@ public class ObjectIdReferenceProperty extends SettableBeanProperty
     public SettableBeanProperty withNullProvider(NullValueProvider nva) {
         return new ObjectIdReferenceProperty(this, _valueDeserializer, nva);
     }
-    
+
     @Override
     public void fixAccess(DeserializationConfig config) {
         if (_forward != null) {
@@ -92,7 +90,7 @@ public class ObjectIdReferenceProperty extends SettableBeanProperty
             Object instance) throws JacksonException
     {
         try {
-            return setAndReturn(instance, deserialize(p, ctxt));
+            return setAndReturn(ctxt, instance, deserialize(p, ctxt));
         } catch (UnresolvedForwardReference reference) {
             boolean usingIdentityInfo = (_objectIdInfo != null)
                     || (_valueDeserializer.getObjectIdReader(ctxt) != null);
@@ -105,13 +103,13 @@ public class ObjectIdReferenceProperty extends SettableBeanProperty
     }
 
     @Override
-    public void set(Object instance, Object value) throws JacksonException {
-        _forward.set(instance, value);
+    public void set(DeserializationContext ctxt, Object instance, Object value) throws JacksonException {
+        _forward.set(ctxt, instance, value);
     }
 
     @Override
-    public Object setAndReturn(Object instance, Object value) throws JacksonException {
-        return _forward.setAndReturn(instance, value);
+    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) throws JacksonException {
+        return _forward.setAndReturn(ctxt, instance, value);
     }
 
     public final static class PropertyReferring extends Referring {
@@ -127,13 +125,14 @@ public class ObjectIdReferenceProperty extends SettableBeanProperty
         }
 
         @Override
-        public void handleResolvedForwardReference(Object id, Object value) throws JacksonException
+        public void handleResolvedForwardReference(DeserializationContext ctxt,
+                Object id, Object value) throws JacksonException
         {
             if (!hasId(id)) {
                 throw new IllegalArgumentException("Trying to resolve a forward reference with id [" + id
                         + "] that wasn't previously seen as unresolved.");
             }
-            _parent.set(_pojo, value);
+            _parent.set(ctxt, _pojo, value);
         }
     }
 }

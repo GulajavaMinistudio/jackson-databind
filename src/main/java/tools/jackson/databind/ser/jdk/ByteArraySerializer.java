@@ -4,11 +4,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonToken;
 import tools.jackson.core.type.WritableTypeId;
+
 import tools.jackson.databind.JavaType;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.annotation.JacksonStdImpl;
-import tools.jackson.databind.jsonFormatVisitors.JsonArrayFormatVisitor;
-import tools.jackson.databind.jsonFormatVisitors.JsonFormatTypes;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatVisitorWrapper;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.ser.std.StdSerializer;
@@ -29,14 +28,14 @@ public class ByteArraySerializer extends StdSerializer<byte[]>
     public ByteArraySerializer() {
         super(byte[].class);
     }
-    
+
     @Override
-    public boolean isEmpty(SerializerProvider prov, byte[] value) {
+    public boolean isEmpty(SerializationContext prov, byte[] value) {
         return value.length == 0;
     }
-    
+
     @Override
-    public void serialize(byte[] value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(byte[] value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         g.writeBinary(provider.getConfig().getBase64Variant(),
@@ -44,7 +43,7 @@ public class ByteArraySerializer extends StdSerializer<byte[]>
     }
 
     @Override
-    public void serializeWithType(byte[] value, JsonGenerator g, SerializerProvider ctxt,
+    public void serializeWithType(byte[] value, JsonGenerator g, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -66,15 +65,6 @@ public class ByteArraySerializer extends StdSerializer<byte[]>
     @Override
     public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
     {
-        // 14-Mar-2016, tatu: while logically (and within JVM) binary, gets encoded as Base64 String,
-        // let's try to indicate it is array of Bytes... difficult, thanks to JSON Schema's
-        // lackluster listing of types
-        //
-        // TODO: for 2.8, make work either as String/base64, or array of numbers,
-        //   with a qualifier that can be used to determine it's byte[]
-        JsonArrayFormatVisitor v2 = visitor.expectArrayFormat(typeHint);
-        if (v2 != null) {
-            v2.itemsFormat(JsonFormatTypes.INTEGER);
-        }
+        acceptJsonFormatVisitorForBinary(visitor, typeHint);
     }
 }

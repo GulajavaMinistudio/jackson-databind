@@ -5,16 +5,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class SingleValueAsArrayTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class SingleValueAsArrayTest extends DatabindTestUtil
 {
-    private static final String JSON = "[{\"message\":\"messageHere\"}]";
-
     static class Bean1421A
     {
         List<Messages> bs = Collections.emptyList();
@@ -62,17 +67,21 @@ public class SingleValueAsArrayTest extends BaseMapTest
     /* Unit tests
     /**********************************************************
      */
-    
+
     private final ObjectMapper MAPPER = jsonMapperBuilder()
             .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
             .build();
 
+    @Test
     public void testSuccessfulDeserializationOfObjectWithChainedArrayCreators() throws IOException
     {
-        Bean1421A result = MAPPER.readValue(JSON, Bean1421A.class);
+        Bean1421A result = MAPPER.readValue("[{\"message\":\"messageHere\"}]", Bean1421A.class);
         assertNotNull(result);
+        assertNotNull(result.bs);
+        assertEquals(1, result.bs.size());
     }
 
+    @Test
     public void testWithSingleString() throws Exception {
         Bean1421B<List<String>> a = MAPPER.readValue(q("test2"),
                 new TypeReference<Bean1421B<List<String>>>() {});
@@ -81,6 +90,7 @@ public class SingleValueAsArrayTest extends BaseMapTest
         assertEquals(expected, a.value);
     }
 
+    @Test
     public void testPrimitives() throws Exception {
         int[] i = MAPPER.readValue("16", int[].class);
         assertEquals(1, i.length);
@@ -96,6 +106,6 @@ public class SingleValueAsArrayTest extends BaseMapTest
 
         boolean[] b = MAPPER.readValue("true", boolean[].class);
         assertEquals(1, d.length);
-        assertEquals(true, b[0]);
+        assertTrue(b[0]);
     }
 }

@@ -1,18 +1,26 @@
 package tools.jackson.databind.deser.creators;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
 
-public class RequiredCreatorTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
+public class RequiredCreatorTest
 {
     static class FascistPoint {
-        int x, y;
+        Integer x, y;
 
         @JsonCreator
-        public FascistPoint(@JsonProperty(value="x", required=true) int x,
-                @JsonProperty(value="y", required=false) int y)
+        public FascistPoint(@JsonProperty(value="x", required=true) Integer x,
+                @JsonProperty(value="y", isRequired=OptBoolean.FALSE) Integer y)
         {
             this.x = x;
             this.y = y;
@@ -26,7 +34,7 @@ public class RequiredCreatorTest extends BaseMapTest
         private String userType;
 
         @JsonCreator
-        public LoginUserResponse(@JsonProperty(value = "otp", required = true) String otp,
+        public LoginUserResponse(@JsonProperty(value = "otp", isRequired = OptBoolean.TRUE) String otp,
                 @JsonProperty(value = "userType", required = true) String userType) {
             this.otp = otp;
             this.userType = userType;
@@ -58,6 +66,7 @@ public class RequiredCreatorTest extends BaseMapTest
     private final ObjectMapper MAPPER = newJsonMapper();
     private final ObjectReader POINT_READER = MAPPER.readerFor(FascistPoint.class);
 
+    @Test
     public void testRequiredAnnotatedParam() throws Exception
     {
         FascistPoint p;
@@ -73,7 +82,7 @@ public class RequiredCreatorTest extends BaseMapTest
         // also fine if 'y' is MIA
         p = POINT_READER.readValue(a2q("{'x':3}"));
         assertEquals(3, p.x);
-        assertEquals(0, p.y);
+        assertNull(p.y);
 
         // but not so good if 'x' missing
         try {
@@ -84,6 +93,7 @@ public class RequiredCreatorTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testRequiredGloballyParam() throws Exception
     {
         FascistPoint p;
@@ -91,7 +101,7 @@ public class RequiredCreatorTest extends BaseMapTest
         // as per above, ok to miss 'y' with default settings:
         p = POINT_READER.readValue(a2q("{'x':2}"));
         assertEquals(2, p.x);
-        assertEquals(0, p.y);
+        assertNull(p.y);
 
         // but not if global checks desired
         ObjectReader r = POINT_READER.with(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES);
@@ -104,6 +114,7 @@ public class RequiredCreatorTest extends BaseMapTest
     }
 
     // [databind#2591]
+    @Test
     public void testRequiredViaParameter2591() throws Exception
     {
         final String input = a2q("{'status':'OK', 'message':'Sent Successfully!'}");

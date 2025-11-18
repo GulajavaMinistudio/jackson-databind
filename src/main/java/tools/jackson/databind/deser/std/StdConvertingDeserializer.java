@@ -1,12 +1,16 @@
 package tools.jackson.databind.deser.std;
 
+import java.util.Collection;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.*;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.type.LogicalType;
+import tools.jackson.databind.util.AccessPattern;
 import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.Converter;
+import tools.jackson.databind.util.NameTransformer;
 
 /**
  * Deserializer implementation where given Java type is first deserialized
@@ -20,9 +24,9 @@ import tools.jackson.databind.util.Converter;
  * to do this will result in an exception.
  *<p>
  * Also note that in Jackson 2.x, this class was named {@code StdDelegatingDeserializer}
- * 
+ *
  * @param <T> Target type to convert to, from delegate type
- * 
+ *
  * @see StdNodeBasedDeserializer
  * @see Converter
  */
@@ -88,6 +92,22 @@ public class StdConvertingDeserializer<T>
         return new StdConvertingDeserializer<T>(converter, delegateType, delegateDeserializer);
     }
 
+    @Override
+    public ValueDeserializer<T> unwrappingDeserializer(DeserializationContext ctxt,
+            NameTransformer unwrapper) {
+        ClassUtil.verifyMustOverride(StdConvertingDeserializer.class, this, "unwrappingDeserializer");
+        return replaceDelegatee(_delegateDeserializer.unwrappingDeserializer(ctxt, unwrapper));
+    }
+
+    @Override
+    public ValueDeserializer<T> replaceDelegatee(ValueDeserializer<?> delegatee) {
+        ClassUtil.verifyMustOverride(StdConvertingDeserializer.class, this, "replaceDelegatee");
+        if (delegatee == _delegateDeserializer) {
+            return this;
+        }
+        return new StdConvertingDeserializer<T>(_converter, _delegateType, delegatee);
+    }
+
     /*
     /**********************************************************************
     /* Contextualization
@@ -124,41 +144,7 @@ public class StdConvertingDeserializer<T>
 
     /*
     /**********************************************************************
-    /* Accessors
-    /**********************************************************************
-     */
-
-    @Override
-    public ValueDeserializer<?> getDelegatee() {
-        return _delegateDeserializer;
-    }
-
-    @Override
-    public Class<?> handledType() {
-        return _delegateDeserializer.handledType();
-    }
-
-    /**
-     * Let's assume that as long as delegate is cachable, we are too.
-     */
-    @Override
-    public boolean isCachable() {
-        return (_delegateDeserializer != null) && _delegateDeserializer.isCachable();
-    }
-
-    @Override
-    public LogicalType logicalType() {
-        return _delegateDeserializer.logicalType();
-    }
-    
-    @Override
-    public Boolean supportsUpdate(DeserializationConfig config) {
-        return _delegateDeserializer.supportsUpdate(config);
-    }
-
-    /*
-    /**********************************************************************
-    /* Serialization
+    /* Deserialization
     /**********************************************************************
      */
 
@@ -169,7 +155,7 @@ public class StdConvertingDeserializer<T>
         if (delegateValue == null) {
             return null;
         }
-        return convertValue(delegateValue);
+        return convertValue(ctxt, delegateValue);
     }
 
     @Override
@@ -191,7 +177,7 @@ public class StdConvertingDeserializer<T>
         if (delegateValue == null) {
             return null;
         }
-        return convertValue(delegateValue);
+        return convertValue(ctxt, delegateValue);
     }
 
     @SuppressWarnings("unchecked")
@@ -203,6 +189,22 @@ public class StdConvertingDeserializer<T>
             return (T) _delegateDeserializer.deserialize(p, ctxt, intoValue);
         }
         return (T) _handleIncompatibleUpdateValue(p, ctxt, intoValue);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
+            TypeDeserializer typeDeserializer, T intoValue)
+        throws JacksonException
+    {
+        // 21-Jan-2023, tatu: Override was missing from 2.15. Tricky to
+        //    support but follow example of the other "deserializeWithType()"
+        //   It seems unlikely to actually work (isn't type check just... wrong?)
+        //   but for now has to do I guess.
+        if (!_delegateType.getRawClass().isAssignableFrom(intoValue.getClass())){
+            return (T) _handleIncompatibleUpdateValue(p, ctxt, intoValue);
+        }
+        return (T) _delegateDeserializer.deserialize(p, ctxt, intoValue);
     }
 
     /**
@@ -217,8 +219,82 @@ public class StdConvertingDeserializer<T>
         throws JacksonException
     {
         throw new UnsupportedOperationException(String.format
-                ("Cannot update object of type %s (using deserializer for type %s)"
-                        +intoValue.getClass().getName(), _delegateType));
+                ("Cannot update object of type %s (using deserializer for type %s)",
+                        intoValue.getClass().getName(), _delegateType));
+    }
+
+    /*
+    /**********************************************************************
+    /* Accessors
+    /**********************************************************************
+     */
+
+    @Override
+    public Class<?> handledType() {
+        return _delegateDeserializer.handledType();
+    }
+
+    @Override
+    public LogicalType logicalType() {
+        return _delegateDeserializer.logicalType();
+    }
+
+    // Let's assume we should be cachable if delegate is
+    @Override
+    public boolean isCachable() {
+        return (_delegateDeserializer != null) && _delegateDeserializer.isCachable();
+    }
+
+    @Override
+    public ValueDeserializer<?> getDelegatee() {
+        return _delegateDeserializer;
+    }
+
+    @Override
+    public Collection<Object> getKnownPropertyNames() {
+        return _delegateDeserializer.getKnownPropertyNames();
+    }
+
+    /*
+    /**********************************************************
+    /* Null/empty/absent accessors
+    /**********************************************************
+     */
+
+    @Override
+    public T getNullValue(DeserializationContext ctxt) {
+        return _convertIfNonNull(ctxt, _delegateDeserializer.getNullValue(ctxt));
+    }
+
+    @Override
+    public AccessPattern getNullAccessPattern() {
+        return _delegateDeserializer.getNullAccessPattern();
+    }
+
+    @Override
+    public Object getAbsentValue(DeserializationContext ctxt) {
+        return _convertIfNonNull(ctxt, _delegateDeserializer.getAbsentValue(ctxt));
+    }
+
+    @Override
+    public Object getEmptyValue(DeserializationContext ctxt) {
+        return _convertIfNonNull(ctxt, _delegateDeserializer.getEmptyValue(ctxt));
+    }
+
+    @Override
+    public AccessPattern getEmptyAccessPattern() {
+        return _delegateDeserializer.getEmptyAccessPattern();
+    }
+
+    /*
+    /**********************************************************
+    /* Other accessors
+    /**********************************************************
+     */
+
+    @Override
+    public Boolean supportsUpdate(DeserializationConfig config) {
+        return _delegateDeserializer.supportsUpdate(config);
     }
 
     /*
@@ -234,12 +310,24 @@ public class StdConvertingDeserializer<T>
      *<P>
      * The default implementation uses configured {@link Converter} to do
      * conversion.
-     * 
-     * @param delegateValue
-     * 
+     *
+     * @param ctxt Context for deserialization (needed for some conversions)
+     * @param delegateValue Value delegated
+     *
      * @return Result of conversion
      */
-    protected T convertValue(Object delegateValue) {
-        return _converter.convert(delegateValue);
+    protected T convertValue(DeserializationContext ctxt, Object delegateValue) {
+        return _converter.convert(ctxt, delegateValue);
+    }
+
+    /*
+    /**********************************************************************
+    /* Helper methods
+    /**********************************************************************
+     */
+
+    protected T _convertIfNonNull(DeserializationContext ctxt, Object delegateValue) {
+        return (delegateValue == null) ? null
+                : _converter.convert(ctxt, delegateValue);
     }
 }

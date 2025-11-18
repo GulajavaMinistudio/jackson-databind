@@ -2,22 +2,25 @@ package tools.jackson.databind.node;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Optional;
+import java.util.OptionalDouble;
 
 import tools.jackson.core.*;
 import tools.jackson.core.io.NumberOutput;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * {@code JsonNode} implementation for efficiently containing 32-bit
  * `float` values.
  */
-public class FloatNode extends NumericNode
+public class FloatNode
+    extends NumericFPNode
 {
     private static final long serialVersionUID = 3L;
 
     protected final float _value;
 
-    /* 
+    /*
     /**********************************************************************
     /* Construction
     /**********************************************************************
@@ -27,41 +30,32 @@ public class FloatNode extends NumericNode
 
     public static FloatNode valueOf(float v) { return new FloatNode(v); }
 
-    /* 
+    /*
     /**********************************************************************
-    /* BaseJsonNode extended API
+    /* Overridden JsonNode methods, simple properties
     /**********************************************************************
      */
-
-    @Override public JsonToken asToken() { return JsonToken.VALUE_NUMBER_FLOAT; }
 
     @Override
     public JsonParser.NumberType numberType() { return JsonParser.NumberType.FLOAT; }
 
-    /* 
+    @Override
+    public boolean isFloat() { return true; }
+
+    @Override
+    public boolean isNaN() {
+        return NumberOutput.notFinite(_value);
+    }
+
+    /*
     /**********************************************************************
-    /* Overrridden JsonNode methods
+    /* Overridden JsonNode methods, scalar access
     /**********************************************************************
      */
 
     @Override
-    public boolean isFloatingPointNumber() { return true; }
-
-    @Override
-    public boolean isFloat() { return true; }
-
-    @Override public boolean canConvertToInt() {
-        return (_value >= Integer.MIN_VALUE && _value <= Integer.MAX_VALUE);
-    }
-
-    @Override public boolean canConvertToLong() {
-        return (_value >= Long.MIN_VALUE && _value <= Long.MAX_VALUE);
-    }
-
-    @Override // since 2.12
-    public boolean canConvertToExactIntegral() {
-        return !Float.isNaN(_value) && !Float.isInfinite(_value)
-                && (_value == Math.round(_value));
+    protected String _asString() {
+        return String.valueOf(_value);
     }
 
     @Override
@@ -70,40 +64,122 @@ public class FloatNode extends NumericNode
     }
 
     @Override
-    public short shortValue() { return (short) _value; }
-
-    @Override
-    public int intValue() { return (int) _value; }
-
-    @Override
-    public long longValue() { return (long) _value; }
-
-    @Override
-    public float floatValue() { return _value; }
-
-    @Override
-    public double doubleValue() { return _value; }
-
-    @Override
-    public BigDecimal decimalValue() { return BigDecimal.valueOf(_value); }
-
-    @Override
-    public BigInteger bigIntegerValue() {
-        return decimalValue().toBigInteger();
+    public float floatValue() {
+        return _value;
     }
 
     @Override
-    public String asText() {
-        return String.valueOf(_value);
+    public float floatValue(float defaultValue) {
+        return _value;
     }
 
     @Override
-    public boolean isNaN() {
-        return NumberOutput.notFinite(_value);
+    public Optional<Float> floatValueOpt() {
+        return Optional.of(_value);
     }
 
     @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
+    public float asFloat() {
+        return _value;
+    }
+
+    @Override
+    public float asFloat(float defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public Optional<Float> asFloatOpt() {
+        return Optional.of(_value);
+    }
+
+    @Override
+    public double doubleValue() {
+        return _value;
+    }
+
+    @Override
+    public double doubleValue(double defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public OptionalDouble doubleValueOpt() {
+        return OptionalDouble.of(_value);
+    }
+
+    @Override
+    public double asDouble() {
+        return _value;
+    }
+
+    @Override
+    public double asDouble(double defaultValue) {
+        return _value;
+    }
+
+    @Override
+    public OptionalDouble asDoubleOpt() {
+        return OptionalDouble.of(_value);
+    }
+
+    /*
+    /**********************************************************************
+    /* NumericFPNode abstract method impls
+    /**********************************************************************
+     */
+
+    @Override
+    public short _asShortValueUnchecked() {
+        return (short) _value;
+    }
+
+    @Override
+    public int _asIntValueUnchecked() {
+        return (int) _value;
+    }
+    
+    @Override
+    public long _asLongValueUnchecked() {
+        return (long) _value;
+    }
+
+    @Override
+    protected BigInteger _asBigIntegerValueUnchecked() {
+        return BigDecimal.valueOf(_value).toBigInteger();
+    }
+
+    @Override
+    protected BigDecimal _asDecimalValueUnchecked() {
+        return BigDecimal.valueOf(_value);
+    }
+
+    @Override
+    public boolean hasFractionalPart() { return _value != Math.round(_value); }
+
+    @Override
+    public boolean inShortRange() {
+        return !isNaN() && (_value >= Short.MIN_VALUE) && (_value <= Short.MAX_VALUE);
+    }
+
+    @Override
+    public boolean inIntRange() {
+        return !isNaN() && (_value >= Integer.MIN_VALUE) && (_value <= Integer.MAX_VALUE);
+    }
+
+    @Override
+    public boolean inLongRange() {
+        return !isNaN() && (_value >= Long.MIN_VALUE) && (_value <= Long.MAX_VALUE);
+    }
+
+    /*
+    /**********************************************************************
+    /* Overrides, other
+    /**********************************************************************
+     */
+    
+    @Override
+    public final void serialize(JsonGenerator g, SerializationContext provider)
             throws JacksonException {
         g.writeNumber(_value);
     }

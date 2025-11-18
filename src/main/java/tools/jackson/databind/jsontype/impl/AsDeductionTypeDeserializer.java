@@ -39,7 +39,7 @@ public class AsDeductionTypeDeserializer extends AsPropertyTypeDeserializer
             JavaType bt, TypeIdResolver idRes, JavaType defaultImpl,
             Collection<NamedType> subtypes)
     {
-        super(bt, idRes, null, false, defaultImpl, null);
+        super(bt, idRes, null, false, defaultImpl, null, true);
         propertyBitIndex = new HashMap<>();
         subtypeFingerprints = buildFingerprints(ctxt, subtypes);
     }
@@ -71,11 +71,25 @@ public class AsDeductionTypeDeserializer extends AsPropertyTypeDeserializer
             BitSet fingerprint = new BitSet(nextProperty + properties.size());
             for (BeanPropertyDefinition property : properties) {
                 String name = property.getName();
-                if (ignoreCase) name = name.toLowerCase();
+                if (ignoreCase) {
+                    name = name.toLowerCase();
+                }
                 Integer bitIndex = propertyBitIndex.get(name);
                 if (bitIndex == null) {
                     bitIndex = nextProperty;
                     propertyBitIndex.put(name, nextProperty++);
+                }
+                // [databind#4327] 2.17 @JsonAlias should be respected by polymorphic deduction
+                for (PropertyName alias : property.findAliases()) {
+                    String simpleName = alias.getSimpleName();
+                    if (ignoreCase) {
+                        simpleName = simpleName.toLowerCase();
+                    }
+                    // but do not override entries (in case alias overlaps a regular name;
+                    // is this even legal?)
+                    if (!propertyBitIndex.containsKey(simpleName)) {
+                        propertyBitIndex.put(simpleName, bitIndex);
+                    }
                 }
                 fingerprint.set(bitIndex);
             }

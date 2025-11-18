@@ -1,14 +1,17 @@
 package tools.jackson.databind.struct;
 
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
-import tools.jackson.databind.BaseMapTest;
-import tools.jackson.databind.MapperFeature;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestUnwrappedWithPrefix extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestUnwrappedWithPrefix extends DatabindTestUtil
 {
     static class Unwrapping {
         public String name;
@@ -16,7 +19,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         public Location location;
 
         public Unwrapping() { }
-        public Unwrapping(String str, int x, int y) {
+        protected Unwrapping(String str, int x, int y) {
             name = str;
             location = new Location(x, y);
         }
@@ -28,7 +31,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         public Unwrapping unwrapped;
 
         public DeepUnwrapping() { }
-        public DeepUnwrapping(String str, int x, int y) {
+        protected DeepUnwrapping(String str, int x, int y) {
             unwrapped = new Unwrapping(str, x, y);
         }
     }
@@ -38,7 +41,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         public int y;
 
         public Location() { }
-        public Location(int x, int y) {
+        protected Location(int x, int y) {
             this.x = x;
             this.y = y;
         }
@@ -52,19 +55,19 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         public Location location;
 
         public PrefixUnwrap() { }
-        public PrefixUnwrap(String str, int x, int y) {
+        protected PrefixUnwrap(String str, int x, int y) {
             name = str;
             location = new Location(x, y);
         }
     }
-    
+
     static class DeepPrefixUnwrap
     {
         @JsonUnwrapped(prefix="u.")
         public PrefixUnwrap unwrapped;
 
         public DeepPrefixUnwrap() { }
-        public DeepPrefixUnwrap(String str, int x, int y) {
+        protected DeepPrefixUnwrap(String str, int x, int y) {
             unwrapped = new PrefixUnwrap(str, x, y);
         }
     }
@@ -75,12 +78,12 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     {
         @JsonUnwrapped(prefix="general.")
         public ConfigGeneral general = new ConfigGeneral();
-        
+
         @JsonUnwrapped(prefix="misc.")
         public ConfigMisc misc = new ConfigMisc();
 
         public ConfigRoot() { }
-        public ConfigRoot(String name, int value)
+        protected ConfigRoot(String name, int value)
         {
             general = new ConfigGeneral(name);
             misc.value = value;
@@ -91,14 +94,14 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     {
         @JsonUnwrapped
         public ConfigGeneral general = new ConfigGeneral();
-        
+
         @JsonUnwrapped(prefix="misc.")
         public ConfigMisc misc = new ConfigMisc();
 
         public int id;
-        
+
         public ConfigAlternate() { }
-        public ConfigAlternate(int id, String name, int value)
+        protected ConfigAlternate(int id, String name, int value)
         {
             this.id = id;
             general = new ConfigGeneral(name);
@@ -110,9 +113,9 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     {
         @JsonUnwrapped(prefix="names.")
         public ConfigNames names = new ConfigNames();
-        
+
         public ConfigGeneral() { }
-        public ConfigGeneral(String name) {
+        protected ConfigGeneral(String name) {
             names.name = name;
         }
     }
@@ -148,8 +151,9 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testPrefixedUnwrappingSerialize() throws Exception
     {
         JsonMapper mapper = JsonMapper.builder().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).build();
@@ -157,6 +161,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
                 mapper.writeValueAsString(new PrefixUnwrap("Tatu", 1, 2)));
     }
 
+    @Test
     public void testDeepPrefixedUnwrappingSerialize() throws Exception
     {
         JsonMapper mapper = JsonMapper.builder().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).build();
@@ -164,6 +169,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         assertEquals("{\"u._x\":1,\"u._y\":1,\"u.name\":\"Bubba\"}", json);
     }
 
+    @Test
     public void testHierarchicConfigSerialize() throws Exception
     {
         String json = MAPPER.writeValueAsString(new ConfigRoot("Fred", 25));
@@ -176,6 +182,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testPrefixedUnwrapDeserialize() throws Exception
     {
         PrefixUnwrap bean = MAPPER.readValue("{\"name\":\"Axel\",\"_x\":4,\"_y\":7}", PrefixUnwrap.class);
@@ -185,7 +192,8 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         assertEquals(4, bean.location.x);
         assertEquals(7, bean.location.y);
     }
-    
+
+    @Test
     public void testDeepPrefixedUnwrapDeserialize() throws Exception
     {
         DeepPrefixUnwrap bean = MAPPER.readValue("{\"u.name\":\"Bubba\",\"u._x\":2,\"u._y\":3}",
@@ -196,7 +204,8 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         assertEquals(3, bean.unwrapped.location.y);
         assertEquals("Bubba", bean.unwrapped.name);
     }
-    
+
+    @Test
     public void testHierarchicConfigDeserialize() throws Exception
     {
         ConfigRoot root = MAPPER.readValue("{\"general.names.name\":\"Bob\",\"misc.value\":3}",
@@ -214,6 +223,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testHierarchicConfigRoundTrip() throws Exception
     {
         ConfigAlternate input = new ConfigAlternate(123, "Joe", 42);
@@ -228,6 +238,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
         assertEquals(42, root.misc.value);
     }
 
+    @Test
     public void testIssue226() throws Exception
     {
         Parent input = new Parent();
@@ -246,7 +257,7 @@ public class TestUnwrappedWithPrefix extends BaseMapTest
 
         assertNotNull(output.c1.sc1);
         assertNotNull(output.c2.sc1);
-        
+
         assertEquals("a", output.c1.sc1.value);
         assertEquals("b", output.c2.sc1.value);
     }

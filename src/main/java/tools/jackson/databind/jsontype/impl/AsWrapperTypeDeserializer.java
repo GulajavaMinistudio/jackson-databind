@@ -28,12 +28,12 @@ public class AsWrapperTypeDeserializer
     protected AsWrapperTypeDeserializer(AsWrapperTypeDeserializer src, BeanProperty property) {
         super(src, property);
     }
-    
+
     @Override
     public TypeDeserializer forProperty(BeanProperty prop) {
         return (prop == _property) ? this : new AsWrapperTypeDeserializer(this, prop);
     }
-    
+
     @Override
     public As getTypeInclusion() { return As.WRAPPER_OBJECT; }
 
@@ -43,7 +43,7 @@ public class AsWrapperTypeDeserializer
     @Override
     public Object deserializeTypedFromObject(JsonParser jp, DeserializationContext ctxt) throws JacksonException {
         return _deserialize(jp, ctxt);
-    }    
+    }
 
     @Override
     public Object deserializeTypedFromArray(JsonParser jp, DeserializationContext ctxt) throws JacksonException {
@@ -59,7 +59,7 @@ public class AsWrapperTypeDeserializer
     public Object deserializeTypedFromAny(JsonParser jp, DeserializationContext ctxt) throws JacksonException {
         return _deserialize(jp, ctxt);
     }
-    
+
     /*
     /***************************************************************
     /* Internal methods
@@ -94,7 +94,7 @@ public class AsWrapperTypeDeserializer
             ctxt.reportWrongTokenException(baseType(), JsonToken.START_OBJECT,
                     "need JSON Object to contain As.WRAPPER_OBJECT type information for class "+baseTypeName());
         }
-        final String typeId = p.getText();
+        final String typeId = p.getString();
         ValueDeserializer<Object> deser = _findDeserializer(ctxt, typeId);
         p.nextToken();
 

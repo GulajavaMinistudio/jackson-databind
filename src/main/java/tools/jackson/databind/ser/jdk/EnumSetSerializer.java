@@ -19,22 +19,22 @@ public class EnumSetSerializer
             Boolean unwrapSingle, BeanProperty property) {
         super(src, vts, valueSerializer, unwrapSingle, property);
     }
-    
+
     @Override
     protected EnumSetSerializer _withValueTypeSerializer(TypeSerializer vts) {
-        // no typing for enums (always "hard" type)
+        // no typing for enum elements (always strongly typed), so don't change
         return this;
     }
 
     @Override
-    public EnumSetSerializer withResolved(BeanProperty property,
+    protected EnumSetSerializer withResolved(BeanProperty property,
             TypeSerializer vts, ValueSerializer<?> elementSerializer,
             Boolean unwrapSingle) {
         return new EnumSetSerializer(this, vts, elementSerializer, unwrapSingle, property);
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider prov, EnumSet<? extends Enum<?>> value) {
+    public boolean isEmpty(SerializationContext prov, EnumSet<? extends Enum<?>> value) {
         return value.isEmpty();
     }
 
@@ -45,7 +45,8 @@ public class EnumSetSerializer
 
     @Override
     public final void serialize(EnumSet<? extends Enum<?>> value, JsonGenerator gen,
-            SerializerProvider provider) throws JacksonException
+            SerializationContext provider)
+        throws JacksonException
     {
         final int len = value.size();
         if (len == 1) {
@@ -60,12 +61,13 @@ public class EnumSetSerializer
         serializeContents(value, gen, provider);
         gen.writeEndArray();
     }
-    
+
     @Override
     public void serializeContents(EnumSet<? extends Enum<?>> value, JsonGenerator gen,
-            SerializerProvider ctxt)
+            SerializationContext ctxt)
         throws JacksonException
     {
+        gen.assignCurrentValue(value);
         ValueSerializer<Object> enumSer = _elementSerializer;
         // Need to dynamically find instance serializer; unfortunately that seems
         // to be the only way to figure out type (no accessors to the enum class that set knows)

@@ -19,6 +19,8 @@ import tools.jackson.databind.ser.jdk.DateTimeSerializerBase;
 public class JavaSqlDateSerializer
     extends DateTimeSerializerBase<java.sql.Date>
 {
+    public static final JavaSqlDateSerializer instance = new JavaSqlDateSerializer();
+
     public JavaSqlDateSerializer() {
         // 11-Oct-2016, tatu: As per [databind#219] fixed for 2.9; was passing `false` prior
         this(null, null);
@@ -37,9 +39,9 @@ public class JavaSqlDateSerializer
     protected long _timestamp(java.sql.Date value) {
         return (value == null) ? 0L : value.getTime();
     }
-    
+
     @Override
-    public void serialize(java.sql.Date value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(java.sql.Date value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         if (_asTimestamp(provider)) {

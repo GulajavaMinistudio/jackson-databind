@@ -3,7 +3,6 @@ package tools.jackson.databind.deser.impl;
 import java.util.*;
 
 import tools.jackson.core.*;
-
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.bean.BeanPropertyMap;
@@ -16,7 +15,7 @@ import tools.jackson.databind.util.TokenBuffer;
  * Helper class that is used to flatten JSON structure when using
  * "external type id" (see {@link com.fasterxml.jackson.annotation.JsonTypeInfo.As#EXTERNAL_PROPERTY}).
  * This is needed to store temporary state and buffer tokens, as the structure is
- * rearranged a bit so that actual type deserializer can resolve type and 
+ * rearranged a bit so that actual type deserializer can resolve type and
  * finalize deserialization.
  */
 public class ExternalTypeHandler
@@ -86,7 +85,7 @@ public class ExternalTypeHandler
         if (ob == null) {
             return false;
         }
-        final String typeId = p.getText();
+        final String typeId = p.getString();
         // 28-Nov-2016, tatu: For [databind#291], need separate handling
         if (ob instanceof List<?>) {
             boolean result = false;
@@ -110,7 +109,7 @@ public class ExternalTypeHandler
         if (!prop.hasTypePropertyName(propName)) { // when could/should this ever happen?
             return false;
         }
-        // note: can NOT skip child values (should always be String anyway)
+        // note: CANNOT skip child values (should always be String anyway)
         boolean canDeserialize = (bean != null) && (_tokens[index] != null);
         // Minor optimization: deserialize properties as soon as we have all we need:
         if (canDeserialize) {
@@ -128,7 +127,7 @@ public class ExternalTypeHandler
      * at point where parser points to the first token of the value.
      * Handling can mean either resolving type id it contains (if it matches type
      * property name), or by buffering the value for further use.
-     * 
+     *
      * @return True, if the given property was properly handled
      */
     @SuppressWarnings("unchecked")
@@ -148,7 +147,7 @@ public class ExternalTypeHandler
             // For now, let's assume it's same type (either type id OR value)
             // for all mappings, so we'll only check first one
             if (prop.hasTypePropertyName(propName)) {
-                String typeId = p.getText();
+                String typeId = p.getString();
                 p.skipChildren();
                 _typeIds[index] = typeId;
                 while (it.hasNext()) {
@@ -220,7 +219,7 @@ public class ExternalTypeHandler
                     SettableBeanProperty prop = extProp.getProperty();
                     Object result = TypeDeserializer.deserializeIfNatural(buffered, ctxt, prop.getType());
                     if (result != null) {
-                        prop.set(bean, result);
+                        prop.set(ctxt, bean, result);
                         continue;
                     }
                 }
@@ -319,7 +318,7 @@ public class ExternalTypeHandler
                     } else {
                         TokenBuffer tb = ctxt.bufferForInputBuffering(p);
                         tb.writeString(typeId);
-                        v = typeProp.getValueDeserializer().deserialize(tb.asParserOnFirstToken(), ctxt);
+                        v = typeProp.getValueDeserializer().deserialize(tb.asParserOnFirstToken(ctxt), ctxt);
                         tb.close();
                     }
                     buffer.assignParameter(typeProp, v);
@@ -331,7 +330,7 @@ public class ExternalTypeHandler
         for (int i = 0; i < len; ++i) {
             SettableBeanProperty prop = _properties[i].getProperty();
             if (prop.getCreatorIndex() < 0) {
-                prop.set(bean, values[i]);
+                prop.set(ctxt, bean, values[i]);
             }
         }
         return bean;
@@ -391,7 +390,7 @@ public class ExternalTypeHandler
         JsonToken t = p2.nextToken();
         // 29-Sep-2015, tatu: As per [databind#942], nulls need special support
         if (t == JsonToken.VALUE_NULL) {
-            _properties[index].getProperty().set(bean, null);
+            _properties[index].getProperty().set(ctxt, bean, null);
             return;
         }
         TokenBuffer merged = ctxt.bufferForInputBuffering(p);
@@ -411,7 +410,7 @@ public class ExternalTypeHandler
     /* Helper classes
     /**********************************************************
      */
-    
+
     public static class Builder
     {
         private final JavaType _beanType;
@@ -446,7 +445,7 @@ public class ExternalTypeHandler
                 _nameToPropertyIndex.put(name, list);
             }
         }
-        
+
         /**
          * Method called after all external properties have been assigned, to further
          * link property with polymorphic value with possible property for type id

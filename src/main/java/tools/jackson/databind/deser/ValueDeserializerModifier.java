@@ -1,5 +1,6 @@
 package tools.jackson.databind.deser;
 
+import java.io.Serializable;
 import java.util.List;
 
 import tools.jackson.databind.*;
@@ -47,19 +48,22 @@ import tools.jackson.databind.type.ReferenceType;
  * NOTE: In Jackson 2.x was named {@code BeanDeserializerModifier}
  */
 public abstract class ValueDeserializerModifier
+    implements Serializable
 {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Method called by {@link BeanDeserializerFactory} when it has collected
      * initial list of {@link BeanPropertyDefinition}s, and done basic by-name
      * and by-type filtering, but before constructing builder or actual
      * property handlers; or arranging order.
-     * 
+     *
      * The most common changes to make at this point are to completely remove
      * specified properties, or rename then: other modifications are easier
      * to make at later points.
      */
     public List<BeanPropertyDefinition> updateProperties(DeserializationConfig config,
-            BeanDescription beanDesc, List<BeanPropertyDefinition> propDefs) {
+            BeanDescription.Supplier beanDescRef, List<BeanPropertyDefinition> propDefs) {
         return propDefs;
     }
 
@@ -72,7 +76,7 @@ public abstract class ValueDeserializerModifier
      * deserializer). Typically changes mostly concern set of properties to deserialize.
      */
     public BeanDeserializerBuilder updateBuilder(DeserializationConfig config,
-            BeanDescription beanDesc, BeanDeserializerBuilder builder) {
+            BeanDescription.Supplier beanDescRef, BeanDeserializerBuilder builder) {
         return builder;
     }
 
@@ -89,7 +93,7 @@ public abstract class ValueDeserializerModifier
      * node type)
      */
     public ValueDeserializer<?> modifyDeserializer(DeserializationConfig config,
-            BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -104,7 +108,7 @@ public abstract class ValueDeserializerModifier
      * enum type deserializer instance.
      */
     public ValueDeserializer<?> modifyEnumDeserializer(DeserializationConfig config,
-            JavaType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            JavaType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -113,7 +117,7 @@ public abstract class ValueDeserializerModifier
      * {@link ReferenceType} deserializer instance.
      */
     public ValueDeserializer<?> modifyReferenceDeserializer(DeserializationConfig config,
-            ReferenceType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            ReferenceType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -123,17 +127,17 @@ public abstract class ValueDeserializerModifier
      * {@link ArrayType}
      * to make it possible to either replace or augment this deserializer with
      * additional functionality.
-     * 
+     *
      * @param config Configuration in use
      * @param valueType Type of the value deserializer is used for.
-     * @param beanDesc Description f
+     * @param beanDescRef Description of the type to deserialize
      * @param deserializer Default deserializer that would be used.
-     * 
+     *
      * @return Deserializer to use; either <code>deserializer</code> that was passed
      *   in, or an instance method constructed.
      */
     public ValueDeserializer<?> modifyArrayDeserializer(DeserializationConfig config,
-            ArrayType valueType, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            ArrayType valueType, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -142,7 +146,7 @@ public abstract class ValueDeserializerModifier
      * {@link CollectionType} deserializer instance.
      */
     public ValueDeserializer<?> modifyCollectionDeserializer(DeserializationConfig config,
-            CollectionType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            CollectionType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -151,7 +155,7 @@ public abstract class ValueDeserializerModifier
      * {@link CollectionLikeType} deserializer instance.
      */
     public ValueDeserializer<?> modifyCollectionLikeDeserializer(DeserializationConfig config,
-            CollectionLikeType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            CollectionLikeType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -160,7 +164,7 @@ public abstract class ValueDeserializerModifier
      * {@link MapType} deserializer instance.
      */
     public ValueDeserializer<?> modifyMapDeserializer(DeserializationConfig config,
-            MapType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            MapType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 
@@ -169,7 +173,7 @@ public abstract class ValueDeserializerModifier
      * {@link MapLikeType} deserializer instance.
      */
     public ValueDeserializer<?> modifyMapLikeDeserializer(DeserializationConfig config,
-            MapLikeType type, BeanDescription beanDesc, ValueDeserializer<?> deserializer) {
+            MapLikeType type, BeanDescription.Supplier beanDescRef, ValueDeserializer<?> deserializer) {
         return deserializer;
     }
 

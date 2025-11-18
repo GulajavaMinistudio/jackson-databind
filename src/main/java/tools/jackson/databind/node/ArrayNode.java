@@ -3,13 +3,14 @@ package tools.jackson.databind.node;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import tools.jackson.core.*;
 import tools.jackson.core.tree.ArrayTreeNode;
 import tools.jackson.core.type.WritableTypeId;
-
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.jsontype.TypeSerializer;
 import tools.jackson.databind.util.RawValue;
@@ -26,33 +27,49 @@ public class ArrayNode
 
     private final List<JsonNode> _children;
 
+    /*
+    /**********************************************************************
+    /* Construction
+    /**********************************************************************
+     */
+    
     public ArrayNode(JsonNodeFactory nf) {
         super(nf);
-        _children = new ArrayList<JsonNode>();
+        _children = new ArrayList<>();
     }
 
     public ArrayNode(JsonNodeFactory nf, int capacity) {
         super(nf);
-        _children = new ArrayList<JsonNode>(capacity);
+        _children = new ArrayList<>(capacity);
     }
 
     public ArrayNode(JsonNodeFactory nf, List<JsonNode> children) {
         super(nf);
-        _children = children;
+        _children = Objects.requireNonNull(children,
+                "Must not pass `null` for 'children' argument");
     }
+
+    /*
+    /**********************************************************************
+    /* Overridden JsonNode methods
+    /**********************************************************************
+     */
 
     @Override
     protected JsonNode _at(JsonPointer ptr) {
         return get(ptr.getMatchingIndex());
     }
 
+    @Override
+    protected String _valueDesc() {
+        return "[...(" + _children.size() + " elements)]";
+    }
+    
     // note: co-variant to allow caller-side type safety
-    @SuppressWarnings("unchecked")
     @Override
     public ArrayNode deepCopy()
     {
-        ArrayNode ret = new ArrayNode(_nodeFactory);
-
+        ArrayNode ret = arrayNode(_children.size());
         for (JsonNode element: _children)
             ret._children.add(element.deepCopy());
 
@@ -160,9 +177,9 @@ public class ArrayNode
             _withXxxSetArrayElement(index, next);
             return next._withArrayAddTailElement(tail, preferIndex);
         }
-        ArrayNode next = this.arrayNode();
+        ObjectNode next = this.objectNode();
         _withXxxSetArrayElement(index, next);
-        return next._withArrayAddTailElement(tail, preferIndex);
+        return next._withArrayAddTailProperty(tail, preferIndex);
     }
 
     protected void _withXxxSetArrayElement(int index, JsonNode value) {
@@ -188,7 +205,7 @@ public class ArrayNode
      */
 
     @Override
-    public boolean isEmpty(SerializerProvider serializers) {
+    public boolean isEmpty(SerializationContext serializers) {
         return _children.isEmpty();
     }
 
@@ -219,11 +236,6 @@ public class ArrayNode
     public boolean isEmpty() { return _children.isEmpty(); }
 
     @Override
-    public Iterator<JsonNode> elements() {
-        return _children.iterator();
-    }
-
-    @Override
     public JsonNode get(int index) {
         if ((index >= 0) && (index < _children.size())) {
             return _children.get(index);
@@ -232,10 +244,15 @@ public class ArrayNode
     }
 
     @Override
-    public JsonNode get(String fieldName) { return null; }
+    public JsonNode get(String propertyName) { return null; }
 
     @Override
-    public JsonNode path(String fieldName) { return MissingNode.getInstance(); }
+    public Optional<JsonNode> optional(int index) {
+        return Optional.ofNullable(get(index));
+    }
+
+    @Override
+    public JsonNode path(String propertyName) { return MissingNode.getInstance(); }
 
     @Override
     public JsonNode path(int index) {
@@ -252,6 +269,28 @@ public class ArrayNode
         }
         return _reportRequiredViolation("No value at index #%d [0, %d) of `ArrayNode`",
                 index, _children.size());
+    }
+
+    /**
+     * {@inheritDoc}
+     *<p>
+     * NOTE: this returns the live <code>List</code> and not a copy.
+     */
+    @Override
+    public Collection<JsonNode> values() {
+        return _children;
+    }
+    
+    @Override
+    public Stream<JsonNode> valueStream() {
+        return _children.stream();
+    }
+
+    /**
+     * Alias of {@link #values()}.
+     */
+    public Collection<JsonNode> elements() {
+        return values();
     }
 
     @Override
@@ -282,7 +321,7 @@ public class ArrayNode
      */
 
     @Override
-    public void serialize(JsonGenerator g, SerializerProvider provider)
+    public void serialize(JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         final List<JsonNode> c = _children;
@@ -295,7 +334,7 @@ public class ArrayNode
     }
 
     @Override
-    public void serializeWithType(JsonGenerator g, SerializerProvider ctxt, TypeSerializer typeSer)
+    public void serializeWithType(JsonGenerator g, SerializationContext ctxt, TypeSerializer typeSer)
         throws JacksonException
     {
         WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
@@ -313,10 +352,10 @@ public class ArrayNode
      */
 
     @Override
-    public JsonNode findValue(String fieldName)
+    public JsonNode findValue(String propertyName)
     {
         for (JsonNode node : _children) {
-            JsonNode value = node.findValue(fieldName);
+            JsonNode value = node.findValue(propertyName);
             if (value != null) {
                 return value;
             }
@@ -325,28 +364,28 @@ public class ArrayNode
     }
 
     @Override
-    public List<JsonNode> findValues(String fieldName, List<JsonNode> foundSoFar)
+    public List<JsonNode> findValues(String propertyName, List<JsonNode> foundSoFar)
     {
         for (JsonNode node : _children) {
-            foundSoFar = node.findValues(fieldName, foundSoFar);
+            foundSoFar = node.findValues(propertyName, foundSoFar);
         }
         return foundSoFar;
     }
 
     @Override
-    public List<String> findValuesAsText(String fieldName, List<String> foundSoFar)
+    public List<String> findValuesAsString(String propertyName, List<String> foundSoFar)
     {
         for (JsonNode node : _children) {
-            foundSoFar = node.findValuesAsText(fieldName, foundSoFar);
+            foundSoFar = node.findValuesAsString(propertyName, foundSoFar);
         }
         return foundSoFar;
     }
 
     @Override
-    public ObjectNode findParent(String fieldName)
+    public ObjectNode findParent(String propertyName)
     {
         for (JsonNode node : _children) {
-            JsonNode parent = node.findParent(fieldName);
+            JsonNode parent = node.findParent(propertyName);
             if (parent != null) {
                 return (ObjectNode) parent;
             }
@@ -355,10 +394,10 @@ public class ArrayNode
     }
 
     @Override
-    public List<JsonNode> findParents(String fieldName, List<JsonNode> foundSoFar)
+    public List<JsonNode> findParents(String propertyName, List<JsonNode> foundSoFar)
     {
         for (JsonNode node : _children) {
-            foundSoFar = node.findParents(fieldName, foundSoFar);
+            foundSoFar = node.findParents(propertyName, foundSoFar);
         }
         return foundSoFar;
     }
@@ -415,7 +454,7 @@ public class ArrayNode
         }
         return _children.set(index, value);
     }
-    
+
     /**
      * Method for adding specified node at the end of this array.
      *
@@ -505,6 +544,12 @@ public class ArrayNode
         return this;
     }
 
+    @Override
+    public ArrayNode removeIf(Predicate<? super JsonNode> predicate) {
+        _children.removeIf(predicate);
+        return this;
+    }
+    
     /*
     /**********************************************************************
     /* Extended ArrayNode API, mutators, generic; addXxx()/insertXxx()/setXxx()
@@ -684,7 +729,7 @@ public class ArrayNode
      * @return This array node, to allow chaining
      */
     public ArrayNode add(String v) {
-        return _add((v == null) ? nullNode() : textNode(v));
+        return _add((v == null) ? nullNode() : stringNode(v));
     }
 
     /**
@@ -905,7 +950,7 @@ public class ArrayNode
      * @return This array node, to allow chaining
      */
     public ArrayNode insert(int index, String v) {
-        return _insert(index, (v == null) ? nullNode() : textNode(v));
+        return _insert(index, (v == null) ? nullNode() : stringNode(v));
     }
 
     /**
@@ -1076,7 +1121,7 @@ public class ArrayNode
      * @return This node (to allow chaining)
      */
     public ArrayNode set(int index, String v) {
-        return _set(index, (v == null) ? nullNode() : textNode(v));
+        return _set(index, (v == null) ? nullNode() : stringNode(v));
     }
 
     /**

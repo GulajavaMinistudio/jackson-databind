@@ -42,7 +42,7 @@ final class AnnotatedCreatorCollector
     }
 
     public static Creators collectCreators(MapperConfig<?> config,
-            TypeResolutionContext tc, 
+            TypeResolutionContext tc,
             JavaType type, Class<?> primaryMixIn, boolean collectAnnotations)
     {
         // 30-Sep-2020, tatu: [databind#2795] Even if annotations not otherwise
@@ -65,25 +65,18 @@ final class AnnotatedCreatorCollector
         /* And then... let's remove all constructors that are deemed
          * ignorable after all annotations have been properly collapsed.
          */
+
         // AnnotationIntrospector is null if annotations not enabled; if so, can skip:
         if (_collectAnnotations) {
-            if (_defaultConstructor != null) {
-                if (_intr.hasIgnoreMarker(_config, _defaultConstructor)) {
-                    _defaultConstructor = null;
-                }
+            if (_defaultConstructor != null && _intr.hasIgnoreMarker(_config, _defaultConstructor)) {
+                _defaultConstructor = null;
             }
-            // count down to allow safe removal
-            for (int i = constructors.size(); --i >= 0; ) {
-                if (_intr.hasIgnoreMarker(_config, constructors.get(i))) {
-                    constructors.remove(i);
-                }
-            }
-            for (int i = factories.size(); --i >= 0; ) {
-                if (_intr.hasIgnoreMarker(_config, factories.get(i))) {
-                    factories.remove(i);
-                }
-            }
+            constructors.removeIf(constructor ->
+                    _intr.hasIgnoreMarker(_config, constructor));
+            factories.removeIf(factory ->
+                    _intr.hasIgnoreMarker(_config, factory));
         }
+
         return new AnnotatedClass.Creators(_defaultConstructor, constructors, factories);
     }
 
@@ -124,7 +117,7 @@ final class AnnotatedCreatorCollector
         if (ctors == null) {
             result = Collections.emptyList();
             // Nothing found? Short-circuit
-            if (defaultCtor == null) { 
+            if (defaultCtor == null) {
                 return result;
             }
             ctorCount = 0;
@@ -155,7 +148,7 @@ final class AnnotatedCreatorCollector
                         }
                     }
                     MemberKey key = new MemberKey(mixinCtor.getConstructor());
-    
+
                     for (int i = 0; i < ctorCount; ++i) {
                         if (key.equals(ctorKeys[i])) {
                             result.set(i,
@@ -211,7 +204,7 @@ final class AnnotatedCreatorCollector
         // 27-Oct-2020, tatu: SIGH. As per [databind#2894] there is widespread use of
         //   incorrect bindings in the wild -- not supported (no tests) but used
         //   nonetheless. So, for 2.11.x, put back "Bad Bindings"...
-//        
+//
 
         // 03-Nov-2020, ckozak: Implement generic JsonCreator TypeVariable handling [databind#2895]
 //        final TypeResolutionContext emptyTypeResCtxt = new TypeResolutionContext.Empty(_config.getTypeFactory());
@@ -269,10 +262,12 @@ final class AnnotatedCreatorCollector
 
     private static boolean _isIncludableFactoryMethod(Method m)
     {
-        return Modifier.isStatic(m.getModifiers())
-                // 09-Nov-2020, ckozak: Avoid considering synthetic methods such as
-                // lambdas used within methods because they're not relevant.
-                && !m.isSynthetic();
+        if (!Modifier.isStatic(m.getModifiers())) {
+            return false;
+        }
+        // 09-Nov-2020, ckozak: Avoid considering synthetic methods such as
+        // lambdas used within methods because they're not relevant.
+        return !m.isSynthetic();
     }
 
     protected AnnotatedConstructor constructDefaultConstructor(ClassUtil.Ctor ctor,
@@ -288,7 +283,7 @@ final class AnnotatedCreatorCollector
             ClassUtil.Ctor mixin)
     {
         final int paramCount = ctor.getParamCount();
-        if (_intr == null) { // when annotation processing is disabled
+        if (!_collectAnnotations) { // when annotation processing is disabled
             return new AnnotatedConstructor(_typeContext, ctor.getConstructor(),
                     _emptyAnnotationMap(), _emptyAnnotationMaps(paramCount));
         }
@@ -345,7 +340,7 @@ ctor.getDeclaringClass().getName(), paramCount, paramAnns.length));
             TypeResolutionContext typeResCtxt, Method mixin)
     {
         final int paramCount = m.getParameterCount();
-        if (_intr == null) { // when annotation processing is disabled
+        if (!_collectAnnotations) { // when annotation processing is disabled
             return new AnnotatedMethod(typeResCtxt, m, _emptyAnnotationMap(),
                     _emptyAnnotationMaps(paramCount));
         }

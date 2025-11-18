@@ -1,13 +1,17 @@
 package tools.jackson.databind.type;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
 
-public class LocalTypeTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class LocalTypeTest
 {
     // [databind#609]
     static class EntityContainer {
         RuleForm entity;
-        
+
         @SuppressWarnings("unchecked")
         public <T extends RuleForm> T getEntity() { return (T) entity; }
         public <T extends RuleForm> void setEntity(T e) { entity = e; }
@@ -21,13 +25,14 @@ public class LocalTypeTest extends BaseMapTest
     }
 
     // [databind#609]
+    @Test
     public void testLocalPartialType609() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        
-        EntityContainer input = new EntityContainer(); 
+
+        EntityContainer input = new EntityContainer();
         input.entity = new RuleForm(12);
         String json = mapper.writeValueAsString(input);
-        
+
         EntityContainer output = mapper.readValue(json, EntityContainer.class);
         assertEquals(12, output.getEntity().value);
     }

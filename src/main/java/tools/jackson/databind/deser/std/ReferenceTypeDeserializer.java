@@ -50,11 +50,14 @@ public abstract class ReferenceTypeDeserializer<T>
     public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
     {
         ValueDeserializer<?> deser = _valueDeserializer;
+        // 23-Jan-2024, tatu: [databind#4337]: May have a content converter
+        deser = findConvertingContentDeserializer(ctxt, property, deser);
         if (deser == null) {
             deser = ctxt.findContextualValueDeserializer(_fullType.getReferencedType(), property);
         } else { // otherwise directly assigned, probably not contextual yet:
-            deser = ctxt.handleSecondaryContextualization(deser, property, _fullType.getReferencedType());            
+            deser = ctxt.handleSecondaryContextualization(deser, property, _fullType.getReferencedType());
         }
+
         TypeDeserializer typeDeser = _valueTypeDeserializer;
         if (typeDeser != null) {
             typeDeser = typeDeser.forProperty(property);
@@ -91,7 +94,7 @@ public abstract class ReferenceTypeDeserializer<T>
     /* Abstract methods for sub-classes to implement
     /**********************************************************************
      */
-    
+
     /**
      * Mutant factory method called when changes are needed; should construct
      * newly configured instance with new values as indicated.
@@ -112,10 +115,20 @@ public abstract class ReferenceTypeDeserializer<T>
 
     // 02-Sep-2021, tatu: Related to [databind#3214] we may want to add this... but
     //    with 2.13.0 so close will not yet do that, but wait for 2.14
-//    @Override
-//    public Object getAbsentValue(DeserializationContext ctxt) {
-//        return null;
-//    }
+    // 13-Oct-2025, tatu: Time to do it for 3.0.1 (ought to have done for 3.0.0 but missed it)
+    @Override
+    public Object getAbsentValue(DeserializationContext ctxt) {
+        // 21-Sep-2022, tatu: [databind#3601] Let's make absent become `null`,
+        //   NOT "null value" (Empty)
+        // return null;
+        // 15-Oct-2025, tatu: [databind#5335] Revert above change for 3.0.1 to
+        //  keep compatibility with 2.x series; 3.1 will add configurability
+        //return getNullValue(ctxt);
+
+        // 25-Oct-2025, tatu: [databind#5350] Now configurable
+        return ctxt.isEnabled(DeserializationFeature.USE_NULL_FOR_MISSING_REFERENCE_VALUES)
+                ? null : getNullValue(ctxt);
+    }
 
     public abstract T referenceValue(Object contents);
 

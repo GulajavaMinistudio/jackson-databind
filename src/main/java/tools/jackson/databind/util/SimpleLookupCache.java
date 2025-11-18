@@ -17,6 +17,9 @@ import tools.jackson.databind.util.internal.PrivateMaxEntriesMap;
  * The implementation evicts the least recently used
  * entry when max size is reached; this is implemented by the backing
  * {@code PrivateMaxEntriesMap} implementation.
+ * Implementation is thread-safe and does NOT require external synchronization
+ *<p>
+ * NOTE: in Jackson 2.x this class was named {@code com.fasterxml.jackson.databind.util.LRUMap}
  */
 public class SimpleLookupCache<K,V>
     implements LookupCache<K,V>, java.io.Serializable
@@ -46,6 +49,11 @@ public class SimpleLookupCache<K,V>
     }
 
     @Override
+    public LookupCache<K,V> emptyCopy() {
+        return new SimpleLookupCache<K,V>(_initialEntries, _maxEntries);
+    }
+
+    @Override
     public SimpleLookupCache<K,V> snapshot() {
         return new SimpleLookupCache<K,V>(_initialEntries, _maxEntries);
     }
@@ -65,9 +73,9 @@ public class SimpleLookupCache<K,V>
     public V putIfAbsent(K key, V value) {
         return _map.putIfAbsent(key, value);
     }
-    
+
     @Override
-    public V get(Object key) { return _map.get(key); }
+    public V get(K key) { return _map.get(key); }
 
     @Override
     public void clear() { _map.clear(); }
@@ -75,12 +83,7 @@ public class SimpleLookupCache<K,V>
     @Override
     public int size() { return _map.size(); }
 
-    /*
-    /**********************************************************************
-    /* Extended API
-    /**********************************************************************
-     */
-    
+    @Override
     public void contents(BiConsumer<K,V> consumer) {
         for (Map.Entry<K,V> entry : _map.entrySet()) {
             consumer.accept(entry.getKey(), entry.getValue());

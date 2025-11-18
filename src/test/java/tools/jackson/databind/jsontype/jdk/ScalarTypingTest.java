@@ -5,18 +5,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-public class ScalarTypingTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+public class ScalarTypingTest extends DatabindTestUtil
 {
     private static class DynamicWrapper {
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY)
         public Object value;
-        
+
         @SuppressWarnings("unused")
         public DynamicWrapper() { }
         public DynamicWrapper(Object v) { value = v; }
@@ -27,7 +32,7 @@ public class ScalarTypingTest extends BaseMapTest
     private static class AbstractWrapper {
         @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY)
         public Serializable value;
-        
+
         @SuppressWarnings("unused")
         public AbstractWrapper() { }
         public AbstractWrapper(Serializable v) { value = v; }
@@ -59,6 +64,7 @@ public class ScalarTypingTest extends BaseMapTest
      * Ensure that per-property dynamic types work, both for "native" types
      * and others
      */
+    @Test
     public void testScalarsWithTyping() throws Exception
     {
         String json;
@@ -81,7 +87,7 @@ public class ScalarTypingTest extends BaseMapTest
         json = m.writeValueAsString(new DynamicWrapper(Boolean.TRUE));
         result = m.readValue(json, DynamicWrapper.class);
         assertEquals(Boolean.TRUE, result.value);
-        
+
         // then verify other scalars
         json = m.writeValueAsString(new DynamicWrapper(Long.valueOf(7L)));
         result = m.readValue(json, DynamicWrapper.class);
@@ -92,6 +98,7 @@ public class ScalarTypingTest extends BaseMapTest
         assertEquals(TestEnum.B, result.value);
     }
 
+    @Test
     public void testScalarsViaAbstractType() throws Exception
     {
         ObjectMapper m = MAPPER;
@@ -114,7 +121,7 @@ public class ScalarTypingTest extends BaseMapTest
         json = m.writeValueAsString(new AbstractWrapper(Boolean.TRUE));
         result = m.readValue(json, AbstractWrapper.class);
         assertEquals(Boolean.TRUE, result.value);
-        
+
         // then verify other scalars
         json = m.writeValueAsString(new AbstractWrapper(Long.valueOf(7L)));
         result = m.readValue(json, AbstractWrapper.class);
@@ -126,6 +133,7 @@ public class ScalarTypingTest extends BaseMapTest
     }
 
     // Test inspired by [databind#1104]
+    @Test
     public void testHeterogenousStringScalars() throws Exception
     {
         final UUID NULL_UUID = UUID.fromString("00000000-0000-0000-0000-000000000000");

@@ -31,28 +31,16 @@ public class AtomicReferenceDeserializer
     @Override
     public AtomicReference<Object> getNullValue(DeserializationContext ctxt) {
         // 07-May-2019, tatu: [databind#2303], needed for nested ReferenceTypes
-        return new AtomicReference<Object>(_valueDeserializer.getNullValue(ctxt));
+        return new AtomicReference<>(_valueDeserializer.getNullValue(ctxt));
     }
 
-    @Override
-    public Object getEmptyValue(DeserializationContext ctxt) {
-        // 07-May-2019, tatu: I _think_ this needs to align with "null value" and
-        //    not necessarily with empty value of contents? (used to just do "absent"
-        //    so either way this seems to me like an improvement)
-        return getNullValue(ctxt);
-    }
-
-    /**
-     * Let's actually NOT coerce missing Creator parameters into empty value.
-     */
-    @Override
-    public Object getAbsentValue(DeserializationContext ctxt) {
-        return null;
-    }
+    // 25-Oct-2025, tatu: As per [databind#5335], no need to override any more
+    //@Override
+    // public Object getAbsentValue(DeserializationContext ctxt) { }
 
     @Override
     public AtomicReference<Object> referenceValue(Object contents) {
-        return new AtomicReference<Object>(contents);
+        return new AtomicReference<>(contents);
     }
 
     @Override

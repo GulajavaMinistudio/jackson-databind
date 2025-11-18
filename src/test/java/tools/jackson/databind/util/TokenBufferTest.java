@@ -3,31 +3,59 @@ package tools.jackson.databind.util;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
 
 import tools.jackson.core.*;
 import tools.jackson.core.JsonParser.NumberType;
+import tools.jackson.core.JsonParser.NumberTypeFP;
 import tools.jackson.core.exc.InputCoercionException;
 import tools.jackson.core.io.SerializedString;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.core.util.JsonParserSequence;
-
 import tools.jackson.databind.*;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.std.StdSerializer;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings("resource")
-public class TokenBufferTest extends BaseMapTest
+public class TokenBufferTest extends DatabindTestUtil
 {
-    private final ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     static class Base1730 { }
 
     static class Sub1730 extends Base1730 { }
 
+    // [databind#3816]
+    @JsonSerialize(using = Serializer3816.class)
+    static class Foo3816 { }
+
+    static class Serializer3816 extends StdSerializer<Foo3816> {
+        Serializer3816() {
+            super(Foo3816.class);
+        }
+
+        @Override
+        public void serialize(Foo3816 value, JsonGenerator gen, SerializationContext provider) {
+            gen.writeStartObject();
+            gen.writeName("field");
+            gen.writeString(new StringReader("foobar"), 6);
+            gen.writeEndObject();
+        }
+    }    
+
     /*
     /**********************************************************************
-    /* Basic TokenBuffer tests
+    /* Basic TokenBuffer tests, direct access
     /**********************************************************************
      */
 
+    @Test
     public void testBasicConfig() throws IOException
     {
         TokenBuffer buf;
@@ -48,12 +76,13 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // for [databind#3528]
+    @Test
     public void testParserFeatureDefaults() throws IOException
     {
-        TokenBuffer buf = new TokenBuffer(false);
+        TokenBuffer buf = TokenBuffer.forGeneration();
         try (JsonParser p = buf.asParser()) {
             for (StreamReadFeature feat : StreamReadFeature.values()) {
-                assertEquals("Feature "+feat, feat.enabledByDefault(), p.isEnabled(feat));
+                assertEquals(feat.enabledByDefault(), p.isEnabled(feat), "Feature "+feat);
             }
         }
     }
@@ -61,6 +90,7 @@ public class TokenBufferTest extends BaseMapTest
     /**
      * Test writing of individual simple values
      */
+    @Test
     public void testSimpleWrites() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -79,7 +109,7 @@ public class TokenBufferTest extends BaseMapTest
         p = buf.asParser(ObjectReadContext.empty());
         assertNull(p.currentToken());
         assertToken(JsonToken.VALUE_STRING, p.nextToken());
-        assertEquals("abc", p.getText());
+        assertEquals("abc", p.getString());
         assertNull(p.nextToken());
         p.close();
 
@@ -96,6 +126,7 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // For 2.9, explicit "isNaN" check
+    @Test
     public void testSimpleNumberWrites() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -121,6 +152,9 @@ public class TokenBufferTest extends BaseMapTest
 
         for (double v : values1) {
             assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+            assertEquals(NumberType.DOUBLE, p.getNumberType());
+            // not retained from JSON, but is when comes as specific number:
+            assertEquals(NumberTypeFP.DOUBLE64, p.getNumberTypeFP());
             double actual = p.getDoubleValue();
             boolean expNan = Double.isNaN(v) || Double.isInfinite(v);
             assertEquals(expNan, p.isNaN());
@@ -128,6 +162,9 @@ public class TokenBufferTest extends BaseMapTest
         }
         for (float v : values2) {
             assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+            // Exact number type info retained when buffering:
+            assertEquals(NumberType.FLOAT, p.getNumberType());
+            assertEquals(NumberTypeFP.FLOAT32, p.getNumberTypeFP());
             float actual = p.getFloatValue();
             boolean expNan = Float.isNaN(v) || Float.isInfinite(v);
             assertEquals(expNan, p.isNaN());
@@ -138,6 +175,7 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // [databind#1729]
+    @Test
     public void testNumberOverflowInt() throws IOException
     {
         try (TokenBuffer buf = new TokenBuffer(null, false)) {
@@ -171,6 +209,7 @@ public class TokenBufferTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testNumberOverflowLong() throws IOException
     {
         try (TokenBuffer buf = new TokenBuffer(null, false)) {
@@ -189,6 +228,86 @@ public class TokenBufferTest extends BaseMapTest
         }
     }
 
+    @Test
+    public void testNumberIntAsString() throws IOException
+    {
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber("123", true);
+            try (JsonParser p = buf.asParser()) {
+                assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
+                assertEquals(NumberType.BIG_INTEGER, p.getNumberType());
+                assertEquals(123, p.getIntValue());
+            }
+        }
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber("-123", true);
+            try (JsonParser p = buf.asParser()) {
+                assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
+                assertEquals(NumberType.BIG_INTEGER, p.getNumberType());
+                assertEquals(-123L, p.getLongValue());
+            }
+        }
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber("123", false);
+            try (JsonParser p = buf.asParser()) {
+                assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+                assertEquals(NumberType.BIG_DECIMAL, p.getNumberType());
+                assertEquals(123.0, p.getFloatValue());
+            }
+        }
+        // legacy method assumes Decimal type
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber("123");
+            try (JsonParser p = buf.asParser()) {
+                assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+                assertEquals(NumberType.BIG_DECIMAL, p.getNumberType());
+                assertEquals(123.0, p.getFloatValue());
+            }
+        }
+    }
+
+    @Test
+    public void testNumberNonIntAsStringNoCoerce() throws IOException
+    {
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber("1234.567", true);
+            try (JsonParser p = buf.asParser()) {
+                assertToken(JsonToken.VALUE_NUMBER_INT, p.nextToken());
+                assertEquals(NumberType.BIG_INTEGER, p.getNumberType());
+                assertThrows(NumberFormatException.class, p::getIntValue);
+            }
+        }
+    }
+
+    @Test
+    public void testBigIntAsString() throws IOException
+    {
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            BigInteger big = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(1));
+            buf.writeNumber(big.toString());
+            try (JsonParser p = buf.asParser()) {
+                // NOTE: oddity of buffering, no inspection of "real" type if given String...
+                assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+                assertEquals(big, p.getBigIntegerValue());
+            }
+        }
+    }
+
+    @Test
+    public void testBigDecimalAsString() throws IOException
+    {
+        final String num = "-10000000000.0000000001";
+        try (TokenBuffer buf = new TokenBuffer(null, false)) {
+            buf.writeNumber(num);
+            try (JsonParser p = buf.asParser()) {
+                // NOTE: oddity of buffering, no inspection of "real" type if given String...
+                assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
+                assertEquals(new BigDecimal(num), p.getDecimalValue());
+            }
+        }
+    }
+
+    @Test
     public void testParentContext() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -204,6 +323,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.close();
     }
 
+    @Test
     public void testSimpleArray() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -264,7 +384,8 @@ public class TokenBufferTest extends BaseMapTest
         p.close();
         buf.close();
     }
-    
+
+    @Test
     public void testSimpleObject() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -302,9 +423,9 @@ public class TokenBufferTest extends BaseMapTest
         // and override should also work:
 //        p.overrideCurrentName("bah");
 //        assertEquals("bah", p.currentName());
-        
+
         assertToken(JsonToken.VALUE_NUMBER_FLOAT, p.nextToken());
-        assertEquals(1.25, p.getDoubleValue());
+        assertEquals(1.25, p.getDoubleValue(), 0.0);
         // should still have access to (overridden) name
 //        assertEquals("bah", p.currentName());
         assertToken(JsonToken.END_OBJECT, p.nextToken());
@@ -319,43 +440,43 @@ public class TokenBufferTest extends BaseMapTest
      * Verify handling of that "standard" test document (from JSON
      * specification)
      */
+    @Test
     public void testWithJSONSampleDoc() throws Exception
     {
         // First, copy events from known good source (StringReader)
-        JsonParser p = createParserUsingReader(SAMPLE_DOC_JSON_SPEC);
         TokenBuffer tb = TokenBuffer.forGeneration();
-        while (p.nextToken() != null) {
-            tb.copyCurrentEvent(p);
+        try (JsonParser p = MAPPER.createParser(SAMPLE_DOC_JSON_SPEC)) {
+            while (p.nextToken() != null) {
+                tb.copyCurrentEvent(p);
+            }
+        
+            // And then request verification; first structure only:
+            verifyJsonSpecSampleDoc(tb.asParser(ObjectReadContext.empty()), false);
+        
+            // then content check too:
+            verifyJsonSpecSampleDoc(tb.asParser(ObjectReadContext.empty()), true);
+            tb.close();
         }
-
-        // And then request verification; first structure only:
-        verifyJsonSpecSampleDoc(tb.asParser(ObjectReadContext.empty()), false);
-
-        // then content check too:
-        verifyJsonSpecSampleDoc(tb.asParser(ObjectReadContext.empty()), true);
-        tb.close();
-        p.close();
-
-    
         // 19-Oct-2016, tatu: Just for fun, trigger `toString()` for code coverage
         String desc = tb.toString();
         assertNotNull(desc);
     }
 
+    @Test
     public void testAppend() throws IOException
     {
         TokenBuffer buf1 = TokenBuffer.forGeneration();
         buf1.writeStartObject();
         buf1.writeName("a");
         buf1.writeBoolean(true);
-        
+
         TokenBuffer buf2 = TokenBuffer.forGeneration();
         buf2.writeName("b");
         buf2.writeNumber(13);
         buf2.writeEndObject();
-        
+
         buf1.append(buf2);
-        
+
         // and verify that we got it all...
         JsonParser p = buf1.asParser(ObjectReadContext.empty());
         assertToken(JsonToken.START_OBJECT, p.nextToken());
@@ -374,6 +495,7 @@ public class TokenBufferTest extends BaseMapTest
 
     // Since 2.3 had big changes to UUID handling, let's verify we can
     // deal with
+    @Test
     public void testWithUUID() throws IOException
     {
         for (String value : new String[] {
@@ -388,7 +510,7 @@ public class TokenBufferTest extends BaseMapTest
             UUID uuid = UUID.fromString(value);
             MAPPER.writeValue(buf, uuid);
             buf.close();
-    
+
             // and bring it back
             UUID out = MAPPER.readValue(buf.asParser(ObjectReadContext.empty()), UUID.class);
             assertEquals(uuid.toString(), out.toString());
@@ -396,12 +518,63 @@ public class TokenBufferTest extends BaseMapTest
             // second part: As per [databind#362], should NOT use binary with TokenBuffer
             JsonParser p = buf.asParser(ObjectReadContext.empty());
             assertEquals(JsonToken.VALUE_STRING, p.nextToken());
-            String str = p.getText();
+            String str = p.getString();
             assertEquals(value, str);
             p.close();
         }
     }
 
+    /*
+    /**********************************************************************
+    /* TokenBuffer as source for ObjectMapper/ObjectReader tests
+    /**********************************************************************
+     */
+
+    @Test
+    public void readFromBufferViaObjectMapper() throws Exception {
+        final Point TEST_OB = new Point(123, -456);
+
+        assertEquals(TEST_OB, MAPPER.readValue(_tokenBufferFor(TEST_OB),
+                Point.class));
+        assertEquals(TEST_OB, MAPPER.readValue(_tokenBufferFor(TEST_OB),
+                MAPPER.constructType(Point.class)));
+        assertEquals(TEST_OB, MAPPER.readValue(_tokenBufferFor(TEST_OB),
+                new TypeReference<Point>() {}));
+
+        assertEquals(MAPPER.valueToTree(TEST_OB),
+                MAPPER.readTree(_tokenBufferFor(TEST_OB)));
+
+        // Try alternate that fills TokenBuffer using mapper itself
+        assertEquals(TEST_OB, MAPPER.readValue(MAPPER.writeValueIntoBuffer(TEST_OB),
+                Point.class));
+    }
+
+    @Test
+    public void readFromBufferViaObjectReader() throws Exception {
+        final Point TEST_OB = new Point(234, 5678);
+        final ObjectReader R = MAPPER.readerFor(Point.class);
+
+        assertEquals(TEST_OB, R.readValue(_tokenBufferFor(TEST_OB)));
+
+        assertEquals(MAPPER.valueToTree(TEST_OB),
+                R.readTree(_tokenBufferFor(TEST_OB)));
+
+        // Try alternate that fills TokenBuffer using ObjectWriter
+        assertEquals(TEST_OB,
+                R.readValue(MAPPER.writer().writeValueIntoBuffer(TEST_OB)));
+    }
+
+    private TokenBuffer _tokenBufferFor(Object value) {
+        final String json = MAPPER.writeValueAsString(value);
+        TokenBuffer buf = TokenBuffer.forGeneration();
+        try (JsonParser p = MAPPER.createParser(json)) {
+            while (p.nextToken() != null) {
+                buf.copyCurrentEvent(p);
+            }
+        }
+        return buf;
+    }
+    
     /*
     /**********************************************************
     /* Tests for read/output contexts
@@ -409,22 +582,23 @@ public class TokenBufferTest extends BaseMapTest
      */
 
     // for [databind#984]: ensure output context handling identical
+    @Test
     public void testOutputContext() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
         StringWriter w = new StringWriter();
         JsonGenerator gen = MAPPER.createGenerator(w);
- 
+
         // test content: [{"a":1,"b":{"c":2}},{"a":2,"b":{"c":3}}]
 
         buf.writeStartArray();
         gen.writeStartArray();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeStartObject();
         gen.writeStartObject();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeName("a");
         gen.writeName("a");
         _verifyOutputContext(buf, gen);
@@ -440,7 +614,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.writeStartObject();
         gen.writeStartObject();
         _verifyOutputContext(buf, gen);
-        
+
         buf.writeName("c");
         gen.writeName("c");
         _verifyOutputContext(buf, gen);
@@ -460,7 +634,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.writeEndArray();
         gen.writeEndArray();
         _verifyOutputContext(buf, gen);
-        
+
         buf.close();
         gen.close();
     }
@@ -500,12 +674,13 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // [databind#1253]
+    @Test
     public void testParentSiblingContext() throws IOException
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
 
         // {"a":{},"b":{"c":"cval"}}
-        
+
         buf.writeStartObject();
         buf.writeName("a");
         buf.writeStartObject();
@@ -522,6 +697,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.close();
     }
 
+    @Test
     public void testBasicSerialize() throws IOException
     {
         TokenBuffer buf;
@@ -530,7 +706,7 @@ public class TokenBufferTest extends BaseMapTest
         buf = TokenBuffer.forGeneration();
         assertEquals("", MAPPER.writeValueAsString(buf));
         buf.close();
-        
+
         buf = TokenBuffer.forGeneration();
         buf.writeStartArray();
         buf.writeBoolean(true);
@@ -560,30 +736,31 @@ public class TokenBufferTest extends BaseMapTest
     /* Tests to verify interaction of TokenBuffer and JsonParserSequence
     /**********************************************************
      */
-    
+
+    @Test
     public void testWithJsonParserSequenceSimple() throws IOException
     {
         // Let's join a TokenBuffer with JsonParser first
         TokenBuffer buf = TokenBuffer.forGeneration();
         buf.writeStartArray();
         buf.writeString("test");
-        JsonParser p = createParserUsingReader("[ true, null ]");
-        
+        JsonParser p = MAPPER.createParser("[ true, null ]");
+
         JsonParserSequence seq = JsonParserSequence.createFlattened(false,
                 buf.asParser(ObjectReadContext.empty()), p);
         assertEquals(2, seq.containedParsersCount());
 
         assertFalse(p.isClosed());
-        
+
         assertFalse(seq.hasCurrentToken());
         assertNull(seq.currentToken());
         assertNull(seq.currentName());
 
         assertToken(JsonToken.START_ARRAY, seq.nextToken());
         assertToken(JsonToken.VALUE_STRING, seq.nextToken());
-        assertEquals("test", seq.getText());
+        assertEquals("test", seq.getString());
         // end of first parser input, should switch over:
-        
+
         assertToken(JsonToken.START_ARRAY, seq.nextToken());
         assertToken(JsonToken.VALUE_TRUE, seq.nextToken());
         assertToken(JsonToken.VALUE_NULL, seq.nextToken());
@@ -606,11 +783,12 @@ public class TokenBufferTest extends BaseMapTest
         buf.close();
         seq.close();
     }
-    
+
     /**
      * Test to verify that TokenBuffer and JsonParserSequence work together
      * as expected.
      */
+    @Test
     public void testWithMultipleJsonParserSequences() throws IOException
     {
         TokenBuffer buf1 = TokenBuffer.forGeneration();
@@ -634,11 +812,11 @@ public class TokenBufferTest extends BaseMapTest
 
         assertToken(JsonToken.START_ARRAY, combo.nextToken());
         assertToken(JsonToken.VALUE_STRING, combo.nextToken());
-        assertEquals("a", combo.getText());
+        assertEquals("a", combo.getString());
         assertToken(JsonToken.VALUE_NUMBER_INT, combo.nextToken());
         assertEquals(13, combo.getIntValue());
         assertToken(JsonToken.END_ARRAY, combo.nextToken());
-        assertNull(combo.nextToken());        
+        assertNull(combo.nextToken());
         buf1.close();
         buf2.close();
         buf3.close();
@@ -646,6 +824,7 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // [databind#743]
+    @Test
     public void testRawValues() throws Exception
     {
         final String RAW = "{\"a\":1}";
@@ -664,6 +843,7 @@ public class TokenBufferTest extends BaseMapTest
     }
 
     // [databind#1730]
+    @Test
     public void testEmbeddedObjectCoerceCheck() throws Exception
     {
         TokenBuffer buf = TokenBuffer.forGeneration();
@@ -680,6 +860,7 @@ public class TokenBufferTest extends BaseMapTest
         buf.close();
     }
 
+    @Test
     public void testIsEmpty() throws Exception
     {
         // Let's check that segment boundary won't ruin it
@@ -693,5 +874,20 @@ public class TokenBufferTest extends BaseMapTest
 
             assertEquals(JsonToken.VALUE_NUMBER_INT, buf.firstToken());
         }
+    }
+
+    /*
+    /**********************************************************
+    /* Misc other tests
+    /**********************************************************
+     */
+
+    // [databind#3816]
+    @Test
+    public void testWriteStringFromStream() throws Exception
+    {
+        Map<String, String> map = MAPPER.convertValue(new Foo3816(),
+                new TypeReference<Map<String, String>>() {});
+        assertNotNull(map);
     }
 }

@@ -5,23 +5,30 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonValue;
+
 import tools.jackson.core.JsonParser.NumberType;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.jsonFormatVisitors.*;
 import tools.jackson.databind.ser.BeanPropertyWriter;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Basic tests to exercise low-level support added for JSON Schema module and
  * other modules that use type introspection.
  */
-public class NewSchemaTest extends BaseMapTest
+public class NewSchemaTest extends DatabindTestUtil
 {
     enum TestEnum {
         A, B, C;
-        
+
         @Override
         public String toString() {
             return "ToString:"+name();
@@ -30,7 +37,7 @@ public class NewSchemaTest extends BaseMapTest
 
     enum TestEnumWithJsonValue {
         A, B, C;
-        
+
         @JsonValue
         public String forSerialize() {
             return "value-"+name();
@@ -109,10 +116,10 @@ public class NewSchemaTest extends BaseMapTest
         extends JsonFormatVisitorWrapper.Base
     {
         // Implement handlers just to get more exercise...
-        
+
         @Override
         public JsonObjectFormatVisitor expectObjectFormat(JavaType type) {
-            return new JsonObjectFormatVisitor.Base(getProvider()) {
+            return new JsonObjectFormatVisitor.Base(getContext()) {
                 @Override
                 public void property(BeanProperty prop) {
                     _visit(prop);
@@ -138,14 +145,14 @@ public class NewSchemaTest extends BaseMapTest
                     }
                     BeanPropertyWriter bpw = (BeanPropertyWriter) prop;
                     ValueSerializer<?> ser = bpw.getSerializer();
-                    final SerializerProvider prov = getProvider();
+                    final SerializationContext prov = getContext();
                     if (ser == null) {
                         if (prov == null) {
-                            throw new Error("SerializerProvider missing");
+                            throw new Error("SerializationContext missing");
                         }
                         ser = prov.findPrimaryPropertySerializer(prop.getType(), prop);
                     }
-                    JsonFormatVisitorWrapper visitor = new JsonFormatVisitorWrapper.Base(getProvider());
+                    JsonFormatVisitorWrapper visitor = new JsonFormatVisitorWrapper.Base(getContext());
                     ser.acceptJsonFormatVisitor(visitor, prop.getType());
                 }
             };
@@ -153,7 +160,7 @@ public class NewSchemaTest extends BaseMapTest
 
         @Override
         public JsonArrayFormatVisitor expectArrayFormat(JavaType type) {
-            return new JsonArrayFormatVisitor.Base(getProvider());
+            return new JsonArrayFormatVisitor.Base(getContext());
         }
 
         @Override
@@ -189,7 +196,7 @@ public class NewSchemaTest extends BaseMapTest
         @Override
         public JsonMapFormatVisitor expectMapFormat(JavaType type) {
             return new JsonMapFormatVisitor.Base();
-        }        
+        }
     }
 
     /*
@@ -204,6 +211,7 @@ public class NewSchemaTest extends BaseMapTest
      * verify what is being reported. Smoke test that should trigger problems
      * if basic POJO type/serializer traversal had issues.
      */
+    @Test
     public void testBasicTraversal() throws Exception
     {
         MAPPER.acceptJsonFormatVisitor(POJO.class, new BogusJsonFormatVisitorWrapper());
@@ -217,10 +225,11 @@ public class NewSchemaTest extends BaseMapTest
         MAPPER.acceptJsonFormatVisitor(POJOWithJsonValue.class, new BogusJsonFormatVisitorWrapper());
     }
 
+    @Test
     public void testSimpleEnum() throws Exception
     {
         final Set<String> values = new TreeSet<String>();
-        ObjectWriter w = MAPPER.writer(SerializationFeature.WRITE_ENUMS_USING_TO_STRING);
+        ObjectWriter w = MAPPER.writer(EnumFeature.WRITE_ENUMS_USING_TO_STRING);
 
         w.acceptJsonFormatVisitor(TestEnum.class, new JsonFormatVisitorWrapper.Base() {
             @Override
@@ -246,6 +255,7 @@ public class NewSchemaTest extends BaseMapTest
         assertEquals(exp, values);
     }
 
+    @Test
     public void testEnumWithJsonValue() throws Exception
     {
         final Set<String> values = new TreeSet<String>();
@@ -275,6 +285,7 @@ public class NewSchemaTest extends BaseMapTest
     }
 
     //  Ensure JsonValueFormat serializes/deserializes as expected
+    @Test
     public void testJsonValueFormatHandling() throws Exception
     {
         // first: serialize using 'toString()', not name
@@ -286,15 +297,16 @@ public class NewSchemaTest extends BaseMapTest
     }
 
     // [databind#1045], regression wrt BigDecimal
+    @Test
     public void testSimpleNumbers() throws Exception
     {
         final StringBuilder sb = new StringBuilder();
-        
+
         MAPPER.acceptJsonFormatVisitor(Numbers.class,
                 new JsonFormatVisitorWrapper.Base() {
             @Override
             public JsonObjectFormatVisitor expectObjectFormat(final JavaType type) {
-                return new JsonObjectFormatVisitor.Base(getProvider()) {
+                return new JsonObjectFormatVisitor.Base(getContext()) {
                     @Override
                     public void optionalProperty(BeanProperty prop) {
                         sb.append("[optProp ").append(prop.getName()).append("(");
@@ -303,7 +315,7 @@ public class NewSchemaTest extends BaseMapTest
                             BeanPropertyWriter bpw = (BeanPropertyWriter) prop;
                             ser = bpw.getSerializer();
                         }
-                        final SerializerProvider prov = getProvider();
+                        final SerializationContext prov = getContext();
                         if (ser == null) {
                             ser = prov.findPrimaryPropertySerializer(prop.getType(), prop);
                         }

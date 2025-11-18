@@ -3,18 +3,23 @@ package tools.jackson.databind.objectid;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestObjectId extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestObjectId extends DatabindTestUtil
 {
     @JsonPropertyOrder({"a", "b"})
     static class Wrapper {
         public ColumnMetadata a, b;
     }
-    
+
     @JsonIdentityInfo(generator=ObjectIdGenerators.IntSequenceGenerator.class, property="@id")
     static class ColumnMetadata {
         private final String name;
@@ -49,7 +54,7 @@ public class TestObjectId extends BaseMapTest
     /* Problem in which always-as-id reference may prevent initial
      * serialization of a POJO.
      */
-    
+
     static class Company {
         public List<Employee> employees;
 
@@ -58,33 +63,6 @@ public class TestObjectId extends BaseMapTest
                 employees = new ArrayList<Employee>();
             }
             employees.add(e);
-        }
-    }
-
-    @JsonIdentityInfo(property="id",
-            generator=ObjectIdGenerators.PropertyGenerator.class)
-    public static class Employee {
-        public int id;
-     
-        public String name;
-     
-        @JsonIdentityReference(alwaysAsId=true)
-        public Employee manager;
-
-        @JsonIdentityReference(alwaysAsId=true)
-        public List<Employee> reports;
-    
-        public Employee() { }
-        public Employee(int id, String name, Employee manager) {
-            this.id = id;
-            this.name = name;
-            this.manager = manager;
-            reports = new ArrayList<Employee>();
-        }
-
-        public Employee addReport(Employee e) {
-            reports.add(e);
-            return this;
         }
     }
 
@@ -106,25 +84,30 @@ public class TestObjectId extends BaseMapTest
             use = JsonTypeInfo.Id.NAME,
             property = "type",
             defaultImpl = JsonMapSchema.class)
-      @JsonSubTypes({
-            @JsonSubTypes.Type(value = JsonMapSchema.class, name = "map"),
-            @JsonSubTypes.Type(value = JsonJdbcSchema.class, name = "jdbc") })
-      public static abstract class JsonSchema {
-          public String name;
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = JsonMapSchema.class, name = "map"),
+        @JsonSubTypes.Type(value = JsonJdbcSchema.class, name = "jdbc") })
+    public static abstract class JsonSchema {
+        public String name;
     }
 
     static class JsonMapSchema extends JsonSchema { }
 
     static class JsonJdbcSchema extends JsonSchema { }
 
+    static class JsonRoot1083 {
+        public List<JsonSchema> schemas = new ArrayList<JsonSchema>();
+    }
+    
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
-    
-    private final ObjectMapper MAPPER = new ObjectMapper();
-    
+
+    private final ObjectMapper MAPPER = newJsonMapper();
+
+    @Test
     public void testColumnMetadata() throws Exception
     {
         ColumnMetadata col = new ColumnMetadata("Billy", "employee", "comment");
@@ -132,12 +115,12 @@ public class TestObjectId extends BaseMapTest
         w.a = col;
         w.b = col;
         String json = MAPPER.writeValueAsString(w);
-        
+
         Wrapper deserialized = MAPPER.readValue(json, Wrapper.class);
         assertNotNull(deserialized);
         assertNotNull(deserialized.a);
         assertNotNull(deserialized.b);
-        
+
         assertEquals("Billy", deserialized.a.getName());
         assertEquals("employee", deserialized.a.getType());
         assertEquals("comment", deserialized.a.getComment());
@@ -146,6 +129,7 @@ public class TestObjectId extends BaseMapTest
     }
 
     // For [databind#188]
+    @Test
     public void testMixedRefsIssue188() throws Exception
     {
         Company comp = new Company();
@@ -157,7 +141,7 @@ public class TestObjectId extends BaseMapTest
 
         JsonMapper mapper = JsonMapper.builder().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).build();
         String json = mapper.writeValueAsString(comp);
-        
+
         assertEquals("{\"employees\":["
                 +"{\"id\":1,\"manager\":null,\"name\":\"First\",\"reports\":[2]},"
                 +"{\"id\":2,\"manager\":1,\"name\":\"Second\",\"reports\":[]}"
@@ -165,19 +149,18 @@ public class TestObjectId extends BaseMapTest
                 json);
     }
 
+    @Test
     public void testObjectAndTypeId() throws Exception
     {
-        final ObjectMapper mapper = new ObjectMapper();
-
         Bar inputRoot = new Bar();
         Foo inputChild = new Foo();
         inputRoot.next = inputChild;
         inputChild.ref = inputRoot;
 
-        String json = mapper.writerWithDefaultPrettyPrinter()
+        String json = MAPPER.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(inputRoot);
-        
-        BaseEntity resultRoot = mapper.readValue(json, BaseEntity.class);
+
+        BaseEntity resultRoot = MAPPER.readValue(json, BaseEntity.class);
         assertNotNull(resultRoot);
         assertTrue(resultRoot instanceof Bar);
         Bar first = (Bar) resultRoot;
@@ -189,14 +172,11 @@ public class TestObjectId extends BaseMapTest
         assertSame(first, second.ref);
     }
 
-    public static class JsonRoot {
-        public final List<JsonSchema> schemas = new ArrayList<JsonSchema>();
-    }
-
+    @Test
     public void testWithFieldsInBaseClass1083() throws Exception {
           final String json = a2q("{'schemas': [{\n"
               + "  'name': 'FoodMart'\n"
               + "}]}\n");
-          MAPPER.readValue(json, JsonRoot.class);
+          MAPPER.readValue(json, JsonRoot1083.class);
     }
 }

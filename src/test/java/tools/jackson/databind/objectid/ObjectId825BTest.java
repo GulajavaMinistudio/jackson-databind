@@ -2,13 +2,18 @@ package tools.jackson.databind.objectid;
 
 import java.util.ArrayList;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 @SuppressWarnings("serial")
-public class ObjectId825BTest extends BaseMapTest
+public class ObjectId825BTest extends DatabindTestUtil
 {
     static abstract class AbstractAct extends AbstractEntity {
         protected java.util.ArrayList<Tr> outTr;
@@ -135,7 +140,7 @@ public class ObjectId825BTest extends BaseMapTest
 
     static class V extends AbstractData {
         private static final long serialVersionUID = 1L;
-    }    
+    }
 
     /*
     /*****************************************************
@@ -143,6 +148,7 @@ public class ObjectId825BTest extends BaseMapTest
     /*****************************************************
      */
 
+    @Test
     public void testFull825() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
@@ -196,7 +202,7 @@ public class ObjectId825BTest extends BaseMapTest
         // also replace package
         final String newPkg = getClass().getName() + "\\$";
         INPUT = INPUT.replaceAll("_PKG_", newPkg);
-        
+
         CTC result = mapper.readValue(INPUT, CTC.class);
         assertNotNull(result);
     }

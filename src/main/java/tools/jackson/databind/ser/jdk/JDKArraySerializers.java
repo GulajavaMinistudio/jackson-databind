@@ -2,8 +2,11 @@ package tools.jackson.databind.ser.jdk;
 
 import java.util.HashMap;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import tools.jackson.core.*;
 import tools.jackson.core.type.WritableTypeId;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
 import tools.jackson.databind.jsonFormatVisitors.JsonFormatTypes;
@@ -21,17 +24,17 @@ import tools.jackson.databind.type.TypeFactory;
 public class JDKArraySerializers
 {
     protected final static HashMap<String, ValueSerializer<?>> _arraySerializers =
-        new HashMap<String, ValueSerializer<?>>();
+        new HashMap<>();
     static {
         // Arrays of various types (including common object types)
-        _arraySerializers.put(boolean[].class.getName(), new JDKArraySerializers.BooleanArraySerializer());
+        _arraySerializers.put(boolean[].class.getName(), new BooleanArraySerializer());
         _arraySerializers.put(byte[].class.getName(), new ByteArraySerializer());
-        _arraySerializers.put(char[].class.getName(), new JDKArraySerializers.CharArraySerializer());
-        _arraySerializers.put(short[].class.getName(), new JDKArraySerializers.ShortArraySerializer());
-        _arraySerializers.put(int[].class.getName(), new JDKArraySerializers.IntArraySerializer());
-        _arraySerializers.put(long[].class.getName(), new JDKArraySerializers.LongArraySerializer());
-        _arraySerializers.put(float[].class.getName(), new JDKArraySerializers.FloatArraySerializer());
-        _arraySerializers.put(double[].class.getName(), new JDKArraySerializers.DoubleArraySerializer());
+        _arraySerializers.put(char[].class.getName(), new CharArraySerializer());
+        _arraySerializers.put(short[].class.getName(), new ShortArraySerializer());
+        _arraySerializers.put(int[].class.getName(), new IntArraySerializer());
+        _arraySerializers.put(long[].class.getName(), new LongArraySerializer());
+        _arraySerializers.put(float[].class.getName(), new FloatArraySerializer());
+        _arraySerializers.put(double[].class.getName(), new DoubleArraySerializer());
     }
 
     protected JDKArraySerializers() { }
@@ -40,10 +43,26 @@ public class JDKArraySerializers
      * Accessor for checking to see if there is a standard serializer for
      * given primitive value type.
      */
-    public static ValueSerializer<?> findStandardImpl(Class<?> cls) {
+    public static ValueSerializer<?> findStandardImpl(SerializationContext ctxt,
+            Class<?> cls, JsonFormat.Value formatOverrides) {
+        if (formatOverrides != null) {
+            if (formatOverrides.getShape() == JsonFormat.Shape.BINARY) {
+                // Special handling for binary formats
+                if (cls == float[].class) {
+                    return BinaryFloatArraySerializer.instance;
+                }
+                if (cls == double[].class) {
+                    return BinaryDoubleArraySerializer.instance;
+                }
+            }
+        }
         return _arraySerializers.get(cls.getName());
     }
-    
+
+    static JavaType simpleElementType(Class<?> elemClass) {
+        return TypeFactory.unsafeSimpleType(elemClass);
+    }
+
     /*
      ****************************************************************
     /* Intermediate base classes
@@ -86,8 +105,7 @@ public class JDKArraySerializers
         extends ArraySerializerBase<boolean[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Boolean.class);
+        private final static JavaType VALUE_TYPE = simpleElementType(Boolean.TYPE);
 
         public BooleanArraySerializer() { super(boolean[].class); }
 
@@ -95,12 +113,12 @@ public class JDKArraySerializers
                 BeanProperty prop, Boolean unwrapSingle) {
             super(src, prop, unwrapSingle);
         }
-        
+
         @Override
         public ValueSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
             return new BooleanArraySerializer(this, prop, unwrapSingle);
         }
-        
+
         /**
          * Booleans never add type info; hence, even if type serializer is suggested,
          * we'll ignore it...
@@ -120,9 +138,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, boolean[] value) {
+        public boolean isEmpty(SerializationContext prov, boolean[] value) {
             return value.length == 0;
         }
 
@@ -132,7 +150,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(boolean[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public final void serialize(boolean[] value, JsonGenerator g, SerializationContext provider) throws JacksonException
         {
             final int len = value.length;
             if ((len == 1) && _shouldUnwrapSingle(provider)) {
@@ -145,7 +163,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public void serializeContents(boolean[] value, JsonGenerator g, SerializerProvider provider)
+        public void serializeContents(boolean[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
@@ -164,8 +182,7 @@ public class JDKArraySerializers
     public static class ShortArraySerializer extends TypedPrimitiveArraySerializer<short[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Short.TYPE);
+        private final static JavaType VALUE_TYPE = simpleElementType(Short.TYPE);
 
         public ShortArraySerializer() { super(short[].class); }
         public ShortArraySerializer(ShortArraySerializer src, BeanProperty prop,
@@ -188,9 +205,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, short[] value) {
+        public boolean isEmpty(SerializationContext prov, short[] value) {
             return value.length == 0;
         }
 
@@ -200,7 +217,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(short[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public final void serialize(short[] value, JsonGenerator g, SerializationContext provider) throws JacksonException
         {
             final int len = value.length;
             if ((len == 1) && _shouldUnwrapSingle(provider)) {
@@ -213,7 +230,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public void serializeContents(short[] value, JsonGenerator g, SerializerProvider provider)
+        public void serializeContents(short[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
@@ -239,14 +256,14 @@ public class JDKArraySerializers
     public static class CharArraySerializer extends StdSerializer<char[]>
     {
         public CharArraySerializer() { super(char[].class); }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, char[] value) {
+        public boolean isEmpty(SerializationContext prov, char[] value) {
             return value.length == 0;
         }
-        
+
         @Override
-        public void serialize(char[] value, JsonGenerator g, SerializerProvider provider)
+        public void serialize(char[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             // [JACKSON-289] allows serializing as 'sparse' char array too:
@@ -260,7 +277,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public void serializeWithType(char[] value, JsonGenerator g, SerializerProvider ctxt,
+        public void serializeWithType(char[] value, JsonGenerator g, SerializationContext ctxt,
                 TypeSerializer typeSer)
             throws JacksonException
         {
@@ -298,8 +315,7 @@ public class JDKArraySerializers
     public static class IntArraySerializer extends ArraySerializerBase<int[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Integer.TYPE);
+        private final static JavaType VALUE_TYPE = simpleElementType(Integer.TYPE);
 
         public IntArraySerializer() { super(int[].class); }
 
@@ -307,12 +323,12 @@ public class JDKArraySerializers
                 BeanProperty prop, Boolean unwrapSingle) {
             super(src, prop, unwrapSingle);
         }
-        
+
         @Override
         public ValueSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
             return new IntArraySerializer(this, prop, unwrapSingle);
         }
-        
+
         /**
          * Ints never add type info; hence, even if type serializer is suggested,
          * we'll ignore it...
@@ -320,7 +336,7 @@ public class JDKArraySerializers
         @Override
         public StdContainerSerializer<?> _withValueTypeSerializer(TypeSerializer vts) {
             return this;
-        }        
+        }
 
         @Override
         public JavaType getContentType() {
@@ -332,9 +348,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, int[] value) {
+        public boolean isEmpty(SerializationContext prov, int[] value) {
             return value.length == 0;
         }
 
@@ -344,7 +360,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(int[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public final void serialize(int[] value, JsonGenerator g, SerializationContext provider) throws JacksonException
         {
             final int len = value.length;
             if ((len == 1) && _shouldUnwrapSingle(provider)) {
@@ -356,7 +372,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public void serializeContents(int[] value, JsonGenerator g, SerializerProvider provider)
+        public void serializeContents(int[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
@@ -375,8 +391,7 @@ public class JDKArraySerializers
     public static class LongArraySerializer extends TypedPrimitiveArraySerializer<long[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Long.TYPE);
+        private final static JavaType VALUE_TYPE = simpleElementType(Long.TYPE);
 
         public LongArraySerializer() { super(long[].class); }
         public LongArraySerializer(LongArraySerializer src, BeanProperty prop,
@@ -399,9 +414,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, long[] value) {
+        public boolean isEmpty(SerializationContext prov, long[] value) {
             return value.length == 0;
         }
 
@@ -411,7 +426,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(long[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public final void serialize(long[] value, JsonGenerator g, SerializationContext provider) throws JacksonException
         {
             final int len = value.length;
             if ((len == 1) && _shouldUnwrapSingle(provider)) {
@@ -421,9 +436,9 @@ public class JDKArraySerializers
             // 11-May-2016, tatu: As per [core#277] we have efficient `writeArray(...)` available
             g.writeArray(value, 0, value.length);
         }
-        
+
         @Override
-        public void serializeContents(long[] value, JsonGenerator g, SerializerProvider provider)
+        public void serializeContents(long[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
@@ -442,19 +457,22 @@ public class JDKArraySerializers
     public static class FloatArraySerializer extends TypedPrimitiveArraySerializer<float[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Float.TYPE);
-        
+        private final static JavaType VALUE_TYPE = simpleElementType(Float.TYPE);
+
+        // @since 2.20
+        final static FloatArraySerializer instance = new FloatArraySerializer();
+
         public FloatArraySerializer() {
             super(float[].class);
         }
+
         public FloatArraySerializer(FloatArraySerializer src, BeanProperty prop,
                 Boolean unwrapSingle) {
             super(src, prop, unwrapSingle);
         }
 
         @Override
-        public ValueSerializer<?> _withResolved(BeanProperty prop,Boolean unwrapSingle) {
+        public ValueSerializer<?> _withResolved(BeanProperty prop, Boolean unwrapSingle) {
             return new FloatArraySerializer(this, prop, unwrapSingle);
         }
 
@@ -468,9 +486,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, float[] value) {
+        public boolean isEmpty(SerializationContext prov, float[] value) {
             return value.length == 0;
         }
 
@@ -480,20 +498,33 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(float[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public ValueSerializer<?> createContextual(SerializationContext ctxt, BeanProperty property)
+        {
+            JsonFormat.Value format = findFormatOverrides(ctxt, property,
+                    handledType());
+            if (format != null) {
+                if (format.getShape() == JsonFormat.Shape.BINARY) {
+                    return BinaryFloatArraySerializer.instance;
+                }
+            }
+            return super.createContextual(ctxt, property);
+        }
+
+        @Override
+        public final void serialize(float[] value, JsonGenerator g, SerializationContext ctxt) throws JacksonException
         {
             final int len = value.length;
-            if ((len == 1) && _shouldUnwrapSingle(provider)) {
-                serializeContents(value, g, provider);
+            if ((len == 1) && _shouldUnwrapSingle(ctxt)) {
+                serializeContents(value, g, ctxt);
                 return;
             }
             g.writeStartArray(value, len);
-            serializeContents(value, g, provider);
+            serializeContents(value, g, ctxt);
             g.writeEndArray();
         }
-        
+
         @Override
-        public void serializeContents(float[] value, JsonGenerator g, SerializerProvider provider)
+        public void serializeContents(float[] value, JsonGenerator g, SerializationContext provider)
             throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
@@ -512,9 +543,11 @@ public class JDKArraySerializers
     public static class DoubleArraySerializer extends ArraySerializerBase<double[]>
     {
         // as above, assuming no one re-defines primitive/wrapper types
-        @SuppressWarnings("deprecation")
-        private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(Double.TYPE);
+        private final static JavaType VALUE_TYPE = simpleElementType(Double.TYPE);
 
+        // @since 2.20
+        final static DoubleArraySerializer instance = new DoubleArraySerializer();
+        
         public DoubleArraySerializer() { super(double[].class); }
 
         /**
@@ -549,9 +582,9 @@ public class JDKArraySerializers
             // 14-Jan-2012, tatu: We could refer to an actual serializer if absolutely necessary
             return null;
         }
-        
+
         @Override
-        public boolean isEmpty(SerializerProvider prov, double[] value) {
+        public boolean isEmpty(SerializationContext prov, double[] value) {
             return value.length == 0;
         }
 
@@ -561,11 +594,25 @@ public class JDKArraySerializers
         }
 
         @Override
-        public final void serialize(double[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public ValueSerializer<?> createContextual(SerializationContext ctxt, BeanProperty property)
+        {
+            JsonFormat.Value format = findFormatOverrides(ctxt, property,
+                    handledType());
+            if (format != null) {
+                if (format.getShape() == JsonFormat.Shape.BINARY) {
+                    return BinaryDoubleArraySerializer.instance;
+                }
+            }
+            return super.createContextual(ctxt, property);
+        }
+        
+        @Override
+        public void serialize(double[] value, JsonGenerator g, SerializationContext ctxt)
+            throws JacksonException
         {
             final int len = value.length;
-            if ((len == 1) && _shouldUnwrapSingle(provider)) {
-                serializeContents(value, g, provider);
+            if ((len == 1) && _shouldUnwrapSingle(ctxt)) {
+                serializeContents(value, g, ctxt);
                 return;
             }
             // 11-May-2016, tatu: As per [core#277] we have efficient `writeArray(...)` available
@@ -573,7 +620,7 @@ public class JDKArraySerializers
         }
 
         @Override
-        public void serializeContents(double[] value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+        public void serializeContents(double[] value, JsonGenerator g, SerializationContext ctxt) throws JacksonException
         {
             for (int i = 0, len = value.length; i < len; ++i) {
                 g.writeNumber(value[i]);
@@ -583,6 +630,174 @@ public class JDKArraySerializers
         @Override
         public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
         {
+            visitArrayFormat(visitor, typeHint, JsonFormatTypes.NUMBER);
+        }
+    }
+
+    /*
+    /**********************************************************************
+    /* Concrete serializers, alternative "binary Vector" representations
+    /**********************************************************************
+     */
+
+    /**
+     * Alternative serializer for arrays of primitive floats, using "packed binary"
+     * representation ("binary vector") instead of JSON array.
+     *
+     * @since 2.20
+     */
+    @JacksonStdImpl
+    public static class BinaryFloatArraySerializer extends StdSerializer<float[]>
+    {
+        final static BinaryFloatArraySerializer instance = new BinaryFloatArraySerializer();
+        
+        public BinaryFloatArraySerializer() {
+            super(float[].class);
+        }
+
+        @Override
+        public boolean isEmpty(SerializationContext ctxt, float[] value) {
+            return value.length == 0;
+        }
+
+        @Override
+        public ValueSerializer<?> createContextual(SerializationContext ctxt, BeanProperty property)
+        {
+            JsonFormat.Value format = findFormatOverrides(ctxt, property,
+                    handledType());
+            if (format != null) {
+                switch (format.getShape()) {
+                case ARRAY:
+                case NATURAL:
+                    return FloatArraySerializer.instance;
+                default:
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public void serialize(float[] value, JsonGenerator g, SerializationContext ctxt)
+            throws JacksonException
+        {
+            // First: "pack" the floats into bytes
+            final int vectorLen = value.length;
+            final byte[] b = new byte[vectorLen << 2];
+            for (int i = 0, out = 0; i < vectorLen; i++) {
+                final int floatBits = Float.floatToIntBits(value[i]);
+                b[out++] = (byte) (floatBits >> 24);
+                b[out++] = (byte) (floatBits >> 16);
+                b[out++] = (byte) (floatBits >> 8);
+                b[out++] = (byte) (floatBits);
+            }
+            // Second: write packed bytes (for JSON, Base64 encoded)
+            g.writeBinary(ctxt.getConfig().getBase64Variant(),
+                    b, 0, b.length);
+        }
+
+        @Override
+        public void serializeWithType(float[] value, JsonGenerator g, SerializationContext ctxt,
+                TypeSerializer typeSer)
+            throws JacksonException
+        {
+            // most likely scalar
+            WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
+                    typeSer.typeId(value, JsonToken.VALUE_EMBEDDED_OBJECT));
+            serialize(value, g, ctxt);
+            typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
+        }
+
+        @Override
+        public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
+        {
+            // 06-Aug-2025, tatu: while logically (and within JVM) binary, gets encoded as Base64 String,
+            // let's try to indicate it is array of Float... difficult, thanks to JSON Schema's
+            // lackluster listing of types
+            visitArrayFormat(visitor, typeHint, JsonFormatTypes.NUMBER);
+        }
+    }
+
+    /**
+     * Alternative serializer for arrays of primitive doubles, using "packed binary"
+     * representation ("binary vector") instead of JSON array.
+     *
+     * @since 2.20
+     */
+    @JacksonStdImpl
+    public static class BinaryDoubleArraySerializer extends StdSerializer<double[]>
+    {
+        final static BinaryDoubleArraySerializer instance = new BinaryDoubleArraySerializer();
+        
+        public BinaryDoubleArraySerializer() {
+            super(double[].class);
+        }
+
+        @Override
+        public boolean isEmpty(SerializationContext ctxt, double[] value) {
+            return value.length == 0;
+        }
+
+        @Override
+        public ValueSerializer<?> createContextual(SerializationContext ctxt, BeanProperty property)
+        {
+            JsonFormat.Value format = findFormatOverrides(ctxt, property,
+                    handledType());
+            if (format != null) {
+                switch (format.getShape()) {
+                case ARRAY:
+                case NATURAL:
+                    return DoubleArraySerializer.instance;
+                default:
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public void serialize(double[] value, JsonGenerator g, SerializationContext ctxt)
+            throws JacksonException
+        {
+            // First: "pack" the floats into bytes
+            final int vectorLen = value.length;
+            final byte[] b = new byte[vectorLen << 3];
+            for (int i = 0, out = 0; i < vectorLen; i++) {
+                long bits = Double.doubleToLongBits(value[i]);
+                final int hi = (int) (bits >> 32);
+                b[out] = (byte) (hi >> 24);
+                b[out+1] = (byte) (hi >> 16);
+                b[out+2] = (byte) (hi >> 8);
+                b[out+3] = (byte) (hi);
+                final int lo = (int) bits;
+                b[out+4] = (byte) (lo >> 24);
+                b[out+5] = (byte) (lo >> 16);
+                b[out+6] = (byte) (lo >> 8);
+                b[out+7] = (byte) (lo);
+                out += 8;
+            }
+            // Second: write packed bytes (for JSON, Base64 encoded)
+            g.writeBinary(ctxt.getConfig().getBase64Variant(),
+                    b, 0, b.length);
+        }
+
+        @Override
+        public void serializeWithType(double[] value, JsonGenerator g, SerializationContext ctxt,
+                TypeSerializer typeSer)
+            throws JacksonException
+        {
+            // most likely scalar
+            WritableTypeId typeIdDef = typeSer.writeTypePrefix(g, ctxt,
+                    typeSer.typeId(value, JsonToken.VALUE_EMBEDDED_OBJECT));
+            serialize(value, g, ctxt);
+            typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
+        }
+
+        @Override
+        public void acceptJsonFormatVisitor(JsonFormatVisitorWrapper visitor, JavaType typeHint)
+            throws JacksonException
+        {
+            // 14-Mar-2016, tatu: while logically (and within JVM) binary, gets encoded as Base64 String,
+            // let's try to indicate it is array of Float... difficult, thanks to JSON Schema's
+            // lackluster listing of types
             visitArrayFormat(visitor, typeHint, JsonFormatTypes.NUMBER);
         }
     }

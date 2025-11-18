@@ -2,24 +2,27 @@ package tools.jackson.databind.jsontype;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.jsontype.impl.StdSubtypeResolver;
-import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Separate tests for verifying that "type name" type id mechanism
  * works.
  */
-public class TestTypeNames extends BaseMapTest
+public class TestTypeNames extends DatabindTestUtil
 {
     @SuppressWarnings("serial")
-    static class AnimalMap extends LinkedHashMap<String,Animal> { }
+    static class AnimalMap extends LinkedHashMap<String, Animal> { }
 
     @JsonTypeInfo(property = "type", include = JsonTypeInfo.As.PROPERTY, use = JsonTypeInfo.Id.NAME)
     @JsonSubTypes({
@@ -32,15 +35,18 @@ public class TestTypeNames extends BaseMapTest
 
     @JsonTypeName("B")
     static class B1616 extends Base1616 { }
-    
+
     /*
     /**********************************************************
     /* Unit tests
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+            .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .build();
 
+    @Test
     public void testBaseTypeId1616() throws Exception
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -58,19 +64,21 @@ public class TestTypeNames extends BaseMapTest
             }
         }
     }
-    
+
+    @Test
     public void testSerialization() throws Exception
     {
         // Note: need to use wrapper array just so that we can define
         // static type on serialization. If we had root static types,
         // could use those; but at the moment root type is dynamic
-        
-        assertEquals("[{\"doggy\":{\"name\":\"Spot\",\"ageInYears\":3}}]",
+
+        assertEquals("[{\"doggy\":{\"ageInYears\":3,\"name\":\"Spot\"}}]",
                 MAPPER.writeValueAsString(new Animal[] { new Dog("Spot", 3) }));
         assertEquals("[{\"MaineCoon\":{\"name\":\"Belzebub\",\"purrs\":true}}]",
                 MAPPER.writeValueAsString(new Animal[] { new MaineCoon("Belzebub", true)}));
     }
 
+    @Test
     public void testRoundTrip() throws Exception
     {
         Animal[] input = new Animal[] {
@@ -81,14 +89,14 @@ public class TestTypeNames extends BaseMapTest
         };
         String json = MAPPER.writeValueAsString(input);
         List<Animal> output = MAPPER.readValue(json,
-                TypeFactory.defaultInstance().constructCollectionType(ArrayList.class, Animal.class));
+                defaultTypeFactory().constructCollectionType(ArrayList.class, Animal.class));
         assertEquals(input.length, output.size());
         for (int i = 0, len = input.length; i < len; ++i) {
-            assertEquals("Entry #"+i+" differs, input = '"+json+"'",
-                input[i], output.get(i));
+            assertEquals(input[i], output.get(i), "Entry #"+i+" differs, input = '"+json+"'");
         }
     }
 
+    @Test
     public void testRoundTripMap() throws Exception
     {
         AnimalMap input = new AnimalMap();
@@ -126,7 +134,6 @@ class Animal
 {
     public String name;
 
-
     @Override
     public boolean equals(Object o) {
         if (o == this) return true;
@@ -146,7 +153,7 @@ class Dog extends Animal
     public int ageInYears;
 
     public Dog() { }
-    public Dog(String n, int y) {
+    protected Dog(String n, int y) {
         name = n;
         ageInYears = y;
     }
@@ -165,7 +172,7 @@ class Dog extends Animal
 abstract class Cat extends Animal {
     public boolean purrs;
     public Cat() { }
-    public Cat(String n, boolean p) {
+    protected Cat(String n, boolean p) {
         name = n;
         purrs = p;
     }
@@ -186,7 +193,7 @@ abstract class Cat extends Animal {
  */
 class MaineCoon extends Cat {
     public MaineCoon() { super(); }
-    public MaineCoon(String n, boolean p) {
+    protected MaineCoon(String n, boolean p) {
         super(n, p);
     }
 }
@@ -194,7 +201,7 @@ class MaineCoon extends Cat {
 @JsonTypeName("persialaisKissa")
 class Persian extends Cat {
     public Persian() { super(); }
-    public Persian(String n, boolean p) {
+    protected Persian(String n, boolean p) {
         super(n, p);
     }
 }

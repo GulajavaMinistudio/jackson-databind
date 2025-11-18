@@ -11,15 +11,18 @@ import tools.jackson.databind.ser.SerializationContextExt;
 import tools.jackson.databind.ser.SerializerCache;
 import tools.jackson.databind.ser.SerializerFactory;
 import tools.jackson.databind.ser.std.StdSerializer;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CustomNullSerializationTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     static class NullAsFoobarSerializer extends StdSerializer<Object>
     {
         public NullAsFoobarSerializer() { super(Object.class); }
         @Override
-        public void serialize(Object value, JsonGenerator gen, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator gen, SerializationContext provider)
         {
             gen.writeString("foobar");
         }
@@ -32,7 +35,7 @@ public class CustomNullSerializationTest
     static class Bean2 {
         public String type = null;
     }
-    
+
     @SuppressWarnings("serial")
     static class MyNullSerializerContexts extends SerializationContexts
     {
@@ -52,14 +55,14 @@ public class CustomNullSerializationTest
         @Override
         public SerializationContextExt createContext(SerializationConfig config,
                 GeneratorSettings genSettings) {
-            return new MyNullSerializerProvider(_streamFactory, _cache,
+            return new MyNullSerializerSerializationContext(_streamFactory, _cache,
                     config, genSettings, _serializerFactory);
         }
     }
 
-    static class MyNullSerializerProvider extends SerializationContextExt
+    static class MyNullSerializerSerializationContext extends SerializationContextExt
     {
-        public MyNullSerializerProvider(TokenStreamFactory streamFactory,
+        public MyNullSerializerSerializationContext(TokenStreamFactory streamFactory,
                 SerializerCache cache, SerializationConfig config,
                 GeneratorSettings genSettings, SerializerFactory f) {
             super(streamFactory, config, genSettings, f, cache);
@@ -85,7 +88,7 @@ public class CustomNullSerializationTest
     @JsonSerialize(nullsUsing=NullSerializer.class)
     static class NullValuedType { }
 */
-    
+
     /*
     /**********************************************************************
     /* Test methods
@@ -93,7 +96,7 @@ public class CustomNullSerializationTest
      */
 
     private final ObjectMapper MAPPER = objectMapper();
-    
+
     public void testSimple() throws Exception
     {
         assertEquals("null", MAPPER.writeValueAsString(null));

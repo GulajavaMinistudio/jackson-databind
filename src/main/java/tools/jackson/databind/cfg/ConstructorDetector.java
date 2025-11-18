@@ -4,7 +4,7 @@ import tools.jackson.databind.util.ClassUtil;
 
 /**
  * Configurable handler used to select aspects of selecting
- * constructor to use as "Creator" for POJOs.
+ * constructor(s) to use as "Creators" for POJOs.
  * Defines the API for handlers, a pre-defined set of standard instances
  * and methods for constructing alternative configurations.
  *
@@ -13,7 +13,14 @@ import tools.jackson.databind.util.ClassUtil;
 public final class ConstructorDetector
     implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 3L;
+
+    /**
+     * See {@link #allowImplicitWithDefaultConstructor} for details.
+     *
+     * @since 3.0
+     */
+    public final static boolean DEFAULT_ALLOW_IMPLICIT_WITH_DEFAULT_CONSTRUCTOR = true;
 
     /**
      * Definition of alternate handling modes of single-argument constructors
@@ -26,7 +33,7 @@ public final class ConstructorDetector
      *<p>
      * Default choice is {@code HEURISTIC} (which is Jackson pre-2.12 always uses)
      *<p>
-     * NOTE: does NOT have any effect if explicit {@code @JsonCreator}} annotation
+     * NOTE: does NOT have any effect if explicit {@code @JsonCreator} annotation
      * is required.
      *
      * @since 2.12
@@ -55,7 +62,7 @@ public final class ConstructorDetector
          * {@link tools.jackson.databind.exc.InvalidDefinitionException}
          * in ambiguous case.
          */
-        REQUIRE_MODE;
+        REQUIRE_MODE
     }
 
     /*
@@ -122,6 +129,14 @@ public final class ConstructorDetector
      */
     protected final boolean _allowJDKTypeCtors;
 
+    /**
+     * Whether implicit detection of Properties-based Constructors is allowed
+     * when there is the default (no-parameter) constructor available.
+     *
+     * @since 3.0
+     */
+    protected final boolean _allowImplicitWithDefaultConstructor;
+
     /*
     /**********************************************************************
     /* Life-cycle
@@ -130,11 +145,13 @@ public final class ConstructorDetector
 
     protected ConstructorDetector(SingleArgConstructor singleArgMode,
             boolean requireCtorAnnotation,
-            boolean allowJDKTypeCtors)
+            boolean allowJDKTypeCtors,
+            boolean allowImplicitWithDefaultConstructor)
     {
         _singleArgMode = singleArgMode;
         _requireCtorAnnotation = requireCtorAnnotation;
         _allowJDKTypeCtors = allowJDKTypeCtors;
+        _allowImplicitWithDefaultConstructor = allowImplicitWithDefaultConstructor;
     }
 
     /**
@@ -142,22 +159,37 @@ public final class ConstructorDetector
      * by {@code _singleArgMode}
      */
     protected ConstructorDetector(SingleArgConstructor singleArgMode) {
-        this(singleArgMode, false, false);
+        this(singleArgMode, false, false, DEFAULT_ALLOW_IMPLICIT_WITH_DEFAULT_CONSTRUCTOR);
     }
 
     public ConstructorDetector withSingleArgMode(SingleArgConstructor singleArgMode) {
         return new ConstructorDetector(singleArgMode,
-                _requireCtorAnnotation, _allowJDKTypeCtors);
+                _requireCtorAnnotation, _allowJDKTypeCtors,
+                _allowImplicitWithDefaultConstructor);
     }
 
     public ConstructorDetector withRequireAnnotation(boolean state) {
         return new ConstructorDetector(_singleArgMode,
-                state, _allowJDKTypeCtors);
+                state, _allowJDKTypeCtors,
+                _allowImplicitWithDefaultConstructor);
     }
 
     public ConstructorDetector withAllowJDKTypeConstructors(boolean state) {
         return new ConstructorDetector(_singleArgMode,
-                _requireCtorAnnotation, state);
+                _requireCtorAnnotation, state,
+                _allowImplicitWithDefaultConstructor);
+    }
+
+    /**
+     * Mutant factory method that can be used to change setting that
+     * {@link #allowImplicitWithDefaultConstructor} returns.
+     *
+     * @since 3.0
+     */
+    public ConstructorDetector withAllowImplicitWithDefaultConstructor(boolean state) {
+        return new ConstructorDetector(_singleArgMode,
+                _requireCtorAnnotation, _allowJDKTypeCtors,
+                state);
     }
 
     /*
@@ -178,6 +210,19 @@ public final class ConstructorDetector
         return _allowJDKTypeCtors;
     }
 
+    /**
+     * Method that can be used to determine whether implicit detection of
+     * Properties-based Constructors is allowed when there is a default
+     * (no-parameter) constructor available.
+     * Note that this only matters if {@link #shouldIntrospectImplicitConstructors}
+     * returns {@code true}.
+     *
+     * @since 3.0
+     */
+    public boolean allowImplicitWithDefaultConstructor() {
+        return _allowImplicitWithDefaultConstructor;
+    }
+
     public boolean singleArgCreatorDefaultsToDelegating() {
         return _singleArgMode == SingleArgConstructor.DELEGATING;
     }
@@ -191,12 +236,12 @@ public final class ConstructorDetector
      * and, if so, whether JDK type constructors are allowed (if type is JDK type)
      * to determine whether implicit constructor
      * detection should be enabled for given type or not.
-     * 
+     *
      * @param rawType Value type to consider
      *
      * @return True if implicit constructor detection should be enabled; false if not
      */
-    public boolean shouldIntrospectorImplicitConstructors(Class<?> rawType) {
+    public boolean shouldIntrospectImplicitConstructors(Class<?> rawType) {
         // May not allow implicit creator introspection at all:
         if (_requireCtorAnnotation) {
             return false;

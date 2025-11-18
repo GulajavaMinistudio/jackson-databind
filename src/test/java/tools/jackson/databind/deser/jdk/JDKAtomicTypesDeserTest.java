@@ -6,17 +6,24 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
+import tools.jackson.core.JsonParser;
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.deser.std.StdScalarDeserializer;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+import static tools.jackson.databind.testutil.DatabindTestUtil.newJsonMapper;
 
 public class JDKAtomicTypesDeserTest
-    extends tools.jackson.databind.BaseMapTest
 {
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
     @JsonSubTypes({ @JsonSubTypes.Type(Impl.class) })
@@ -85,6 +92,16 @@ public class JDKAtomicTypesDeserTest
         public AtomicReference<Object> value;
     }
 
+    static class LowerCasingDeserializer extends StdScalarDeserializer<String>
+    {
+        public LowerCasingDeserializer() { super(String.class); }
+
+        @Override
+        public String deserialize(JsonParser p, DeserializationContext ctxt) {
+            return p.getString().toLowerCase();
+        }
+    }
+
     static class LCStringWrapper {
         @JsonDeserialize(contentUsing=LowerCasingDeserializer.class)
         public AtomicReference<String> value;
@@ -146,25 +163,29 @@ public class JDKAtomicTypesDeserTest
      */
 
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testAtomicBoolean() throws Exception
     {
         AtomicBoolean b = MAPPER.readValue("true", AtomicBoolean.class);
         assertTrue(b.get());
     }
 
+    @Test
     public void testAtomicInt() throws Exception
     {
         AtomicInteger value = MAPPER.readValue("13", AtomicInteger.class);
         assertEquals(13, value.get());
     }
 
+    @Test
     public void testAtomicLong() throws Exception
     {
         AtomicLong value = MAPPER.readValue("12345678901", AtomicLong.class);
         assertEquals(12345678901L, value.get());
     }
 
+    @Test
     public void testAtomicReference() throws Exception
     {
         AtomicReference<long[]> value = MAPPER.readValue("[1,2]",
@@ -180,6 +201,7 @@ public class JDKAtomicTypesDeserTest
     }
 
     // for [databind#811]
+    @Test
     public void testAbsentExclusion() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -191,6 +213,7 @@ public class JDKAtomicTypesDeserTest
                 mapper.writeValueAsString(new SimpleWrapper(null)));
     }
 
+    @Test
     public void testSerPropInclusionAlways() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -201,6 +224,7 @@ public class JDKAtomicTypesDeserTest
                 mapper.writeValueAsString(new SimpleWrapper(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonNull() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -211,6 +235,7 @@ public class JDKAtomicTypesDeserTest
                 mapper.writeValueAsString(new SimpleWrapper(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonAbsent() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -221,6 +246,7 @@ public class JDKAtomicTypesDeserTest
                 mapper.writeValueAsString(new SimpleWrapper(Boolean.TRUE)));
     }
 
+    @Test
     public void testSerPropInclusionNonEmpty() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -232,11 +258,12 @@ public class JDKAtomicTypesDeserTest
     }
 
     // [databind#340]
+    @Test
     public void testPolymorphicAtomicReference() throws Exception
     {
         RefWrapper input = new RefWrapper(13);
         String json = MAPPER.writeValueAsString(input);
-        
+
         RefWrapper result = MAPPER.readValue(json, RefWrapper.class);
         assertNotNull(result.w);
         Object ob = result.w.get();
@@ -245,6 +272,7 @@ public class JDKAtomicTypesDeserTest
     }
 
     // [databind#740]
+    @Test
     public void testFilteringOfAtomicReference() throws Exception
     {
         SimpleWrapper input = new SimpleWrapper(null);
@@ -266,6 +294,7 @@ public class JDKAtomicTypesDeserTest
         assertEquals("{}", mapper.writeValueAsString(input));
     }
 
+    @Test
     public void testTypeRefinement() throws Exception
     {
         RefiningWrapper input = new RefiningWrapper();
@@ -282,6 +311,7 @@ public class JDKAtomicTypesDeserTest
     }
 
     // [databind#882]: verify `@JsonDeserialize(contentAs=)` works with AtomicReference
+    @Test
     public void testDeserializeWithContentAs() throws Exception
     {
         AtomicRefReadWrapper result = MAPPER.readValue(a2q("{'value':'abc'}"),
@@ -291,8 +321,9 @@ public class JDKAtomicTypesDeserTest
          assertEquals(WrappedString.class, v.getClass());
          assertEquals("abc", ((WrappedString)v).value);
     }
-    
+
     // [databind#932]: support unwrapping too
+    @Test
     public void testWithUnwrapping() throws Exception
     {
          String jsonExp = a2q("{'XX.name':'Bob'}");
@@ -300,6 +331,7 @@ public class JDKAtomicTypesDeserTest
          assertEquals(jsonExp, jsonAct);
     }
 
+    @Test
     public void testWithCustomDeserializer() throws Exception
     {
         LCStringWrapper w = MAPPER.readValue(a2q("{'value':'FoobaR'}"),
@@ -307,6 +339,7 @@ public class JDKAtomicTypesDeserTest
         assertEquals("foobar", w.value.get());
     }
 
+    @Test
     public void testEmpty1256() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -317,6 +350,7 @@ public class JDKAtomicTypesDeserTest
 
     // [databind#1307]
     @SuppressWarnings("unchecked")
+    @Test
     public void testNullValueHandling() throws Exception
     {
         AtomicReference<Double> inputData = new AtomicReference<Double>();
@@ -327,6 +361,7 @@ public class JDKAtomicTypesDeserTest
     }
 
     // [databind#2303]
+    @Test
     public void testNullWithinNested() throws Exception
     {
         final ObjectReader r = MAPPER.readerFor(MyBean2303.class);
@@ -342,6 +377,7 @@ public class JDKAtomicTypesDeserTest
     }
 
     // for [modules-java8#214]: ReferenceType of List, merge
+    @Test
     public void testMergeToListViaRef() throws Exception
     {
         ListWrapper base = MAPPER.readValue(a2q("{'list':['a']}"),
@@ -359,26 +395,39 @@ public class JDKAtomicTypesDeserTest
     // values.
     //
     // @since 2.14
+    @Test
     public void testAbsentAtomicRefViaCreator() throws Exception
     {
         AtomicRefBean bean;
 
+        ObjectReader r = MAPPER.readerFor(AtomicRefBean.class);
+        
         // First: null should become empty, non-null reference
-        bean = MAPPER.readValue(a2q("{'atomic':null}"), AtomicRefBean.class);
+        bean = r.readValue(a2q("{'atomic':null}"));
         assertNotNull(bean._atomic);
         assertNull(bean._atomic.get());
 
         // And then absent (missing), via Creator method, should become actual null
-        bean = MAPPER.readValue("{}", AtomicRefBean.class);
+        // 25-Oct-2025, tatu: [databind#53530] Actually, by default should become
+        //   empty ref
+        bean = r.readValue("{}");
+        assertNotNull(bean._atomic);
+        assertNull(bean._atomic.get());
+
+        // 25-Oct-2025, tatu: but can reconfigure to get `null` instead
+        bean = r.with(DeserializationFeature.USE_NULL_FOR_MISSING_REFERENCE_VALUES)
+                .readValue("{}");
         assertNull(bean._atomic);
 
-        // Except that we can override handling to produce empty
+        // Plus can override handling to produce empty
         AtomicRefBeanWithEmpty bean2 = MAPPER.readValue("{}", AtomicRefBeanWithEmpty.class);
         assertNotNull(bean2._atomic);
         assertNull(bean2._atomic.get());
+
     }
 
     // @since 2.14
+    @Test
     public void testAtomicRefWithNodeViaCreator() throws Exception
     {
         AtomicRefWithNodeBean bean;
@@ -391,7 +440,16 @@ public class JDKAtomicTypesDeserTest
         assertTrue(n.isNull());
 
         // And then absent (missing), via Creator method, should become actual null
+        // 25-Oct-2025, tatu: [databind#5350] Not any longer... (by default)
         bean = MAPPER.readValue("{}", AtomicRefWithNodeBean.class);
+        assertNotNull(bean._atomicNode);
+        n = bean._atomicNode.get();
+        assertTrue(n.isNull());
+
+        // but can reconfigure to get `null` instead
+        bean = MAPPER.readerFor(AtomicRefWithNodeBean.class)
+                .with(DeserializationFeature.USE_NULL_FOR_MISSING_REFERENCE_VALUES)
+                .readValue("{}");
         assertNull(bean._atomicNode);
     }
 }

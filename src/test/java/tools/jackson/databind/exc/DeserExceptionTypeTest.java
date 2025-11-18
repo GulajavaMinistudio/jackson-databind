@@ -1,10 +1,16 @@
 package tools.jackson.databind.exc;
 
-import tools.jackson.core.*;
-import tools.jackson.core.exc.WrappedIOException;
+import org.junit.jupiter.api.Test;
 
+import tools.jackson.core.*;
+import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.databind.*;
 import tools.jackson.databind.testutil.BrokenStringReader;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Unit test for verifying that exceptions are properly handled (caught,
@@ -13,7 +19,7 @@ import tools.jackson.databind.testutil.BrokenStringReader;
  * (and streaming-level equivalents).
  */
 public class DeserExceptionTypeTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     static class Bean {
         public String propX;
@@ -27,7 +33,7 @@ public class DeserExceptionTypeTest
         // Constructor that is not detectable as Creator
         protected NoCreatorsBean(boolean foo, int foo2) { }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
@@ -35,12 +41,15 @@ public class DeserExceptionTypeTest
      */
 
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testHandlingOfUnrecognized() throws Exception
     {
         UnrecognizedPropertyException exc = null;
         try {
-            MAPPER.readValue("{\"bar\":3}", Bean.class);
+            MAPPER.readerFor(Bean.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .readValue("{\"bar\":3}");
         } catch (UnrecognizedPropertyException e) {
             exc = e;
         }
@@ -51,12 +60,15 @@ public class DeserExceptionTypeTest
         assertEquals(Bean.class, exc.getReferringClass());
         // also: should get list of known properties
         verifyException(exc, "propX");
+        // and as per [databind#5179] current token (pointing to start of value?)
+        assertEquals(JsonToken.VALUE_NUMBER_INT, exc.getCurrentToken());
     }
 
     /**
      * Simple test to check behavior when end-of-stream is encountered
      * without content.
      */
+    @Test
     public void testExceptionWithEmpty() throws Exception
     {
         try {
@@ -64,9 +76,11 @@ public class DeserExceptionTypeTest
             fail("Expected an exception, but got result value: "+result);
         } catch (MismatchedInputException e) {
             verifyException(e, "No content");
+            assertNull(e.getCurrentToken());
         }
     }
 
+    @Test
     public void testExceptionWithIncomplete()
         throws Exception
     {
@@ -78,10 +92,11 @@ public class DeserExceptionTypeTest
         } catch (JacksonException e) {
             // For "bona fide" IO problems (due to low-level problem,
             // thrown by reader/stream), IOException must be thrown
-            verifyException(e, WrappedIOException.class, "TEST");
+            verifyException(e, JacksonIOException.class, "TEST");
         }
     }
 
+    @Test
     public void testExceptionWithEOF() throws Exception
     {
         JsonParser p = MAPPER.createParser("  3");
@@ -95,6 +110,8 @@ public class DeserExceptionTypeTest
             fail("Should have gotten an exception");
         } catch (JacksonException e) {
             verifyException(e, MismatchedInputException.class, "No content");
+            MismatchedInputException mie = (MismatchedInputException) e;
+            assertNull(mie.getCurrentToken());
         }
         // also: should have no current token after end-of-input
         JsonToken t = p.currentToken();
@@ -105,6 +122,7 @@ public class DeserExceptionTypeTest
     }
 
     // [databind#1414]
+    @Test
     public void testExceptionForNoCreators() throws Exception
     {
         try {

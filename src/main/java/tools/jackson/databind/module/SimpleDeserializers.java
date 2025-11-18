@@ -29,19 +29,19 @@ public class SimpleDeserializers
      * Flag to help find "generic" enum deserializer, if one has been registered.
      */
     protected boolean _hasEnumDeserializer = false;
-    
+
     /*
     /**********************************************************
     /* Life-cycle, construction and configuring
     /**********************************************************
      */
-    
+
     public SimpleDeserializers() { }
 
     public SimpleDeserializers(Map<Class<?>,ValueDeserializer<?>> desers) {
         addDeserializers(desers);
     }
-    
+
     public <T> SimpleDeserializers addDeserializer(Class<T> forClass, ValueDeserializer<? extends T> deser)
     {
         ClassKey key = new ClassKey(forClass);
@@ -67,7 +67,7 @@ public class SimpleDeserializers
         }
         return this;
     }
-    
+
     /*
     /**********************************************************
     /* Serializers implementation
@@ -76,7 +76,7 @@ public class SimpleDeserializers
 
     @Override
     public ValueDeserializer<?> findArrayDeserializer(ArrayType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
     {
         return _find(type);
@@ -84,14 +84,14 @@ public class SimpleDeserializers
 
     @Override
     public ValueDeserializer<?> findBeanDeserializer(JavaType type,
-            DeserializationConfig config, BeanDescription beanDesc)
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef)
     {
         return _find(type);
     }
 
     @Override
     public ValueDeserializer<?> findCollectionDeserializer(CollectionType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             TypeDeserializer elementTypeDeserializer,
             ValueDeserializer<?> elementDeserializer)
     {
@@ -100,27 +100,27 @@ public class SimpleDeserializers
 
     @Override
     public ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             TypeDeserializer elementTypeDeserializer,
             ValueDeserializer<?> elementDeserializer)
     {
         return _find(type);
     }
-    
+
     @Override
-    public ValueDeserializer<?> findEnumDeserializer(Class<?> type,
-            DeserializationConfig config, BeanDescription beanDesc)
+    public ValueDeserializer<?> findEnumDeserializer(JavaType enumType,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef)
     {
         if (_classMappings == null) {
             return null;
         }
-        ValueDeserializer<?> deser = _classMappings.get(new ClassKey(type));
+        ValueDeserializer<?> deser = _classMappings.get(new ClassKey(enumType.getRawClass()));
         if (deser == null) {
             // 29-Sep-2019, tatu: Not 100% sure this is workable logic but leaving
             //   as is (wrt [databind#2457]. Probably works ok since this covers direct
             //   sub-classes of `Enum`; but even if custom sub-classes aren't, unlikely
             //   mapping for those ever requested for deserialization
-            if (_hasEnumDeserializer && type.isEnum()) {
+            if (_hasEnumDeserializer && enumType.isEnumType()) {
                 deser = _classMappings.get(new ClassKey(Enum.class));
             }
         }
@@ -128,18 +128,15 @@ public class SimpleDeserializers
     }
 
     @Override
-    public ValueDeserializer<?> findTreeNodeDeserializer(Class<? extends JsonNode> nodeType,
-            DeserializationConfig config, BeanDescription beanDesc)
+    public ValueDeserializer<?> findTreeNodeDeserializer(JavaType nodeType,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef)
     {
-        if (_classMappings == null) {
-            return null;
-        }
-        return _classMappings.get(new ClassKey(nodeType));
+        return _find(nodeType);
     }
 
     @Override
     public ValueDeserializer<?> findReferenceDeserializer(ReferenceType refType,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             TypeDeserializer contentTypeDeserializer, ValueDeserializer<?> contentDeserializer)
     {
         // 21-Oct-2015, tatu: Unlikely this will really get used (reference types need more
@@ -149,7 +146,7 @@ public class SimpleDeserializers
 
     @Override
     public ValueDeserializer<?> findMapDeserializer(MapType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             KeyDeserializer keyDeserializer,
             TypeDeserializer elementTypeDeserializer,
             ValueDeserializer<?> elementDeserializer)
@@ -159,7 +156,7 @@ public class SimpleDeserializers
 
     @Override
     public ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             KeyDeserializer keyDeserializer,
             TypeDeserializer elementTypeDeserializer,
             ValueDeserializer<?> elementDeserializer)

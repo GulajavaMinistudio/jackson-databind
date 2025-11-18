@@ -2,22 +2,26 @@ package tools.jackson.databind.introspect;
 
 import java.util.Objects;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidDefinitionException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestAutoDetect
-    extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestAutoDetect extends DatabindTestUtil
 {
     // 21-Sep-2017, tatu: With 2.x, private delegating ctor was acceptable; with 3.x
     //    must be non-private OR annotated
     static class ProtectedBean {
-        String a;
+        String _a;
 
-        protected ProtectedBean(String a) { this.a = a; }
+        protected ProtectedBean(String a) { this._a = a; }
     }
 
     // Private scalar constructor ok, but only if annotated (or level changed)
@@ -32,7 +36,7 @@ public class TestAutoDetect
         String a;
         private PrivateBeanNonAnnotated(String a) { this.a = a; }
     }
-    
+
     // test for [databind#1347], config overrides for visibility
     @JsonPropertyOrder(alphabetic=true)
     static class Feature1347SerBean {
@@ -106,12 +110,13 @@ public class TestAutoDetect
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testProtectedDelegatingCtor() throws Exception
     {
         // first, default settings, with which construction works ok
         ObjectMapper m = new ObjectMapper();
         ProtectedBean bean = m.readValue(q("abc"), ProtectedBean.class);
-        assertEquals("abc", bean.a);
+        assertEquals("abc", bean._a);
 
         // then by increasing visibility requirement:
         m = jsonMapperBuilder()
@@ -149,6 +154,7 @@ public class TestAutoDetect
     }
 
     // [databind#1347]
+    @Test
     public void testVisibilityConfigOverridesForSer() throws Exception
     {
         // first, by default, both field/method should be visible
@@ -166,6 +172,7 @@ public class TestAutoDetect
     }
 
     // [databind#1347]
+    @Test
     public void testVisibilityConfigOverridesForDeser() throws Exception
     {
         final String JSON = a2q("{'value':3}");
@@ -175,11 +182,13 @@ public class TestAutoDetect
             /*Feature1347DeserBean bean =*/
             MAPPER.readValue(JSON, Feature1347DeserBean.class);
             fail("Should not pass");
-        } catch (DatabindException e) { // should probably be something more specific but...
+        } catch (JacksonException e) { // should probably be something more specific but...
+            assertInstanceOf(DatabindException.class, e);
             verifyException(e, "Should NOT get called");
         }
 
         // but when instructed to ignore setter, should work
+        // [databind#1947]
         ObjectMapper mapper = jsonMapperBuilder()
                 .withConfigOverride(Feature1347DeserBean.class,
                         o -> o.setVisibility(JsonAutoDetect.Value.construct(PropertyAccessor.SETTER,
@@ -190,6 +199,7 @@ public class TestAutoDetect
     }
 
     // [databind#2789]
+    @Test
     public void testAnnotatedFieldIssue2789() throws Exception {
         final String json = MAPPER.writeValueAsString(new DataClassA());
         final DataParent2789 copy = MAPPER.readValue(json, DataParent2789.class);

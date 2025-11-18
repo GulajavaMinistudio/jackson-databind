@@ -1,5 +1,7 @@
 package tools.jackson.databind.deser.creators;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -9,7 +11,13 @@ import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.introspect.AnnotatedParameter;
 import tools.jackson.databind.introspect.JacksonAnnotationIntrospector;
 
-public class ImplicitNameMatch792Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.a2q;
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+import static tools.jackson.databind.testutil.DatabindTestUtil.sharedMapper;
+
+public class ImplicitNameMatch792Test
 {
     // Simple introspector that gives generated "ctorN" names for constructor
     // parameters
@@ -19,13 +27,13 @@ public class ImplicitNameMatch792Test extends BaseMapTest
 
         @Override
         public String findImplicitPropertyName(MapperConfig<?> config, AnnotatedMember member) {
-            if (member instanceof AnnotatedParameter) {
-                return String.format("ctor%d", ((AnnotatedParameter) member).getIndex());
+            if (member instanceof AnnotatedParameter ap) {
+                return String.format("ctor%d", ap.getIndex());
             }
             return super.findImplicitPropertyName(config, member);
         }
     }
-    
+
     @JsonPropertyOrder({ "first" ,"second", "other" })
     static class Issue792Bean
     {
@@ -38,20 +46,23 @@ public class ImplicitNameMatch792Test extends BaseMapTest
         }
 
         public String getCtor0() { return value; }
-        
+
         public int getOther() { return 3; }
     }
 
     static class Bean2
     {
         int x = 3;
-        
+
         @JsonProperty("stuff")
         private void setValue(int i) { x = i; }
 
         public int getValue() { return x; }
     }
 
+    // 17-May-2024, tatu: [databind#4515] This is not a valid test; commenting
+    //    out; to be removed in near future (after 2.18)
+    /*
     static class ReadWriteBean
     {
         private int value;
@@ -71,6 +82,7 @@ public class ImplicitNameMatch792Test extends BaseMapTest
             throw new RuntimeException("Should have used constructor for 'value' not setter");
         }
     }
+    */
 
     // Bean that should only serialize 'value', but deserialize both
     static class PasswordBean
@@ -87,7 +99,7 @@ public class ImplicitNameMatch792Test extends BaseMapTest
             return String.format("[password='%s',value=%d]", password, value);
         }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
@@ -95,7 +107,8 @@ public class ImplicitNameMatch792Test extends BaseMapTest
      */
 
     private final ObjectMapper MAPPER = sharedMapper();
-    
+
+    @Test
     public void testBindingOfImplicitCreatorNames() throws Exception
     {
         ObjectMapper m = jsonMapperBuilder()
@@ -105,18 +118,26 @@ public class ImplicitNameMatch792Test extends BaseMapTest
         assertEquals(a2q("{'first':'a','other':3}"), json);
     }
 
+    @Test
     public void testImplicitWithSetterGetter() throws Exception
     {
         String json = MAPPER.writeValueAsString(new Bean2());
         assertEquals(a2q("{'stuff':3}"), json);
     }
 
+    // 17-May-2024, tatu: [databind#4515] This is not a valid test; commenting
+    //    out; to be removed in near future (after 2.18)
+    // 30-May-2024, tatu: Hmmh. Actually passes if commented out... should reconsider?
+    /*
+    @Test
     public void testReadWriteWithPrivateField() throws Exception
     {
         String json = MAPPER.writeValueAsString(new ReadWriteBean(3));
         assertEquals("{\"value\":3}", json);
     }
+    */
 
+    @Test
     public void testWriteOnly() throws Exception
     {
         PasswordBean bean = MAPPER.readValue(a2q("{'value':7,'password':'foo'}"),

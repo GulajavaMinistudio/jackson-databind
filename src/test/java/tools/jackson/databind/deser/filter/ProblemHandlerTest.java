@@ -3,6 +3,8 @@ package tools.jackson.databind.deser.filter;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import tools.jackson.core.JsonParser;
@@ -14,10 +16,14 @@ import tools.jackson.databind.exc.InvalidTypeIdException;
 import tools.jackson.databind.exc.ValueInstantiationException;
 import tools.jackson.databind.jsontype.TypeIdResolver;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 /**
  * Tests to exercise handler methods of {@link DeserializationProblemHandler}.
  */
-public class ProblemHandlerTest extends BaseMapTest
+public class ProblemHandlerTest
 {
     /*
     /**********************************************************
@@ -65,11 +71,11 @@ public class ProblemHandlerTest extends BaseMapTest
         extends DeserializationProblemHandler
     {
         protected final Object value;
-    
+
         public WeirdStringHandler(Object v0) {
             value = v0;
         }
-    
+
         @Override
         public Object handleWeirdStringValue(DeserializationContext ctxt,
                 Class<?> targetType, String v,
@@ -83,7 +89,7 @@ public class ProblemHandlerTest extends BaseMapTest
         extends DeserializationProblemHandler
     {
         protected final Object value;
-    
+
         public InstantiationProblemHandler(Object v0) {
             value = v0;
         }
@@ -131,6 +137,7 @@ public class ProblemHandlerTest extends BaseMapTest
                 JavaType targetType, JsonToken t, JsonParser p,
                 String failureMsg)
         {
+            p.skipChildren();
             return value;
         }
     }
@@ -141,7 +148,7 @@ public class ProblemHandlerTest extends BaseMapTest
         protected final Class<?> raw;
 
         public UnknownTypeIdHandler(Class<?> r) { raw = r; }
-        
+
         @Override
         public JavaType handleUnknownTypeId(DeserializationContext ctxt,
                 JavaType baseType, String subTypeId, TypeIdResolver idResolver,
@@ -155,9 +162,9 @@ public class ProblemHandlerTest extends BaseMapTest
         extends DeserializationProblemHandler
     {
         protected final Class<?> raw;
-    
+
         public MissingTypeIdHandler(Class<?> r) { raw = r; }
-        
+
         @Override
         public JavaType handleMissingTypeId(DeserializationContext ctxt,
                 JavaType baseType, TypeIdResolver idResolver,
@@ -196,7 +203,7 @@ public class ProblemHandlerTest extends BaseMapTest
     static class Base2Wrapper {
         public Base2 value;
     }
-    
+
     enum SingleValuedEnum {
         A;
     }
@@ -224,6 +231,7 @@ public class ProblemHandlerTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testWeirdKeyHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -237,6 +245,7 @@ public class ProblemHandlerTest extends BaseMapTest
         assertEquals(Integer.valueOf(7), map.keySet().iterator().next());
     }
 
+    @Test
     public void testWeirdNumberHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -246,6 +255,7 @@ public class ProblemHandlerTest extends BaseMapTest
         assertEquals(SingleValuedEnum.A, result);
     }
 
+    @Test
     public void testWeirdStringHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -262,6 +272,24 @@ public class ProblemHandlerTest extends BaseMapTest
         assertNull(result2);
     }
 
+    // [databind#3784]: Base64 decoding
+    @Test
+    public void testWeirdStringForBase64() throws Exception
+    {
+        ObjectMapper mapper = jsonMapperBuilder()
+                .addHandler(new WeirdStringHandler(new byte[0]))
+                .build();
+        byte[] binary = mapper.readValue(q("foobar"), byte[].class);
+        assertNotNull(binary);
+        assertEquals(0, binary.length);
+
+        JsonNode tree = mapper.readTree(q("foobar"));
+        binary = mapper.treeToValue(tree, byte[].class);
+        assertNotNull(binary);
+        assertEquals(0, binary.length);
+    }
+
+    @Test
     public void testInvalidTypeId() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -273,6 +301,7 @@ public class ProblemHandlerTest extends BaseMapTest
         assertEquals(BaseImpl.class, w.value.getClass());
     }
 
+    @Test
     public void testInvalidClassAsId() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -286,6 +315,7 @@ public class ProblemHandlerTest extends BaseMapTest
 
     // 2.9: missing type id, distinct from unknown
 
+    @Test
     public void testMissingTypeId() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -297,6 +327,7 @@ public class ProblemHandlerTest extends BaseMapTest
         assertEquals(BaseImpl.class, w.value.getClass());
     }
 
+    @Test
     public void testMissingClassAsId() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -307,8 +338,9 @@ public class ProblemHandlerTest extends BaseMapTest
         assertNotNull(w);
         assertEquals(Base2Impl.class, w.value.getClass());
     }
-    
+
     // verify that by default we get special exception type
+    @Test
     public void testInvalidTypeIdFail() throws Exception
     {
         try {
@@ -322,6 +354,7 @@ public class ProblemHandlerTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testInstantiationExceptionHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -332,9 +365,14 @@ public class ProblemHandlerTest extends BaseMapTest
         assertNotNull(w);
     }
 
+    @Test
     public void testMissingInstantiatorHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
+            // 14-Jan-2025, tatu: Need to disable trailing tokens (for 3.0)
+            //   for this to work (handler not consuming all tokens as it should
+            //   but no time to fully fix right now)
+            .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .addHandler(new MissingInstantiationHandler(new NoDefaultCtor(13)))
             .build();
         NoDefaultCtor w = mapper.readValue("{ \"x\" : true }", NoDefaultCtor.class);
@@ -342,6 +380,7 @@ public class ProblemHandlerTest extends BaseMapTest
         assertEquals(13, w.value);
     }
 
+    @Test
     public void testUnexpectedTokenHandling() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()

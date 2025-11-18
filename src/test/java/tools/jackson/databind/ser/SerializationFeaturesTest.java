@@ -3,17 +3,22 @@ package tools.jackson.databind.ser;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for checking handling of some of {@link MapperFeature}s
  * and {@link SerializationFeature}s for serialization.
  */
 public class SerializationFeaturesTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
-    static class CloseableBean implements Closeable
+    static class CloseableBean implements AutoCloseable
     {
         public int a = 3;
 
@@ -28,7 +33,7 @@ public class SerializationFeaturesTest
     private static class StringListBean {
         @SuppressWarnings("unused")
         public Collection<String> values;
-        
+
         public StringListBean(Collection<String> v) { values = v; }
     }
 
@@ -38,9 +43,10 @@ public class SerializationFeaturesTest
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     @SuppressWarnings("resource")
+    @Test
     public void testCloseCloseable() throws IOException
     {
         // default should be disabled:
@@ -48,10 +54,23 @@ public class SerializationFeaturesTest
         MAPPER.writeValueAsString(bean);
         assertFalse(bean.wasClosed);
 
-        // but can enable it:
+        // via writer as well
         bean = new CloseableBean();
         MAPPER.writer()
-            .with(SerializationFeature.CLOSE_CLOSEABLE)
+            .writeValueAsString(bean);
+        assertFalse(bean.wasClosed);
+        
+        // but can enable it:
+        ObjectMapper mapper2 = jsonMapperBuilder()
+                .enable(SerializationFeature.CLOSE_CLOSEABLE)
+                .build();
+        bean = new CloseableBean();
+        mapper2.writeValueAsString(bean);
+        assertTrue(bean.wasClosed);
+
+        // and same via writer
+        bean = new CloseableBean();
+        mapper2.writer()
             .writeValueAsString(bean);
         assertTrue(bean.wasClosed);
 
@@ -63,14 +82,14 @@ public class SerializationFeaturesTest
         assertTrue(bean.wasClosed);
     }
 
-    // Test for [JACKSON-289]
+    @Test
     public void testCharArrays() throws IOException
     {
         char[] chars = new char[] { 'a','b','c' };
         ObjectMapper m = new ObjectMapper();
         // default: serialize as Strings
         assertEquals(q("abc"), m.writeValueAsString(chars));
-        
+
         // new feature: serialize as JSON array:
         assertEquals("[\"a\",\"b\",\"c\"]",
                 m.writer()
@@ -78,6 +97,7 @@ public class SerializationFeaturesTest
                 .writeValueAsString(chars));
     }
 
+    @Test
     public void testFlushingAutomatic() throws IOException
     {
         ObjectMapper mapper = new ObjectMapper();
@@ -94,6 +114,7 @@ public class SerializationFeaturesTest
         assertEquals("99", sw.toString());
     }
 
+    @Test
     public void testFlushingNotAutomatic() throws IOException
     {
         // but should not occur if configured otherwise
@@ -122,6 +143,7 @@ public class SerializationFeaturesTest
         g.close();
     }
 
+    @Test
     public void testSingleElementCollections() throws IOException
     {
         final ObjectWriter writer = objectWriter().with(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED);
@@ -145,7 +167,7 @@ public class SerializationFeaturesTest
         final Set<String> SET = new HashSet<String>();
         SET.add("foo");
         assertEquals(EXP_STRINGS, writer.writeValueAsString(new StringListBean(SET)));
-        
+
         // arrays:
         assertEquals("true", writer.writeValueAsString(new boolean[] { true }));
         assertEquals("[true,false]", writer.writeValueAsString(new boolean[] { true, false }));
@@ -153,7 +175,7 @@ public class SerializationFeaturesTest
 
         assertEquals("3", writer.writeValueAsString(new short[] { 3 }));
         assertEquals("[3,2]", writer.writeValueAsString(new short[] { 3, 2 }));
-        
+
         assertEquals("3", writer.writeValueAsString(new int[] { 3 }));
         assertEquals("[3,2]", writer.writeValueAsString(new int[] { 3, 2 }));
 
@@ -165,7 +187,7 @@ public class SerializationFeaturesTest
 
         assertEquals("0.5", writer.writeValueAsString(new float[] { 0.5f }));
         assertEquals("[0.5,2.5]", writer.writeValueAsString(new float[] { 0.5f, 2.5f }));
-        
+
         assertEquals(q("foo"), writer.writeValueAsString(new String[] { "foo" }));
     }
 }

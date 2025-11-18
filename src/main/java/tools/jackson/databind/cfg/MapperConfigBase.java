@@ -15,6 +15,7 @@ import tools.jackson.databind.jsontype.TypeResolverProvider;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.type.TypeFactory;
 import tools.jackson.databind.util.ClassUtil;
+import tools.jackson.databind.util.Converter;
 import tools.jackson.databind.util.RootNameLookup;
 
 @SuppressWarnings("serial")
@@ -64,7 +65,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     /* Immutable config, factories
     /**********************************************************************
      */
-    
+
     /**
      * Explicitly defined root name to use, if any; if empty
      * String, will disable root-name wrapping; if null, will
@@ -259,7 +260,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     /* Additional shared fluent factory methods; DatatypeFeatures
     /**********************************************************************
      */
-    
+
     /**
      * Fluent factory method that will return a configuration
      * object instance with specified feature enabled: this may be
@@ -299,7 +300,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     public final T withoutFeatures(DatatypeFeature... features) {
         return _with(_datatypeFeatures().withoutFeatures(features));
     }
-    
+
     /**
      * Fluent factory method that will construct and return a new configuration
      * object instance with specified features disabled.
@@ -331,7 +332,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     public T withAttributes(Map<?,?> attributes) {
         return with(getAttributes().withSharedAttributes(attributes));
     }
-    
+
     /**
      * Method for constructing an instance that has specified
      * value for attribute for given key.
@@ -360,6 +361,13 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
      */
     public final T with(TypeResolverBuilder<?> trb) {
         return _withBase(_base.with(trb));
+    }
+
+    /**
+     * @since 2.16
+     */
+    public T with(CacheProvider provider) {
+        return _withBase(_base.with(Objects.requireNonNull(provider)));
     }
 
     /*
@@ -420,7 +428,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
      * disable root name wrapping; and if null used, will instead use
      * <code>SerializationFeature</code> to determine if to use wrapping, and annotation
      * (or default name) for actual root name to use.
-     * 
+     *
      * @param rootName to use: if null, means "use default" (clear setting);
      *   if empty String ("") means that no root name wrapping is used;
      *   otherwise defines root name to use.
@@ -481,6 +489,22 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
         return _typeFactory.constructType(valueTypeRef.getType());
     }
 
+    /*
+    /**********************************************************************
+    /* Simple Feature access
+    /**********************************************************************
+     */
+    
+    @Override
+    public final boolean isEnabled(DatatypeFeature feature) {
+        return _datatypeFeatures.isEnabled(feature);
+    }
+
+    @Override
+    public final DatatypeFeatures getDatatypeFeatures() {
+        return _datatypeFeatures;
+    }
+    
     /*
     /**********************************************************************
     /* Simple config property access
@@ -598,6 +622,9 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
 
         if (ClassUtil.isJDKClass(baseType)) {
             vc = VisibilityChecker.allPublicInstance();
+        } else if (ClassUtil.isRecordType(baseType)) {
+            // 15-Jan-2023, tatu: [databind#3724] Records require slightly different defaults
+            vc = _configOverrides.getDefaultRecordVisibility();
         } else {
             vc = getDefaultVisibilityChecker();
         }
@@ -676,18 +703,56 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
     public boolean hasMixIns() {
         return _mixIns.hasMixIns();
     }
-    
+
     // Not really relevant here (should not get called)
     @Override
     public MixInResolver snapshot() {
         throw new UnsupportedOperationException();
     }
-    
+
     /**
      * Test-only method -- does not reflect possibly open-ended set that external
      * mix-in resolver might provide.
      */
     public final int mixInCount() {
         return _mixIns.localSize();
+    }
+
+    /*
+    /**********************************************************************
+    /* Helper methods for implementations
+    /**********************************************************************
+     */
+
+    @SuppressWarnings("unchecked")
+    protected Converter<Object,Object> _createConverter(Annotated annotated,
+            Object converterDef)
+    {
+        if (converterDef == null) {
+            return null;
+        }
+        if (converterDef instanceof Converter<?,?>) {
+            return (Converter<Object,Object>) converterDef;
+        }
+        if (!(converterDef instanceof Class)) {
+            throw new IllegalStateException("`AnnotationIntrospector` returned `Converter` definition of type "
+                    +ClassUtil.classNameOf(converterDef)+"; expected type `Converter` or `Class<Converter>` instead");
+        }
+        Class<?> converterClass = (Class<?>)converterDef;
+        // there are some known "no class" markers to consider too:
+        if (converterClass == Converter.None.class || ClassUtil.isBogusClass(converterClass)) {
+            return null;
+        }
+        if (!Converter.class.isAssignableFrom(converterClass)) {
+            throw new IllegalStateException("AnnotationIntrospector returned `Class<"
+                    +ClassUtil.classNameOf(converterClass)+"`>; expected `Class<Converter>`");
+        }
+        HandlerInstantiator hi = getHandlerInstantiator();
+        Converter<?,?> conv = (hi == null) ? null : hi.converterInstance(this, annotated, converterClass);
+        if (conv == null) {
+            conv = (Converter<?,?>) ClassUtil.createInstance(converterClass,
+                    canOverrideAccessModifiers());
+        }
+        return (Converter<Object,Object>) conv;
     }
 }

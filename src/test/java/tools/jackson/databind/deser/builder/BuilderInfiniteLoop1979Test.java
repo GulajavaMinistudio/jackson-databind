@@ -1,20 +1,25 @@
 package tools.jackson.databind.deser.builder;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
-import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-// first for [databind#1978] but follow up for [databind#1979]
-public class BuilderInfiniteLoop1979Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+//first for [databind#1978] but follow up for [databind#1979]
+public class BuilderInfiniteLoop1979Test
+    extends DatabindTestUtil
 {
     static class Builder
     {
          private SubBean temp;
-         private int id;
+         private Integer id;
 
-         Builder(@JsonProperty("beanId") int beanId) {
+         Builder(@JsonProperty("beanId") Integer beanId) {
               this.id = beanId;
          }
 
@@ -35,10 +40,10 @@ public class BuilderInfiniteLoop1979Test extends BaseMapTest
     @JsonDeserialize(builder = Builder.class)
     static class Bean
     {
-        int id;
+        Integer id;
         SubBean thing;
 
-        public Bean(int id) {
+        public Bean(Integer id) {
             this.id = id;
         }
 
@@ -55,13 +60,13 @@ public class BuilderInfiniteLoop1979Test extends BaseMapTest
     {
          private int element1;
          private String element2;
-         
+
          @JsonProperty("el1")
          public SubBuilder withElement1(int e1) {
              this.element1 = e1;
              return this;
          }
-         
+
          public SubBean build()
          {
               SubBean bean = new SubBean();
@@ -85,11 +90,11 @@ public class BuilderInfiniteLoop1979Test extends BaseMapTest
      */
 
     // for [databind#1978]
+    @Test
     public void testInfiniteLoop1978() throws Exception
     {
         String json = "{\"sub.el1\":34,\"sub.el2\":\"some text\"}";
-        ObjectMapper mapper = new ObjectMapper();
-        Bean bean = mapper.readValue( json, Bean.class );
+        Bean bean = sharedMapper().readValue( json, Bean.class );
         assertNotNull(bean);
     }
 }

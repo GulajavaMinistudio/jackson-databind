@@ -3,7 +3,9 @@ package tools.jackson.databind.deser.jdk;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.deser.SettableBeanProperty;
 import tools.jackson.databind.deser.ValueInstantiator;
 import tools.jackson.databind.deser.bean.PropertyBasedCreator;
@@ -13,6 +15,7 @@ import tools.jackson.databind.introspect.AnnotatedMethod;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.type.LogicalType;
 import tools.jackson.databind.util.ClassUtil;
+import tools.jackson.databind.util.EnumResolver;
 
 /**
  * Deserializer that uses a single-String static factory method
@@ -28,30 +31,32 @@ class FactoryBasedEnumDeserializer
     protected final ValueInstantiator _valueInstantiator;
     protected final SettableBeanProperty[] _creatorProps;
 
+    // @since 2.19
+    protected final Enum<?> _defaultValue;
+
     protected final boolean _hasArgs;
 
     /**
      * Lazily instantiated property-based creator.
      */
-    private transient PropertyBasedCreator _propCreator;
-    
+    private transient volatile PropertyBasedCreator _propCreator;
+
     public FactoryBasedEnumDeserializer(Class<?> cls, AnnotatedMethod f, JavaType paramType,
-            ValueInstantiator valueInstantiator, SettableBeanProperty[] creatorProps)
+            ValueInstantiator valueInstantiator, SettableBeanProperty[] creatorProps,
+            EnumResolver enumResolver)
     {
         super(cls);
         _factory = f;
         _hasArgs = true;
-        // We'll skip case of `String`, as well as no type (zero-args): 
+        // We'll skip case of `String`, as well as no type (zero-args):
         _inputType = (paramType.hasRawClass(String.class) || paramType.hasRawClass(CharSequence.class))
                 ? null : paramType;
         _deser = null;
         _valueInstantiator = valueInstantiator;
         _creatorProps = creatorProps;
+        _defaultValue = (enumResolver == null) ? null : enumResolver.getDefaultValue();
     }
 
-    /**
-     * @since 2.8
-     */
     public FactoryBasedEnumDeserializer(Class<?> cls, AnnotatedMethod f)
     {
         super(cls);
@@ -61,6 +66,7 @@ class FactoryBasedEnumDeserializer
         _deser = null;
         _valueInstantiator = null;
         _creatorProps = null;
+        _defaultValue = null;
     }
 
     protected FactoryBasedEnumDeserializer(FactoryBasedEnumDeserializer base,
@@ -71,6 +77,7 @@ class FactoryBasedEnumDeserializer
         _hasArgs = base._hasArgs;
         _valueInstantiator = base._valueInstantiator;
         _creatorProps = base._creatorProps;
+        _defaultValue = base._defaultValue;
 
         _deser = deser;
     }
@@ -121,18 +128,25 @@ class FactoryBasedEnumDeserializer
             // 30-Mar-2020, tatu: For properties-based one, MUST get JSON Object (before
             //   2.11, was just assuming match)
             if (_creatorProps != null) {
-                if (!p.isExpectedStartObjectToken()) {
+                if (p.isExpectedStartObjectToken()) {
+                    PropertyBasedCreator pc = _propCreator;
+                    if (pc == null) {
+                        _propCreator = pc = PropertyBasedCreator.construct(ctxt,
+                                _valueInstantiator, _creatorProps,
+                                ctxt.isEnabled(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES));
+                    }
+                    p.nextToken();
+                    return deserializeEnumUsingPropertyBased(p, ctxt, pc);
+                }
+                // If value cannot possibly be delegating-creator,
+                if (!_valueInstantiator.canCreateFromString()) {
                     final JavaType targetType = getValueType(ctxt);
-                    ctxt.reportInputMismatch(targetType,
-"Input mismatch reading Enum %s: properties-based `@JsonCreator` (%s) expects JSON Object (JsonToken.START_OBJECT), got JsonToken.%s",
-ClassUtil.getTypeDescription(targetType), _factory, p.currentToken());
+                    final JsonToken t = p.currentToken();
+                    return ctxt.reportInputMismatch(targetType,
+                        "Input mismatch reading Enum %s: properties-based `@JsonCreator` (%s) expects Object Value, got %s (`JsonToken.%s`)",
+                        ClassUtil.getTypeDescription(targetType), _factory,
+                        JsonToken.valueDescFor(t), t.name());
                 }
-                if (_propCreator == null) {
-                    _propCreator = PropertyBasedCreator.construct(ctxt, _valueInstantiator, _creatorProps,
-                            ctxt.isEnabled(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES));
-                }
-                p.nextToken();
-                return deserializeEnumUsingPropertyBased(p, ctxt, _propCreator);
             }
             // 12-Oct-2021, tatu: We really should only get here if and when String
             //    value is expected; otherwise Deserializer should have been used earlier
@@ -146,10 +160,22 @@ ClassUtil.getTypeDescription(targetType), _factory, p.currentToken());
             if (unwrapping) {
                 t = p.nextToken();
             }
-            if ((t == null) || !t.isScalarValue()) {
+            // 24-Nov-2024, tatu: New! "Scalar from Object" (mostly for XML) -- see
+            //   https://github.com/FasterXML/jackson-databind/issues/4807
+            if (t == JsonToken.START_OBJECT) {
+                value = ctxt.extractScalarFromObject(p, this, _valueClass);
+                // 17-May-2025, tatu: [databind#4656] need to check for `null`
+                if (value == null) {
+                    return ctxt.handleUnexpectedToken(_valueClass, p);
+                }
+            } else if ((t == null) || !t.isScalarValue()) {
                 // Could argue we should throw an exception but...
-                value = "";
-                p.skipChildren();
+                // 01-Jun-2023, tatu: And now we will finally do it!
+                final JavaType targetType = getValueType(ctxt);
+                return ctxt.reportInputMismatch(targetType,
+                    "Input mismatch reading Enum %s: properties-based `@JsonCreator` (%s) expects String Value, got %s (`JsonToken.%s`)",
+                    ClassUtil.getTypeDescription(targetType), _factory,
+                    JsonToken.valueDescFor(t), t.name());
             } else {
                 value = p.getValueAsString();
             }
@@ -172,8 +198,15 @@ ClassUtil.getTypeDescription(targetType), _factory, p.currentToken());
         } catch (Exception e) {
             Throwable t = ClassUtil.throwRootCauseIfJacksonE(e);
             if (t instanceof IllegalArgumentException) {
-                // [databind#1642]:
-                if (ctxt.isEnabled(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
+                // [databind#4979]: unknown as default
+                if (ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)) {
+                    // ... only if we DO have a default
+                    if (_defaultValue != null) {
+                        return _defaultValue;
+                    }
+                }
+                // [databind#1642]: unknown as null
+                if (ctxt.isEnabled(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)) {
                     return null;
                 }
                 // 12-Oct-2021, tatu: Should probably try to provide better exception since
@@ -187,23 +220,23 @@ ClassUtil.getTypeDescription(targetType), _factory, p.currentToken());
     public Object deserializeWithType(JsonParser p, DeserializationContext ctxt, TypeDeserializer typeDeserializer)
             throws JacksonException
     {
-        if (_deser == null) { // String never has type info
-            return deserialize(p, ctxt);
-        }
+        // 27-Feb-2023, tatu: [databind#3796] required we do NOT skip call
+        //    to typed handling even for "simple" Strings
+        // if (_deser == null) { return deserialize(p, ctxt); }
         return typeDeserializer.deserializeTypedFromAny(p, ctxt);
     }
-    
+
     // Method to deserialize the Enum using property based methodology
     protected Object deserializeEnumUsingPropertyBased(final JsonParser p, final DeserializationContext ctxt,
     		final PropertyBasedCreator creator) throws JacksonException
     {
         PropertyValueBuffer buffer = creator.startBuilding(p, ctxt, null);
-    
+
         JsonToken t = p.currentToken();
         for (; t == JsonToken.PROPERTY_NAME; t = p.nextToken()) {
             String propName = p.currentName();
             p.nextToken(); // to point to value
-    
+
             final SettableBeanProperty creatorProp = creator.findCreatorProperty(propName);
             if (buffer.readIdProperty(propName) && creatorProp == null) {
                 continue;
@@ -233,7 +266,9 @@ ClassUtil.getTypeDescription(targetType), _factory, p.currentToken());
     protected Object wrapAndThrow(Throwable t, Object bean, String fieldName, DeserializationContext ctxt)
         throws DatabindException
     {
-        throw DatabindException.wrapWithPath(throwOrReturnThrowable(t, ctxt), bean, fieldName);
+        throw DatabindException.wrapWithPath(ctxt,
+                throwOrReturnThrowable(t, ctxt),
+                new JacksonException.Reference(bean, fieldName));
     }
 
     private Throwable throwOrReturnThrowable(Throwable t, DeserializationContext ctxt)

@@ -1,10 +1,14 @@
 package tools.jackson.databind.module;
 
-import tools.jackson.core.Version;
-import tools.jackson.databind.*;
-import tools.jackson.databind.jsontype.NamedType;
+import org.junit.jupiter.api.Test;
 
-public class SimpleModuleArgCheckTest extends BaseMapTest
+import tools.jackson.core.Version;
+import tools.jackson.databind.jsontype.NamedType;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class SimpleModuleArgCheckTest extends DatabindTestUtil
 {
     /*
     /**********************************************************
@@ -12,6 +16,7 @@ public class SimpleModuleArgCheckTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testInvalidForDeserializers() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
@@ -36,6 +41,7 @@ public class SimpleModuleArgCheckTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testInvalidAbstractTypeMapping() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
@@ -53,6 +59,7 @@ public class SimpleModuleArgCheckTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testInvalidSubtypeMappings() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
@@ -71,6 +78,7 @@ public class SimpleModuleArgCheckTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testInvalidValueInstantiator() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());
@@ -89,6 +97,7 @@ public class SimpleModuleArgCheckTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testInvalidMixIn() throws Exception
     {
         SimpleModule mod = new SimpleModule("test", Version.unknownVersion());

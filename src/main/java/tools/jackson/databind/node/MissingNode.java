@@ -1,10 +1,11 @@
 package tools.jackson.databind.node;
 
 import java.util.List;
+import java.util.Optional;
 
 import tools.jackson.core.*;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsontype.TypeSerializer;
 
 /**
@@ -17,7 +18,7 @@ import tools.jackson.databind.jsontype.TypeSerializer;
  * In most respects this placeholder node will act as {@link NullNode};
  * for example, for purposes of value conversions, value is considered
  * to be null and represented as value zero when used for numeric
- * conversions. 
+ * conversions.
  */
 public final class MissingNode
     extends BaseJsonNode // NOTE! Does NOT extend `ValueNode` unlike in 2.x
@@ -34,9 +35,8 @@ public final class MissingNode
     }
 
     // Immutable: no need to copy
-    @SuppressWarnings("unchecked")
     @Override
-    public <T extends JsonNode> T deepCopy() { return (T) this; }
+    public MissingNode deepCopy() { return this; }
 
     public static MissingNode getInstance() { return instance; }
 
@@ -52,38 +52,23 @@ public final class MissingNode
 
     @Override public JsonToken asToken() { return JsonToken.NOT_AVAILABLE; }
 
-    @Override public String asText() { return ""; }
+    @Override
+    protected String _valueDesc() {
+        return "<missing>";
+    }
 
-    @Override public String asText(String defaultValue) { return defaultValue; }
-    
     // // Note: not a numeric node, hence default 'asXxx()' are fine:
-    
+
     /*
     public int asInt(int defaultValue);
     public long asLong(long defaultValue);
     public double asDouble(double defaultValue);
     public boolean asBoolean(boolean defaultValue);
     */
-    
-    @Override
-    public final void serialize(JsonGenerator g, SerializerProvider provider)
-        throws JacksonException
-    {
-        /* Nothing to output... should we signal an error tho?
-         * Chances are, this is an erroneous call. For now, let's
-         * not do that; serialize as explicit null. Why? Because we
-         * cannot just omit a value as JSON Object field name may have
-         * been written out.
-         */
-        g.writeNull();
-    }
 
     @Override
-    public void serializeWithType(JsonGenerator g, SerializerProvider provider,
-            TypeSerializer typeSer)
-        throws JacksonException
-    {
-        g.writeNull();
+    public Optional<JsonNode> asOptional() {
+        return Optional.empty();
     }
 
     @SuppressWarnings("unchecked")
@@ -130,7 +115,7 @@ public final class MissingNode
     }
 
     @Override
-    public List<String> findValuesAsText(String fieldName, List<String> foundSoFar) {
+    public List<String> findValuesAsString(String fieldName, List<String> foundSoFar) {
         return foundSoFar;
     }
 
@@ -140,9 +125,36 @@ public final class MissingNode
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
+    /* Serialization: bit tricky as we don't really have a value
+    /**********************************************************************
+     */
+
+    @Override
+    public final void serialize(JsonGenerator g, SerializationContext provider)
+        throws JacksonException
+    {
+        /* Nothing to output... should we signal an error tho?
+         * Chances are, this is an erroneous call. For now, let's
+         * not do that; serialize as explicit null. Why? Because we
+         * cannot just omit a value as JSON Object field name may have
+         * been written out.
+         */
+        g.writeNull();
+    }
+
+    @Override
+    public void serializeWithType(JsonGenerator g, SerializationContext provider,
+            TypeSerializer typeSer)
+        throws JacksonException
+    {
+        g.writeNull();
+    }
+
+    /*
+    /**********************************************************************
     /* Standard method overrides
-    /**********************************************************
+    /**********************************************************************
      */
 
     @Override

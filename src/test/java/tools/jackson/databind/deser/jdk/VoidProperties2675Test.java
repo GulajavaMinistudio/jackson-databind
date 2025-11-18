@@ -1,11 +1,17 @@
 package tools.jackson.databind.deser.jdk;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
 import tools.jackson.databind.exc.InvalidDefinitionException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
+
 // [databind#2675]: Void-valued "properties"
-public class VoidProperties2675Test extends BaseMapTest
+public class VoidProperties2675Test
 {
     static class VoidBean {
         protected Void value;
@@ -21,24 +27,32 @@ public class VoidProperties2675Test extends BaseMapTest
     /**********************************************************************
      */
 
-    private final ObjectMapper VOID_MAPPER = sharedMapper();
+    private final ObjectMapper VOID_MAPPER = jsonMapperBuilder()
+            .enable(MapperFeature.ALLOW_VOID_VALUED_PROPERTIES)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            .build();
 
     private final ObjectMapper NO_VOID_MAPPER = jsonMapperBuilder()
             .disable(MapperFeature.ALLOW_VOID_VALUED_PROPERTIES)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
             .build();
 
+    @Test
     public void testVoidBeanSerialization() throws Exception
     {
         // with 3.x enabled by default, but may disable
         assertEquals("{\"value\":null}", VOID_MAPPER.writeValueAsString(new VoidBean()));
         try {
-            NO_VOID_MAPPER.writeValueAsString(new VoidBean());
-            fail("Should not pass");
+            String json = NO_VOID_MAPPER.writeValueAsString(new VoidBean());
+            fail("Should not pass; got: "+json);
         } catch (InvalidDefinitionException e) {
             verifyException(e, "no properties discovered");
         }
     }
 
+    @Test
     public void testVoidBeanDeserialization() throws Exception {
         final String DOC = "{\"value\":null}";
         VoidBean result = VOID_MAPPER.readValue(DOC, VoidBean.class);

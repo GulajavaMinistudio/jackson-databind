@@ -6,13 +6,13 @@ package tools.jackson.databind;
  *
  * @since 3.0
  */
-public class ObjectMapperTestAccess
+public abstract class ObjectMapperTestAccess
 {
     public static BeanDescription beanDescriptionForDeser(ObjectMapper mapper, Class<?> type) {
         return mapper._deserializationContext().introspectBeanDescription(mapper.constructType(type));
     }
 
     public static BeanDescription beanDescriptionForSer(ObjectMapper mapper, Class<?> type) {
-        return mapper._serializerProvider().introspectBeanDescription(mapper.constructType(type));
+        return mapper._serializationContext().introspectBeanDescription(mapper.constructType(type));
     }
 }

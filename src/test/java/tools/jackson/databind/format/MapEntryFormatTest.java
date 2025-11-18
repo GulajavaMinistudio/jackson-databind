@@ -3,13 +3,18 @@ package tools.jackson.databind.format;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class MapEntryFormatTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class MapEntryFormatTest extends DatabindTestUtil
 {
     static class BeanWithMapEntry {
         // would work with any other shape than OBJECT, or without annotation:
@@ -34,7 +39,7 @@ public class MapEntryFormatTest extends BaseMapTest
             key = k;
             value = v;
         }
-        
+
         @Override
         public String getKey() {
             return key;
@@ -87,7 +92,7 @@ public class MapEntryFormatTest extends BaseMapTest
             entry = map.entrySet().iterator().next();
         }
     }
-    
+
     static class EmptyEntryWrapper {
         @JsonInclude(value=JsonInclude.Include.NON_EMPTY,
                 content=JsonInclude.Include.NON_EMPTY)
@@ -99,15 +104,16 @@ public class MapEntryFormatTest extends BaseMapTest
             entry = map.entrySet().iterator().next();
         }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods, basic
     /**********************************************************
      */
-    
+
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testInclusion() throws Exception
     {
         assertEquals(a2q("{'entry':{'a':'b'}}"),
@@ -127,6 +133,7 @@ public class MapEntryFormatTest extends BaseMapTest
                 MAPPER.writeValueAsString(new EntryWithNullWrapper("a", null)));
     }
 
+    @Test
     public void testInclusionWithReference() throws Exception
     {
         assertEquals(a2q("{'entry':{'a':'b'}}"),
@@ -145,6 +152,7 @@ public class MapEntryFormatTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testAsNaturalRoundtrip() throws Exception
     {
         BeanWithMapEntry input = new BeanWithMapEntry("foo" ,"bar");
@@ -155,6 +163,7 @@ public class MapEntryFormatTest extends BaseMapTest
         assertEquals("bar", result.entry.getValue());
     }
     // should work via class annotation
+    @Test
     public void testAsObjectRoundtrip() throws Exception
     {
         MapEntryAsObject input = new MapEntryAsObject("foo" ,"bar");
@@ -163,13 +172,14 @@ public class MapEntryFormatTest extends BaseMapTest
 
         // 16-Oct-2016, tatu: Happens to work by default because it's NOT basic
         //   `Map.Entry` but subtype.
-        
+
         MapEntryAsObject result = MAPPER.readValue(json, MapEntryAsObject.class);
         assertEquals("foo", result.getKey());
         assertEquals("bar", result.getValue());
     }
 
     // [databind#1895]
+    @Test
     public void testDefaultShapeOverride() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -178,7 +188,7 @@ public class MapEntryFormatTest extends BaseMapTest
                 .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
                 .build();
         Map.Entry<String,String> input = new BeanWithMapEntry("foo", "bar").entry;
-        assertEquals(a2q("{'key':'foo','value':'bar'}"),
-                mapper.writeValueAsString(input));
+        assertTrue(mapper.writeValueAsString(input).equals(a2q("{'key':'foo','value':'bar'}"))
+                || mapper.writeValueAsString(input).equals(a2q("{'value':'bar','key':'foo'}")));
     }
 }

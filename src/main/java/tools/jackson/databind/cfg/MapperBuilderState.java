@@ -1,8 +1,8 @@
 package tools.jackson.databind.cfg;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 import tools.jackson.core.PrettyPrinter;
 import tools.jackson.core.TokenStreamFactory;
@@ -65,6 +65,7 @@ public abstract class MapperBuilderState
 
     /**
      * Modules registered in registration order, if any; `null` if none.
+     * Does not contain {@code null} values.
      */
     protected final JacksonModule[] _modules;
 
@@ -108,8 +109,6 @@ public abstract class MapperBuilderState
     protected final LinkedNode<DeserializationProblemHandler> _problemHandlers;
 
     protected final AbstractTypeResolver[] _abstractTypeResolvers;
-
-    protected final ConstructorDetector _ctorDetector;
 
     /*
     /**********************************************************************
@@ -167,7 +166,6 @@ public abstract class MapperBuilderState
         // assume our usage of LinkedNode-based list is immutable here (should be)
         _problemHandlers = src._problemHandlers;
         _abstractTypeResolvers = src._abstractTypeResolvers;
-        _ctorDetector = src._ctorDetector;
 
         // Other handlers
         _defaultAttributes = Snapshottable.takeSnapshot(src._defaultAttributes);
@@ -198,7 +196,7 @@ public abstract class MapperBuilderState
         if (_modules == null) {
             return Collections.emptyList();
         }
-        return Collections.unmodifiableList(Arrays.asList(_modules));
+        return List.of(_modules);
     }
 
     /*

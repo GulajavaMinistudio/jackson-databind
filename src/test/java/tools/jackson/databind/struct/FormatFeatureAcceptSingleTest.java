@@ -5,15 +5,21 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class FormatFeatureAcceptSingleTest extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class FormatFeatureAcceptSingleTest extends DatabindTestUtil
 {
     static class StringArrayNotAnnoted {
         public String[] values;
@@ -21,7 +27,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         protected StringArrayNotAnnoted() { }
         public StringArrayNotAnnoted(String ... v) { values = v; }
     }
-    
+
     static class StringArrayWrapper {
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         public String[] values;
@@ -46,7 +52,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         public float[] values;
     }
-    
+
     static class DoubleArrayWrapper {
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         public double[] values;
@@ -88,7 +94,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         public EnumSet<ABC> values;
     }
-    
+
     static class RolesInArray {
         @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
         public Role[] roles;
@@ -161,6 +167,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
     /**********************************************************
      */
 
+    @Test
     public void testSingleStringArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': 'first' }");
@@ -181,6 +188,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("first", result2.values[0]);
     }
 
+    @Test
     public void testSingleIntArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': 123 }");
@@ -190,6 +198,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals(123, result.values[0]);
     }
 
+    @Test
     public void testSingleLongArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': -205 }");
@@ -199,15 +208,17 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals(-205L, result.values[0]);
     }
 
+    @Test
     public void testSingleBooleanArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': true }");
         BooleanArrayWrapper result = MAPPER.readValue(json, BooleanArrayWrapper.class);
         assertNotNull(result.values);
         assertEquals(1, result.values.length);
-        assertEquals(true, result.values[0]);
+        assertTrue(result.values[0]);
     }
 
+    @Test
     public void testSingleDoubleArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': -0.5 }");
@@ -217,6 +228,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals(-0.5, result.values[0]);
     }
 
+    @Test
     public void testSingleFloatArrayRead() throws Exception {
         String json = a2q(
                 "{ 'values': 0.25 }");
@@ -225,7 +237,8 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals(1, result.values.length);
         assertEquals(0.25f, result.values[0]);
     }
-    
+
+    @Test
     public void testSingleElementArrayRead() throws Exception {
         String json = a2q(
                 "{ 'roles': { 'Name': 'User', 'ID': '333' } }");
@@ -235,6 +248,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("333", response.roles[0].ID);
     }
 
+    @Test
     public void testSingleStringListRead() throws Exception {
         String json = a2q(
                 "{ 'values': 'first' }");
@@ -244,6 +258,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("first", result.values.get(0));
     }
 
+    @Test
     public void testSingleStringListReadWithBuilder() throws Exception {
         String json = a2q(
                 "{ 'values': 'first' }");
@@ -254,6 +269,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("first", result.values.get(0));
     }
 
+    @Test
     public void testSingleElementListRead() throws Exception {
         String json = a2q(
                 "{ 'roles': { 'Name': 'User', 'ID': '333' } }");
@@ -263,6 +279,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("333", response.roles.get(0).ID);
     }
 
+    @Test
     public void testSingleElementListReadWithBuilder() throws Exception {
         String json = a2q(
                 "{ 'roles': { 'Name': 'User', 'ID': '333' } }");
@@ -272,6 +289,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("333", response.roles.get(0).ID);
     }
 
+    @Test
     public void testSingleElementWithStringFactoryRead() throws Exception {
         String json = a2q(
                 "{ 'values': '333' }");
@@ -281,6 +299,7 @@ public class FormatFeatureAcceptSingleTest extends BaseMapTest
         assertEquals("333", response.values.get(0).role.Name);
     }
 
+    @Test
     public void testSingleEnumSetRead() throws Exception {
         EnumSetWrapper result = MAPPER.readValue(a2q("{ 'values': 'B' }"),
                 EnumSetWrapper.class);

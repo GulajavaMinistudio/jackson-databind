@@ -16,6 +16,7 @@ import tools.jackson.core.util.DefaultPrettyPrinter;
 import tools.jackson.core.util.Snapshottable;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.*;
+import tools.jackson.databind.ext.javatime.JavaTimeInitializer;
 import tools.jackson.databind.introspect.*;
 import tools.jackson.databind.jsontype.*;
 import tools.jackson.databind.jsontype.impl.DefaultTypeResolverBuilder;
@@ -50,17 +51,19 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected final static PolymorphicTypeValidator DEFAULT_TYPE_VALIDATOR = new DefaultBaseTypeLimitingValidator();
 
     protected final static AccessorNamingStrategy.Provider DEFAULT_ACCESSOR_NAMING = new DefaultAccessorNamingStrategy.Provider();
-    
+
     protected final static BaseSettings DEFAULT_BASE_SETTINGS = new BaseSettings(
             DEFAULT_ANNOTATION_INTROSPECTOR,
-            null, DEFAULT_ACCESSOR_NAMING,
+            null, null, DEFAULT_ACCESSOR_NAMING,
             null, // no default typing, by default
             DEFAULT_TYPE_VALIDATOR, // and polymorphic type by class won't pass either
             StdDateFormat.instance, null,
             Locale.getDefault(),
             null, // to indicate "use Jackson default TimeZone" (UTC)
             Base64Variants.getDefaultVariant(),
-            JsonNodeFactory.instance
+            DefaultCacheProvider.defaultInstance(),
+            JsonNodeFactory.instance,
+            null // ConstructorDetector
     );
 
     protected final static TypeResolverProvider DEFAULT_TYPE_RESOLVER_PROVIDER = new TypeResolverProvider();
@@ -143,12 +146,12 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
 
     /**
-     * {@link SerializationContexts} to use as factory for stateful {@link SerializerProvider}s
+     * {@link SerializationContexts} to use as factory for stateful {@link SerializationContext}s
      */
     protected SerializationContexts _serializationContexts;
 
     protected SerializerFactory _serializerFactory;
-    
+
     protected FilterProvider _filterProvider;
 
     protected PrettyPrinter _defaultPrettyPrinter;
@@ -178,8 +181,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected LinkedNode<DeserializationProblemHandler> _problemHandlers;
 
     protected AbstractTypeResolver[] _abstractTypeResolvers;
-
-    protected ConstructorDetector _ctorDetector;
 
     /*
     /**********************************************************************
@@ -254,7 +255,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * allow future "rebuild".
      */
     protected transient MapperBuilderState _savedState;
-    
+
     /*
     /**********************************************************************
     /* Life-cycle
@@ -297,7 +298,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _deserializationContexts = null;
         _injectableValues = null;
         _problemHandlers = null;
-        _ctorDetector = null;
         _abstractTypeResolvers = NO_ABSTRACT_TYPE_RESOLVERS;
 
         _defaultAttributes = null;
@@ -344,7 +344,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _injectableValues = Snapshottable.takeSnapshot(state._injectableValues);
         _problemHandlers = state._problemHandlers;
         _abstractTypeResolvers = state._abstractTypeResolvers;
-        _ctorDetector = state._ctorDetector;
 
         // Factories/handlers, other
         _defaultAttributes = Snapshottable.takeSnapshot(state._defaultAttributes);
@@ -393,7 +392,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         _injectableValues = base._injectableValues;
         _problemHandlers = base._problemHandlers;
         _abstractTypeResolvers = base._abstractTypeResolvers;
-        _ctorDetector = base._ctorDetector;
+        _cacheProvider = base._cacheProvider;
     }
     */
 
@@ -421,8 +420,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     {
         if (_savedState == null) {
             _savedState = _saveState();
+            ModuleContextBase ctxt = _constructModuleContext();
+            JavaTimeInitializer.getInstance().setupModule(ctxt);
             if (_modules != null) {
-                ModuleContextBase ctxt = _constructModuleContext();
                 _modules.values().forEach(m -> m.setupModule(ctxt));
                 // and since context may buffer some changes, ensure those are flushed:
                 ctxt.applyChanges(this);
@@ -442,7 +442,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /* Secondary factory methods
     /**********************************************************************
      */
-    
+
     public SerializationConfig buildSerializationConfig(ConfigOverrides configOverrides,
             MixInHandler mixins, TypeFactory tf, ClassIntrospector classIntr, SubtypeResolver str,
             RootNameLookup rootNames,
@@ -466,7 +466,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
                 configOverrides, coercionConfigs,
                 tf, classIntr, mixins, str,
                 defaultAttributes(), rootNames,
-                _abstractTypeResolvers, _ctorDetector);
+                _abstractTypeResolvers);
     }
 
     /*
@@ -487,7 +487,6 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     public boolean isEnabled(DatatypeFeature f) {
         return _datatypeFeatures.isEnabled(f);
     }
-
     public boolean isEnabled(StreamReadFeature f) {
         return f.enabledIn(_streamReadFeatures);
     }
@@ -537,7 +536,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     protected ContextAttributes _defaultDefaultAttributes() {
         return ContextAttributes.getEmpty();
     }
-    
+
     /*
     /**********************************************************************
     /* Accessors, introspection
@@ -552,10 +551,10 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /**
-     * Overridable method for changing default {@link SubtypeResolver} instance to use
+     * Overridable method for changing default {@link TypeFactory} instance to use
      */
     protected TypeFactory _defaultTypeFactory() {
-        return TypeFactory.defaultInstance();
+        return TypeFactory.createDefaultInstance();
     }
 
     public ClassIntrospector classIntrospector() {
@@ -630,7 +629,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /**
-     * Overridable method for changing default {@link SerializerProvider} prototype
+     * Overridable method for changing default {@link SerializationContext} prototype
      * to use.
      */
     protected SerializationContexts _defaultSerializationContexts() {
@@ -651,7 +650,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     public FilterProvider filterProvider() {
         return _filterProvider;
     }
-    
+
     public PrettyPrinter defaultPrettyPrinter() {
         if (_defaultPrettyPrinter == null) {
             _defaultPrettyPrinter = _defaultPrettyPrinter();
@@ -677,7 +676,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /**
-     * Overridable method for changing default {@link SerializerProvider} prototype
+     * Overridable method for changing default {@link SerializationContext} prototype
      * to use.
      */
     protected DeserializationContexts _defaultDeserializationContexts() {
@@ -702,7 +701,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     public LinkedNode<DeserializationProblemHandler> deserializationProblemHandlers() {
         return _problemHandlers;
     }
-    
+
     /*
     /**********************************************************************
     /* Changing features: mapper, ser, deser
@@ -800,6 +799,39 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
+    /**
+     * The builder returned uses default settings more closely
+     * matching the default configuration used in Jackson 2.x versions.
+     * It affects:
+     * <ul>
+     * <li>{@link DateTimeFeature}s</li>
+     * <li>{@link DeserializationFeature}s</li>
+     * <li>{@link EnumFeature}s</li>
+     * <li>{@link MapperFeature}s</li>
+     * <li>{@link SerializationFeature}s</li>
+     *  </ul>
+     * <p>
+     * This method is still a work in progress and may not yet fully replicate the
+     * default settings of Jackson 2.x.
+     * </p>
+     */
+    public B configureForJackson2() {
+        return disable(DateTimeFeature.ONE_BASED_MONTHS)
+                .enable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .enable(DateTimeFeature.WRITE_DURATIONS_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
+                .disable(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                .enable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
+                .disable(MapperFeature.DETECT_PARAMETER_NAMES) // [databind#5314]
+                .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .enable(MapperFeature.USE_GETTERS_AS_SETTERS)
+                .enable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                ;
+    }
+
     /*
     /**********************************************************************
     /* Changing features: parser, generator
@@ -891,7 +923,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         VisibilityChecker oldV = _configOverrides.getDefaultVisibility();
         VisibilityChecker newV = handler.apply(oldV);
         if (newV != oldV) {
-            Objects.requireNonNull(newV, "Can not assign null default VisibilityChecker");
+            Objects.requireNonNull(newV, "Cannot assign null default VisibilityChecker");
             _configOverrides.setDefaultVisibility(newV);
         }
         return _this();
@@ -906,7 +938,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         JsonInclude.Value oldIncl = _configOverrides.getDefaultInclusion();
         JsonInclude.Value newIncl = handler.apply(oldIncl);
         if (newIncl != oldIncl) {
-            Objects.requireNonNull(newIncl, "Can not assign null default Property Inclusion");
+            Objects.requireNonNull(newIncl, "Cannot assign null default Property Inclusion");
             _configOverrides.setDefaultInclusion(newIncl);
         }
         //public ObjectMapper setDefaultPropertyInclusion() {
@@ -922,7 +954,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         JsonSetter.Value oldIncl = _configOverrides.getDefaultNullHandling();
         JsonSetter.Value newIncl = handler.apply(oldIncl);
         if (newIncl != oldIncl) {
-            Objects.requireNonNull(newIncl, "Can not assign null default Null Handling");
+            Objects.requireNonNull(newIncl, "Cannot assign null default Null Handling");
             _configOverrides.setDefaultNullHandling(newIncl);
         }
         return _this();
@@ -1015,6 +1047,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     public B addModule(JacksonModule module)
     {
+        Objects.requireNonNull(module, "Cannot add null `JacksonModule`");
         _verifyModuleMetadata(module);
         final Object moduleId = module.getRegistrationId();
         if (_modules == null) {
@@ -1111,17 +1144,31 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      *   addModules(builder.findModules());
      *</code>
      *<p>
-     * As with {@link #findModules()}, no caching is done for modules, so care
-     * needs to be taken to either create and share a single mapper instance;
-     * or to cache introspected set of modules.
+     * As with {@link #findModules()}, no caching is done for modules, so for
+     * performance reasons it may make sense to cache introspected set of modules
+     * if needed multiple times.
      */
     public B findAndAddModules() {
         return addModules(findModules());
     }
 
     /**
+     * Convenience method that is functionally equivalent to:
+     *<code>
+     *   addModules(builder.findModules(classLoader));
+     *</code>
+     *<p>
+     * As with {@link #findModules(ClassLoader)}, no caching is done for modules, so for
+     * performance reasons it may make sense to cache introspected set of modules
+     * if needed multiple times.
+     */
+    public B findAndAddModules(ClassLoader cl) {
+        return addModules(findModules(cl));
+    }
+
+    /**
      * "Accessor" method that will expose set of registered modules, in addition
-     * order, to given handler.
+     * order, using {@code handler} given.
      */
     public B withModules(Consumer<JacksonModule> handler) {
         if (_modules != null) {
@@ -1239,6 +1286,19 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     }
 
     /**
+     * Method for configuring {@link EnumNamingStrategy} to use for adapting
+     * POJO enum names (internal) into content property names (external)
+     *
+     * @param s Strategy instance to use
+     *
+     * @return Builder instance itself to allow chaining
+     */
+    public B enumNamingStrategy(EnumNamingStrategy s) {
+        _baseSettings = _baseSettings.with(s);
+        return _this();
+    }
+
+    /**
      * Method for configuring {@link AccessorNamingStrategy} to use for auto-detecting
      * accessor ("getter") and mutator ("setter") methods based on naming of methods.
      *
@@ -1321,8 +1381,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * single-argument constructors).
      */
     public B constructorDetector(ConstructorDetector cd) {
-        _ctorDetector = cd;
+        _baseSettings = _baseSettings.with(cd);
         return _this();
+    }
+
+    public B cacheProvider(CacheProvider cacheProvider) {
+        _baseSettings = _baseSettings.with(cacheProvider);
+        // Unlike Deserializer-/SerializerCaches, need to eagerly update
+        // TypeFactory now. Need to call `typeFactory()` to force instantiation
+        TypeFactory tf = typeFactory().withCache(cacheProvider.forTypeFactory());
+        return typeFactory(tf);
     }
 
     /**
@@ -1372,7 +1440,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     public B defaultDateFormat(DateFormat f) {
         _baseSettings = _baseSettings.with(f);
-        configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, (f == null));
+        configure(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS, (f == null));
         return _this();
     }
 
@@ -1403,9 +1471,9 @@ public abstract class MapperBuilder<M extends ObjectMapper,
     /**
      * Method that will configure default {@link Base64Variant} that
      * <code>byte[]</code> serializers and deserializers will use.
-     * 
+     *
      * @param v Base64 variant to use
-     * 
+     *
      * @return This mapper, for convenience to allow chaining
      */
     public B defaultBase64Variant(Base64Variant v) {
@@ -1575,7 +1643,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * attacks using "deserialization gadgets". Implementations should use
      * allow-listing to specify acceptable types unless source of content
      * is fully trusted to only send safe types.
-     * 
+     *
      * @param applicability Defines kinds of types for which additional type information
      *    is added; see {@link DefaultTyping} for more information.
      */
@@ -1631,7 +1699,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * content comes from untrusted sources, so care should be taken to use
      * a {@link TypeResolverBuilder} that can limit allowed classes to
      * deserialize.
-     * 
+     *
      * @param typer Type information inclusion handler
      */
     public B setDefaultTyping(TypeResolverBuilder<?> typer) {

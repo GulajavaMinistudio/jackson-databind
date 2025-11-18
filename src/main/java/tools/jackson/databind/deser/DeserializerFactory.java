@@ -9,7 +9,7 @@ import tools.jackson.databind.type.*;
  * {@link ValueDeserializer} instances (which are then cached by
  * context and/or dedicated cache).
  *<p>
- * Since there are multiple broad categories of deserializers, there are 
+ * Since there are multiple broad categories of deserializers, there are
  * multiple factory methods:
  *<ul>
  * <li>For JSON "Array" type, we need 2 methods: one to deal with expected
@@ -35,7 +35,6 @@ import tools.jackson.databind.type.*;
  *  </li>
  * <li>For all other types, {@link #createBeanDeserializer} is used.
  * </ul>
- *<p>
  */
 public abstract class DeserializerFactory
 {
@@ -52,7 +51,7 @@ public abstract class DeserializerFactory
      * for the bean type to deserialize.
      */
     public abstract ValueInstantiator findValueInstantiator(DeserializationContext ctxt,
-            BeanDescription beanDesc);
+            BeanDescription.Supplier beanDescRef);
 
     /**
      * Method called to create (or, for completely immutable deserializers,
@@ -67,28 +66,28 @@ public abstract class DeserializerFactory
      * @param type Type to be deserialized
      */
     public abstract ValueDeserializer<Object> createBeanDeserializer(DeserializationContext ctxt,
-            JavaType type, BeanDescription beanDesc);
+            JavaType type, BeanDescription.Supplier beanDescRef);
 
     /**
      * Method called to create a deserializer that will use specified Builder
      * class for building value instances.
      */
     public abstract ValueDeserializer<Object> createBuilderBasedDeserializer(
-    		DeserializationContext ctxt, JavaType type, BeanDescription beanDesc,
+    		DeserializationContext ctxt, JavaType type, BeanDescription.Supplier beanDescRef,
     		Class<?> builderClass);
 
     public abstract ValueDeserializer<?> createEnumDeserializer(DeserializationContext ctxt,
-            JavaType type, BeanDescription beanDesc);
+            JavaType type, BeanDescription.Supplier beanDescRef);
 
     public abstract ValueDeserializer<?> createReferenceDeserializer(DeserializationContext ctxt,
-            ReferenceType type, BeanDescription beanDesc);
+            ReferenceType type, BeanDescription.Supplier beanDescRef);
 
     /**
      * Method called to create and return a deserializer that can construct
      * JsonNode(s) from JSON content.
      */
     public abstract ValueDeserializer<?> createTreeDeserializer(DeserializationConfig config,
-            JavaType type, BeanDescription beanDesc);
+            JavaType type, BeanDescription.Supplier beanDescRef);
 
     /**
      * Method called to create (or, for completely immutable deserializers,
@@ -98,25 +97,25 @@ public abstract class DeserializerFactory
      * @param type Type to be deserialized
      */
     public abstract ValueDeserializer<?> createArrayDeserializer(DeserializationContext ctxt,
-            ArrayType type, BeanDescription beanDesc);
+            ArrayType type, BeanDescription.Supplier beanDescRef);
 
     public abstract ValueDeserializer<?> createCollectionDeserializer(DeserializationContext ctxt,
-            CollectionType type, BeanDescription beanDesc);
+            CollectionType type, BeanDescription.Supplier beanDescRef);
 
     public abstract ValueDeserializer<?> createCollectionLikeDeserializer(DeserializationContext ctxt,
-            CollectionLikeType type, BeanDescription beanDesc);
+            CollectionLikeType type, BeanDescription.Supplier beanDescRef);
 
     public abstract ValueDeserializer<?> createMapDeserializer(DeserializationContext ctxt,
-            MapType type, BeanDescription beanDesc);
+            MapType type, BeanDescription.Supplier beanDescRef);
 
     public abstract ValueDeserializer<?> createMapLikeDeserializer(DeserializationContext ctxt,
-            MapLikeType type, BeanDescription beanDesc);
+            MapLikeType type, BeanDescription.Supplier beanDescRef);
 
     /**
      * Method called to find if factory knows how to create a key deserializer
      * for specified type; currently this means checking if a module has registered
      * possible deserializers.
-     * 
+     *
      * @return Key deserializer to use for specified type, if one found; null if not
      *   (and default key deserializer should be used)
      */
@@ -129,7 +128,7 @@ public abstract class DeserializerFactory
      * given type as opposed to auto-generated "Bean" deserializer. Factory itself will check
      * for known JDK-provided types, but registered {@link tools.jackson.databind.JacksonModule}s
      * are also called to see if they might provide explicit deserializer.
-     *<p> 
+     *<p>
      * Main use for this method is with Safe Default Typing (and generally Safe Polymorphic
      * Deserialization), during which it is good to be able to check that given raw type
      * is explicitly supported and as such "known type" (as opposed to potentially
@@ -159,7 +158,7 @@ public abstract class DeserializerFactory
      * {@link KeyDeserializers}.
      */
     public abstract DeserializerFactory withAdditionalKeyDeserializers(KeyDeserializers additional);
-    
+
     /**
      * Convenience method for creating a new factory instance with additional
      * {@link ValueDeserializerModifier}.

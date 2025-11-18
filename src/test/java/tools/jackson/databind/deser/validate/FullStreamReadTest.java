@@ -2,20 +2,21 @@ package tools.jackson.databind.deser.validate;
 
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.core.json.JsonReadFeature;
-import tools.jackson.databind.BaseMapTest;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.*;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test for validating {@link tools.jackson.databind.DeserializationFeature#FAIL_ON_TRAILING_TOKENS}.
  */
-public class FullStreamReadTest extends BaseMapTest
+public class FullStreamReadTest extends DatabindTestUtil
 {
     private final static String JSON_OK_ARRAY = " [ 1, 2, 3]    ";
     private final static String JSON_OK_ARRAY_WITH_COMMENT = JSON_OK_ARRAY + " // stuff ";
@@ -25,7 +26,7 @@ public class FullStreamReadTest extends BaseMapTest
     private final static String JSON_OK_NULL = " null  ";
     private final static String JSON_OK_NULL_WITH_COMMENT = " null /* stuff */ ";
     private final static String JSON_FAIL_NULL = JSON_OK_NULL + " false";
-    
+
     /*
     /**********************************************************************
     /* Test methods, config
@@ -34,31 +35,37 @@ public class FullStreamReadTest extends BaseMapTest
 
     private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testMapperAcceptTrailing()
     {
-        assertFalse(MAPPER.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS));
+        ObjectMapper mapper = jsonMapperBuilder()
+                .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .build();
+
+        assertFalse(mapper.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS));
 
         // by default, should be ok to read, all
-        _verifyArray(MAPPER.readTree(JSON_OK_ARRAY));
-        _verifyArray(MAPPER.readTree(JSON_OK_ARRAY_WITH_COMMENT));
-        _verifyArray(MAPPER.readTree(JSON_FAIL_ARRAY));
+        _verifyArray(mapper.readTree(JSON_OK_ARRAY));
+        _verifyArray(mapper.readTree(JSON_OK_ARRAY_WITH_COMMENT));
+        _verifyArray(mapper.readTree(JSON_FAIL_ARRAY));
 
         // and also via "untyped"
-        _verifyCollection(MAPPER.readValue(JSON_OK_ARRAY, List.class));
-        _verifyCollection(MAPPER.readValue(JSON_OK_ARRAY_WITH_COMMENT, List.class));
-        _verifyCollection(MAPPER.readValue(JSON_FAIL_ARRAY, List.class));
+        _verifyCollection(mapper.readValue(JSON_OK_ARRAY, List.class));
+        _verifyCollection(mapper.readValue(JSON_OK_ARRAY_WITH_COMMENT, List.class));
+        _verifyCollection(mapper.readValue(JSON_FAIL_ARRAY, List.class));
 
         // ditto for getting `null` and some other token
 
-        assertTrue(MAPPER.readTree(JSON_OK_NULL).isNull());
-        assertTrue(MAPPER.readTree(JSON_OK_NULL_WITH_COMMENT).isNull());
-        assertTrue(MAPPER.readTree(JSON_FAIL_NULL).isNull());
+        assertTrue(mapper.readTree(JSON_OK_NULL).isNull());
+        assertTrue(mapper.readTree(JSON_OK_NULL_WITH_COMMENT).isNull());
+        assertTrue(mapper.readTree(JSON_FAIL_NULL).isNull());
 
-        assertNull(MAPPER.readValue(JSON_OK_NULL, Object.class));
-        assertNull(MAPPER.readValue(JSON_OK_NULL_WITH_COMMENT, Object.class));
-        assertNull(MAPPER.readValue(JSON_FAIL_NULL, Object.class));
+        assertNull(mapper.readValue(JSON_OK_NULL, Object.class));
+        assertNull(mapper.readValue(JSON_OK_NULL_WITH_COMMENT, Object.class));
+        assertNull(mapper.readValue(JSON_FAIL_NULL, Object.class));
     }
 
+    @Test
     public void testMapperFailOnTrailing()
     {
         // but things change if we enforce checks
@@ -76,7 +83,7 @@ public class FullStreamReadTest extends BaseMapTest
             strict.readTree(JSON_FAIL_ARRAY);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type START_ARRAY)");
+            verifyException(e, "Trailing token (`JsonToken.START_ARRAY`)");
             verifyException(e, "value (bound as `tools.jackson.databind.JsonNode`)");
         }
 
@@ -84,7 +91,7 @@ public class FullStreamReadTest extends BaseMapTest
             strict.readValue(JSON_FAIL_ARRAY, List.class);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type START_ARRAY)");
+            verifyException(e, "Trailing token (`JsonToken.START_ARRAY`)");
             verifyException(e, "value (bound as `java.util.List`)");
         }
 
@@ -111,6 +118,7 @@ public class FullStreamReadTest extends BaseMapTest
                 .readValue(JSON_OK_ARRAY_WITH_COMMENT));
     }
 
+    @Test
     public void testMapperFailOnTrailingWithNull()
     {
         final JsonMapper strict = JsonMapper.builder()
@@ -127,7 +135,7 @@ public class FullStreamReadTest extends BaseMapTest
             strict.readTree(JSON_FAIL_NULL);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type VALUE_FALSE)");
+            verifyException(e, "Trailing token (`JsonToken.VALUE_FALSE`)");
             verifyException(e, "value (bound as `tools.jackson.databind.JsonNode`)");
         }
 
@@ -135,7 +143,7 @@ public class FullStreamReadTest extends BaseMapTest
             strict.readValue(JSON_FAIL_NULL, List.class);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type VALUE_FALSE)");
+            verifyException(e, "Trailing token (`JsonToken.VALUE_FALSE`)");
             verifyException(e, "value (bound as `java.util.List`)");
         }
 
@@ -166,11 +174,12 @@ public class FullStreamReadTest extends BaseMapTest
                 .readValue(JSON_OK_NULL_WITH_COMMENT);
         assertNull(ob);
     }
-    
+
+    @Test
     public void testReaderAcceptTrailing()
     {
-        ObjectReader R = MAPPER.reader();
-        assertFalse(R.isEnabled(DeserializationFeature.FAIL_ON_TRAILING_TOKENS));
+        ObjectReader R = MAPPER.reader()
+                .without(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
         _verifyArray(R.readTree(JSON_OK_ARRAY));
         _verifyArray(R.readTree(JSON_OK_ARRAY_WITH_COMMENT));
@@ -181,6 +190,7 @@ public class FullStreamReadTest extends BaseMapTest
         _verifyCollection((List<?>)rColl.readValue(JSON_FAIL_ARRAY));
     }
 
+    @Test
     public void testReaderFailOnTrailing()
     {
         ObjectReader strictR = MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -193,14 +203,14 @@ public class FullStreamReadTest extends BaseMapTest
             strictRForList.readValue(JSON_FAIL_ARRAY);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type START_ARRAY)");
+            verifyException(e, "Trailing token (`JsonToken.START_ARRAY`)");
             verifyException(e, "value (bound as `java.util.List`)");
         }
         try {
             strictR.readTree(JSON_FAIL_ARRAY);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type START_ARRAY)");
+            verifyException(e, "Trailing token (`JsonToken.START_ARRAY`)");
             verifyException(e, "value (bound as `tools.jackson.databind.JsonNode`)");
         }
 
@@ -210,7 +220,7 @@ public class FullStreamReadTest extends BaseMapTest
                 .readValue(JSON_FAIL_ARRAY);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type START_ARRAY)");
+            verifyException(e, "Trailing token (`JsonToken.START_ARRAY`)");
             verifyException(e, "value (bound as `java.util.ArrayList`)");
         }
 
@@ -234,11 +244,12 @@ public class FullStreamReadTest extends BaseMapTest
         // but works if comments enabled etc
 
         ObjectReader strictRWithComments = strictR.with(JsonReadFeature.ALLOW_JAVA_COMMENTS);
-        
+
         _verifyCollection((List<?>)strictRWithComments.forType(List.class).readValue(JSON_OK_ARRAY_WITH_COMMENT));
         _verifyArray(strictRWithComments.readTree(JSON_OK_ARRAY_WITH_COMMENT));
     }
 
+    @Test
     public void testReaderFailOnTrailingWithNull()
     {
         ObjectReader strictR = MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -251,7 +262,7 @@ public class FullStreamReadTest extends BaseMapTest
             strictRForList.readValue(JSON_FAIL_NULL);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type VALUE_FALSE)");
+            verifyException(e, "Trailing token (`JsonToken.VALUE_FALSE`)");
             verifyException(e, "value (bound as `java.util.List`)");
         }
 
@@ -259,7 +270,7 @@ public class FullStreamReadTest extends BaseMapTest
             strictR.readTree(JSON_FAIL_NULL);
             fail("Should not have passed");
         } catch (MismatchedInputException e) {
-            verifyException(e, "Trailing token (of type VALUE_FALSE)");
+            verifyException(e, "Trailing token (`JsonToken.VALUE_FALSE`)");
             verifyException(e, "value (bound as `tools.jackson.databind.JsonNode`)");
         }
 
@@ -286,7 +297,7 @@ public class FullStreamReadTest extends BaseMapTest
         Object ob = strictRWithComments.forType(List.class).readValue(JSON_OK_NULL_WITH_COMMENT);
         assertNull(ob);
     }
-    
+
     private void _verifyArray(JsonNode n)
     {
         assertTrue(n.isArray());

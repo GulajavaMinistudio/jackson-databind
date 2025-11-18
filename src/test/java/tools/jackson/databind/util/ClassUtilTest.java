@@ -3,24 +3,21 @@ package tools.jackson.databind.util;
 import java.io.*;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.type.TypeReference;
-
-import tools.jackson.databind.BaseMapTest;
 import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.JavaType;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.type.TypeFactory;
 
-public class ClassUtilTest extends BaseMapTest
-{
-    /*
-    /**********************************************************
-    /* Test classes, enums
-    /**********************************************************
-     */
+import static org.junit.jupiter.api.Assertions.*;
 
+public class ClassUtilTest extends DatabindTestUtil
+{
     /* Test classes and interfaces needed for testing class util
      * methods
      */
@@ -60,7 +57,7 @@ public class ClassUtilTest extends BaseMapTest
 
     static abstract class ConcreteAndAbstract {
         public abstract void a();
-        
+
         public void c() { }
     }
 
@@ -73,12 +70,15 @@ public class ClassUtilTest extends BaseMapTest
         public void setMethod(int x) { }
     }
 
+    private final TypeFactory TF = defaultTypeFactory();
+
     /*
     /**********************************************************
     /* Test methods
     /**********************************************************
      */
 
+    @Test
     public void testIsConcrete() throws Exception
     {
         assertTrue(ClassUtil.isConcrete(getClass()));
@@ -89,6 +89,7 @@ public class ClassUtilTest extends BaseMapTest
         assertTrue(ClassUtil.isConcrete(ConcreteAndAbstract.class.getDeclaredMethod("c")));
     }
 
+    @Test
     public void testCanBeABeanType()
     {
         assertEquals("annotation", ClassUtil.canBeABeanType(java.lang.annotation.Retention.class));
@@ -101,6 +102,7 @@ public class ClassUtilTest extends BaseMapTest
         assertNull(ClassUtil.isLocalType(Integer.class, false));
     }
 
+    @Test
     public void testExceptionHelpers()
     {
         RuntimeException e = new RuntimeException("test");
@@ -122,7 +124,7 @@ public class ClassUtilTest extends BaseMapTest
         } catch (Error errAct) {
             assertSame(err, errAct);
         }
-        
+
         try {
             ClassUtil.unwrapAndThrowAsIAE(wrapper);
             fail("Shouldn't get this far");
@@ -131,6 +133,7 @@ public class ClassUtilTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testFailedCreateInstance()
     {
         try {
@@ -154,6 +157,7 @@ public class ClassUtilTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testPrimitiveDefaultValue()
     {
         assertEquals(Integer.valueOf(0), ClassUtil.defaultValue(Integer.TYPE));
@@ -166,7 +170,7 @@ public class ClassUtilTest extends BaseMapTest
         assertEquals(Float.valueOf(0.0f), ClassUtil.defaultValue(Float.TYPE));
 
         assertEquals(Boolean.FALSE, ClassUtil.defaultValue(Boolean.TYPE));
-        
+
         try {
             ClassUtil.defaultValue(String.class);
         } catch (IllegalArgumentException e) {
@@ -174,6 +178,7 @@ public class ClassUtilTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testPrimitiveWrapperType()
     {
         assertEquals(Byte.class, ClassUtil.wrapperType(Byte.TYPE));
@@ -186,7 +191,7 @@ public class ClassUtilTest extends BaseMapTest
         assertEquals(Float.class, ClassUtil.wrapperType(Float.TYPE));
 
         assertEquals(Boolean.class, ClassUtil.wrapperType(Boolean.TYPE));
-        
+
         try {
             ClassUtil.wrapperType(String.class);
             fail("Should not pass");
@@ -195,6 +200,7 @@ public class ClassUtilTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testWrapperToPrimitiveType()
     {
         assertEquals(Integer.TYPE, ClassUtil.primitiveType(Integer.class));
@@ -205,17 +211,19 @@ public class ClassUtilTest extends BaseMapTest
         assertEquals(Float.TYPE, ClassUtil.primitiveType(Float.class));
         assertEquals(Double.TYPE, ClassUtil.primitiveType(Double.class));
         assertEquals(Boolean.TYPE, ClassUtil.primitiveType(Boolean.class));
-        
+
         assertNull(ClassUtil.primitiveType(String.class));
     }
 
+    @Test
     public void testFindEnumTypeNonJdk()
     {
         assertEquals(TestEnum.class, ClassUtil.findEnumType(TestEnum.A));
         assertEquals(TestEnum.class, ClassUtil.findEnumType(TestEnum.B));
     }
 
-    // Some trouble with JDK 16+
+    // Some trouble with JDK 17+ (unless --add-opens to force access added)
+    @Test
     public void testFindEnumSetTypeJDK()
     {
         // different codepaths for empty and non-empty EnumSets...
@@ -223,31 +231,35 @@ public class ClassUtilTest extends BaseMapTest
         assertEquals(TestEnum.class, ClassUtil.findEnumType(EnumSet.noneOf(TestEnum.class)));
     }
 
-    // Some trouble with JDK 16+
+    // Some trouble with JDK 17+ (unless --add-opens to force access added)
+    @Test
     public void testFindEnumMapTypeJDK()
     {
         assertEquals(TestEnum.class, ClassUtil.findEnumType(new EnumMap<TestEnum,Integer>(TestEnum.class)));
     }
 
+    @Test
     public void testDescs()
     {
         final String stringExp = "`java.lang.String`";
         assertEquals(stringExp, ClassUtil.getClassDescription("foo"));
         assertEquals(stringExp, ClassUtil.getClassDescription(String.class));
-        final JavaType stringType = TypeFactory.defaultInstance().constructType(String.class);
+        final JavaType stringType = TF.constructType(String.class);
         assertEquals(stringExp, ClassUtil.getTypeDescription(stringType));
-        final JavaType mapType = TypeFactory.defaultInstance().constructType(
+        final JavaType mapType = TF.constructType(
                 new TypeReference<Map<String, Integer>>() { });
         assertEquals("`java.util.Map<java.lang.String,java.lang.Integer>`",
                 ClassUtil.getTypeDescription(mapType));
     }
 
+    @Test
     public void testGetDeclaringClass()
     {
         assertEquals(null, ClassUtil.getDeclaringClass(String.class));
         assertEquals(getClass(), ClassUtil.getDeclaringClass(BaseClass.class));
     }
 
+    @Test
     public void testIsXxxType()
     {
         assertTrue(ClassUtil.isCollectionMapOrArray(String[].class));
@@ -260,6 +272,7 @@ public class ClassUtilTest extends BaseMapTest
         assertFalse(ClassUtil.isBogusClass(String.class));
     }
 
+    @Test
     public void testEnforceSubtype()
     {
         try {
@@ -269,6 +282,7 @@ public class ClassUtilTest extends BaseMapTest
         }
     }
 
+    @Test
     public void testCloseEtc() throws Exception
     {
         final Exception testExc1 = new IllegalArgumentException("test");
@@ -298,6 +312,7 @@ public class ClassUtilTest extends BaseMapTest
     }
 
     @SuppressWarnings("serial")
+    @Test
     public void testExceptionMessage() {
         DatabindException jacksonException = new DatabindException("A message") {
             @Override
@@ -318,6 +333,7 @@ public class ClassUtilTest extends BaseMapTest
         throw new IllegalArgumentException("A custom message");
     }
 
+    @Test
     public void testJDKChecks() {
         int version = ClassUtil.getJDKMajorVersion();
         assertTrue(version > 0);

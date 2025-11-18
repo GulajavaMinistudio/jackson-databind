@@ -1,13 +1,19 @@
 package tools.jackson.databind.ser;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.exc.InvalidDefinitionException;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TestEmptyClass
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     static class Empty { }
 
@@ -17,34 +23,34 @@ public class TestEmptyClass
     @JsonSerialize(using=NonZeroSerializer.class)
     static class NonZero {
         public int nr;
-        
+
         public NonZero(int i) { nr = i; }
     }
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     static class NonZeroWrapper {
         public NonZero value;
-        
+
         public NonZeroWrapper(int i) {
             value = new NonZero(i);
         }
     }
-    
+
     static class NonZeroSerializer extends ValueSerializer<NonZero>
     {
         @Override
-        public void serialize(NonZero value, JsonGenerator jgen, SerializerProvider provider)
+        public void serialize(NonZero value, JsonGenerator jgen, SerializationContext provider)
         {
             jgen.writeNumber(value.nr);
         }
 
         @Override
-        public boolean isEmpty(SerializerProvider provider, NonZero value) {
+        public boolean isEmpty(SerializationContext provider, NonZero value) {
             if (value == null) return true;
             return (value.nr == 0);
         }
     }
-    
+
     /*
     /**********************************************************
     /* Test methods
@@ -53,11 +59,14 @@ public class TestEmptyClass
 
     protected final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testEmptyWithAnnotations() throws Exception
     {
         // First: without annotations, should complain
         try {
-            MAPPER.writeValueAsString(new Empty());
+            MAPPER.writer()
+                .with(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                    .writeValueAsString(new Empty());
             fail("Should fail");
         } catch (InvalidDefinitionException e) {
             verifyException(e, "No serializer found for class");
@@ -77,16 +86,17 @@ public class TestEmptyClass
      * Alternative it is possible to use a feature to allow
      * serializing empty classes, too
      */
+    @Test
     public void testEmptyWithFeature() throws Exception
     {
-        // should be enabled by default
-        assertTrue(MAPPER.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS));
+        // should be disabled by default as of 3.x
+        assertFalse(MAPPER.isEnabled(SerializationFeature.FAIL_ON_EMPTY_BEANS));
         assertEquals("{}",
                 MAPPER.writer()
-                    .without(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                     .writeValueAsString(new Empty()));
     }
 
+    @Test
     public void testCustomNoEmpty() throws Exception
     {
         // first non-empty:

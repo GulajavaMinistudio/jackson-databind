@@ -1,6 +1,9 @@
 package tools.jackson.databind.deser.creators;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.core.Version;
 import tools.jackson.databind.*;
 import tools.jackson.databind.deser.SettableBeanProperty;
@@ -10,15 +13,19 @@ import tools.jackson.databind.deser.bean.PropertyValueBuffer;
 import tools.jackson.databind.deser.std.StdValueInstantiator;
 import tools.jackson.databind.module.SimpleModule;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.jsonMapperBuilder;
+
 /**
  * Exercises a custom value instantiator with an overridden
  * {@link ValueInstantiator#createFromObjectWith(DeserializationContext, SettableBeanProperty[], PropertyValueBuffer)}
  * as well as the {@link PropertyValueBuffer#hasParameter(SettableBeanProperty)}
- * and {@link PropertyValueBuffer#getParameter(SettableBeanProperty)} methods.
+ * and {@link PropertyValueBuffer#getParameter} methods.
  */
 @SuppressWarnings("serial")
 public class TestCustomValueInstDefaults
-    extends BaseMapTest
 {
     static class Bucket
     {
@@ -128,13 +135,13 @@ public class TestCustomValueInstDefaults
             for (SettableBeanProperty prop : props) {
                 if (buffer.hasParameter(prop)) {
                     if (prop.getName().equals("a")) {
-                        a = (Integer) buffer.getParameter(prop);
+                        a = (Integer) buffer.getParameter(ctxt, prop);
                     } else if (prop.getName().equals("b")) {
-                        b = (Integer) buffer.getParameter(prop);
+                        b = (Integer) buffer.getParameter(ctxt, prop);
                     } else if (prop.getName().equals("c")) {
-                        c = (String) buffer.getParameter(prop);
+                        c = (String) buffer.getParameter(ctxt, prop);
                     } else if (prop.getName().equals("d")) {
-                        d = (String) buffer.getParameter(prop);
+                        d = (String) buffer.getParameter(ctxt, prop);
                     }
                 }
             }
@@ -188,7 +195,7 @@ public class TestCustomValueInstDefaults
             for (SettableBeanProperty prop : props) {
                 if (buffer.hasParameter(prop)) {
                     String name = prop.getName();
-                    Object value = buffer.getParameter(prop);
+                    Object value = buffer.getParameter(ctxt, prop);
                     if (name.equals("i01")) i01 = (Integer) value;
                     else if (name.equals("i02")) i02 = (Integer) value;
                     else if (name.equals("i03")) i03 = (Integer) value;
@@ -237,15 +244,15 @@ public class TestCustomValueInstDefaults
         @Override
         public ValueInstantiator modifyValueInstantiator(
                 DeserializationConfig config,
-                BeanDescription beanDesc,
+                BeanDescription.Supplier beanDescRef,
                 ValueInstantiator defaultInstantiator)
         {
             if (defaultInstantiator instanceof StdValueInstantiator) {
-                if (beanDesc.getBeanClass() == Bucket.class) {
+                if (beanDescRef.getBeanClass() == Bucket.class) {
                     return new BucketInstantiator(
                             (StdValueInstantiator) defaultInstantiator);
                 }
-                if (beanDesc.getBeanClass() == BigBucket.class) {
+                if (beanDescRef.getBeanClass() == BigBucket.class) {
                     return new BigBucketInstantiator(
                             (StdValueInstantiator) defaultInstantiator);
                 }
@@ -335,14 +342,14 @@ public class TestCustomValueInstDefaults
         public Object createFromObjectWith(DeserializationContext ctxt, SettableBeanProperty[] props, PropertyValueBuffer buffer)
         {
             for (SettableBeanProperty prop : props) {
-                assertTrue("prop " + prop.getName() + " was expected to have buffer.hasParameter(prop) be true but was false", buffer.hasParameter(prop));
+                assertTrue(buffer.hasParameter(prop), "prop " + prop.getName() + " was expected to have buffer.hasParameter(prop) be true but was false");
             }
             return super.createFromObjectWith(ctxt, props, buffer);
         }
     }
 
     // [databind#1432]
-    
+
     public static class ClassWith32Module extends SimpleModule {
         public ClassWith32Module() {
             super("test", Version.unknownVersion());
@@ -353,8 +360,8 @@ public class TestCustomValueInstDefaults
             context.addValueInstantiators(new ValueInstantiators.Base() {
                 @Override
                 public ValueInstantiator modifyValueInstantiator(DeserializationConfig config,
-                        BeanDescription beanDesc, ValueInstantiator defaultInstantiator) {
-                    if (beanDesc.getBeanClass() == ClassWith32Props.class) {
+                        BeanDescription.Supplier beanDescRef, ValueInstantiator defaultInstantiator) {
+                    if (beanDescRef.getBeanClass() == ClassWith32Props.class) {
                         return new VerifyingValueInstantiator((StdValueInstantiator)
                                 defaultInstantiator);
                     }
@@ -369,8 +376,9 @@ public class TestCustomValueInstDefaults
     /* Test methods
     /**********************************************************
      */
-    
+
     // When all values are in the source, no defaults should be used.
+    @Test
     public void testAllPresent() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -387,6 +395,7 @@ public class TestCustomValueInstDefaults
     }
 
     // When no values are in the source, all defaults should be used.
+    @Test
     public void testAllAbsent() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -404,6 +413,7 @@ public class TestCustomValueInstDefaults
 
     // When some values are in the source and some are not, defaults should only
     // be used for the missing values.
+    @Test
     public void testMixedPresentAndAbsent() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -447,6 +457,7 @@ public class TestCustomValueInstDefaults
     }
 
     // Ensure that 0 is not mistaken for a missing int value.
+    @Test
     public void testPresentZeroPrimitive() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -463,6 +474,7 @@ public class TestCustomValueInstDefaults
     }
 
     // Ensure that null is not mistaken for a missing String value.
+    @Test
     public void testPresentNullReference() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -481,6 +493,7 @@ public class TestCustomValueInstDefaults
     // When we have more than 32 creator parameters, the buffer will use a
     // BitSet instead of a primitive int to keep track of which parameters it
     // has seen.  Ensure that nothing breaks in that case.
+    @Test
     public void testMoreThan32CreatorParams() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -525,6 +538,7 @@ public class TestCustomValueInstDefaults
     }
 
     // [databind#1432]
+    @Test
     public void testClassWith32CreatorParams() throws Exception
     {
         StringBuilder sb = new StringBuilder()

@@ -3,12 +3,17 @@ package tools.jackson.databind.objectid;
 import java.net.URI;
 import java.util.*;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestObjectIdWithEquals extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestObjectIdWithEquals extends DatabindTestUtil
 {
     @JsonIdentityInfo(generator=ObjectIdGenerators.PropertyGenerator.class, property="id", scope=Foo.class)
     @JsonPropertyOrder({ "id", "bars", "otherBars" })
@@ -31,7 +36,7 @@ public class TestObjectIdWithEquals extends BaseMapTest
         public Bar(int i) {
             id = i;
         }
-        
+
         @Override
         public int hashCode() {
             return id;
@@ -80,6 +85,7 @@ public class TestObjectIdWithEquals extends BaseMapTest
     /******************************************************
      */
 
+    @Test
     public void testSimpleEquals() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -92,7 +98,7 @@ public class TestObjectIdWithEquals extends BaseMapTest
         Bar bar1 = new Bar(1);
         Bar bar2 = new Bar(2);
         // this is another bar which is supposed to be "equal" to bar1
-        // due to the same ID and 
+        // due to the same ID and
         // Bar class' equals() method will return true.
         Bar anotherBar1 = new Bar(1);
 
@@ -104,12 +110,12 @@ public class TestObjectIdWithEquals extends BaseMapTest
 
         String json = mapper.writeValueAsString(foo);
         assertEquals("{\"id\":1,\"bars\":[{\"id\":1},{\"id\":2}],\"otherBars\":[1,2]}", json);
-
-        Foo foo2 = mapper.readValue(json, Foo.class);       
+        Foo foo2 = mapper.readValue(json, Foo.class);
         assertNotNull(foo2);
         assertEquals(foo.id, foo2.id);
     }
 
+    @Test
     public void testEqualObjectIdsExternal() throws Exception
     {
         Element element = new Element();

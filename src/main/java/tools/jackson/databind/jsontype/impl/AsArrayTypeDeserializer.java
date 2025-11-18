@@ -7,6 +7,7 @@ import tools.jackson.core.util.JsonParserSequence;
 import tools.jackson.databind.*;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.jsontype.TypeIdResolver;
+import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.TokenBuffer;
 
 /**
@@ -28,13 +29,13 @@ public class AsArrayTypeDeserializer
     public AsArrayTypeDeserializer(AsArrayTypeDeserializer src, BeanProperty property) {
         super(src, property);
     }
-    
+
     @Override
     public TypeDeserializer forProperty(BeanProperty prop) {
         // usually if it's null:
         return (prop == _property) ? this : new AsArrayTypeDeserializer(this, prop);
     }
-    
+
     @Override
     public As getTypeInclusion() { return As.WRAPPER_ARRAY; }
 
@@ -53,17 +54,17 @@ public class AsArrayTypeDeserializer
     public Object deserializeTypedFromObject(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         return _deserialize(p, ctxt);
     }
-    
+
     @Override
     public Object deserializeTypedFromScalar(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         return _deserialize(p, ctxt);
-    }    
+    }
 
     @Override
     public Object deserializeTypedFromAny(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         return _deserialize(p, ctxt);
-    }    
-    
+    }
+
     /*
     /***************************************************************
     /* Internal methods
@@ -122,26 +123,32 @@ public class AsArrayTypeDeserializer
             // ... but for now, fall through
         }
         return value;
-    }    
-    
+    }
+
     protected String _locateTypeId(JsonParser p, DeserializationContext ctxt) throws JacksonException
     {
         if (!p.isExpectedStartArrayToken()) {
             // Need to allow even more customized handling, if something unexpected seen...
             // but should there be a way to limit this to likely success cases?
             if (_defaultImpl != null) {
-                return _idResolver.idFromBaseType(ctxt);
+                String id = _idResolver.idFromBaseType(ctxt);
+                if (id == null) {
+                    ctxt.reportBadDefinition(_idResolver.getClass(),
+                            "`idFromBaseType()` (of "
+                            +ClassUtil.classNameOf(_idResolver)+") returned `null`");
+                }
+                return id;
             }
-             ctxt.reportWrongTokenException(baseType(), JsonToken.START_ARRAY,
-                     "need Array value to contain `As.WRAPPER_ARRAY` type information for class "+baseTypeName());
-             return null;
+            ctxt.reportWrongTokenException(baseType(), JsonToken.START_ARRAY,
+                    "need Array value to contain `As.WRAPPER_ARRAY` type information for class "+baseTypeName());
+            return null;
         }
         // And then type id as a String
         JsonToken t = p.nextToken();
         if ((t == JsonToken.VALUE_STRING)
                 // 25-Nov-2022, tatu: [databind#1761] Also accept other scalars
             || ((t != null) && t.isScalarValue())) {
-            String result = p.getText();
+            String result = p.getString();
             p.nextToken();
             return result;
         }

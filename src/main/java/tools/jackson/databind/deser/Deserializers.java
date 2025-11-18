@@ -1,5 +1,6 @@
 package tools.jackson.databind.deser;
 
+import tools.jackson.core.TreeNode;
 import tools.jackson.databind.*;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.type.*;
@@ -21,62 +22,70 @@ public interface Deserializers
 
     /**
      * Method called to locate deserializer for specified {@link java.lang.Enum} type.
-     * 
+     *
      * @param type Type of {@link java.lang.Enum} instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findEnumDeserializer(Class<?> type,
-            DeserializationConfig config, BeanDescription beanDesc);
+    default ValueDeserializer<?> findEnumDeserializer(JavaType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified JSON tree node type.
-     * 
+     *
      * @param nodeType Specific type of JSON tree nodes to deserialize
-     *  (subtype of {@link tools.jackson.databind.JsonNode})
+     *  (subtype of {@link TreeNode})
      * @param config Configuration in effect
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findTreeNodeDeserializer(Class<? extends JsonNode> nodeType,
-            DeserializationConfig config, BeanDescription beanDesc);
+    default ValueDeserializer<?> findTreeNodeDeserializer(JavaType nodeType,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified value type which does not belong to any other
      * category (not an Enum, Collection, Map, Array, reference value or tree node)
-     * 
+     *
      * @param type Bean type to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findBeanDeserializer(JavaType type,
-            DeserializationConfig config, BeanDescription beanDesc);
-    
+    default ValueDeserializer<?> findBeanDeserializer(JavaType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef) {
+        return null;
+    }
+
     // // // Then container types
-    
+
     /**
      * Method called to locate deserializer for value that is of referential
      * type,
-     * 
+     *
      * @param refType Specific referential type to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the reference type that contains class annotations and
+     * @param beanDescRef Definition of the reference type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param contentTypeDeserializer Possible type deserializer for referenced value
      * @param contentDeserializer Value deserializer to use for referenced value, if indicated
      *    by property annotation
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findReferenceDeserializer(ReferenceType refType,
-            DeserializationConfig config, BeanDescription beanDesc,
-            TypeDeserializer contentTypeDeserializer, ValueDeserializer<?> contentDeserializer);
+    default ValueDeserializer<?> findReferenceDeserializer(ReferenceType refType,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
+            TypeDeserializer contentTypeDeserializer, ValueDeserializer<?> contentDeserializer) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified array type.
@@ -85,10 +94,10 @@ public interface Deserializers
      * annotations, typically), but usually are not.
      * Type deserializer for element is passed if one is needed based on contextual information
      * (annotations on declared element class; or on field or method type is associated with).
-     * 
+     *
      * @param type Type of array instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param elementTypeDeserializer If element type needs polymorphic type handling, this is
      *    the type information deserializer to use; should usually be used as is when constructing
@@ -96,12 +105,14 @@ public interface Deserializers
      * @param elementDeserializer Deserializer to use for elements, if explicitly defined (by using
      *    annotations, for example). May be null, in which case it will need to be resolved
      *    by deserializer at a later point.
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findArrayDeserializer(ArrayType type,
-            DeserializationConfig config, BeanDescription beanDesc,
-            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer);
+    default ValueDeserializer<?> findArrayDeserializer(ArrayType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
+            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified {@link java.util.Collection} (List, Set etc) type.
@@ -110,10 +121,10 @@ public interface Deserializers
      * annotations, typically), but usually are not.
      * Type deserializer for element is passed if one is needed based on contextual information
      * (annotations on declared element class; or on field or method type is associated with).
-     * 
+     *
      * @param type Type of collection instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param elementTypeDeserializer If element type needs polymorphic type handling, this is
      *    the type information deserializer to use; should usually be used as is when constructing
@@ -121,12 +132,14 @@ public interface Deserializers
      * @param elementDeserializer Deserializer to use for elements, if explicitly defined (by using
      *    annotations, for example). May be null, in which case it will need to be resolved
      *    by deserializer at a later point.
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findCollectionDeserializer(CollectionType type,
-            DeserializationConfig config, BeanDescription beanDesc,
-            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer);
+    default ValueDeserializer<?> findCollectionDeserializer(CollectionType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
+            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified
@@ -137,10 +150,10 @@ public interface Deserializers
      * annotations, typically), but usually are not.
      * Type deserializer for element is passed if one is needed based on contextual information
      * (annotations on declared element class; or on field or method type is associated with).
-     * 
+     *
      * @param type Type of instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param elementTypeDeserializer If element type needs polymorphic type handling, this is
      *    the type information deserializer to use; should usually be used as is when constructing
@@ -148,12 +161,14 @@ public interface Deserializers
      * @param elementDeserializer Deserializer to use for elements, if explicitly defined (by using
      *    annotations, for example). May be null, in which case it will need to be resolved
      *    by deserializer at a later point.
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type,
-            DeserializationConfig config, BeanDescription beanDesc,
-            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer);
+    default ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
+            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified {@link java.util.Map} type.
@@ -167,10 +182,10 @@ public interface Deserializers
      * a specific configuration override (annotations) to indicate instance to use.
      * Otherwise null is passed, and key deserializer needs to be obtained later during
      * resolution of map serializer constructed here.
-     * 
+     *
      * @param type Type of {@link java.util.Map} instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param keyDeserializer Key deserializer use, if it is defined via annotations or other configuration;
      *    null if default key deserializer for key type can be used.
@@ -180,13 +195,15 @@ public interface Deserializers
      * @param elementDeserializer Deserializer to use for elements, if explicitly defined (by using
      *    annotations, for example). May be null, in which case it will need to be resolved
      *    by deserializer at a later point.
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findMapDeserializer(MapType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+    default ValueDeserializer<?> findMapDeserializer(MapType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             KeyDeserializer keyDeserializer,
-            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer);
+            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer) {
+        return null;
+    }
 
     /**
      * Method called to locate deserializer for specified
@@ -202,10 +219,10 @@ public interface Deserializers
      * a specific configuration override (annotations) to indicate instance to use.
      * Otherwise null is passed, and key deserializer needs to be obtained later during
      * resolution, by deserializer constructed here.
-     * 
+     *
      * @param type Type of {@link java.util.Map} instances to deserialize
      * @param config Configuration in effect
-     * @param beanDesc Definition of the enumeration type that contains class annotations and
+     * @param beanDescRef Definition of the enumeration type that contains class annotations and
      *    other information typically needed for building deserializers
      * @param keyDeserializer Key deserializer use, if it is defined via annotations or other configuration;
      *    null if default key deserializer for key type can be used.
@@ -215,13 +232,15 @@ public interface Deserializers
      * @param elementDeserializer Deserializer to use for elements, if explicitly defined (by using
      *    annotations, for example). May be null, in which case it will need to be resolved
      *    by deserializer at a later point.
-     * 
+     *
      * @return Deserializer to use for the type; or null if this provider does not know how to construct it
      */
-    public ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type,
-            DeserializationConfig config, BeanDescription beanDesc,
+    default ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type,
+            DeserializationConfig config, BeanDescription.Supplier beanDescRef,
             KeyDeserializer keyDeserializer,
-            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer);
+            TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer) {
+        return null;
+    }
 
     /**
      * Method that may be called to check whether this deserializer provider would provide
@@ -234,7 +253,7 @@ public interface Deserializers
      *
      * @since 3.0
      */
-    public boolean hasDeserializerFor(DeserializationConfig config,
+    boolean hasDeserializerFor(DeserializationConfig config,
             Class<?> valueType);
 
     /*
@@ -253,75 +272,10 @@ public interface Deserializers
     public abstract static class Base
         implements Deserializers
     {
-        @Override
-        public ValueDeserializer<?> findEnumDeserializer(Class<?> type,
-                DeserializationConfig config, BeanDescription beanDesc)
-        {
-            return null;
-        }
-        
-        @Override
-        public ValueDeserializer<?> findTreeNodeDeserializer(Class<? extends JsonNode> nodeType,
-                DeserializationConfig config, BeanDescription beanDesc)
-        {
-            return null;
-        }
+        // For other methods default implementation is fine (returns null)
 
         @Override
-        public ValueDeserializer<?> findReferenceDeserializer(ReferenceType refType,
-                DeserializationConfig config, BeanDescription beanDesc,
-                TypeDeserializer contentTypeDeserializer, ValueDeserializer<?> contentDeserializer)
-        {
-            return null;
-        }
-        
-        @Override
-        public ValueDeserializer<?> findBeanDeserializer(JavaType type,
-                DeserializationConfig config, BeanDescription beanDesc)
-        {
-            return null;
-        }
-        
-        @Override
-        public ValueDeserializer<?> findArrayDeserializer(ArrayType type,
-                DeserializationConfig config, BeanDescription beanDesc,
-                TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
-        {
-            return null;
-        }
-
-        @Override
-        public ValueDeserializer<?> findCollectionDeserializer(CollectionType type,
-                DeserializationConfig config, BeanDescription beanDesc,
-                TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
-        {
-            return null;
-        }
-
-        @Override
-        public ValueDeserializer<?> findCollectionLikeDeserializer(CollectionLikeType type,
-                DeserializationConfig config, BeanDescription beanDesc,
-                TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
-        {
-            return null;
-        }
-
-        @Override
-        public ValueDeserializer<?> findMapDeserializer(MapType type,
-                DeserializationConfig config, BeanDescription beanDesc,
-                KeyDeserializer keyDeserializer,
-                TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
-        {
-            return null;
-        }
-
-        @Override
-        public ValueDeserializer<?> findMapLikeDeserializer(MapLikeType type,
-                DeserializationConfig config, BeanDescription beanDesc,
-                KeyDeserializer keyDeserializer,
-                TypeDeserializer elementTypeDeserializer, ValueDeserializer<?> elementDeserializer)
-        {
-            return null;
-        }
+        public abstract boolean hasDeserializerFor(DeserializationConfig config,
+                Class<?> valueType);
     }
 }

@@ -2,23 +2,31 @@ package tools.jackson.databind.deser.jdk;
 
 import java.nio.charset.StandardCharsets;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.*;
+import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.exc.MismatchedInputException;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import static tools.jackson.databind.testutil.DatabindTestUtil.*;
 
 // Mostly for [databind#1425]; not in optimal place (as it also has
 // tree-access tests), but has to do for now
-public class Base64DecodingTest extends BaseMapTest
+public class Base64DecodingTest
 {
-    private final ObjectMapper MAPPER = objectMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
     private final byte[] HELLO_BYTES = "hello".getBytes(StandardCharsets.UTF_8);
     private final String BASE64_HELLO = "aGVsbG8=";
 
     // for [databind#1425]
+    @Test
     public void testInvalidBase64() throws Exception
     {
         byte[] b = MAPPER.readValue(q(BASE64_HELLO), byte[].class);
-        assertEquals(HELLO_BYTES, b);
+        assertArrayEquals(HELLO_BYTES, b);
 
         _testInvalidBase64(MAPPER, BASE64_HELLO+"!");
         _testInvalidBase64(MAPPER, BASE64_HELLO+"!!");
@@ -44,8 +52,8 @@ public class Base64DecodingTest extends BaseMapTest
         try {
             /*byte[] b =*/ nodeValue.binaryValue();
             fail("Should not pass");
-        } catch (MismatchedInputException e) {
-            verifyException(e, "Cannot access contents of TextNode as binary");
+        } catch (JsonNodeException e) {
+            verifyException(e, "method `binaryValue()` cannot convert value");
             verifyException(e, "Illegal character '!'");
         }
     }

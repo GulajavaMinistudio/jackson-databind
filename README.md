@@ -15,31 +15,30 @@ Naming of classes uses word 'JSON' in many places even though there is no actual
 | Type | Status |
 | ---- | ------ |
 | Build (CI) | [![Build (github)](https://github.com/FasterXML/jackson-databind/actions/workflows/main.yml/badge.svg)](https://github.com/FasterXML/jackson-databind/actions/workflows/main.yml) |
-| Artifact | [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.fasterxml.jackson.core/jackson-databind) |
-| OSS Sponsorship | [![Tidelift](https://tidelift.com/badges/package/maven/com.fasterxml.jackson.core:jackson-databind)](https://tidelift.com/subscription/pkg/maven-com-fasterxml-jackson-core-jackson-databind?utm_source=maven-com-fasterxml-jackson-core-jackson-databind&utm_medium=referral&utm_campaign=readme) |
-| Javadocs | [![Javadoc](https://javadoc.io/badge/com.fasterxml.jackson.core/jackson-databind.svg)](http://www.javadoc.io/doc/com.fasterxml.jackson.core/jackson-databind) |
-| Code coverage (3.0) | [![codecov.io](https://codecov.io/github/FasterXML/jackson-databind/coverage.svg?branch=master)](https://codecov.io/github/FasterXML/jackson-databind?branch=master) |
-| CodeQ (LGTM.com) | [![LGTM alerts](https://img.shields.io/lgtm/alerts/g/FasterXML/jackson-databind.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/FasterXML/jackson-databind/alerts/) [![Language grade: Java](https://img.shields.io/lgtm/grade/java/g/FasterXML/jackson-databind.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/FasterXML/jackson-databind/context:java) |
-
+| Artifact | ![Maven Central](https://img.shields.io/maven-central/v/tools.jackson.core/jackson-databind) |
+| OSS Sponsorship | [![Tidelift](https://tidelift.com/badges/package/maven/tools.jackson.core:jackson-databind)](https://tidelift.com/subscription/pkg/maven-tools-jackson-core-jackson-databind?utm_source=maven-tools-jackson-core-jackson-databind&utm_medium=referral&utm_campaign=readme) |
+| Javadocs | [![Javadoc](https://javadoc.io/badge/tools.jackson.core/jackson-databind.svg)](http://www.javadoc.io/doc/tools.jackson.core/jackson-databind) |
+| Code coverage (3.0) | [![codecov.io](https://codecov.io/github/FasterXML/jackson-databind/coverage.svg?branch=3.x)](https://codecov.io/github/FasterXML/jackson-databind?branch=3.x) |
+| OpenSSF Score | [![OpenSSF  Scorecard](https://api.securityscorecards.dev/projects/github.com/FasterXML/jackson-databind/badge)](https://securityscorecards.dev/viewer/?uri=github.com/FasterXML/jackson-databind) |
 
 # Get it!
 
 ## Maven
 
-Functionality of this package is contained in Java package `com.fasterxml.jackson.databind`, and can be used using following Maven dependency:
+Functionality of this package is contained in Java package `tools.jackson.databind` (for Jackson 3.x), and can be used using following Maven dependency:
 
 ```xml
 <properties>
   ...
   <!-- Use the latest version whenever possible. -->
-  <jackson.version>2.13.2</jackson.version>
+  <jackson.version>3.0.0</jackson.version>
   ...
 </properties>
 
 <dependencies>
   ...
   <dependency>
-    <groupId>com.fasterxml.jackson.core</groupId>
+    <groupId>tools.jackson.core</groupId>
     <artifactId>jackson-databind</artifactId>
     <version>${jackson.version}</version>
   </dependency>
@@ -56,8 +55,8 @@ and include these 2 jars explicitly.
 
 ## Non-Maven dependency resolution
 
-For use cases that do not automaticall resolve dependencies from Maven repositories, you can still
-download jars from [Central Maven repository](https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/).
+For use cases that do not automatically resolve dependencies from Maven repositories, you can still
+download jars from [Central Maven repository](https://repo1.maven.org/maven2/tools/jackson/core/jackson-databind/).
 
 Databind jar is also a functional OSGi bundle, with proper import/export declarations, so it can be use on OSGi container as is.
 
@@ -72,16 +71,15 @@ Jackson 2.12 and above include additional Gradle 6 Module Metadata for version a
 
 Jackson-databind package baseline JDK requirements are as follows:
 
-* Versions 2.0 - 2.7 require JDK 6
-* Versions 2.8 - 2.12 require JDK 7 to run (but 2.11 - 2.12 require JDK 8 to build)
-* Versions 2.13 and above require JDK 8
+* Versions 2.x require JDK 8
+* Versions 3.x require JDK 17
 
 ### Android
 
-List is incomplete due to recent addition of compatibility checker.
+List is incomplete due to compatibility checker addition being done for Jackson 2.13.
 
-* 2.13: Android SDK 24+
-* 2.14: Android SDK 26+
+* 2.14 - 2.19: Android SDK 26+
+* 3.0: Android SDK 34+
 
 for information on Android SDK versions to Android Release names see [https://en.wikipedia.org/wiki/Android_version_history]
 
@@ -105,10 +103,16 @@ public class MyValue {
 }
 ```
 
-we will need a `com.fasterxml.jackson.databind.ObjectMapper` instance, used for all data-binding, so let's construct one:
+we will need a `tools.jackson.databind.ObjectMapper` instance, used for all data-binding, so let's construct one:
 
 ```java
+// With default settings can use
 ObjectMapper mapper = new ObjectMapper(); // create once, reuse
+
+// But if configuration needed, use builder pattern:
+ObjectMapper mapper = JsonMapper.builder()
+    // configuration
+    .build();
 ```
 
 The default instance is fine for our use -- we will learn later on how to configure mapper instance if necessary. Usage is simple:
@@ -158,30 +162,70 @@ Map<String, ResultValue> results = mapper.readValue(jsonSource,
 
 But wait! There is more!
 
+(enters Tree Model...)
+
+### Tree Model
+
 While dealing with `Map`s, `List`s and other "simple" Object types (Strings, Numbers, Booleans) can be simple, Object traversal can be cumbersome.
 This is where Jackson's [Tree model](https://github.com/FasterXML/jackson-databind/wiki/JacksonTreeModel) can come in handy:
 
 ```java
 // can be read as generic JsonNode, if it can be Object or Array; or,
 // if known to be Object, as ObjectNode, if array, ArrayNode etc:
-ObjectNode root = mapper.readTree("stuff.json");
+JsonNode root = mapper.readTree("{ \"name\": \"Joe\", \"age\": 13 }");
 String name = root.get("name").asText();
 int age = root.get("age").asInt();
 
 // can modify as well: this adds child Object as property 'other', set property 'type'
-root.with("other").put("type", "student");
-String json = mapper.writeValueAsString(root);
+root.withObject("/other").put("type", "student");
+String json = mapper.writeValueAsString(root); // prints below
 
-// with above, we end up with something like as 'json' String:
-// {
-//   "name" : "Bob", "age" : 13,
-//   "other" : {
-//      "type" : "student"
-//   }
-// }
+/*
+with above, we end up with something like as 'json' String:
+{
+  "name" : "Bob",
+  "age" : 13,
+  "other" : {
+    "type" : "student"
+  }
+} 
+*/
 ```
 
 Tree Model can be more convenient than data-binding, especially in cases where structure is highly dynamic, or does not map nicely to Java classes.
+
+Finally, feel free to mix and match, and even in the same json document (useful when only part of the document is known and modeled in your code)
+
+```java
+// Some parts of this json are modeled in our code, some are not
+JsonNode root = mapper.readTree(complexJson);
+Person p = mapper.treeToValue(root.get("person"), Person.class); // known single pojo
+Map<String, Object> dynamicmetadata = mapper.treeToValue(root.get("dynamicmetadata"), Map.class); // unknown smallish subfield, convert all to collections
+int singledeep = root.get("deep").get("large").get("hiearchy").get("important").intValue(); // single value in very deep optional subfield, ignoring the rest
+int singledeeppath = root.at("/deep/large/hiearchy/important").intValue(); // json path
+int singledeeppathunique = root.findValue("important").intValue(); // by unique field name
+
+// Send an aggregate json from heterogenous sources
+ObjectNode root = mapper.createObjectNode();
+root.putPOJO("person", new Person("Joe")); // simple pojo
+root.putPOJO("friends", List.of(new Person("Jane"), new Person("Jack"))); // generics
+Map<String, Object> dynamicmetadata = Map.of("Some", "Metadata");
+root.putPOJO("dynamicmetadata", dynamicmetadata);  // collections
+root.putPOJO("dynamicmetadata", mapper.valueToTree(dynamicmetadata)); // same thing
+root.set("dynamicmetadata", mapper.valueToTree(dynamicmetadata)); // same thing
+root.withObject("deep").withObject("large").withObject("hiearchy").put("important", 42); // create as you go
+root.withObject("/deep/large/hiearchy").put("important", 42); // json path
+mapper.writeValueAsString(root);
+```
+
+**Supported for Jackson 2.16+ versions**
+
+```java
+// generics
+List<Person> friends = mapper.treeToValue(root.get("friends"), new TypeReference<List<Person>>() { });
+// create as you go but without trying json path
+root.withObjectProperty("deep").withObjectProperty("large").withObjectProperty("hiearchy").put("important", 42);
+```
 
 ## 5 minute tutorial: Streaming parser, generator
 
@@ -197,7 +241,7 @@ ObjectMapper mapper = ...;
 File jsonFile = new File("test.json");
 // note: method added in Jackson 2.11 (earlier would need to use
 // mapper.getFactory().createGenerator(...)
-JsonGenerator g = f.createGenerator(jsonFile, JsonEncoding.UTF8);
+JsonGenerator g = mapper.createGenerator(jsonFile, JsonEncoding.UTF8);
 // write JSON: { "message" : "Hello world!" }
 g.writeStartObject();
 g.writeStringField("message", "Hello world!");
@@ -230,43 +274,55 @@ There are two entry-level configuration mechanisms you are likely to use:
 Here are examples of configuration features that you are most likely to need to know about.
 
 Let's start with higher-level data-binding configuration.
+With Jackson 3.x, you need to use "Builder"-style construction (2.x also supported direct configuration but this was removed to make `ObjectMapper` instances immutable and fully thread-safe)
 
 ```java
 // SerializationFeature for changing how JSON is written
 
 // to enable standard indentation ("pretty-printing"):
-mapper.enable(SerializationFeature.INDENT_OUTPUT);
-// to allow serialization of "empty" POJOs (no properties to serialize)
-// (without this setting, an exception is thrown in those cases)
-mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
-// to write java.util.Date, Calendar as number (timestamp):
-mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-// DeserializationFeature for changing how JSON is read as POJOs:
+ObjcetMapper mapper = JsonMapper.builder()
+    .enable(SerializationFeature.INDENT_OUTPUT)
+    // to allow serialization of "empty" POJOs (no properties to serialize)
+    // (without this setting, an exception is thrown in those cases)
+    .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+    // to write java.util.Date, Calendar as number (timestamp):
+    .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
 
-// to prevent exception when encountering unknown property:
-mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-// to allow coercion of JSON empty String ("") to null Object value:
-mapper.enable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT);
+    // DeserializationFeature for changing how JSON is read as POJOs:
+
+    // to prevent exception when encountering unknown property:
+    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+    // to allow coercion of JSON empty String ("") to null Object value:
+    .enable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+
+    .build();
 ```
 
-In addition, you may need to change some of low-level JSON parsing, generation details:
+In addition, you may need to change some of low-level JSON parsing, generation details.
+This happens by enabling disabling:
+
+* `StreamReadFeature` / `StreamWriteFeature` for generic (format-agnostic) settings
+* `JsonReadFeature` / `JsonWriteFeature` for JSON-specific settings
 
 ```java
-// JsonParser.Feature for configuring parsing settings:
+ObjcetMapper mapper = JsonMapper.builder()
 
-// to allow C/C++ style comments in JSON (non-standard, disabled by default)
-// (note: with Jackson 2.5, there is also `mapper.enable(feature)` / `mapper.disable(feature)`)
-mapper.configure(JsonParser.Feature.ALLOW_COMMENTS, true);
-// to allow (non-standard) unquoted field names in JSON:
-mapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
-// to allow use of apostrophes (single quotes), non standard
-mapper.configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
+    // StreamReadFeatures for configuring parsing settings:
 
-// JsonGenerator.Feature for configuring low-level JSON generation:
+    // to allow C/C++ style comments in JSON (non-standard, disabled by default)
+    .configure(JsonReadFeature.ALLOW_JAVA_COMMENTS, true)
+    // to allow (non-standard) unquoted field names in JSON:
+    .configure(JsonReadFeature.ALLOW_UNQUOTED_PROPERTY_NAMES, true)
+    // to allow use of apostrophes (single quotes), non standard
+    .configure(JsonReadFeature.ALLOW_SINGLE_QUOTES, true)
 
-// to force escaping of non-ASCII characters:
-mapper.configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, true);
+    // JsonWriteFeature for configuring low-level JSON generation:
+
+    // to force escaping of non-ASCII characters:
+    .configure(JsonWriteFeature.ESCAPE_NON_ASCII, true)
+    
+    .build();
 ```
 
 Full set of features are explained on [Jackson Features](https://github.com/FasterXML/jackson-databind/wiki/JacksonFeatures) page.
@@ -289,13 +345,13 @@ public class MyBean {
 }
 ```
 
-There are other mechanisms to use for systematic naming changes: see [Custom Naming Convention](https://github.com/FasterXML/jackson-databind/wiki/JacksonCustomNamingConvention) for details.
+There are other mechanisms to use for systematic naming changes, including use of "Naming Strategy" (via `@JsonNaming` annotation).
 
-Note, too, that you can use [Mix-in Annotations](https://github.com/FasterXML/jackson-databind/wiki/JacksonMixinAnnotations) to associate all annotations.
+You can use [Mix-in Annotations](https://github.com/FasterXML/jackson-docs/wiki/JacksonMixinAnnotations) to associate any and all Jackson-provided annotations.
 
 ### Annotations: Ignoring properties
 
-There are two main annotations that can be used to to ignore properties: `@JsonIgnore` for individual properties; and `@JsonIgnoreProperties` for per-class definition
+There are two main annotations that can be used to ignore properties: `@JsonIgnore` for individual properties; and `@JsonIgnoreProperties` for per-class definition
 
 ```java
 // means that if we see "foo" or "bar" in JSON, they will be quietly skipped
@@ -387,7 +443,7 @@ ResultType result = mapper.convertValue(sourceObject, ResultType.class);
 ```
 
 and as long as source and result types are compatible -- that is, if to-JSON, from-JSON sequence would succeed -- things will "just work".
-But here are couple of potentially useful use cases:
+But here are a couple of potentially useful use cases:
 
 ```java
 // Convert from List<Integer> to int[]
@@ -524,16 +580,13 @@ static class Builder {
 This will deserialize JSON fields with `known_as`, as well as `identifer` and `first_name` into `name`. Rather than an array of entries, a single alias can be used by specifying a string as such `JsonAlias("identifier")`.  
 Note: to use the `@JsonAlias` annotation, a `@JsonProperty` annotation must also be used.
 
-
-
-
 Overall, Jackson library is very powerful in deserializing objects using builder pattern.
  
 # Contribute!
 
 We would love to get your contribution, whether it's in form of bug reports, Requests for Enhancement (RFE), documentation, or code patches.
 
-See [CONTRIBUTING](https://github.com/FasterXML/jackson/blob/master/CONTRIBUTING.md) for details on things like:
+See [CONTRIBUTING](https://github.com/FasterXML/jackson/blob/3.x/CONTRIBUTING.md) for details on things like:
 
 * Community, ways to interact (mailing lists, gitter)
 * Issue tracking ([GitHub Issues](https://github.com/FasterXML/jackson-databind/issues))
@@ -553,29 +606,32 @@ usually a Jackson module.
 
 ## Branches
 
-`master` branch is for developing the next major Jackson version -- 3.0 -- but there
+`3.x` branch is for developing the next major Jackson version -- 3.0 -- but there
 are active maintenance branches in which much of development happens:
 
-* `2.15` is the branch for "next" minor version to release (as of November 2022)
-* `2.14` is the current stable minor 2.x version
-* `2.13` is for selected backported fixes
+* `2.x` is the branch for "next" minor version to release (2.20 as of May 2025)
+* `2.19` is the current stable minor 2.x version
+* `2.18` is for selected backported fixes
 
 Older branches are usually not maintained after being declared as closed
 on [Jackson Releases](https://github.com/FasterXML/jackson/wiki/Jackson-Releases) page,
 but exist just in case a rare emergency patch is needed.
-All released versions have matching git tags (`jackson-dataformats-binary-2.12.3`).
+All released versions have matching git tags (e.g. `jackson-dataformats-binary-2.12.3`).
 
 -----
 
 ## Differences from Jackson 1.x
 
-Project contains versions 2.0 and above: source code for last (1.x) release, 1.9, is available at
+Repository contains versions 2.0 and above: source code for last (1.x) release, 1.9, is available at
 [Jackson-1](../../../jackson-1) repo.
 
 Main differences compared to 1.x "mapper" jar are:
 
 * Maven build instead of Ant
-* Java package is now `com.fasterxml.jackson.databind` (instead of `org.codehaus.jackson.map`)
+* Java package:
+    * 1.x: `org.codehaus.jackson.mapper`
+    * 2.x: `com.fasterxml.jackson.databind` 
+    * 3.x: `tools.jackson.databind`
 
 -----
 
@@ -588,7 +644,7 @@ Jackson components are supported by the Jackson community through mailing lists,
 
 ### Enterprise support
 
-Available as part of the Tidelift Subscription.
+Available as part of the [Tidelift](https://tidelift.com/subscription/pkg/maven-com-fasterxml-jackson-core-jackson-databind) Subscription.
 
 The maintainers of `jackson-databind` and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source dependencies you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use. [Learn more.](https://tidelift.com/subscription/pkg/maven-com-fasterxml-jackson-core-jackson-databind?utm_source=maven-com-fasterxml-jackson-core-jackson-databind&utm_medium=referral&utm_campaign=enterprise&utm_term=repo)
 

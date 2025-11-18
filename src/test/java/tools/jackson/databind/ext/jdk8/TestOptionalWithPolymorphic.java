@@ -4,12 +4,18 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestOptionalWithPolymorphic extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestOptionalWithPolymorphic
+    extends DatabindTestUtil
 {
     static class ContainerA {
         @JsonProperty private Optional<String> name = Optional.empty();
@@ -65,46 +71,50 @@ public class TestOptionalWithPolymorphic extends BaseMapTest
     /**********************************************************
      */
 
-    final ObjectMapper MAPPER = newJsonMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
+    @Test
     public void testOptionalMapsFoo() throws Exception {
 
 		Map<String, Object> foo = new LinkedHashMap<>();
 		Map<String, Object> loop = new LinkedHashMap<>();
 		loop.put("type", "Foo");
 		loop.put("foo", 42);
-		
+
 		foo.put("name", "foo strategy");
 		foo.put("strategy", loop);
-		
+
 		_test(MAPPER, foo);
     }
 
+    @Test
     public void testOptionalMapsBar() throws Exception {
-		
+
 		Map<String, Object> bar = new LinkedHashMap<>();
 		Map<String, Object> loop = new LinkedHashMap<>();
 		loop.put("type", "Bar");
 		loop.put("bar", true);
-		
+
 		bar.put("name", "bar strategy");
 		bar.put("strategy", loop);
-		
+
 		_test(MAPPER, bar);
     }
 
+    @Test
     public void testOptionalMapsBaz() throws Exception {
 		Map<String, Object> baz = new LinkedHashMap<>();
 		Map<String, Object> loop = new LinkedHashMap<>();
 		loop.put("type", "Baz");
 		loop.put("baz", "hello world!");
-		
+
 		baz.put("name", "bar strategy");
 		baz.put("strategy", loop);
 
 		_test(MAPPER, baz);
     }
 
+    @Test
     public void testOptionalWithTypeAnnotation13() throws Exception
     {
         AbstractOptional result = MAPPER.readValue("{\"value\" : 5}",

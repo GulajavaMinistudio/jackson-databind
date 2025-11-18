@@ -3,6 +3,7 @@ package tools.jackson.databind.ser.jdk;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.*;
@@ -25,14 +26,13 @@ public class StringArraySerializer
     /* Note: not clean in general, but we are betting against
      * anyone re-defining properties of String.class here...
      */
-    @SuppressWarnings("deprecation")
-    private final static JavaType VALUE_TYPE = TypeFactory.defaultInstance().uncheckedSimpleType(String.class);
+    private final static JavaType VALUE_TYPE = TypeFactory.unsafeSimpleType(String.class);
 
     public final static StringArraySerializer instance = new StringArraySerializer();
 
     /**
      * Value serializer to use, if it's not the standard one
-     * (if it is we can optimize serialization a lot)
+     * (if it is we can optimize serialization significantly)
      */
     protected final ValueSerializer<Object> _elementSerializer;
 
@@ -41,7 +41,7 @@ public class StringArraySerializer
     /* Life-cycle
     /**********************************************************************
      */
-    
+
     protected StringArraySerializer() {
         super(String[].class);
         _elementSerializer = null;
@@ -73,9 +73,9 @@ public class StringArraySerializer
     /* Post-processing
     /**********************************************************************
      */
-    
+
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider provider,
+    public ValueSerializer<?> createContextual(SerializationContext provider,
             BeanProperty property)
     {
         // 29-Sep-2012, tatu: Actually, we need to do much more contextual
@@ -130,9 +130,9 @@ public class StringArraySerializer
     public ValueSerializer<?> getContentSerializer() {
         return _elementSerializer;
     }
-    
+
     @Override
-    public boolean isEmpty(SerializerProvider prov, String[] value) {
+    public boolean isEmpty(SerializationContext prov, String[] value) {
         return (value.length == 0);
     }
 
@@ -146,9 +146,9 @@ public class StringArraySerializer
     /* Actual serialization
     /**********************************************************************
      */
-    
+
     @Override
-    public final void serialize(String[] value, JsonGenerator gen, SerializerProvider provider)
+    public final void serialize(String[] value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         final int len = value.length;
@@ -164,9 +164,9 @@ public class StringArraySerializer
         serializeContents(value, gen, provider);
         gen.writeEndArray();
     }
-    
+
     @Override
-    public void serializeContents(String[] value, JsonGenerator gen, SerializerProvider provider)
+    public void serializeContents(String[] value, JsonGenerator gen, SerializationContext provider)
         throws JacksonException
     {
         final int len = value.length;
@@ -187,7 +187,7 @@ public class StringArraySerializer
         }
     }
 
-    private void serializeContentsSlow(String[] value, JsonGenerator gen, SerializerProvider provider, ValueSerializer<Object> ser)
+    private void serializeContentsSlow(String[] value, JsonGenerator gen, SerializationContext provider, ValueSerializer<Object> ser)
         throws JacksonException
     {
         for (int i = 0, len = value.length; i < len; ++i) {

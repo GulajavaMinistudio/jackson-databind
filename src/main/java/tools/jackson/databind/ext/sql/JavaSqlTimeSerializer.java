@@ -16,10 +16,12 @@ import tools.jackson.databind.ser.std.StdScalarSerializer;
 public class JavaSqlTimeSerializer
     extends StdScalarSerializer<java.sql.Time>
 {
+    public final static JavaSqlTimeSerializer instance = new JavaSqlTimeSerializer();
+
     public JavaSqlTimeSerializer() { super(java.sql.Time.class); }
 
     @Override
-    public void serialize(java.sql.Time value, JsonGenerator g, SerializerProvider provider)
+    public void serialize(java.sql.Time value, JsonGenerator g, SerializationContext provider)
         throws JacksonException
     {
         g.writeString(value.toString());

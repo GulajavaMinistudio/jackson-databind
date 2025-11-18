@@ -4,7 +4,7 @@ import java.util.stream.IntStream;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ser.std.StdSerializer;
 
 /**
@@ -28,7 +28,7 @@ public class IntStreamSerializer extends StdSerializer<IntStream>
     }
 
     @Override
-    public void serialize(IntStream stream, JsonGenerator g, SerializerProvider ctxt)
+    public void serialize(IntStream stream, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException
     {
         try (IntStream is = stream) {
@@ -39,7 +39,7 @@ public class IntStreamSerializer extends StdSerializer<IntStream>
             g.writeEndArray();
         } catch (Exception e) {
             // For most regular serializers we won't both handling but streams are typically
-            // root values so 
+            // root values so
             wrapAndThrow(ctxt, e, stream, g.streamWriteContext().getCurrentIndex());
         }
     }

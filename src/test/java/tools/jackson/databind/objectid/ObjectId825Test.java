@@ -1,11 +1,16 @@
 package tools.jackson.databind.objectid;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 import tools.jackson.databind.testutil.NoCheckSubTypeValidator;
 
-public class ObjectId825Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ObjectId825Test extends DatabindTestUtil
 {
     @JsonIdentityInfo(generator=ObjectIdGenerators.PropertyGenerator.class, property="oidString")
     public static class AbstractEntity {
@@ -15,7 +20,7 @@ public class ObjectId825Test extends BaseMapTest
     public static class TestA extends AbstractEntity {
         public TestAbst testAbst;
         public TestD d;
-    }    
+    }
 
     static class TestAbst extends AbstractEntity { }
 
@@ -30,6 +35,7 @@ public class ObjectId825Test extends BaseMapTest
                     DefaultTyping.NON_FINAL)
             .build();
 
+    @Test
     public void testDeserialize() throws Exception {
         TestA a = new TestA();
         a.oidString = "oidA";

@@ -86,7 +86,7 @@ public class PropertyBuilder
      *    to use for contained values (only used for properties that are
      *    of container type)
      */
-    protected BeanPropertyWriter buildWriter(SerializerProvider ctxt,
+    protected BeanPropertyWriter buildWriter(SerializationContext ctxt,
             BeanPropertyDefinition propDef, JavaType declaredType, ValueSerializer<?> ser,
             TypeSerializer typeSer, TypeSerializer contentTypeSer,
             AnnotatedMember am, boolean defaultUseStaticTyping)
@@ -126,7 +126,7 @@ public class PropertyBuilder
 
         // 12-Jul-2016, tatu: [databind#1256] Need to make sure we consider type refinement
         JavaType actualType = (serializationType == null) ? declaredType : serializationType;
-        
+
         // 17-Mar-2017: [databind#1522] Allow config override per property type
         AnnotatedMember accessor = propDef.getAccessor(); // lgtm [java/dereferenced-value-may-be-null]
         if (accessor == null) {
@@ -143,7 +143,7 @@ public class PropertyBuilder
                 rawPropertyType, _defaultInclusion);
 
         // property annotation override
-        
+
         inclV = inclV.withOverrides(propDef.findInclusion());
 
         JsonInclude.Include inclusion = inclV.getValueInclusion();
@@ -179,6 +179,12 @@ public class PropertyBuilder
             }
             if (valueToSuppress == null) {
                 suppressNulls = true;
+                // [databind#4471] Different behavior when Include.NON_DEFAULT
+                //   setting is used on POJO vs global setting, as per documentation.
+                if (!_useRealPropertyDefaults) {
+                    // [databind#4464] NON_DEFAULT does not work with NON_EMPTY for custom serializer
+                    valueToSuppress = BeanPropertyWriter.MARKER_FOR_EMPTY;
+                }
             } else {
                 if (valueToSuppress.getClass().isArray()) {
                     valueToSuppress = ArrayBuilders.getArrayComparator(valueToSuppress);
@@ -275,7 +281,7 @@ public class PropertyBuilder
             // Must be a super type to be usable
             Class<?> rawDeclared = declaredType.getRawClass();
             if (serClass.isAssignableFrom(rawDeclared)) {
-                ; // fine as is
+                // fine as is
             } else {
                 /* 18-Nov-2010, tatu: Related to fixing [JACKSON-416], an issue with such
                  *   check is that for deserialization more specific type makes sense;
@@ -302,7 +308,7 @@ public class PropertyBuilder
         if (useStaticTyping) {
             // 11-Oct-2015, tatu: Make sure JavaType also "knows" static-ness...
             return declaredType.withStaticTyping();
-            
+
         }
         return null;
     }
@@ -341,7 +347,7 @@ public class PropertyBuilder
     /* Helper methods for exception handling
     /**********************************************************************
      */
-    
+
     protected Object _throwWrapped(Exception e, String propName, Object defaultBean)
     {
         Throwable t = e;

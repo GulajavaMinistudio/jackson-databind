@@ -12,7 +12,7 @@ public class SimpleValueInstantiators
     extends ValueInstantiators.Base
     implements java.io.Serializable
 {
-    private static final long serialVersionUID = -8929386427526115130L;
+    private static final long serialVersionUID = 3L;
 
     /**
      * Mappings from raw (type-erased, i.e. non-generic) types
@@ -28,20 +28,20 @@ public class SimpleValueInstantiators
 
     public SimpleValueInstantiators()
     {
-        _classMappings = new HashMap<ClassKey,ValueInstantiator>();        
+        _classMappings = new HashMap<ClassKey,ValueInstantiator>();
     }
-    
+
     public SimpleValueInstantiators addValueInstantiator(Class<?> forType,
             ValueInstantiator inst)
     {
         _classMappings.put(new ClassKey(forType), inst);
         return this;
     }
-    
+
     @Override
     public ValueInstantiator findValueInstantiator(DeserializationConfig config,
-            BeanDescription beanDesc)
+            BeanDescription.Supplier beanDescRef)
     {
-        return _classMappings.get(new ClassKey(beanDesc.getBeanClass()));
+        return _classMappings.get(new ClassKey(beanDescRef.getBeanClass()));
     }
 }

@@ -1,7 +1,7 @@
 package tools.jackson.databind.ser;
 
 import tools.jackson.core.util.Snapshottable;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 
 /**
  * Interface for objects that provides instances of {@link PropertyFilter}
@@ -22,9 +22,9 @@ public abstract class FilterProvider
      * @param valueToFilter Object being filtered (usually POJO, but may be a {@link java.util.Map},
      *   or in future a container), <b>if available</b>; not available when generating
      *   schemas.
-     * 
+     *
      * @return Filter to use, if any.
      */
-    public abstract PropertyFilter findPropertyFilter(SerializerProvider ctxt,
+    public abstract PropertyFilter findPropertyFilter(SerializationContext ctxt,
             Object filterId, Object valueToFilter);
 }

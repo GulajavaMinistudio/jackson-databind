@@ -1,11 +1,13 @@
 package tools.jackson.databind.node;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 
 import tools.jackson.core.*;
 import tools.jackson.core.type.WritableTypeId;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializerProvider;
+import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.jsontype.TypeSerializer;
 
 /**
@@ -17,6 +19,21 @@ public abstract class ValueNode
     extends BaseJsonNode
 {
     private static final long serialVersionUID = 3L;
+
+    // For numeric range checks
+    protected final static BigInteger BI_MIN_SHORT = BigInteger.valueOf(Short.MIN_VALUE);
+    protected final static BigInteger BI_MAX_SHORT = BigInteger.valueOf(Short.MAX_VALUE);
+    protected final static BigInteger BI_MIN_INTEGER = BigInteger.valueOf(Integer.MIN_VALUE);
+    protected final static BigInteger BI_MAX_INTEGER = BigInteger.valueOf(Integer.MAX_VALUE);
+    protected final static BigInteger BI_MIN_LONG = BigInteger.valueOf(Long.MIN_VALUE);
+    protected final static BigInteger BI_MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
+
+    protected final static BigDecimal BD_MIN_SHORT = BigDecimal.valueOf(Short.MIN_VALUE);
+    protected final static BigDecimal BD_MAX_SHORT = BigDecimal.valueOf(Short.MAX_VALUE);
+    protected final static BigDecimal BD_MIN_INTEGER = BigDecimal.valueOf(Integer.MIN_VALUE);
+    protected final static BigDecimal BD_MAX_INTEGER = BigDecimal.valueOf(Integer.MAX_VALUE);
+    protected final static BigDecimal BD_MIN_LONG = BigDecimal.valueOf(Long.MIN_VALUE);
+    protected final static BigDecimal BD_MAX_LONG = BigDecimal.valueOf(Long.MAX_VALUE);
 
     protected final static JsonNode MISSING = MissingNode.getInstance();
 
@@ -33,14 +50,13 @@ public abstract class ValueNode
      * All current value nodes are immutable, so we can just return
      * them as is.
      */
-    @SuppressWarnings("unchecked")
     @Override
-    public <T extends JsonNode> T deepCopy() { return (T) this; }
-    
+    public ValueNode deepCopy() { return this; }
+
     @Override public abstract JsonToken asToken();
 
     @Override
-    public void serializeWithType(JsonGenerator g, SerializerProvider ctxt,
+    public void serializeWithType(JsonGenerator g, SerializationContext ctxt,
             TypeSerializer typeSer)
         throws JacksonException
     {
@@ -58,7 +74,7 @@ public abstract class ValueNode
 
     @Override
     public boolean isEmpty() { return true; }
-    
+
     /*
     /**********************************************************************
     /* Navigation methods
@@ -112,7 +128,7 @@ public abstract class ValueNode
     }
 
     @Override
-    public final List<String> findValuesAsText(String fieldName, List<String> foundSoFar) {
+    public final List<String> findValuesAsString(String fieldName, List<String> foundSoFar) {
         return foundSoFar;
     }
 

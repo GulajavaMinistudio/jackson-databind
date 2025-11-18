@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
@@ -33,7 +34,7 @@ public class NumberSerializer
      * Copied from `jackson-core` class `GeneratorBase`
      */
     protected final static int MAX_BIG_DECIMAL_SCALE = 9999;
-    
+
     protected final boolean _isInt;
 
     /**
@@ -46,7 +47,7 @@ public class NumberSerializer
     }
 
     @Override
-    public ValueSerializer<?> createContextual(SerializerProvider prov,
+    public ValueSerializer<?> createContextual(SerializationContext prov,
             BeanProperty property)
     {
         JsonFormat.Value format = findFormatOverrides(prov, property, handledType());
@@ -65,14 +66,14 @@ public class NumberSerializer
     }
 
     @Override
-    public void serialize(Number value, JsonGenerator g, SerializerProvider provider) throws JacksonException
+    public void serialize(Number value, JsonGenerator g, SerializationContext provider) throws JacksonException
     {
         // should mostly come in as one of these two:
         if (value instanceof BigDecimal) {
             g.writeNumber((BigDecimal) value);
         } else if (value instanceof BigInteger) {
             g.writeNumber((BigInteger) value);
-            
+
         // These should not occur, as more specific methods should have been called; but
         // just in case let's cover all bases:
         } else if (value instanceof Long) {
@@ -110,25 +111,25 @@ public class NumberSerializer
     public static ValueSerializer<?> bigDecimalAsStringSerializer() {
         return BigDecimalAsStringSerializer.BD_INSTANCE;
     }
-    
+
     final static class BigDecimalAsStringSerializer
         extends ToStringSerializerBase
     {
         final static BigDecimalAsStringSerializer BD_INSTANCE = new BigDecimalAsStringSerializer();
-        
+
         public BigDecimalAsStringSerializer() {
             super(BigDecimal.class);
         }
 
         @Override
-        public boolean isEmpty(SerializerProvider prov, Object value) {
+        public boolean isEmpty(SerializationContext prov, Object value) {
             // As per [databind#2513], should not delegate; also, never empty (numbers do
             // have "default value" to filter by, just not "empty"
             return false;
         }
 
         @Override
-        public void serialize(Object value, JsonGenerator gen, SerializerProvider provider)
+        public void serialize(Object value, JsonGenerator gen, SerializationContext provider)
             throws JacksonException
         {
             final String text;

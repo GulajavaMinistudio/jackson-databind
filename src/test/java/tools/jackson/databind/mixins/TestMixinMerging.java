@@ -1,13 +1,18 @@
 package tools.jackson.databind.mixins;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class TestMixinMerging extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestMixinMerging extends DatabindTestUtil
 {
     public interface Contact {
         String getCity();
@@ -35,12 +40,13 @@ public class TestMixinMerging extends BaseMapTest
     /* Unit tests
     /**********************************************************
      */
-    
+
     // for [databind#515]
+    @Test
     public void testDisappearingMixins515() throws Exception
     {
         SimpleModule module = new SimpleModule("Test");
-        module.setMixInAnnotation(Person.class, PersonMixin.class);        
+        module.setMixInAnnotation(Person.class, PersonMixin.class);
         ObjectMapper mapper = jsonMapperBuilder()
                 .disable(MapperFeature.INFER_PROPERTY_MUTATORS)
                 .disable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)

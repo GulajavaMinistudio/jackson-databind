@@ -29,8 +29,6 @@ import tools.jackson.databind.util.ClassUtil;
 public class CreatorProperty
     extends SettableBeanProperty
 {
-    private static final long serialVersionUID = 1L;
-
     /**
      * Placeholder that represents constructor parameter, when it is created
      * from actual constructor.
@@ -39,8 +37,11 @@ public class CreatorProperty
     protected final AnnotatedParameter _annotated;
 
     /**
-     * Id of value to inject, if value injection should be used for this parameter
+     * Injection settings, if value injection should be used for this parameter
      * (in addition to, or instead of, regular deserialization).
+     *<p>
+     * NOTE: badly named, should be more like "_injectionDefinition" but
+     * renaming would be a breaking (internal) change.
      */
     protected final JacksonInject.Value _injectableValue;
 
@@ -192,7 +193,7 @@ public class CreatorProperty
     /* BeanProperty impl
     /**********************************************************************
      */
-    
+
     @Override
     public <A extends Annotation> A getAnnotation(Class<A> acls) {
         if (_annotated == null) {
@@ -218,7 +219,7 @@ public class CreatorProperty
             Object instance) throws JacksonException
     {
         _verifySetter();
-        _fallbackSetter.set(instance, deserialize(p, ctxt));
+        _fallbackSetter.set(ctxt, instance, deserialize(p, ctxt));
     }
 
     @Override
@@ -226,21 +227,21 @@ public class CreatorProperty
             DeserializationContext ctxt, Object instance) throws JacksonException
     {
         _verifySetter();
-        return _fallbackSetter.setAndReturn(instance, deserialize(p, ctxt));
-    }
-    
-    @Override
-    public void set(Object instance, Object value)
-    {
-        _verifySetter();
-        _fallbackSetter.set(instance, value);
+        return _fallbackSetter.setAndReturn(ctxt, instance, deserialize(p, ctxt));
     }
 
     @Override
-    public Object setAndReturn(Object instance, Object value)
+    public void set(DeserializationContext ctxt, Object instance, Object value)
     {
         _verifySetter();
-        return _fallbackSetter.setAndReturn(instance, value);
+        _fallbackSetter.set(ctxt, instance, value);
+    }
+
+    @Override
+    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value)
+    {
+        _verifySetter();
+        return _fallbackSetter.setAndReturn(ctxt,instance, value);
     }
 
     @Override
@@ -261,6 +262,11 @@ public class CreatorProperty
     @Override
     public Object getInjectableValueId() {
         return (_injectableValue == null) ? null : _injectableValue.getId();
+    }
+
+    @Override // since 2.21
+    public JacksonInject.Value getInjectionDefinition() {
+        return _injectableValue;
     }
 
     @Override
@@ -294,7 +300,11 @@ public class CreatorProperty
     private void _reportMissingSetter(JsonParser p, DeserializationContext ctxt)
             throws JacksonException
     {
-        final String msg = "No fallback setter/field defined for creator property "+ClassUtil.name(getName());
+        String clsDesc = (_annotated == null) ? "UNKNOWN TYPE"
+                : ClassUtil.getClassDescription(_annotated.getOwner().getDeclaringClass());
+        final String msg = String.format(
+                "No fallback setter/field defined for creator property %s (of %s)",
+                        ClassUtil.name(getName()), clsDesc);
         // Hmmmh. Should we return quietly (NOP), or error?
         // Perhaps better to throw an exception, since it's generally an error.
         if (ctxt != null ) {

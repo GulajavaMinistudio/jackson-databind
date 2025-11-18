@@ -1,11 +1,17 @@
 package tools.jackson.databind.exc;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 // for [databind#1794]
-public class StackTraceElementTest extends BaseMapTest
+public class StackTraceElementTest extends DatabindTestUtil
 {
     public static class ErrorObject {
 
@@ -25,6 +31,7 @@ public class StackTraceElementTest extends BaseMapTest
     }
 
     // for [databind#1794] where extra `declaringClass` is serialized from private field.
+    @Test
     public void testCustomStackTraceDeser() throws Exception
     {
         ObjectMapper mapper = jsonMapperBuilder()
@@ -38,5 +45,17 @@ public class StackTraceElementTest extends BaseMapTest
 
         ErrorObject result = mapper.readValue(json, ErrorObject.class);
         assertNotNull(result);
+    }
+
+    // for [databind#2593]: missing fields (due to JDK 8 compatibility)
+    @Test
+    public void testAllFieldsDeserialized() throws Exception
+    {
+        final ObjectMapper mapper = sharedMapper();
+        StackTraceElement input = new StackTraceElement("classLoaderX", "moduleY", "1.0",
+                "MyClass", "MyMethod", "MyClass.java", 10);
+        String json = mapper.writeValueAsString(input);
+        StackTraceElement output = mapper.readValue(json, StackTraceElement.class);
+        assertEquals(input, output);
     }
 }

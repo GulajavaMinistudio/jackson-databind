@@ -12,6 +12,7 @@ import tools.jackson.databind.deser.impl.ExternalTypeHandler;
 import tools.jackson.databind.deser.impl.ObjectIdReader;
 import tools.jackson.databind.deser.impl.UnwrappedPropertyHandler;
 import tools.jackson.databind.introspect.AnnotatedMethod;
+import tools.jackson.databind.util.ClassUtil;
 import tools.jackson.databind.util.IgnorePropertiesUtil;
 import tools.jackson.databind.util.NameTransformer;
 import tools.jackson.databind.util.TokenBuffer;
@@ -59,31 +60,32 @@ public class BuilderBasedDeserializer
      * Constructor used by {@link BeanDeserializerBuilder}.
      */
     public BuilderBasedDeserializer(BeanDeserializerBuilder builder,
-            BeanDescription beanDesc, JavaType targetType,
+            BeanDescription.Supplier beanDescRef, JavaType targetType,
             BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
             Set<String> ignorableProps, boolean ignoreAllUnknown,
             boolean hasViews)
     {
-        this(builder, beanDesc, targetType, properties, backRefs, ignorableProps, ignoreAllUnknown, null, hasViews);
+        this(builder, beanDescRef, targetType, properties, backRefs, ignorableProps, ignoreAllUnknown,
+                null, hasViews);
     }
 
     /**
      * @since 2.12
      */
     public BuilderBasedDeserializer(BeanDeserializerBuilder builder,
-            BeanDescription beanDesc, JavaType targetType,
+            BeanDescription.Supplier beanDescRef, JavaType targetType,
             BeanPropertyMap properties, Map<String, SettableBeanProperty> backRefs,
             Set<String> ignorableProps, boolean ignoreAllUnknown, Set<String> includableProps,
             boolean hasViews)
     {
-        super(builder, beanDesc, properties, backRefs,
+        super(builder, beanDescRef, properties, backRefs,
                 ignorableProps, ignoreAllUnknown, includableProps, hasViews);
         _targetType = targetType;
         _buildMethod = builder.getBuildMethod();
         // 05-Mar-2012, tatu: Cannot really make Object Ids work with builders, not yet anyway
         if (_objectIdReader != null) {
             throw new IllegalArgumentException("Cannot use Object Id with Builder-based deserialization (type "
-                    +beanDesc.getType()+")");
+                    +beanDescRef.getType()+")");
         }
     }
 
@@ -106,9 +108,10 @@ public class BuilderBasedDeserializer
     }
 
     protected BuilderBasedDeserializer(BuilderBasedDeserializer src,
-            UnwrappedPropertyHandler unwrapHandler, BeanPropertyMap renamedProperties,
-            boolean ignoreAllUnknown) {
-        super(src, unwrapHandler, renamedProperties, ignoreAllUnknown);
+            UnwrappedPropertyHandler unwrapHandler, PropertyBasedCreator pbCreator,
+            BeanPropertyMap renamedProperties, boolean ignoreAllUnknown
+    ) {
+        super(src, unwrapHandler, pbCreator, renamedProperties, ignoreAllUnknown);
         _buildMethod = src._buildMethod;
         _targetType = src._targetType;
         _propertyNameMatcher = _beanProperties.getNameMatcher();
@@ -166,9 +169,13 @@ public class BuilderBasedDeserializer
             if (uwHandler != null) {
                 uwHandler = uwHandler.renameAll(ctxt, transformer);
             }
+            PropertyBasedCreator pbCreator = _propertyBasedCreator;
+            if (pbCreator != null) {
+                pbCreator = pbCreator.renameAll(ctxt, transformer);
+            }
             // and handle direct unwrapping as well:
             BeanPropertyMap props = _beanProperties.renameAll(ctxt, transformer);
-            return new BuilderBasedDeserializer(this, uwHandler, props, true);
+            return new BuilderBasedDeserializer(this, uwHandler, pbCreator, props, true);
         } finally { _currentlyTransforming = null; }
     }
 
@@ -196,7 +203,7 @@ public class BuilderBasedDeserializer
     @Override
     protected BeanDeserializerBase asArrayDeserializer() {
         return new BeanAsArrayBuilderDeserializer(this, _targetType,
-                _beanProperties.getPrimaryProperties(), 
+                _beanProperties.getPrimaryProperties(),
                 _buildMethod);
     }
 
@@ -222,7 +229,7 @@ public class BuilderBasedDeserializer
         try {
             return _buildMethod.getMember().invoke(builder, (Object[]) null);
         } catch (Exception e) {
-            return wrapInstantiationProblem(e, ctxt);
+            return wrapInstantiationProblem(ctxt, e);
         }
     }
 
@@ -234,7 +241,7 @@ public class BuilderBasedDeserializer
         throws JacksonException
     {
         // common case first:
-        if (p.isExpectedStartObjectToken()) { 
+        if (p.isExpectedStartObjectToken()) {
             if (_vanillaProcessing) {
                 return finishBuild(ctxt, _vanillaDeserialize(p, ctxt));
             }
@@ -391,7 +398,7 @@ public class BuilderBasedDeserializer
     protected Object _deserializeUsingPropertyBased(final JsonParser p,
             final DeserializationContext ctxt)
         throws JacksonException
-    { 
+    {
         final PropertyBasedCreator creator = _propertyBasedCreator;
         PropertyValueBuffer buffer = creator.startBuilding(p, ctxt, _objectIdReader);
         final Class<?> activeView = _needViewProcesing ? ctxt.getActiveView() : null;
@@ -411,6 +418,12 @@ public class BuilderBasedDeserializer
             }
             if (creatorProp != null) {
                 if ((activeView != null) && !creatorProp.visibleInView(activeView)) {
+                    p.skipChildren();
+                    continue;
+                }
+                // [databind#1381]: if useInput=FALSE, skip deserialization from input
+                if (creatorProp.isInjectionOnly()) {
+                    // Skip the input value, will be injected later in PropertyValueBuffer
                     p.skipChildren();
                     continue;
                 }
@@ -467,7 +480,7 @@ public class BuilderBasedDeserializer
         try {
             builder = creator.build(ctxt, buffer);
         } catch (Exception e) {
-            builder = wrapInstantiationProblem(e, ctxt);
+            builder = wrapInstantiationProblem(ctxt, e);
         }
         if (unknown != null) {
             // polymorphic?
@@ -482,7 +495,7 @@ public class BuilderBasedDeserializer
 
     protected final Object _deserialize(JsonParser p,
             DeserializationContext ctxt, Object builder) throws JacksonException
-    {        
+    {
         if (_injectables != null) {
             injectValues(ctxt, builder);
         }
@@ -583,6 +596,13 @@ public class BuilderBasedDeserializer
                 p.nextToken();
                 SettableBeanProperty prop = _propertiesByIndex[ix];
                 if (!prop.visibleInView(activeView)) {
+                    // [databind#437]: fields in other views to be considered as unknown properties
+                    if (ctxt.isEnabled(DeserializationFeature.FAIL_ON_UNEXPECTED_VIEW_PROPERTIES)){
+                        ctxt.reportInputMismatch(handledType(),
+                            String.format("Input mismatch while deserializing %s. Property '%s' is not part of current active view '%s'" +
+                                    " (disable 'DeserializationFeature.FAIL_ON_UNEXPECTED_VIEW_PROPERTIES' to allow)",
+                                ClassUtil.nameOf(handledType()), prop.getName(), activeView.getName()));
+                    }
                     p.skipChildren();
                     continue;
                 }
@@ -745,6 +765,13 @@ public class BuilderBasedDeserializer
                 continue;
             }
             if (creatorProp != null) {
+                // [databind#1381]: if useInput=FALSE, skip deserialization from input
+                if (creatorProp.isInjectionOnly()) {
+                    // Skip the input value, will be injected later in PropertyValueBuffer
+                    p.skipChildren();
+                    continue;
+                }
+
                 // Last creator property to set?
                 if (buffer.assignParameter(creatorProp, creatorProp.deserialize(p, ctxt))) {
                     t = p.nextToken(); // to move to following FIELD_NAME/END_OBJECT
@@ -786,7 +813,7 @@ public class BuilderBasedDeserializer
         try {
             builder = creator.build(ctxt, buffer);
         } catch (Exception e) {
-            return wrapInstantiationProblem(e, ctxt);
+            return wrapInstantiationProblem(ctxt, e);
 
         }
         return _unwrappedPropertyHandler.processUnwrapped(p, ctxt, builder, tokens);

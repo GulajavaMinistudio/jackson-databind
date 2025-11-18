@@ -1,17 +1,23 @@
 package tools.jackson.databind.node;
 
+import org.junit.jupiter.api.Test;
+
 import tools.jackson.core.JsonPointer;
 import tools.jackson.databind.*;
+import tools.jackson.databind.testutil.DatabindTestUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonPointerWithNodeTest
-    extends BaseMapTest
+    extends DatabindTestUtil
 {
     private final ObjectMapper MAPPER = newJsonMapper();
-    
+
+    @Test
     public void testIt() throws Exception
     {
         final JsonNode SAMPLE_ROOT = MAPPER.readTree(SAMPLE_DOC_JSON_SPEC);
-        
+
         // first: "empty" pointer points to context node:
         assertSame(SAMPLE_ROOT, SAMPLE_ROOT.at(JsonPointer.compile("")));
         // second: "/" is NOT root, but "root property with name of Empty String"
@@ -37,20 +43,22 @@ public class JsonPointerWithNodeTest
     }
 
     // To help verify [core#133]; should be fine with "big numbers" as property keys
+    @Test
     public void testLongNumbers() throws Exception
     {
         // First, with small int key
         JsonNode root = MAPPER.readTree("{\"123\" : 456}");
-        JsonNode jn2 = root.at("/123"); 
+        JsonNode jn2 = root.at("/123");
         assertEquals(456, jn2.asInt());
 
         // and then with above int-32:
         root = MAPPER.readTree("{\"35361706045\" : 1234}");
-        jn2 = root.at("/35361706045"); 
+        jn2 = root.at("/35361706045");
         assertEquals(1234, jn2.asInt());
     }
 
     // [databind#2934]
+    @Test
     public void testIssue2934() throws Exception
     {
         JsonNode tree = MAPPER.readTree("{\"\" : 123}");

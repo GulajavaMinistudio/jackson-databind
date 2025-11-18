@@ -3,20 +3,26 @@ package tools.jackson.databind.jsontype.ext;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JsonTypeIdResolver;
 import tools.jackson.databind.jsontype.TypeIdResolver;
+import tools.jackson.databind.testutil.DatabindTestUtil;
 
-public class ExternalTypeIdWithEnum1328Test extends BaseMapTest
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ExternalTypeIdWithEnum1328Test extends DatabindTestUtil
 {
     public interface Animal { }
 
     public static class Dog implements Animal {
         public String dogStuff;
     }
-    
+
     public enum AnimalType {
         Dog;
     }
@@ -24,10 +30,10 @@ public class ExternalTypeIdWithEnum1328Test extends BaseMapTest
     public static class AnimalAndType {
         public AnimalType type;
 
-        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, 
-            include = JsonTypeInfo.As.EXTERNAL_PROPERTY, 
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS,
+            include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
             property = "type")
-        @JsonTypeIdResolver(AnimalResolver.class)   
+        @JsonTypeIdResolver(AnimalResolver.class)
         private Animal animal;
 
         public AnimalAndType() { }
@@ -56,7 +62,7 @@ public class ExternalTypeIdWithEnum1328Test extends BaseMapTest
 
         @Override
         public String idFromBaseType(DatabindContext ctxt) {
-            throw new UnsupportedOperationException("Missing action type information - Can not construct");
+            throw new UnsupportedOperationException("Missing action type information - Cannot construct");
         }
 
         @Override
@@ -75,12 +81,13 @@ public class ExternalTypeIdWithEnum1328Test extends BaseMapTest
         @Override
         public JsonTypeInfo.Id getMechanism() {
             return JsonTypeInfo.Id.CUSTOM;
-        } 
+        }
     }
 
+    @Test
     public void testExample() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        
+
         String json = mapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(Arrays.asList(new AnimalAndType(AnimalType.Dog, new Dog())));
         List<AnimalAndType> list = mapper.readerFor(new TypeReference<List<AnimalAndType>>() { })
