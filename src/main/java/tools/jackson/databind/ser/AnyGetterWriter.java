@@ -14,10 +14,7 @@ import tools.jackson.databind.ser.jdk.MapSerializer;
  * (Map) properties
  */
 public class AnyGetterWriter extends BeanPropertyWriter
-    implements java.io.Serializable
 {
-    private static final long serialVersionUID = 1L;
-
     protected final BeanProperty _property;
 
     /**
