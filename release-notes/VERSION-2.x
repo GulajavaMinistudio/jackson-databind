@@ -20,6 +20,12 @@ Project: jackson-databind
  (contributed by @wrongwrong)
 #5361: Fix Maven SBOM publishing
 
+2.20.2 (not yet released)
+
+#5393: `@JsonAnyGetter property gets included in generated schema since 2.19.0`
+ (reported by @victor-noel-pfx)
+ (fix by Joo-Hyuk K)
+
 2.20.1 (30-Oct-2025)
 
 #5292: `MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX` does not work with
