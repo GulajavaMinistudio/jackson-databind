@@ -14,6 +14,8 @@ Versions: 3.x (for earlier see VERSION-2.x)
 #5393: `@JsonAnyGetter` property gets included in generated schema
  (reported by @victor-noel-pfx)
  (fix by Joo-Hyuk K)
+#5401: Regression with `@JsonCreator` that returns `null` for empty strings
+ (fix contributed by Joost K)
 
 3.0.2 (07-Nov-2025)
 
