@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 // [databind#4938] Allow JsonCreator factory method to return `null`
 // [databind#5401] Do not replace null from JsonCreator factory method
-public class JsonCreatorReturningNull4938Test
+public class JsonCreatorReturningNullTest
     extends DatabindTestUtil
 {
     // [databind#4938]
