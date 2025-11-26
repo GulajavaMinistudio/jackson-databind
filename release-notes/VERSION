@@ -11,6 +11,9 @@ Versions: 3.x (for earlier see VERSION-2.x)
 
 3.0.3 (not yet released)
 
+#5368: Optimize performance of `ObjectMapper.convertValue()` when `TokenBuffer`
+  passed as `fromValue`
+ (requested by @qsLI)
 #5393: `@JsonAnyGetter` property gets included in generated schema
  (reported by @victor-noel-pfx)
  (fix by Joo-Hyuk K)
