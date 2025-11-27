@@ -57,7 +57,7 @@ public class EnumValuesToWrite
             }
         } else {
             if ((strs = _enumNames) == null) {
-                _enumNamesLC = strs = _fetch(config,
+                _enumNames = strs = _fetch(config,
                         e -> _nameWithStrategy(config, e),
                         false);
             }
