@@ -18,6 +18,22 @@ Project: jackson-databind
 #5313: Expose `getConverter()` in `StdDelegatingSerializer` for improved
   customizability
  (contributed by @wrongwrong)
+#5361: Fix Maven SBOM publishing
+#5368: Optimize performance of `ObjectMapper.convertValue()` when `TokenBuffer`
+  passed as `fromValue`
+ (requested by @qsLI)
+#5398: `@JsonProperty.value` + `@JsonIgnore` on setter does not work
+  anymore since 2.18.4
+ (reported by @victor-noel-pfx)
+ (fix by @cowtowncoder, w/ Claude code)
+#5413: Add/support forward reference resolution for array values
+ (contributed by Hélios G)
+
+2.20.2 (not yet released)
+
+#5393: `@JsonAnyGetter` property gets included in generated schema since 2.19.0
+ (reported by @victor-noel-pfx)
+ (fix by Joo-Hyuk K)
 
 2.20.1 (30-Oct-2025)
 
