@@ -596,11 +596,11 @@ public class BeanDeserializer
                     p.skipChildren();
                     continue;
                 }
-                Object value = _deserializeWithErrorWrapping(p, ctxt, creatorProp);
                 // Last creator property to set?
                 // [databind#4690] cannot quit early as optimization any more
                 // if (buffer.assignParameter(creatorProp, value)) { ... build ... }
-                buffer.assignParameter(creatorProp, value);
+                buffer.assignParameter(creatorProp,
+                        _deserializeWithErrorWrapping(p, ctxt, creatorProp));
                 continue;
             }
             // regular property? needs buffering
