@@ -7,6 +7,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
 
@@ -16,7 +17,31 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test to verify that the order of properties is preserved when using @JsonPropertyOrder
  * with @JsonUnwrapped and @JsonAnyGetter
  */
-public class AnyGetterOrdering4388Test extends DatabindTestUtil {
+public class AnyGetterOrdering4388Test extends DatabindTestUtil
+{
+    // For [databind#518]
+
+    @JsonPropertyOrder(alphabetic = true)
+    static class Bean518
+    {
+        public int b;
+
+        protected Map<String,Object> extra = new HashMap<>();
+
+        public int a;
+
+        public Bean518(int a, int b, Map<String,Object> x) {
+            this.a = a;
+            this.b = b;
+            extra = x;
+        }
+
+        @JsonAnyGetter
+        public Map<String,Object> getExtra() { return extra; }
+    }
+    
+    // For [databind#4388]
+
     // Base class with properties
     static class BaseWithProperties {
         public String entityName;
@@ -136,7 +161,24 @@ public class AnyGetterOrdering4388Test extends DatabindTestUtil {
         }
     }
 
+    /*
+    /**********************************************************************
+    /* Test methods
+    /**********************************************************************
+     */
+    
     private final ObjectMapper MAPPER = newJsonMapper();
+
+    // For [databind#518]
+    @Test
+    void anyBeanWithSort518() throws Exception
+    {
+        Map<String,Object> extra = new LinkedHashMap<>();
+        extra.put("y", 4);
+        extra.put("x", 3);
+        String json = MAPPER.writeValueAsString(new Bean518(2, 1, extra));
+        assertEquals(a2q("{'a':2,'b':1,'y':4,'x':3}"), json);
+    }
 
     // For [databind#4388]
     @Test
