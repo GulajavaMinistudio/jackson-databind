@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.*;
 
+import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -158,6 +161,25 @@ public class AnyGetterOrdering4388Test extends DatabindTestUtil
     static class PrivateAnyGetterPojoSorted extends PrivateAnyGetterPojo {
         public Map<String, Object> getSecondProperties() {
             return super.secondProperties;
+        }
+    }
+
+    // For [databind#5215]: Any-getter should be sorted last, by default
+    static class DynaBean5215 {
+        public String l;
+        public String j;
+        public String a;
+
+        protected Map<String, Object> extensions = new LinkedHashMap<>();
+
+        @JsonAnyGetter
+        public Map<String, Object> getExtensions() {
+            return extensions;
+        }
+
+        @JsonAnySetter
+        public void addExtension(String name, Object value) {
+            extensions.put(name, value);
         }
     }
 
@@ -344,5 +366,28 @@ public class AnyGetterOrdering4388Test extends DatabindTestUtil
         base.childEntities.child2 = 3;
         base.products = new HashMap<>();
         base.products.put("product1", 4);
+    }
+
+    // For [databind#5215]: Any-getter should be sorted last, by default
+    @Test
+    public void dynaBean5215() throws Exception
+    {
+        final ObjectMapper mapper = JsonMapper.builder()
+                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .build();
+
+        DynaBean5215 b = new DynaBean5215();
+        b.a = "1";
+        b.j = "2";
+        b.l = "3";
+        b.addExtension("z", "5");
+        b.addExtension("b", "4");
+        assertEquals(a2q("{" +
+                "'a':'1'," +
+                "'j':'2'," +
+                "'l':'3'," +
+                "'b':'4'," +
+                "'z':'5'}"), mapper.writeValueAsString(b));
     }
 }
