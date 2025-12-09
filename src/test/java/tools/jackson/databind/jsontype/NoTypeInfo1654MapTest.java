@@ -17,7 +17,11 @@ import tools.jackson.databind.testutil.DatabindTestUtil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class NoTypeInfo1654Test extends DatabindTestUtil
+/**
+ * Test for Map values with {@code @JsonTypeInfo(use = Id.NONE)} override,
+ * extending issue #1654 coverage to Map types.
+ */
+class NoTypeInfo1654MapTest extends DatabindTestUtil
 {
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
     static class Value1654 {
@@ -30,37 +34,37 @@ class NoTypeInfo1654Test extends DatabindTestUtil
         }
     }
 
-    static class Value1654TypedContainer {
-        public List<Value1654> values;
+    static class Value1654TypedMapContainer {
+        public Map<String, Value1654> values;
 
-        protected Value1654TypedContainer() { }
+        protected Value1654TypedMapContainer() { }
 
-        public Value1654TypedContainer(Value1654... v) {
-            values = Arrays.asList(v);
+        public Value1654TypedMapContainer(Map<String, Value1654> v) {
+            values = v;
         }
     }
 
-    static class Value1654UntypedContainer {
+    static class Value1654UntypedMapContainer {
         @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
-        public List<Value1654> values;
+        public Map<String, Value1654> values;
 
-        protected Value1654UntypedContainer() { }
+        protected Value1654UntypedMapContainer() { }
 
-        public Value1654UntypedContainer(Value1654... v) {
-            values = Arrays.asList(v);
+        public Value1654UntypedMapContainer(Map<String, Value1654> v) {
+            values = v;
         }
     }
 
-    static class Value1654UsingCustomSerDeserUntypedContainer {
+    static class Value1654UsingCustomSerDeserUntypedMapContainer {
         @JsonDeserialize(contentUsing = Value1654Deserializer.class)
         @JsonSerialize(contentUsing = Value1654Serializer.class)
         @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
-        public List<Value1654> values;
+        public Map<String, Value1654> values;
 
-        protected Value1654UsingCustomSerDeserUntypedContainer() { }
+        protected Value1654UsingCustomSerDeserUntypedMapContainer() { }
 
-        public Value1654UsingCustomSerDeserUntypedContainer(Value1654... v) {
-            values = Arrays.asList(v);
+        public Value1654UsingCustomSerDeserUntypedMapContainer(Map<String, Value1654> v) {
+            values = v;
         }
     }
 
@@ -99,70 +103,80 @@ class NoTypeInfo1654Test extends DatabindTestUtil
         }
     }
 
+    /*
+    /**********************************************************************
+    /* Test methods
+    /**********************************************************************
+     */
+
     private final ObjectMapper MAPPER = newJsonMapper();
 
-    // [databind#1654]: no override, default polymorphic type id
+    // [databind#1654]: no override, default polymorphic type id for Map values
     @Test
     void withoutNoTypeElementOverrideSerAndDeser() throws Exception {
         // regular typed case
-        String json = MAPPER.writeValueAsString(new Value1654TypedContainer(
-                new Value1654(1),
-                new Value1654(2)
-        ));
+        Map<String, Value1654> map = new LinkedHashMap<>();
+        map.put("first", new Value1654(1));
+        map.put("second", new Value1654(2));
+
+        String json = MAPPER.writeValueAsString(new Value1654TypedMapContainer(map));
         String typeId = Value1654.class.getName();
         typeId = "'@type':'" + typeId.substring(typeId.lastIndexOf('.') + 1) + "'";
-        assertEquals(a2q("{'values':[{"+typeId+",'x':1},{"+typeId+",'x':2}]}"), json);
+        assertEquals(a2q("{'values':{'first':{"+typeId+",'x':1},'second':{"+typeId+",'x':2}}}"), json);
 
-        Value1654TypedContainer result = MAPPER.readValue(json, Value1654TypedContainer.class);
+        Value1654TypedMapContainer result = MAPPER.readValue(json, Value1654TypedMapContainer.class);
         assertEquals(2, result.values.size());
-        assertEquals(2, result.values.get(1).x);
+        assertEquals(2, result.values.get("second").x);
     }
 
-    // [databind#1654]: override, no polymorphic type id, serialization
+    // [databind#1654]: override, no polymorphic type id for Map values, serialization
     @Test
     void withNoTypeInfoDefaultSer() throws Exception {
-        Value1654UntypedContainer cont = new Value1654UntypedContainer(
-                new Value1654(3),
-                new Value1654(7)
-        );
-        assertEquals(a2q("{'values':[{'x':3},{'x':7}]}"),
+        Map<String, Value1654> map = new LinkedHashMap<>();
+        map.put("first", new Value1654(3));
+        map.put("second", new Value1654(7));
+
+        Value1654UntypedMapContainer cont = new Value1654UntypedMapContainer(map);
+        assertEquals(a2q("{'values':{'first':{'x':3},'second':{'x':7}}}"),
                 MAPPER.writeValueAsString(cont));
     }
 
-    // [databind#1654]: override, no polymorphic type id, deserialization
+    // [databind#1654]: override, no polymorphic type id for Map values, deserialization
     @Test
     void withNoTypeInfoDefaultDeser() throws Exception {
         final String noTypeJson = a2q(
-                "{'values':[{'x':3},{'x':7}]}"
+                "{'values':{'first':{'x':3},'second':{'x':7}}}"
         );
-        Value1654UntypedContainer unResult = MAPPER.readValue(noTypeJson,
-                Value1654UntypedContainer.class);
+        Value1654UntypedMapContainer unResult = MAPPER.readValue(noTypeJson,
+                Value1654UntypedMapContainer.class);
         assertEquals(2, unResult.values.size());
-        assertEquals(7, unResult.values.get(1).x);
+        assertEquals(7, unResult.values.get("second").x);
     }
 
-    // [databind#1654]: override, no polymorphic type id, custom serialization
+    // [databind#1654]: override, no polymorphic type id for Map values, custom serialization
     @Test
     void withNoTypeInfoOverrideSer() throws Exception {
-        Value1654UsingCustomSerDeserUntypedContainer cont = new Value1654UsingCustomSerDeserUntypedContainer(
-                new Value1654(1),
-                new Value1654(2)
-        );
-        assertEquals(a2q("{'values':[{'v':1},{'v':2}]}"),
+        Map<String, Value1654> map = new LinkedHashMap<>();
+        map.put("first", new Value1654(1));
+        map.put("second", new Value1654(2));
+
+        Value1654UsingCustomSerDeserUntypedMapContainer cont =
+                new Value1654UsingCustomSerDeserUntypedMapContainer(map);
+        assertEquals(a2q("{'values':{'first':{'v':1},'second':{'v':2}}}"),
                 MAPPER.writeValueAsString(cont));
     }
 
-    // [databind#1654]: override, no polymorphic type id, custom deserialization
+    // [databind#1654]: override, no polymorphic type id for Map values, custom deserialization
     @Test
     void withNoTypeInfoOverrideDeser() throws Exception {
         final String noTypeJson = a2q(
-                "{'values':[{'v':3},{'v':7}]}"
+                "{'values':{'first':{'v':3},'second':{'v':7}}}"
         );
-        Value1654UsingCustomSerDeserUntypedContainer unResult = MAPPER.readValue(noTypeJson,
-                Value1654UsingCustomSerDeserUntypedContainer.class);
+        Value1654UsingCustomSerDeserUntypedMapContainer unResult = MAPPER.readValue(noTypeJson,
+                Value1654UsingCustomSerDeserUntypedMapContainer.class);
         assertEquals(2, unResult.values.size());
-        assertEquals(3, unResult.values.get(0).x);
-        assertEquals(7, unResult.values.get(1).x);
+        assertEquals(3, unResult.values.get("first").x);
+        assertEquals(7, unResult.values.get("second").x);
     }
 
     // // And then validation for individual value, not in Container
