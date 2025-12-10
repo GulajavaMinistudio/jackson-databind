@@ -216,7 +216,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testSimpleVanillaScalars() throws IOException
+    public void testSimpleVanillaScalars() throws Exception
     {
         assertEquals("foo", MAPPER.readValue(q("foo"), Object.class));
 
@@ -227,14 +227,14 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testSimpleVanillaStructured() throws IOException
+    public void testSimpleVanillaStructured() throws Exception
     {
         List<?> list = (List<?>) MAPPER.readValue("[ 1, 2, 3]", Object.class);
         assertEquals(Integer.valueOf(1), list.get(0));
     }
 
     @Test
-    public void testNestedUntypes() throws IOException
+    public void testNestedUntypes() throws Exception
     {
         // 05-Apr-2014, tatu: Odd failures if using shared mapper; so work around:
         Object root = MAPPER.readValue(a2q("{'a':3,'b':[1,2]}"),
@@ -251,7 +251,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testUntypedWithCustomScalarDesers() throws IOException
+    public void testUntypedWithCustomScalarDesers() throws Exception
     {
         SimpleModule m = new SimpleModule("test-module");
         m.addDeserializer(String.class, new UCStringDeserializer());
@@ -275,7 +275,7 @@ public class UntypedDeserializationTest
 
     // Test that exercises non-vanilla variant, with just one simple custom deserializer
     @Test
-    public void testNonVanilla() throws IOException
+    public void testNonVanilla() throws Exception
     {
         SimpleModule m = new SimpleModule("test-module");
         m.addDeserializer(String.class, new UCStringDeserializer());
@@ -283,23 +283,43 @@ public class UntypedDeserializationTest
                 .polymorphicTypeValidator(new NoCheckSubTypeValidator())
                 .addModule(m)
                 .build();
+        ObjectReader r = mapper.readerFor(Object.class);
         // Also: since this is now non-vanilla variant, try more alternatives
-        List<?> l = (List<?>) mapper.readValue("[ true, false, 7, 0.5, \"foo\"]", Object.class);
-        assertEquals(5, l.size());
+        List<?> l = (List<?>) r.readValue("[ true, false, 7, 0.5, \"foo\", null]");
+        assertEquals(6, l.size());
         assertEquals(Boolean.TRUE, l.get(0));
         assertEquals(Boolean.FALSE, l.get(1));
         assertEquals(Integer.valueOf(7), l.get(2));
         assertEquals(Double.valueOf(0.5), l.get(3));
         assertEquals("FOO", l.get(4));
+        assertNull(l.get(5));
 
+        // And Maps
+        Map<?,?> map = (Map<?,?>) r.readValue(a2q("{'a':0.25,'b':3,'c':true,'d':false}"));
+        assertEquals(Map.of("a", 0.25, "b", 3, "c", true, "d", false), map);
+
+        // And Scalars too; regular and "updating" readers
+        l = new ArrayList<>();
+        assertEquals(Integer.valueOf(42), r.readValue("42"));
+        assertEquals(Integer.valueOf(42), r.withValueToUpdate(l).readValue("42"));
+        assertEquals(Double.valueOf(2.5), r.readValue("2.5"));
+        assertEquals(Double.valueOf(2.5), r.withValueToUpdate(l).readValue("2.5"));
+        assertEquals(true, r.readValue("true"));
+        assertEquals(true, r.withValueToUpdate(l).readValue("true"));
+        assertEquals(false, r.readValue("false"));
+        assertEquals(false, r.withValueToUpdate(l).readValue("false"));
+        assertNull(r.readValue("null"));
+        assertSame(l, r.withValueToUpdate(l).readValue("null"));
+        
+        // and minimal nesting
         l = (List<?>) mapper.readValue("[ {}, [] ]", Object.class);
         assertEquals(2, l.size());
-        assertTrue(l.get(0) instanceof Map<?,?>);
-        assertTrue(l.get(1) instanceof List<?>);
+        assertEquals(Map.of(), l.get(0));
+        assertEquals(List.of(), l.get(1));
     }
 
     @Test
-    public void testUntypedWithListDeser() throws IOException
+    public void testUntypedWithListDeser() throws Exception
     {
         SimpleModule m = new SimpleModule("test-module");
         m.addDeserializer(List.class, new ListDeserializer());
@@ -317,7 +337,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testUntypedWithMapDeser() throws IOException
+    public void testUntypedWithMapDeser() throws Exception
     {
         SimpleModule m = new SimpleModule("test-module");
         m.addDeserializer(Map.class, new YMapDeserializer());
@@ -333,7 +353,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testNestedUntyped989() throws IOException
+    public void testNestedUntyped989() throws Exception
     {
         DelegatingUntyped pojo;
         ObjectReader r = MAPPER.readerFor(DelegatingUntyped.class);
@@ -360,8 +380,10 @@ public class UntypedDeserializationTest
         ObjectMapper mapper = jsonMapperBuilder()
                 .enable(DeserializationFeature.USE_JAVA_ARRAY_FOR_JSON_ARRAY)
                 .build();
-        ob = mapper.readValue("[1]", Object.class);
+        ob = mapper.readValue("[1, false, true, 0.5, {}]", Object.class);
         assertEquals(Object[].class, ob.getClass());
+        assertEquals(List.of(1, false, true, 0.5, Map.of()),
+                Arrays.asList((Object[]) ob));
     }
 
     @Test
@@ -489,7 +511,7 @@ public class UntypedDeserializationTest
 
     // Allow 'upgrade' of big integers into Long, BigInteger
     @Test
-    public void testObjectSerializeWithLong() throws IOException
+    public void testObjectSerializeWithLong() throws Exception
     {
         final ObjectMapper mapper = jsonMapperBuilder()
                 .activateDefaultTyping(NoCheckSubTypeValidator.instance,
@@ -510,7 +532,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testPolymorphicUntypedVanilla() throws IOException
+    public void testPolymorphicUntypedVanilla() throws Exception
     {
         ObjectReader rDefault = jsonMapperBuilder()
                 .polymorphicTypeValidator(new NoCheckSubTypeValidator())
@@ -554,7 +576,7 @@ public class UntypedDeserializationTest
     }
 
     @Test
-    public void testPolymorphicUntypedCustom() throws IOException
+    public void testPolymorphicUntypedCustom() throws Exception
     {
         // register module just to override one deserializer, to prevent use of Vanilla deser
         SimpleModule m = new SimpleModule("test-module")

@@ -144,14 +144,11 @@ final class UntypedObjectDeserializerNR
             }
             break;
         case JsonTokenId.ID_START_ARRAY:
-            {
-                JsonToken t = p.nextToken(); // to get to FIELD_NAME or END_OBJECT
+            if (intoValue instanceof Collection<?>) {
+                JsonToken t = p.nextToken(); // to get to END_OBJECT
                 if (t == JsonToken.END_ARRAY) {
                     return intoValue;
                 }
-            }
-
-            if (intoValue instanceof Collection<?>) {
                 Collection<Object> c = (Collection<Object>) intoValue;
                 // NOTE: merge for arrays/Collections means append, can't merge contents
                 do {
@@ -161,6 +158,7 @@ final class UntypedObjectDeserializerNR
             }
             // 21-Apr-2017, tatu: Should we try to support merging of Object[] values too?
             //    ... maybe future improvement
+
             break;
         }
         // Easiest handling for the rest, delegate. Only (?) question: how about nulls?
