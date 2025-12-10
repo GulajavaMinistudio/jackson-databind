@@ -412,20 +412,43 @@ public class UntypedDeserializationTest
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("a", 42);
 
+        // First update Map with JSON Object
         ObjectReader r = MAPPER.readerFor(Object.class).withValueToUpdate(map);
-        Object result = r.readValue(a2q("{'b' : 57}"));
-        assertSame(map, result);
-        assertEquals(2, map.size());
-        assertEquals(Integer.valueOf(57), map.get("b"));
+        Object result;
 
-        // Try same with other types, too
+        result = r.readValue(a2q("{'b': 0.25, 'c': [] }"));
+        assertSame(map, result);
+        assertEquals(3, map.size());
+        assertEquals(0.25, map.get("b"));
+        assertEquals(List.of(), map.get("c"));
+
+        // Then List with Array
         List<Object> list = new ArrayList<>();
         list.add(1);
         r = MAPPER.readerFor(Object.class).withValueToUpdate(list);
-        result = r.readValue("[ 2, true ]");
+        result = r.readValue("[ true, -0.5, { } ]");
         assertSame(list, result);
-        assertEquals(3, list.size());
-        assertEquals(Boolean.TRUE, list.get(2));
+        assertEquals(List.of(1, true, -0.5, Map.of()), result);
+
+        // Then mismatches: Map with JSON Array
+        r = MAPPER.readerFor(Object.class)
+                .withValueToUpdate(map);
+        result = r.readValue("[ 42, -0.25, false, null ]");
+        List<Object> exp = new ArrayList<>();
+        exp.add(42);
+        exp.add(-0.25);
+        exp.add(false);
+        exp.add(null);
+        assertEquals(exp, result);
+
+        // And then List with JSON Object
+        r = MAPPER.readerFor(Object.class)
+                .withValueToUpdate(new ArrayList<>());
+        map.clear();
+        map.put("a", 0.5);
+        map.put("b", null);
+        result = r.readValue(a2q("{'a': 0.5, 'b': null}"));
+        assertEquals(map, result);
     }
 
     @Test
@@ -574,37 +597,16 @@ public class UntypedDeserializationTest
     @Test
     public void testEmptyArrayAndObject() throws Exception
     {
-        // Empty array
-        Object result = MAPPER.readValue("[]", Object.class);
-        assertNotNull(result);
-        assertTrue(result instanceof List);
-        assertEquals(0, ((List<?>) result).size());
-
-        // Empty object
-        result = MAPPER.readValue("{}", Object.class);
-        assertNotNull(result);
-        assertTrue(result instanceof Map);
-        assertEquals(0, ((Map<?,?>) result).size());
+        assertEquals(List.of(), MAPPER.readValue("[]", Object.class));
+        assertEquals(Map.of(), MAPPER.readValue("{}", Object.class));
     }
 
     @Test
     public void testSingleElementArrayAndObject() throws Exception
     {
-        // Single element array
-        Object result = MAPPER.readValue("[42]", Object.class);
-        assertNotNull(result);
-        assertTrue(result instanceof List);
-        List<?> list = (List<?>) result;
-        assertEquals(1, list.size());
-        assertEquals(Integer.valueOf(42), list.get(0));
-
-        // Single property object
-        result = MAPPER.readValue("{\"key\":\"value\"}", Object.class);
-        assertNotNull(result);
-        assertTrue(result instanceof Map);
-        Map<?,?> map = (Map<?,?>) result;
-        assertEquals(1, map.size());
-        assertEquals("value", map.get("key"));
+        assertEquals(List.of(42), MAPPER.readValue("[42]", Object.class));
+        assertEquals(Map.of("key", true),
+                MAPPER.readValue("{\"key\": true}", Object.class));
     }
 
     @Test
@@ -623,7 +625,6 @@ public class UntypedDeserializationTest
     @Test
     public void testFloatTypesFloat32AndFloat64() throws Exception
     {
-        // Test Float (32-bit)
         Object result = MAPPER.readValue("1.5", Object.class);
         assertTrue(result instanceof Double);
         result = MAPPER.readValue("2.718281828", Object.class);
