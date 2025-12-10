@@ -440,7 +440,7 @@ public class UntypedDeserializationTest
         map.put("a", 42);
 
         ObjectReader r = customMapper.readerFor(Object.class).withValueToUpdate(map);
-        Object result = r.readValue(a2q("{'b' : 'value', 'c' : 111222333444, 'enabled':true}"));
+        Object result = r.readValue(a2q("{'b': 'value', 'c': 111222333444, 'enabled': true}"));
         assertSame(map, result);
         assertEquals(4, map.size());
         assertEquals("VALUE", map.get("b"));
@@ -477,7 +477,7 @@ public class UntypedDeserializationTest
         // works fine as node
         JsonNode deserialized = mapper.readTree(serialized);
         assertEquals(VALUE, deserialized.get("timestamp").asLong());
-        // and actually should work in Maps too
+        // and actually should work for Maps too
         Map<?,?> deserMap = mapper.readValue(serialized, Map.class);
         Number n = (Number) deserMap.get("timestamp");
         assertNotNull(n);
