@@ -10,8 +10,9 @@ import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static tools.jackson.databind.testutil.DatabindTestUtil.newJsonMapper;
 
-public class KotlinGithub54Test {
-
+// From https://github.com/FasterXML/jackson-module-kotlin/issues/54
+public class JsonIdentityKotlinGithub54Test
+{
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class)
     static class Entity1 {
         private final String name;
