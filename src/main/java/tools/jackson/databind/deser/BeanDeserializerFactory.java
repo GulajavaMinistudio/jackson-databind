@@ -274,7 +274,9 @@ public class BeanDeserializerFactory
         addObjectIdReader(ctxt, beanDescRef, deserBuilder);
 
         // managed/back reference fields/setters need special handling... first part
-        addBackReferenceProperties(ctxt, beanDescRef, deserBuilder);
+        // [databind#2686]: Pass null for non-Builder deserialization (only Builder-based
+        // deserialization needs the target type for back-reference resolution)
+        addBackReferenceProperties(ctxt, beanDescRef, deserBuilder, null);
         addInjectables(ctxt, beanDescRef, deserBuilder);
 
         final DeserializationConfig config = ctxt.getConfig();
@@ -334,7 +336,8 @@ public class BeanDeserializerFactory
         addObjectIdReader(ctxt, builderDescRef, deserBuilder);
 
         // managed/back reference fields/setters need special handling... first part
-        addBackReferenceProperties(ctxt, builderDescRef, deserBuilder);
+        // [databind#2686]: For Builder pattern, pass target type so that back-reference
+        addBackReferenceProperties(ctxt, builderDescRef, deserBuilder, valueType);
         addInjectables(ctxt, builderDescRef, deserBuilder);
 
         JsonPOJOBuilder.Value builderConfig = ctxt.getAnnotationIntrospector()
@@ -734,9 +737,13 @@ ClassUtil.name(propName)));
     /**
      * Method that will find if bean has any managed- or back-reference properties,
      * and if so add them to bean, to be linked during resolution phase.
+     *
+     * @param builtType Non-{@code null} for Builder-based POJOs, indicating type
+     *    of POJO (not Builder); {@code null} for regular POJOs
      */
     protected void addBackReferenceProperties(DeserializationContext ctxt,
-            BeanDescription.Supplier beanDescRef, BeanDeserializerBuilder builder)
+            BeanDescription.Supplier beanDescRef, BeanDeserializerBuilder deserBuilder,
+            JavaType builtType)
     {
         // and then back references, not necessarily found as regular properties
         List<BeanPropertyDefinition> refProps = beanDescRef.get().findBackReferences();
@@ -764,8 +771,30 @@ ClassUtil.name(name), ((AnnotatedParameter) m).getIndex());
                             refProp.getName());
                 }
                 String refName = refProp.findReferenceName();
-                builder.addBackReferenceProperty(refName, constructSettableProperty(ctxt,
-                        beanDescRef, refProp, refProp.getPrimaryType()));
+                SettableBeanProperty backRefProp;
+
+                if (builtType != null) {
+                    // [databind#2686]: Handle Builder
+                    backRefProp = constructBuilderBackRefProperty(ctxt,
+                            builtType, refProp);
+                } else {
+                    // normal
+                    backRefProp = constructSettableProperty(ctxt,
+                            beanDescRef, refProp, refProp.getPrimaryType());
+                }
+
+                if (backRefProp == null) {
+                    if (builtType != null) {
+                        ctxt.reportBadTypeDefinition(beanDescRef,
+                                "Cannot find back-reference field '%s' in target type %s for Builder-based deserialization: ensure the field exists in the target class, not just the Builder",
+                                refProp.getName(), ClassUtil.nameOf(builtType.getRawClass()));
+                    } else {
+                        ctxt.reportBadTypeDefinition(beanDescRef,
+                                "Cannot resolve back-reference property '%s'",
+                                refProp.getName());
+                    }
+                }
+                deserBuilder.addBackReferenceProperty(refName, backRefProp);
             }
         }
     }
@@ -1062,10 +1091,33 @@ ClassUtil.name(name), ((AnnotatedParameter) m).getIndex());
         return status.booleanValue();
     }
 
-    // @since 2.8.11
     protected void _validateSubType(DeserializationContext ctxt, JavaType type,
             BeanDescription.Supplier beanDescRef)
     {
         SubTypeValidator.instance().validateSubType(ctxt, type, beanDescRef);
+    }
+
+    /**
+     * Helper method for constructing back-reference property when using Builder pattern.
+     *
+     * @since 3.1
+     */
+    protected SettableBeanProperty constructBuilderBackRefProperty(DeserializationContext ctxt,
+            JavaType builtType, BeanPropertyDefinition builderRefProp)
+    {
+        BeanDescription.Supplier targetDescRef = ctxt.lazyIntrospectBeanDescription(builtType);
+        BeanDescription targetDesc = targetDescRef.get();
+
+        // find back reference with same field
+        String propName = builderRefProp.getName();
+        for (BeanPropertyDefinition propDef : targetDesc.findProperties()) {
+            if (propName.equals(propDef.getName()) && propDef.hasField()) {
+                AnnotatedField field = propDef.getField();
+                JavaType propertyType = field.getType();
+                return constructSettableProperty(ctxt, targetDescRef, propDef, propertyType);
+            }
+        }
+
+        return null;
     }
 }
