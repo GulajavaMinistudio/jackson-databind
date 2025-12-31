@@ -171,7 +171,7 @@ public final class JavaTimeInitializer
                 // because we will (for now) be getting a subtype, but in future may want to downgrade
                 // to the common base type. Even more, serializer may purposefully force use of base type.
                 // So... in practice it really should always work, in the end. :)
-  
+
                 // 30-Dec-2025, tatu: Does not seem to get called, ever... remove from 3.2?
                 //   (or try to reproduce case where this would be needed?)
                 if (ZoneId.class.isAssignableFrom(raw)) {
