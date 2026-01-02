@@ -2,9 +2,12 @@ package com.fasterxml.jackson.databind.struct;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -62,6 +65,30 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
         }
     }
 
+    static class Bean1421C {
+        Collection<IdentifiedType> collection;
+        IdentifiedType value;
+
+        public void setValue(IdentifiedType value) {
+            this.value = value;
+        }
+
+        public void setCollection(Collection<IdentifiedType> collection) {
+            this.collection = collection;
+        }
+    }
+
+    @JsonIdentityInfo(generator=ObjectIdGenerators.IntSequenceGenerator.class)
+    static class IdentifiedType {
+        String entry;
+
+        @JsonCreator
+        IdentifiedType(@JsonProperty("entry") String entry)
+        {
+            this.entry = entry;
+        }
+    }
+
     /*
     /**********************************************************
     /* Unit tests
@@ -89,6 +116,17 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
         List<String> expected = new ArrayList<>();
         expected.add("test2");
         assertEquals(expected, a.value);
+    }
+
+    @Test
+    public void testCollectionWithObjectId() throws IOException
+    {
+        Bean1421C result = MAPPER.readValue("{\"collection\":1,\"value\":{\"@id\":1,\"entry\":\"s\"}}", Bean1421C.class);
+        assertNotNull(result);
+        assertNotNull(result.value);
+        assertEquals(1, result.collection.size());
+        assertNotNull(result.collection.iterator().next());
+        assertEquals("s", result.collection.iterator().next().entry);
     }
 
     @Test

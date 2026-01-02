@@ -404,6 +404,10 @@ _containerType,
             return (Collection<Object>) ctxt.handleUnexpectedToken(_containerType, p);
         }
 
+        if (_valueDeserializer.getObjectIdReader() != null) {
+            return _wrapSingleWithObjectId(p, ctxt, result);
+        }
+
         Object value;
 
         try {
@@ -431,8 +435,7 @@ _containerType,
             if (!wrap) {
                 ClassUtil.throwIfRTE(e);
             }
-            // note: pass Object.class, not Object[].class, as we need element type for error info
-            throw JsonMappingException.wrapWithPath(e, Object.class, result.size());
+            throw JsonMappingException.wrapWithPath(e, _containerType.getContentType().getRawClass(), result.size());
         }
         result.add(value);
         return result;
@@ -483,6 +486,50 @@ _containerType,
                 }
                 throw JsonMappingException.wrapWithPath(e, result, result.size());
             }
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    protected final Collection<Object> _wrapSingleWithObjectId(JsonParser p, DeserializationContext ctxt,
+                                                               Collection<Object> result)
+            throws IOException
+    {
+        CollectionReferringAccumulator referringAccumulator =
+                new CollectionReferringAccumulator(_containerType.getContentType().getRawClass(), result);
+
+        Object value;
+
+        try {
+            if (p.hasToken(JsonToken.VALUE_NULL)) {
+                // 03-Feb-2017, tatu: Hmmh. I wonder... let's try skipping here, too
+                if (_skipNullValues) {
+                    return result;
+                }
+                value = null;
+            } else {
+                value = _deserializeNoNullChecks(p, ctxt);
+            }
+
+            if (value == null) {
+                value = _nullProvider.getNullValue(ctxt);
+
+                // _skipNullValues is checked by _tryToAddNull.
+                if (value == null) {
+                    _tryToAddNull(p, ctxt, result);
+                    return result;
+                }
+            }
+            referringAccumulator.add(value);
+        } catch (UnresolvedForwardReference reference) {
+            Referring ref = referringAccumulator.handleUnresolvedReference(reference);
+            reference.getRoid().appendReferring(ref);
+        } catch (Exception e) {
+            boolean wrap = ctxt.isEnabled(DeserializationFeature.WRAP_EXCEPTIONS);
+            if (!wrap) {
+                ClassUtil.throwIfRTE(e);
+            }
+            throw JsonMappingException.wrapWithPath(e, _containerType.getContentType().getRawClass(), result.size());
         }
         return result;
     }
