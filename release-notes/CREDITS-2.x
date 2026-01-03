@@ -1974,3 +1974,8 @@ Michael Reiche (@mikereiche)
  * Reported #5271: `EnumDeserializer` fails to deserialize Enums with @JsonValue - uses table
    with name() key instead of @JsonValue key
   (2.20.0)
+
+Moritz Reyer (@MoritzR200)
+ * Contributed #5537: Add missing `@JsonIdentityInfo` handling for implicit `Collection`s with
+   `DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY`
+  (2.20.2)

@@ -1,17 +1,13 @@
 package com.fasterxml.jackson.databind.struct;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
@@ -65,25 +61,26 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
         }
     }
 
-    static class Bean1421C {
-        Collection<IdentifiedType> collection;
-        IdentifiedType value;
+    // for [databind#5537]
+    static class Bean5537 {
+        Collection<IdentifiedType5537> collection;
+        IdentifiedType5537 value;
 
-        public void setValue(IdentifiedType value) {
+        public void setValue(IdentifiedType5537 value) {
             this.value = value;
         }
 
-        public void setCollection(Collection<IdentifiedType> collection) {
+        public void setCollection(Collection<IdentifiedType5537> collection) {
             this.collection = collection;
         }
     }
 
     @JsonIdentityInfo(generator=ObjectIdGenerators.IntSequenceGenerator.class)
-    static class IdentifiedType {
+    static class IdentifiedType5537 {
         String entry;
 
         @JsonCreator
-        IdentifiedType(@JsonProperty("entry") String entry)
+        IdentifiedType5537(@JsonProperty("entry") String entry)
         {
             this.entry = entry;
         }
@@ -95,13 +92,12 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
     /**********************************************************
      */
 
-    private final ObjectMapper MAPPER = newJsonMapper();
-    {
-        MAPPER.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
-    }
+    private final ObjectMapper MAPPER = jsonMapperBuilder()
+            .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+            .build();
 
     @Test
-    public void testSuccessfulDeserializationOfObjectWithChainedArrayCreators() throws IOException
+    public void testSuccessfulDeserializationOfObjectWithChainedArrayCreators() throws Exception
     {
         Bean1421A result = MAPPER.readValue("[{\"message\":\"messageHere\"}]", Bean1421A.class);
         assertNotNull(result);
@@ -116,17 +112,6 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
         List<String> expected = new ArrayList<>();
         expected.add("test2");
         assertEquals(expected, a.value);
-    }
-
-    @Test
-    public void testCollectionWithObjectId() throws IOException
-    {
-        Bean1421C result = MAPPER.readValue("{\"collection\":1,\"value\":{\"@id\":1,\"entry\":\"s\"}}", Bean1421C.class);
-        assertNotNull(result);
-        assertNotNull(result.value);
-        assertEquals(1, result.collection.size());
-        assertNotNull(result.collection.iterator().next());
-        assertEquals("s", result.collection.iterator().next().entry);
     }
 
     @Test
@@ -146,5 +131,18 @@ public class SingleValueAsArrayTest extends DatabindTestUtil
         boolean[] b = MAPPER.readValue("true", boolean[].class);
         assertEquals(1, d.length);
         assertTrue(b[0]);
+    }
+
+    // for [databind#5537]
+    @Test
+    public void testCollectionWithObjectId() throws Exception
+    {
+        Bean5537 result = MAPPER.readValue("{\"collection\":1,\"value\":{\"@id\":1,\"entry\":\"s\"}}",
+                Bean5537.class);
+        assertNotNull(result);
+        assertNotNull(result.value);
+        assertEquals(1, result.collection.size());
+        assertNotNull(result.collection.iterator().next());
+        assertEquals("s", result.collection.iterator().next().entry);
     }
 }

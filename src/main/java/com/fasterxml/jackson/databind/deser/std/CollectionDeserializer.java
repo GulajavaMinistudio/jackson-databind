@@ -404,6 +404,7 @@ _containerType,
             return (Collection<Object>) ctxt.handleUnexpectedToken(_containerType, p);
         }
 
+        // 03-Jan-2026: [databind#5537] Support Object Id for implicit Collections too
         if (_valueDeserializer.getObjectIdReader() != null) {
             return _wrapSingleWithObjectId(p, ctxt, result);
         }
@@ -441,8 +442,8 @@ _containerType,
         return result;
     }
 
-    protected Collection<Object> _deserializeWithObjectId(JsonParser p, DeserializationContext ctxt,
-            Collection<Object> result)
+    protected Collection<Object> _deserializeWithObjectId(JsonParser p,
+            DeserializationContext ctxt, Collection<Object> result)
         throws IOException
     {
         // Ok: must point to START_ARRAY (or equivalent)
@@ -490,19 +491,18 @@ _containerType,
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    protected final Collection<Object> _wrapSingleWithObjectId(JsonParser p, DeserializationContext ctxt,
-                                                               Collection<Object> result)
-            throws IOException
+    // @since 2.20.2
+    // Copied from `_deserializeWithObjectId()` above
+    protected Collection<Object> _wrapSingleWithObjectId(JsonParser p,
+            DeserializationContext ctxt, Collection<Object> result)
+        throws IOException
     {
-        CollectionReferringAccumulator referringAccumulator =
-                new CollectionReferringAccumulator(_containerType.getContentType().getRawClass(), result);
-
-        Object value;
+        final CollectionReferringAccumulator referringAccumulator =
+                new CollectionReferringAccumulator(getContentType().getRawClass(), result);
 
         try {
+            Object value;
             if (p.hasToken(JsonToken.VALUE_NULL)) {
-                // 03-Feb-2017, tatu: Hmmh. I wonder... let's try skipping here, too
                 if (_skipNullValues) {
                     return result;
                 }
@@ -513,8 +513,6 @@ _containerType,
 
             if (value == null) {
                 value = _nullProvider.getNullValue(ctxt);
-
-                // _skipNullValues is checked by _tryToAddNull.
                 if (value == null) {
                     _tryToAddNull(p, ctxt, result);
                     return result;
@@ -525,11 +523,10 @@ _containerType,
             Referring ref = referringAccumulator.handleUnresolvedReference(reference);
             reference.getRoid().appendReferring(ref);
         } catch (Exception e) {
-            boolean wrap = ctxt.isEnabled(DeserializationFeature.WRAP_EXCEPTIONS);
-            if (!wrap) {
+            if (!ctxt.isEnabled(DeserializationFeature.WRAP_EXCEPTIONS)) {
                 ClassUtil.throwIfRTE(e);
             }
-            throw JsonMappingException.wrapWithPath(e, _containerType.getContentType().getRawClass(), result.size());
+            throw JsonMappingException.wrapWithPath(e, getContentType().getRawClass(), result.size());
         }
         return result;
     }
