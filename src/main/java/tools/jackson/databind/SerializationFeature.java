@@ -272,7 +272,7 @@ public enum SerializationFeature implements ConfigFeature
      *
      * @since 3.1
      */
-    APPLY_JSON_INCLUDE_FOR_COLLECTIONS(false),
+    APPLY_JSON_INCLUDE_FOR_CONTAINERS(false),
 
     /*
     /**********************************************************************
