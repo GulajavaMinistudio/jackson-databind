@@ -159,14 +159,15 @@ public class NumberDeserializers
             return AccessPattern.CONSTANT;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public final T getNullValue(DeserializationContext ctxt) {
             // 01-Mar-2017, tatu: Alas, not all paths lead to `_coerceNull()`, as `SettableBeanProperty`
             //    short-circuits `null` handling. Hence need this check as well.
             if (_primitive && ctxt.isEnabled(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)) {
-                ctxt.reportInputMismatch(this,
-                        "Cannot map `null` into type %s (set DeserializationConfig.DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES to 'false' to allow)",
-                        ClassUtil.classNameOf(handledType()));
+                return (T) ctxt.handleNullForPrimitives(handledType(), ctxt.getParser(), this,
+"Cannot map `null` into type %s (set `DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES` to 'false' to allow)",
+                                ClassUtil.nameOf(handledType()));
             }
             return _nullValue;
         }
@@ -261,6 +262,17 @@ public class NumberDeserializers
             return _parseByte(p, ctxt);
         }
 
+
+        /**
+         * @since 3.1
+         */
+        @Override
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property)
+        {
+            return RadixDeserializerFactory.createRadixStringDeserializer(this,
+                    findFormatOverrides(ctxt, property, handledType()));
+        }
+
         protected Byte _parseByte(JsonParser p, DeserializationContext ctxt)
                 throws JacksonException
         {
@@ -344,6 +356,17 @@ public class NumberDeserializers
         public ShortDeserializer(Class<Short> cls, Short nvl)
         {
             super(cls, LogicalType.Integer, nvl, (short)0);
+        }
+
+        /**
+         * @since 3.1
+         */
+        @Override
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+                BeanProperty property)
+        {
+            return RadixDeserializerFactory.createRadixStringDeserializer(this,
+                    findFormatOverrides(ctxt, property, handledType()));
         }
 
         @Override
@@ -476,7 +499,8 @@ public class NumberDeserializers
                         "value outside valid Character range (0x0000 - 0xFFFF)");
             case JsonTokenId.ID_NULL:
                 if (_primitive) {
-                    _verifyNullForPrimitive(ctxt);
+                    char c = (char) _verifyNullForPrimitive(ctxt, p, '\0');
+                    return c;
                 }
                 return (Character) getNullValue(ctxt);
             case JsonTokenId.ID_START_ARRAY:
@@ -526,6 +550,17 @@ public class NumberDeserializers
         @Override
         public boolean isCachable() { return true; }
 
+        /**
+         * @since 3.1
+         */
+        @Override
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+                BeanProperty property)
+        {
+            return RadixDeserializerFactory.createRadixStringDeserializer(this,
+                    findFormatOverrides(ctxt, property, handledType()));
+        }
+
         @Override
         public Integer deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
             if (p.isExpectedNumberIntToken()) {
@@ -567,8 +602,21 @@ public class NumberDeserializers
         @Override
         public boolean isCachable() { return true; }
 
+        /**
+         * @since 3.1
+         */
         @Override
-        public Long deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+                BeanProperty property)
+        {
+            return RadixDeserializerFactory.createRadixStringDeserializer(this,
+                    findFormatOverrides(ctxt, property, handledType()));
+        }
+
+        @Override
+        public Long deserialize(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
+        {
             if (p.isExpectedNumberIntToken()) {
                 return p.getLongValue();
             }
@@ -591,7 +639,8 @@ public class NumberDeserializers
         }
 
         @Override
-        public Float deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException
+        public Float deserialize(JsonParser p, DeserializationContext ctxt)
+            throws JacksonException
         {
             if (p.hasToken(JsonToken.VALUE_NUMBER_FLOAT)) {
                 return p.getFloatValue();
@@ -935,6 +984,17 @@ public class NumberDeserializers
         @Override
         public final LogicalType logicalType() {
             return LogicalType.Integer;
+        }
+
+        /**
+         * @since 3.1
+         */
+        @Override
+        public ValueDeserializer<?> createContextual(DeserializationContext ctxt,
+                BeanProperty property)
+        {
+            return RadixDeserializerFactory.createRadixStringDeserializer(this,
+                    findFormatOverrides(ctxt, property, handledType()));
         }
 
         @Override

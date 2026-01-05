@@ -568,6 +568,11 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
         return def.withOverrides(v);
     }
 
+    @Override // @since 3.1
+    public JsonFormat.Value getDefaultFormat() {
+        return _configOverrides.getDefaultFormat();
+    }
+
     @Override
     public final JsonFormat.Value getDefaultPropertyFormat(Class<?> type) {
         return _configOverrides.findFormatDefaults(type);
@@ -622,7 +627,7 @@ public abstract class MapperConfigBase<CFG extends ConfigFeature,
 
         if (ClassUtil.isJDKClass(baseType)) {
             vc = VisibilityChecker.allPublicInstance();
-        } else if (ClassUtil.isRecordType(baseType)) {
+        } else if (baseType.isRecord()) {
             // 15-Jan-2023, tatu: [databind#3724] Records require slightly different defaults
             vc = _configOverrides.getDefaultRecordVisibility();
         } else {

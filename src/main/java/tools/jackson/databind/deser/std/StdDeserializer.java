@@ -20,6 +20,7 @@ import tools.jackson.databind.deser.bean.BeanDeserializerBase;
 import tools.jackson.databind.deser.impl.NullsAsEmptyProvider;
 import tools.jackson.databind.deser.impl.NullsConstantProvider;
 import tools.jackson.databind.deser.impl.NullsFailProvider;
+import tools.jackson.databind.introspect.AnnotatedClass;
 import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.jsontype.TypeDeserializer;
 import tools.jackson.databind.type.LogicalType;
@@ -348,10 +349,10 @@ public abstract class StdDeserializer<T>
             return true;
         case JsonTokenId.ID_FALSE:
             return false;
-        case JsonTokenId.ID_NULL: // null fine for non-primitive
-            _verifyNullForPrimitive(ctxt);
-            return false;
-        // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
+        case JsonTokenId.ID_NULL: // null may or may be ok for primitive
+            return (boolean) _verifyNullForPrimitive(ctxt, p, false);
+
+            // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Boolean.TYPE);
             // 17-May-2025, tatu: [databind#4656] need to check for `null`
@@ -377,8 +378,7 @@ public abstract class StdDeserializer<T>
         final CoercionAction act = _checkFromStringCoercion(ctxt, text,
                 LogicalType.Boolean, Boolean.TYPE);
         if (act == CoercionAction.AsNull) {
-            _verifyNullForPrimitive(ctxt);
-            return false;
+            return (boolean) _verifyNullForPrimitive(ctxt, p, false);
         }
         if (act == CoercionAction.AsEmpty) {
             return false;
@@ -535,8 +535,7 @@ public abstract class StdDeserializer<T>
         case JsonTokenId.ID_NUMBER_INT:
             return p.getByteValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return (byte) 0;
+            return (byte) _verifyNullForPrimitive(ctxt, p, (byte) 0);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Byte.TYPE);
@@ -565,8 +564,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Byte.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return (byte) 0;
+            return (byte) _verifyNullForPrimitive(ctxt, p, (byte) 0);
         }
         if (act == CoercionAction.AsEmpty) {
             return (byte) 0;
@@ -619,8 +617,7 @@ public abstract class StdDeserializer<T>
         case JsonTokenId.ID_NUMBER_INT:
             return p.getShortValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return (short) 0;
+            return (short) _verifyNullForPrimitive(ctxt, p, (short) 0);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Short.TYPE);
@@ -648,8 +645,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Short.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return (short) 0;
+            return (short) _verifyNullForPrimitive(ctxt, p, (short) 0);
         }
         if (act == CoercionAction.AsEmpty) {
             return (short) 0;
@@ -696,8 +692,7 @@ public abstract class StdDeserializer<T>
             // Here regular (strict) accessor is fine
             return p.getIntValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return 0;
+            return (int) _verifyNullForPrimitive(ctxt, p, 0);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Integer.TYPE);
@@ -724,8 +719,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Integer.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return 0;
+            return (int) _verifyNullForPrimitive(ctxt, p, 0);
         }
         if (act == CoercionAction.AsEmpty) {
             return 0;
@@ -852,8 +846,7 @@ public abstract class StdDeserializer<T>
         case JsonTokenId.ID_NUMBER_INT:
             return p.getLongValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return 0L;
+            return (long) _verifyNullForPrimitive(ctxt, p, 0L);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Long.TYPE);
@@ -880,8 +873,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Long.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return 0L;
+            return (long) _verifyNullForPrimitive(ctxt, p, 0L);
         }
         if (act == CoercionAction.AsEmpty) {
             return 0L;
@@ -992,8 +984,7 @@ public abstract class StdDeserializer<T>
         case JsonTokenId.ID_NUMBER_FLOAT:
             return p.getFloatValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return 0f;
+            return (float) _verifyNullForPrimitive(ctxt, p, 0f);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Float.TYPE);
@@ -1030,8 +1021,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Float.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return  0.0f;
+            return (float) _verifyNullForPrimitive(ctxt, p, 0.0f);
         }
         if (act == CoercionAction.AsEmpty) {
             return  0.0f;
@@ -1112,8 +1102,7 @@ public abstract class StdDeserializer<T>
         case JsonTokenId.ID_NUMBER_FLOAT:
             return p.getDoubleValue();
         case JsonTokenId.ID_NULL:
-            _verifyNullForPrimitive(ctxt);
-            return 0.0;
+            return (double)_verifyNullForPrimitive(ctxt, p, 0.0);
         // 29-Jun-2020, tatu: New! "Scalar from Object" (mostly for XML)
         case JsonTokenId.ID_START_OBJECT:
             text = ctxt.extractScalarFromObject(p, this, Double.TYPE);
@@ -1150,8 +1139,7 @@ public abstract class StdDeserializer<T>
                 LogicalType.Integer, Double.TYPE);
         if (act == CoercionAction.AsNull) {
             // 03-May-2021, tatu: Might not be allowed (should we do "empty" check?)
-            _verifyNullForPrimitive(ctxt);
-            return  0.0;
+            return (double)_verifyNullForPrimitive(ctxt, p, 0.0);
         }
         if (act == CoercionAction.AsEmpty) {
             return  0.0;
@@ -1634,16 +1622,29 @@ inputDesc, _coercedTypeDesc(targetType));
      * was received by other means (coerced due to configuration, or even from
      * optionally acceptable String {@code "null"} token).
      */
-    protected final void _verifyNullForPrimitive(DeserializationContext ctxt)
+    protected Object _verifyNullForPrimitive(DeserializationContext ctxt,
+            JsonParser p, Object defaultValue)
         throws DatabindException
     {
         if (ctxt.isEnabled(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)) {
-            ctxt.reportInputMismatch(this,
+            return ctxt.handleNullForPrimitives(handledType(), p,
+                    this,
 "Cannot coerce `null` to %s (disable `DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES` to allow)",
-                    _coercedTypeDesc());
+                        _coercedTypeDesc());
         }
+        return defaultValue;
     }
 
+    /**
+     * @deprecated Since 3.1 use overload {@link #_verifyNullForPrimitive(DeserializationContext, JsonParser, Object)}
+     */
+    @Deprecated // @since 3.1
+    protected final void _verifyNullForPrimitive(DeserializationContext ctxt)
+            throws DatabindException
+    {
+        _verifyNullForPrimitive(ctxt, ctxt.getParser(), null);
+    }
+    
     /**
      * Method called to verify that text value {@code "null"} from input is acceptable
      * for primitive (unboxed) target type. It should not be called if actual
@@ -1844,6 +1845,30 @@ inputDesc, _coercedTypeDesc(targetType));
     }
 
     /**
+     * Overloaded variant that also considers class annotations in addition
+     * of type defaults and property annotations.
+     *
+     * @since 3.1
+     */
+    protected JsonFormat.Value findFormatOverrides(DeserializationContext ctxt,
+            BeanProperty prop, Class<?> typeForDefaults,
+            AnnotatedClass clsAnnotations)
+    {
+        // Per-property annotations have highest precedence, followed by
+        // per-typ defaults
+        JsonFormat.Value overrides = (prop == null)
+                ? ctxt.getDefaultPropertyFormat(typeForDefaults)
+                : prop.findPropertyFormat(ctxt.getConfig(), typeForDefaults);
+        if (clsAnnotations != null) {
+            // Lowest precedence for Class annotations
+            JsonFormat.Value overrides2 = ctxt.getAnnotationIntrospector()
+                    .findFormat(ctxt.getConfig(), clsAnnotations);
+            overrides = JsonFormat.Value.merge(overrides2, overrides);
+        }
+        return overrides;
+    }
+
+    /**
      * Convenience method that uses {@link #findFormatOverrides} to find possible
      * defaults and/of overrides, and then calls
      * <code>JsonFormat.Value.getFeature(feat)</code>
@@ -1855,10 +1880,22 @@ inputDesc, _coercedTypeDesc(targetType));
             BeanProperty prop, Class<?> typeForDefaults, JsonFormat.Feature feat)
     {
         JsonFormat.Value format = findFormatOverrides(ctxt, prop, typeForDefaults);
-        if (format != null) {
-            return format.getFeature(feat);
-        }
-        return null;
+        return (format == null) ? null : format.getFeature(feat);
+    }
+
+    /**
+     * Overloaded variant that also considers class annotations in addition
+     * of type defaults and property annotations.
+     *
+     * @since 3.1
+     */
+    protected Boolean findFormatFeature(DeserializationContext ctxt,
+            BeanProperty prop, Class<?> typeForDefaults,
+            AnnotatedClass clsAnnotations,
+            JsonFormat.Feature feat)
+    {
+        JsonFormat.Value format = findFormatOverrides(ctxt, prop, typeForDefaults, clsAnnotations);
+        return (format == null) ? null : format.getFeature(feat);
     }
 
     /**

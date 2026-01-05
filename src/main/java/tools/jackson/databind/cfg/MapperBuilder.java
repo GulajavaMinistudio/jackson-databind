@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -807,6 +808,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      * <li>{@link DateTimeFeature}s</li>
      * <li>{@link DeserializationFeature}s</li>
      * <li>{@link EnumFeature}s</li>
+     * <li>{@link JsonNodeFeature}s</li>
      * <li>{@link MapperFeature}s</li>
      * <li>{@link SerializationFeature}s</li>
      *  </ul>
@@ -824,6 +826,7 @@ public abstract class MapperBuilder<M extends ObjectMapper,
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .disable(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+                .enable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
                 .enable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
                 .disable(MapperFeature.DETECT_PARAMETER_NAMES) // [databind#5314]
                 .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
@@ -980,6 +983,16 @@ public abstract class MapperBuilder<M extends ObjectMapper,
         return _this();
     }
 
+    /**
+     * Method for configuring default format settings to use for serialization and deserialization.
+     *
+     * @since 3.1
+     */
+    public B defaultFormat(JsonFormat.Value format) {
+        _configOverrides.setDefaultFormat(format);
+        return _this();
+    }
+
     /*
     /**********************************************************************
     /* Changing settings, coercion config
@@ -1035,6 +1048,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
      */
     public B removeAllModules() {
         _modules = null;
+        // [databind#5481]: invalidate cached state when modules are modified
+        _savedState = null;
         return _this();
     }
 
@@ -1066,6 +1081,8 @@ public abstract class MapperBuilder<M extends ObjectMapper,
             _modules.putIfAbsent(dep.getRegistrationId(), dep);
         }
         _modules.put(moduleId, module);
+        // [databind#5481]: invalidate cached state when modules are modified
+        _savedState = null;
         return _this();
     }
 

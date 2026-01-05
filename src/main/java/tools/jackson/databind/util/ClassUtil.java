@@ -238,7 +238,10 @@ public final class ClassUtil
 
     /**
      * Helper method for detecting Java14-added {@code Record} types
+     *
+     * @deprecated Since 3.1 Just call {@code Class.isRecord()}
      */
+    @Deprecated
     public static boolean isRecordType(Class<?> cls) {
         return cls.isRecord();
     }
@@ -542,7 +545,7 @@ public final class ClassUtil
         if (str == null) {
             return forNull;
         }
-        return String.format("\"%s\"", str);
+        return "\"" + str + "\"";
     }
 
     /*

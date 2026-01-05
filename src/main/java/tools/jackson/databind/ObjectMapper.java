@@ -186,11 +186,7 @@ public class ObjectMapper
      */
 
     /**
-     * Factory used for constructing per-call {@link SerializationContext}s.
-     *<p>
-     * Note: while serializers are only exposed {@link SerializationContext},
-     * mappers and readers need to access additional API defined by
-     * {@link SerializationContextExt}
+     * Factory used for constructing per-call {@link SerializationContext} instances.
      */
     protected final SerializationContexts _serializationContexts;
 
@@ -207,7 +203,7 @@ public class ObjectMapper
      */
 
     /**
-     * Factory used for constructing per-call {@link DeserializationContext}s.
+     * Factory used for constructing per-call {@link DeserializationContext} instances.
      */
     protected final DeserializationContexts _deserializationContexts;
 
@@ -1022,7 +1018,7 @@ public class ObjectMapper
      *   expected for result type (or has other mismatch issues)
      */
     @SuppressWarnings("unchecked")
-    public final <T> T readValue(JsonParser p, ResolvedType valueType) throws JacksonException
+    public <T> T readValue(JsonParser p, ResolvedType valueType) throws JacksonException
     {
         _assertNotNull("p", p);
         return (T) _readValue(_deserializationContext(p), p, (JavaType) valueType);
@@ -2585,7 +2581,9 @@ public class ObjectMapper
             // 28-Jan-2025, tatu: [databind#4932] Need to handle this case too
             result = null;
         } else { // pointing to event other than null
-            result = ctxt.readRootValue(p, valueType, _findRootDeserializer(ctxt, valueType), null);
+            result = ctxt.readRootValue(p, valueType,
+                    _findRootDeserializer(ctxt, valueType), null);
+            ctxt.checkUnresolvedObjectId();
         }
         // Need to consume the token too
         p.clearCurrentToken();
@@ -2816,7 +2814,7 @@ public class ObjectMapper
 
     protected final void _assertNotNull(String paramName, Object src) {
         if (src == null){
-            throw new IllegalArgumentException(String.format("argument \"%s\" is null", paramName));
+            throw new IllegalArgumentException("argument \"" + paramName + "\" is null");
         }
     }
 }

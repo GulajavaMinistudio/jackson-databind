@@ -1,4 +1,4 @@
-package tools.jackson.databind.tofix;
+package tools.jackson.databind.format;
 
 import java.util.*;
 
@@ -8,9 +8,8 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
-import tools.jackson.databind.*;
+import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.testutil.DatabindTestUtil;
-import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -62,25 +61,39 @@ public class MapFormatShape5405Test extends DatabindTestUtil
     }
 
     /*
-    /**********************************************************
+    /**********************************************************************
     /* Test methods, serialization
-    /**********************************************************
+    /**********************************************************************
      */
 
-    final private ObjectMapper MAPPER = newJsonMapper();
+    private final ObjectMapper MAPPER = newJsonMapper();
 
-    // Can't yet use per-property overrides at all, see [databind#5405]
-    @JacksonTestFailureExpected
+    // [databind#5045]: property overrides for @JsonFormat.shape won't work for Maps
+    // 30-Nov-2025, tatu: Something about caching is the issue: if "b" commented out,
+    //    override appears to work; with "b" not
     @Test
-    public void testSerializeAsPOJOViaProperty() throws Exception
+    public void serializeAsPOJOViaProperty() throws Exception
     {
         String result = MAPPER.writeValueAsString(new Bean5405Container(1,0,3));
-        assertEquals(a2q("{'a':{'extra':13,'empty':false},'c':{'empty':false,'value':3}}"),
+        assertEquals(a2q(
+                "{'a':{'extra':13,'empty':false},'c':{'extra':13,'empty':false}}"),
+                result);
+    }
+
+    // [databind#5405]:
+    // 01-Dec-2025, JacksonJang: In this case, the @JsonFormat(shape = POJO) override
+    // behaves correctly even with b included.
+    @Test
+    public void serializeAsPOJOViaFullProperty() throws Exception
+    {
+        String result = MAPPER.writeValueAsString(new Bean5405Container(1,2,3));
+        assertEquals(a2q(
+                "{'a':{'extra':13,'empty':false},'b':{'value':2},'c':{'extra':13,'empty':false}}"),
                 result);
     }
 
     @Test
-    public void testSerializeNaturalViaOverride() throws Exception
+    public void serializeNaturalViaOverride() throws Exception
     {
         String result = MAPPER.writeValueAsString(new Bean5405Override(123));
         assertEquals(a2q("{'stuff':{'value':123}}"),

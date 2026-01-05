@@ -139,7 +139,7 @@ public abstract class BeanDeserializerBase
     protected final Set<String> _ignorableProps;
 
     /**
-     * Keep track of the the properties that needs to be specifically included.
+     * Keep track of the properties that need to be specifically included.
      */
     protected final Set<String> _includableProps;
 
@@ -551,7 +551,7 @@ public abstract class BeanDeserializerBase
                         unwrapped = new UnwrappedPropertyHandler();
                     }
 
-                    if (prop instanceof CreatorProperty) {
+                    if (prop.isCreatorProperty()) {
                         unwrapped.addCreatorProperty(prop);
                     } else {
                         unwrapped.addProperty(prop);
@@ -635,9 +635,12 @@ ClassUtil.getTypeDescription(_beanType), ClassUtil.classNameOf(_valueInstantiato
             _nonStandardCreation = true;
         }
 
-        _unwrappedPropertyHandler = unwrapped;
         if (unwrapped != null) { // we consider this non-standard, to offline handling
             _nonStandardCreation = true;
+            // [databind#650]: Initialize unwrapped property names for hasUnwrappedProperty()
+            _unwrappedPropertyHandler = unwrapped.initializeUnwrappedPropertyNames();
+        } else {
+            _unwrappedPropertyHandler = null;
         }
         // may need to disable vanilla processing, if unwrapped handling was enabled...
         _vanillaProcessing = _vanillaProcessing && !_nonStandardCreation;
@@ -1132,12 +1135,44 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         return _objectIdReader;
     }
 
+    /**
+     * Accessor for checking if the POJO handled by this deserializer has given
+     *    physical property (regular or unwrapped, not including
+     *    "any properties".
+     *
+     * @param propertyName Property to check
+     *
+     * @return True if the POJO handled by this deserializer has given
+     *    physical property (regular or unwrapped); not including
+     *    "any properties"
+     */
     public boolean hasProperty(String propertyName) {
-        return _beanProperties.findDefinition(propertyName) != null;
+        // normal properties
+        if (_beanProperties.findDefinition(propertyName) != null) {
+            return true;
+        }
+        // 19-Dec-2025: [databind#650] Check unwrapped properties too.
+        if (_unwrappedPropertyHandler != null) {
+            if (_unwrappedPropertyHandler.hasUnwrappedProperty(propertyName)) {
+                return true;
+            }
+        }
+        // 19-Dec-2025: [databind#650] but should "any-setter" be considered too?
+        // if (_anySetter != null) {
+        //     return true;
+        // }
+        return false;
     }
 
     public boolean hasViews() {
         return _needViewProcesing;
+    }
+
+    /**
+     * @since 3.1
+     */
+    public boolean hasAnySetter() {
+        return _anySetter != null;
     }
 
     /**
@@ -1149,7 +1184,7 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
 
     @Override
     public Collection<Object> getKnownPropertyNames() {
-        ArrayList<Object> names = new ArrayList<Object>();
+        ArrayList<Object> names = new ArrayList<>();
         for (SettableBeanProperty prop : _beanProperties) {
             names.add(prop.getName());
         }
@@ -1162,6 +1197,23 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
         }
         */
         return names;
+    }
+
+    /**
+     * Method to collect all property names including nested unwrapped properties
+     *
+     * @param names (not null) Set to add property names to; for both regular
+     *   and "any" properties.
+     *
+     * @since 3.1
+     */
+    public void collectAllPropertyNamesTo(Set<String> names) {
+        for (SettableBeanProperty prop : _beanProperties) {
+            names.add(prop.getName());
+        }
+        if (_unwrappedPropertyHandler != null) {
+            _unwrappedPropertyHandler.collectUnwrappedPropertyNamesTo(names);
+        }
     }
 
     @Override
@@ -1202,7 +1254,6 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
 
     public SettableBeanProperty findProperty(PropertyName propertyName)
     {
-        // TODO: start matching full name?
         return findProperty(propertyName.getSimpleName());
     }
 
@@ -1210,6 +1261,8 @@ ClassUtil.name(refName), ClassUtil.getTypeDescription(backRefType),
      * Accessor for finding the property with given name, if POJO
      * has one. Name used is the external name, i.e. name used
      * in external data representation (JSON).
+     *<p>
+     * NOTE: does NOT match "unwrapped" properties POJO contains (if any).
      */
     protected SettableBeanProperty findProperty(String propertyName)
     {

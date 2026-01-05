@@ -28,12 +28,27 @@ Project: jackson-databind
  (fix by @cowtowncoder, w/ Claude code)
 #5413: Add/support forward reference resolution for array values
  (contributed by Hélios G)
+#5429: Formatting and Parsing of Large ISO-8601 Dates is inconsistent
+ (reported by @DavTurns)
+#5475: Support `@JsonDeserializeAs` annotation
+ (implemented by @cowtowncoder, w/ Claude code)
+#5476: Support `@JsonSerializeAs` annotation
+ (implemented by @cowtowncoder, w/ Claude code)
+#5541: Add missing `@JsonIdentityInfo` handling for implicit arrays with
+  `DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY`
+ (contributed by Moritz R)
+#5542: `ObjectReader.readValue()` does not fail when
+  `DeserializationFeature.FAIL_ON_UNRESOLVED_OBJECT_IDS` enabled
+ (implemented by @cowtowncoder, w/ Claude code)
 
 2.20.2 (not yet released)
 
 #5393: `@JsonAnyGetter` property gets included in generated schema since 2.19.0
  (reported by @victor-noel-pfx)
  (fix by Joo-Hyuk K)
+#5537: Add missing `@JsonIdentityInfo` handling for implicit `Collection`s with
+  `DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY`
+ (contributed by Moritz R)
 
 2.20.1 (30-Oct-2025)
 
