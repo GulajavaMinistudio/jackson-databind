@@ -14,6 +14,7 @@ import tools.jackson.core.SerializableString;
 import tools.jackson.core.io.SerializedString;
 import tools.jackson.databind.*;
 import tools.jackson.databind.annotation.JacksonStdImpl;
+import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.*;
 import tools.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import tools.jackson.databind.jsontype.TypeSerializer;
@@ -428,6 +429,25 @@ public class BeanPropertyWriter
     @Override
     public AnnotatedMember getMember() {
         return _member;
+    }
+
+    @Override
+    public JsonInclude.Value findPropertyInclusion(MapperConfig<?> config, Class<?> baseType)
+    {
+        AnnotatedMember member = getMember();
+        if (member == null) {
+            return config.getDefaultPropertyInclusion(baseType);
+        }
+        JsonInclude.Value v0 = config.getDefaultInclusion(baseType, member.getRawType());
+        AnnotationIntrospector intr = config.getAnnotationIntrospector();
+        if (intr == null) {
+            return v0;
+        }
+        JsonInclude.Value v = intr.findPropertyInclusion(config, member);
+        if (v0 == null) {
+            return v;
+        }
+        return v0.withOverrides(v);
     }
 
     protected void _depositSchemaProperty(ObjectNode propertiesNode,

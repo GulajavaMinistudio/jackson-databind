@@ -2,8 +2,11 @@ package tools.jackson.databind.ser.jdk;
 
 import java.lang.annotation.Annotation;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.*;
+import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.introspect.AnnotatedMember;
 import tools.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 import tools.jackson.databind.jsontype.TypeSerializer;
@@ -76,6 +79,12 @@ public class MapProperty extends PropertyWriter
     @Override
     public <A extends Annotation> A getContextAnnotation(Class<A> acls) {
         return _property.getContextAnnotation(acls);
+    }
+
+    @Override
+    public JsonInclude.Value findPropertyInclusion(MapperConfig<?> config, Class<?> baseType) {
+        // Not needed with this virtual wrapping; could add if needed
+        return JsonInclude.Value.empty();
     }
 
     @Override
