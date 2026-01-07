@@ -17,10 +17,10 @@ public class PropertyBuilder
 {
     private final static Object NO_DEFAULT_MARKER = Boolean.FALSE;
 
-    final protected SerializationConfig _config;
-    final protected BeanDescription _beanDesc;
+    protected final SerializationConfig _config;
+    protected final BeanDescription _beanDesc;
 
-    final protected AnnotationIntrospector _annotationIntrospector;
+    protected final AnnotationIntrospector _annotationIntrospector;
 
     /**
      * If a property has serialization inclusion value of
@@ -39,13 +39,13 @@ public class PropertyBuilder
      * per-property basis. Combines global inclusion defaults and
      * per-type (annotation and type-override) inclusion overrides.
      */
-    final protected JsonInclude.Value _defaultInclusion;
+    protected final JsonInclude.Value _defaultInclusion;
 
     /**
      * Marker flag used to indicate that "real" default values are to be used
      * for properties, as per per-type value inclusion of type <code>NON_DEFAULT</code>
      */
-    final protected boolean _useRealPropertyDefaults;
+    protected final boolean _useRealPropertyDefaults;
 
     public PropertyBuilder(SerializationConfig config, BeanDescription beanDesc)
     {
@@ -214,7 +214,6 @@ public class PropertyBuilder
         case ALWAYS: // default
         default:
             // we may still want to suppress empty collections
-            @SuppressWarnings("deprecation")
             final SerializationFeature emptyJsonArrays = SerializationFeature.WRITE_EMPTY_JSON_ARRAYS;
             if (actualType.isContainerType() && !_config.isEnabled(emptyJsonArrays)) {
                 valueToSuppress = BeanPropertyWriter.MARKER_FOR_EMPTY;
@@ -274,14 +273,14 @@ public class PropertyBuilder
     {
         JavaType secondary = _annotationIntrospector.refineSerializationType(_config, a, declaredType);
 
-        // 11-Oct-2015, tatu: As of 2.7, not 100% sure following checks are needed. But keeping
-        //    for now, just in case
+        // 11-Oct-2015, tatu: As of 2.7, not 100% sure following checks are needed.
+        //    But keeping for now, just in case
         if (secondary != declaredType) {
             Class<?> serClass = secondary.getRawClass();
             // Must be a super type to be usable
             Class<?> rawDeclared = declaredType.getRawClass();
             if (serClass.isAssignableFrom(rawDeclared)) {
-                // fine as is
+                ; // fine as is
             } else {
                 /* 18-Nov-2010, tatu: Related to fixing [JACKSON-416], an issue with such
                  *   check is that for deserialization more specific type makes sense;
@@ -323,9 +322,8 @@ public class PropertyBuilder
     {
         Object def = _defaultBean;
         if (def == null) {
-            /* If we can fix access rights, we should; otherwise non-public
-             * classes or default constructor will prevent instantiation
-             */
+            // If we can fix access rights, we should; otherwise non-public
+            // classes or default constructor will prevent instantiation
             def = _beanDesc.instantiateBean(_config.canOverrideAccessModifiers());
             if (def == null) {
                 // 06-Nov-2015, tatu: As per [databind#998], do not fail.
