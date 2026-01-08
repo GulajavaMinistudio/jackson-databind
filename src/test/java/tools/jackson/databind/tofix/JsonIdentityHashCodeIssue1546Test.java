@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.*;
 
 import tools.jackson.databind.*;
 import tools.jackson.databind.testutil.DatabindTestUtil;
+import tools.jackson.databind.testutil.failure.JacksonTestFailureExpected;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -156,7 +157,7 @@ public class JsonIdentityHashCodeIssue1546Test extends DatabindTestUtil
         // Find a product that should be in the order
         Product someProduct = deserializedOrder.getItems().iterator().next();
 
-        // THIS IS THE BUG: contains() returns false even though the product is in the set
+        // Would fail if: contains() returns false even though the product is in the set
         // because the product was added to the HashSet with a different hashCode
         // (before its id field was properly set from JSON)
         assertTrue(deserializedOrder.getItems().contains(someProduct),
@@ -167,7 +168,7 @@ public class JsonIdentityHashCodeIssue1546Test extends DatabindTestUtil
             .anyMatch(p -> p.equals(someProduct)),
             "Stream-based equality check works");
 
-        // THIS ALSO FAILS: remove() doesn't work
+        // Could also fail
         Set<Product> itemsCopy = new HashSet<>(deserializedOrder.getItems());
         assertTrue(itemsCopy.remove(someProduct),
             "Should be able to remove product from HashSet - but fails due to hashCode corruption");
@@ -233,6 +234,7 @@ public class JsonIdentityHashCodeIssue1546Test extends DatabindTestUtil
     // This test currently FAILS, demonstrating the bug
     // Child objects are added to HashSet before parent back-reference is set,
     // causing hashCode to change after insertion
+    @JacksonTestFailureExpected
     @Test
     public void testHashSetCorruptionWithBackReferences() throws Exception
     {
