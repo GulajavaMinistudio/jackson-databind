@@ -178,11 +178,9 @@ public class BeanPropertyWriter
     protected final Class<?>[] _includeInViews;
 
     /**
-     * Inclusion settings for this property, pre-computed in PropertyBuilder
+     * Inclusion settings for this property, pre-computed in {@code PropertyBuilder}
      * by merging global defaults, type defaults, and property-level annotations,
      * including contextual annotations from the enclosing class.
-     * If non-null, will be returned by {@link #findPropertyInclusion} instead
-     * of dynamically re-computing inclusion settings.
      *
      * @since 3.1
      */
@@ -251,7 +249,7 @@ public class BeanPropertyWriter
         // this will be resolved later on, unless nulls are to be suppressed
         _nullSerializer = null;
         _includeInViews = includeInViews;
-        _inclusion = inclusion;
+        _inclusion = (inclusion == null) ? JsonInclude.Value.empty() : inclusion;
     }
 
     /**
