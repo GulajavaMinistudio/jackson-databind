@@ -163,12 +163,12 @@ public abstract class ArraySerializerBase<T>
         typeSer.writeTypeSuffix(g, ctxt, typeIdDef);
     }
 
-    protected abstract void serializeContents(T value, JsonGenerator jgen, SerializationContext provider)
+    protected abstract void serializeContents(T value, JsonGenerator g, SerializationContext ctxt)
         throws JacksonException;
 
-    protected final boolean _shouldUnwrapSingle(SerializationContext provider) {
+    protected final boolean _shouldUnwrapSingle(SerializationContext ctxt) {
         if (_unwrapSingle == null) {
-            return provider.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED);
+            return ctxt.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED);
         }
         return _unwrapSingle.booleanValue();
     }
