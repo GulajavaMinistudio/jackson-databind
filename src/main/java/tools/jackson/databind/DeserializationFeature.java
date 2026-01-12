@@ -434,13 +434,17 @@ public enum DeserializationFeature implements ConfigFeature
     ACCEPT_EMPTY_STRING_AS_NULL_OBJECT(false),
 
     /**
-     * Feature that can be enabled to allow empty JSON Array
-     * value (that is, {@code [ ]} to be bound to POJOs as Java {@code null}.
-     * If disabled, standard POJOs can only be bound from JSON {@code null} or
-     * JSON Object (standard meaning that no custom deserializers or
-     * constructors are defined, both of which can add support for other
-     * kinds of JSON values); if enabled, empty JSON Array will be taken
-     * to be equivalent of JSON {@code null}.
+     * Legacy feature that can be enabled to allow empty JSON Array
+     * value (that is, {@code [ ]} to be bound to Java {@code null} for
+     * target types like POJOs, {@link java.util.Map}s, {@link java.lang.String}s
+     * and scalar (non-structured) types such as {@code java.lang.Number}s.
+     * If disabled, such values can only be bound from empty JSON Arrays
+     * if JSON Arrays bound "naturally" as is the case for Java Arrays
+     * and {@link java.util.Collection}s.
+     *<p>
+     * NOTE: in Jackson 2.12 and above, this is considered "legacy" feature because
+     * there is more granular system for allowing coercions like this: see
+     * {@link MapperBuilder#withCoercionConfig} for more information.
      *<p>
      * Feature is disabled by default.
      */
