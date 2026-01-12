@@ -435,10 +435,10 @@ public enum DeserializationFeature implements ConfigFeature
 
     /**
      * Feature that can be enabled to allow empty JSON Array
-     * value (that is, {@code [ ]} to be bound to POJOs {@code null}.
+     * value (that is, {@code [ ]} to be bound to POJOs as Java {@code null}.
      * If disabled, standard POJOs can only be bound from JSON {@code null} or
      * JSON Object (standard meaning that no custom deserializers or
-     * constructors are defined; both of which can add support for other
+     * constructors are defined, both of which can add support for other
      * kinds of JSON values); if enabled, empty JSON Array will be taken
      * to be equivalent of JSON {@code null}.
      *<p>
