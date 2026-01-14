@@ -36,6 +36,10 @@ Versions: 3.x (for earlier see VERSION-2.x)
  (fix by @cowtowncoder, @JacksonJang)
 #1980: Add method `remove(JsonPointer)` in `ContainerNode`
  (fix by @cowtowncoder, w/ Claude code)
+#2124: Allow coercion of '[ ]' into empty/null String with
+  `ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT`
+ (reported by Ulf A)
+ (fix by @cowtowncoder, w/ Claude code)
 #2438: Prevent use of setter/field in case Creator property
   already exists, duplicate value seen
 #2686: `@JsonBackReference` does not work with a builder
@@ -117,6 +121,12 @@ Versions: 3.x (for earlier see VERSION-2.x)
  (contributed by Moritz R)
 #5542: `ObjectReader.readValue()` does not fail when
   `DeserializationFeature.FAIL_ON_UNRESOLVED_OBJECT_IDS` enabled
+ (implemented by @cowtowncoder, w/ Claude code)
+#5570: Add `MapperFeature.WRAPPERS_DEFAULT_TO_NULL` to allow configuring
+  `JsonInclude.Include.NON_DEFAULT` default for primitive wrapper types to be `null`,
+  not wrapped default of primitive
+#5575: Allow configuring a default serialization and deserialization view (3.x)
+ (requested by Réda H-A)
  (implemented by @cowtowncoder, w/ Claude code)
 
 3.0.4 (not yet released)
